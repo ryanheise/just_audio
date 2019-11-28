@@ -10,16 +10,27 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 public class AudioPlayerPlugin implements MethodCallHandler {
   /** Plugin registration. */
   public static void registerWith(Registrar registrar) {
-    final MethodChannel channel = new MethodChannel(registrar.messenger(), "audio_player");
-    channel.setMethodCallHandler(new AudioPlayerPlugin());
+    final MethodChannel channel = new MethodChannel(registrar.messenger(), "com.ryanheise.audio_player.methods");
+    channel.setMethodCallHandler(new AudioPlayerPlugin(registrar));
   }
+
+	private Registrar registrar;
+
+	public AudioPlayerPlugin(Registrar registrar) {
+		this.registrar = registrar;
+	}
 
   @Override
   public void onMethodCall(MethodCall call, Result result) {
-    if (call.method.equals("getPlatformVersion")) {
-      result.success("Android " + android.os.Build.VERSION.RELEASE);
-    } else {
-      result.notImplemented();
-    }
+		switch (call.method) {
+		case "init":
+			long id = (Long)call.arguments;
+			new AudioPlayer(registrar, id);
+			result.success(null);
+			break;
+		default:
+			result.notImplemented();
+			break;
+		}
   }
 }

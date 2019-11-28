@@ -1,14 +1,12 @@
 # audio_player
 
-A new flutter plugin project.
+A new Flutter audio player plugin designed to support background playback with [audio_service](https://pub.dev/packages/audio_service)
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/developing-packages/),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+* Plays audio from streams, files and assets.
+* Broadcasts state changes helpful in streaming apps such as `buffering` and `connecting` in addition to the typical `playing`, `paused` and `stopped` states.
+* Control audio playback via standard operations: play, pause, stop, setVolume, seek.
+* Compatible with [audio_service](https://pub.dev/packages/audio_service) to support full background playback, queue management, and controlling playback from the lock screen, notifications and headset buttons.
 
-For help getting started with Flutter, view our 
-[online documentation](https://flutter.dev/docs), which offers tutorials, 
-samples, guidance on mobile development, and a full API reference.
+The initial release is for Android. iOS is the next priority.

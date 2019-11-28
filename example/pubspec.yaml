@@ -2,9 +2,6 @@ name: audio_player_example
 description: Demonstrates how to use the audio_player plugin.
 publish_to: 'none'
 
-environment:
-  sdk: ">=2.1.0 <3.0.0"
-
 dependencies:
   flutter:
     sdk: flutter

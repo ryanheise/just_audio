@@ -1,13 +1,16 @@
 name: audio_player
-description: A new flutter plugin project.
+description: Flutter plugin to play audio from streams, files and assets. Works with audio_service to play audio in the background.
 version: 0.0.1
-author:
-homepage:
+author: Ryan Heise <ryan@ryanheise.com>
+homepage: https://pub.dev/packages/audio_service
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
 
 dependencies:
+  rxdart: ^0.22.6
+  path: ^1.6.4
+  path_provider: ^1.4.5
   flutter:
     sdk: flutter
 

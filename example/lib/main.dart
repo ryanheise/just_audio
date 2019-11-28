@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -12,32 +14,19 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
+  final AudioPlayer _player = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    _player.setUrl(
+        "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3");
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      platformVersion = await AudioPlayer.platformVersion;
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
-    });
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
   }
 
   @override
@@ -45,12 +34,121 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('Audio Player Demo'),
         ),
         body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text("Science Friday"),
+              Text("Science Friday and WNYC Studios"),
+              StreamBuilder<AudioPlaybackState>(
+                stream: _player.playbackStateStream,
+                builder: (context, snapshot) {
+                  final state = snapshot.data;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (state == AudioPlaybackState.playing)
+                        IconButton(
+                          icon: Icon(Icons.pause),
+                          iconSize: 64.0,
+                          onPressed: _player.pause,
+                        )
+                      else if (state == AudioPlaybackState.buffering ||
+                          state == AudioPlaybackState.connecting)
+                        Container(
+                          margin: EdgeInsets.all(8.0),
+                          width: 64.0,
+                          height: 64.0,
+                          child: CircularProgressIndicator(),
+                        )
+                      else
+                        IconButton(
+                          icon: Icon(Icons.play_arrow),
+                          iconSize: 64.0,
+                          onPressed: _player.play,
+                        ),
+                      IconButton(
+                        icon: Icon(Icons.stop),
+                        iconSize: 64.0,
+                        onPressed: state == AudioPlaybackState.stopped ||
+                                state == AudioPlaybackState.none
+                            ? null
+                            : _player.stop,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              StreamBuilder<Duration>(
+                stream: _player.durationStream,
+                builder: (context, snapshot) {
+                  final duration = snapshot.data ?? Duration.zero;
+                  return StreamBuilder<Duration>(
+                    stream: _player.getPositionStream(),
+                    builder: (context, snapshot) {
+                      final position = snapshot.data ?? Duration.zero;
+                      return SeekBar(
+                        duration: duration,
+                        position: position,
+                        onChangeEnd: (newPosition) {
+                          _player.seek(newPosition);
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class SeekBar extends StatefulWidget {
+  final Duration duration;
+  final Duration position;
+  final ValueChanged<Duration> onChanged;
+  final ValueChanged<Duration> onChangeEnd;
+
+  SeekBar({
+    @required this.duration,
+    @required this.position,
+    this.onChanged,
+    this.onChangeEnd,
+  });
+
+  @override
+  _SeekBarState createState() => _SeekBarState();
+}
+
+class _SeekBarState extends State<SeekBar> {
+  double _dragValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Slider(
+      min: 0.0,
+      max: widget.duration.inMilliseconds.toDouble(),
+      value: _dragValue ?? widget.position.inMilliseconds.toDouble(),
+      onChanged: (value) {
+        setState(() {
+          _dragValue = value;
+        });
+        if (widget.onChanged != null) {
+          widget.onChanged(Duration(milliseconds: value.round()));
+        }
+      },
+      onChangeEnd: (value) {
+        _dragValue = null;
+        if (widget.onChangeEnd != null) {
+          widget.onChangeEnd(Duration(milliseconds: value.round()));
+        }
+      },
     );
   }
 }
