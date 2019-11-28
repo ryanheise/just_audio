@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'package:audio_player/audio_player.dart';
+import 'package:just_audio/just_audio.dart';
 
 void main() => runApp(MyApp());
 

@@ -45,11 +45,11 @@ import 'package:rxdart/rxdart.dart';
 /// whatever state the player was in prior to the seek request.
 class AudioPlayer {
   static final _mainChannel =
-      MethodChannel('com.ryanheise.audio_player.methods');
+      MethodChannel('com.ryanheise.just_audio.methods');
 
   static Future<MethodChannel> _createChannel(int id) async {
     await _mainChannel.invokeMethod('init', id);
-    return MethodChannel('com.ryanheise.audio_player.methods.$id');
+    return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
   final Future<MethodChannel> _channel;
@@ -75,7 +75,7 @@ class AudioPlayer {
       AudioPlayer._internal(DateTime.now().microsecondsSinceEpoch);
 
   AudioPlayer._internal(this._id) : _channel = _createChannel(_id) {
-    _eventChannelStream = EventChannel('com.ryanheise.audio_player.events.$_id')
+    _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
         .map((data) => _audioPlayerState = AudioPlayerState(
               state: AudioPlaybackState.values[data[0]],
@@ -136,7 +136,7 @@ class AudioPlayer {
     return await setFilePath(file.path);
   }
 
-  Future<File> get _cacheFile async => File(p.join((await getTemporaryDirectory()).path, 'audio_player_asset_cache', '$_id'));
+  Future<File> get _cacheFile async => File(p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
 
   /// Plays the currently loaded media from the current position. It is legal
   /// to invoke this method only from one of the following states:

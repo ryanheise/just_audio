@@ -1,5 +1,5 @@
-name: audio_player_example
-description: Demonstrates how to use the audio_player plugin.
+name: just_audio_example
+description: Demonstrates how to use the just_audio plugin.
 publish_to: 'none'
 
 dependencies:
@@ -14,7 +14,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  audio_player:
+  just_audio:
     path: ../
 
 # For information on the generic Dart part of this file, see the

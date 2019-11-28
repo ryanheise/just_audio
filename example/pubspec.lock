@@ -8,7 +8,7 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.3.0"
-  audio_player:
+  just_audio:
     dependency: "direct dev"
     description:
       path: ".."

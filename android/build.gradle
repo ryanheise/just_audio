@@ -1,4 +1,4 @@
-group 'com.ryanheise.audio_player'
+group 'com.ryanheise.just_audio'
 version '1.0'
 
 buildscript {

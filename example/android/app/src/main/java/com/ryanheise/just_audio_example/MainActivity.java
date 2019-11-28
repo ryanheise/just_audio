@@ -1,4 +1,4 @@
-package com.ryanheise.audio_player_example;
+package com.ryanheise.just_audio_example;
 
 import android.os.Bundle;
 import io.flutter.app.FlutterActivity;

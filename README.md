@@ -1,4 +1,4 @@
-# audio_player
+# just_audio
 
 A new Flutter audio player plugin designed to support background playback with [audio_service](https://pub.dev/packages/audio_service)
 

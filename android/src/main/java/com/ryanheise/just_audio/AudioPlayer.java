@@ -1,4 +1,4 @@
-package com.ryanheise.audio_player;
+package com.ryanheise.just_audio;
 
 import android.media.MediaPlayer;
 import android.media.MediaTimestamp;
@@ -45,9 +45,9 @@ public class AudioPlayer implements MethodCallHandler, MediaPlayer.OnCompletionL
 	public AudioPlayer(final Registrar registrar, final long id) {
 		this.registrar = registrar;
 		this.id = id;
-		methodChannel = new MethodChannel(registrar.messenger(), "com.ryanheise.audio_player.methods." + id);
+		methodChannel = new MethodChannel(registrar.messenger(), "com.ryanheise.just_audio.methods." + id);
 		methodChannel.setMethodCallHandler(this);
-		eventChannel = new EventChannel(registrar.messenger(), "com.ryanheise.audio_player.events." + id);
+		eventChannel = new EventChannel(registrar.messenger(), "com.ryanheise.just_audio.events." + id);
 		eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
 			@Override
 			public void onListen(final Object arguments, final EventSink eventSink) {

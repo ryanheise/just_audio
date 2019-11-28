@@ -1,6 +1,6 @@
-# audio_player_example
+# just_audio_example
 
-Demonstrates how to use the audio_player plugin.
+Demonstrates how to use the just_audio plugin.
 
 ## Getting Started
 
