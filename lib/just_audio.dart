@@ -12,13 +12,13 @@ import 'package:rxdart/rxdart.dart';
 /// ```
 /// final player = AudioPlayer();
 /// await player.setUrl('https://foo.com/bar.mp3');
-/// await player.play();
+/// player.play();
 /// await player.pause();
 /// await player.play(untilPosition: Duration(minutes: 1));
 /// await player.stop()
 /// await player.setUrl('https://foo.com/baz.mp3');
 /// await player.seek(Duration(minutes: 5));
-/// await player.play();
+/// player.play();
 /// await player.stop();
 /// await player.dispose();
 /// ```
@@ -40,12 +40,11 @@ import 'package:rxdart/rxdart.dart';
 /// during normal playback when the next buffer is not ready to be played.
 /// * [AudioPlaybackState.connecting]: immediately after [setUrl],
 /// [setFilePath] and [setAsset] while waiting for the media to load.
-/// 
+///
 /// Additionally, after a [seek] request completes, the state will return to
 /// whatever state the player was in prior to the seek request.
 class AudioPlayer {
-  static final _mainChannel =
-      MethodChannel('com.ryanheise.just_audio.methods');
+  static final _mainChannel = MethodChannel('com.ryanheise.just_audio.methods');
 
   static Future<MethodChannel> _createChannel(int id) async {
     await _mainChannel.invokeMethod('init', '$id');
@@ -123,7 +122,8 @@ class AudioPlayer {
   }
 
   /// Loads audio media from a file and returns the duration of that audio.
-  Future<Duration> setFilePath(final String filePath) => setUrl('file://$filePath');
+  Future<Duration> setFilePath(final String filePath) =>
+      setUrl('file://$filePath');
 
   /// Loads audio media from an asset and returns the duration of that audio.
   Future<Duration> setAsset(final String assetPath) async {
@@ -131,12 +131,13 @@ class AudioPlayer {
     if (!file.existsSync()) {
       await file.create(recursive: true);
     }
-    await file.writeAsBytes(
-        (await rootBundle.load(assetPath)).buffer.asUint8List());
+    await file
+        .writeAsBytes((await rootBundle.load(assetPath)).buffer.asUint8List());
     return await setFilePath(file.path);
   }
 
-  Future<File> get _cacheFile async => File(p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
+  Future<File> get _cacheFile async => File(p.join(
+      (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
 
   /// Plays the currently loaded media from the current position. It is legal
   /// to invoke this method only from one of the following states:
@@ -209,9 +210,11 @@ class AudioPlayer {
 class AudioPlayerState {
   /// The current playback state.
   final AudioPlaybackState state;
+
   /// When the last time a position discontinuity happened, as measured in time
   /// since the epoch.
   final Duration updateTime;
+
   /// The position at [updateTime].
   final Duration updatePosition;
 
