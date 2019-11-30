@@ -1,17 +1,31 @@
 #import "JustAudioPlugin.h"
+#import "AudioPlayer.h"
+#import "AudioPlayer.h"
 
-@implementation JustAudioPlugin
+@implementation JustAudioPlugin {
+  NSObject<FlutterPluginRegistrar>* _registrar;
+}
+
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   FlutterMethodChannel* channel = [FlutterMethodChannel
-      methodChannelWithName:@"just_audio"
-            binaryMessenger:[registrar messenger]];
-  JustAudioPlugin* instance = [[JustAudioPlugin alloc] init];
+    methodChannelWithName:@"com.ryanheise.just_audio.methods"
+          binaryMessenger:[registrar messenger]];
+  JustAudioPlugin* instance = [[JustAudioPlugin alloc] initWithRegistrar:registrar];
   [registrar addMethodCallDelegate:instance channel:channel];
 }
 
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar {
+  self = [super init];
+  NSAssert(self, @"super init cannot be nil");
+  _registrar = registrar;
+  return self;
+}
+
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-  if ([@"getPlatformVersion" isEqualToString:call.method]) {
-    result([@"iOS " stringByAppendingString:[[UIDevice currentDevice] systemVersion]]);
+  if ([@"init" isEqualToString:call.method]) {
+    NSString* playerId = call.arguments;
+    AudioPlayer* player = [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId];
+    result(nil);
   } else {
     result(FlutterMethodNotImplemented);
   }

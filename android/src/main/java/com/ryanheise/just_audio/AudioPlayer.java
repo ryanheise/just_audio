@@ -34,7 +34,7 @@ public class AudioPlayer implements MethodCallHandler, MediaPlayer.OnCompletionL
 		}
 	};
 
-	private final long id;
+	private final String id;
 	private final MediaPlayer player;
 	private PlaybackState state;
 	private PlaybackState stateBeforeSeek;
@@ -42,7 +42,7 @@ public class AudioPlayer implements MethodCallHandler, MediaPlayer.OnCompletionL
 	private int updatePosition;
 	private Integer seekPos;
 
-	public AudioPlayer(final Registrar registrar, final long id) {
+	public AudioPlayer(final Registrar registrar, final String id) {
 		this.registrar = registrar;
 		this.id = id;
 		methodChannel = new MethodChannel(registrar.messenger(), "com.ryanheise.just_audio.methods." + id);

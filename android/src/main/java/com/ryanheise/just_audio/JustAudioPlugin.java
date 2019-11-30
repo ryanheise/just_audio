@@ -24,7 +24,7 @@ public class JustAudioPlugin implements MethodCallHandler {
   public void onMethodCall(MethodCall call, Result result) {
 		switch (call.method) {
 		case "init":
-			long id = (Long)call.arguments;
+			String id = (String)call.arguments;
 			new AudioPlayer(registrar, id);
 			result.success(null);
 			break;

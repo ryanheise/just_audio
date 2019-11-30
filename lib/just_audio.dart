@@ -48,7 +48,7 @@ class AudioPlayer {
       MethodChannel('com.ryanheise.just_audio.methods');
 
   static Future<MethodChannel> _createChannel(int id) async {
-    await _mainChannel.invokeMethod('init', id);
+    await _mainChannel.invokeMethod('init', '$id');
     return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
