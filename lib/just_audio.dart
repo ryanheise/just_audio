@@ -90,10 +90,6 @@ class AudioPlayer {
         _eventChannelStream.listen(_playbackEventSubject.add);
     _playbackStateSubject
         .addStream(playbackEventStream.map((state) => state.state).distinct());
-
-    playbackEventStream.listen((state) {
-      print("state: $state");
-    });
   }
 
   /// The duration of any media set via [setUrl], [setFilePath] or [setAsset],
