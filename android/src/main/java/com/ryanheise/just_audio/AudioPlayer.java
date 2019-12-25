@@ -96,7 +96,7 @@ public class AudioPlayer implements MethodCallHandler {
 		final long drift = position - expectedPosition;
 		// Update if we've drifted or just started observing
 		if (updateTime == 0L) {
-			broadcastPlayerState();
+			broadcastPlaybackEvent();
 		} else if (drift < -100) {
 			System.out.println("time discontinuity detected: " + drift);
 			transition(PlaybackState.buffering);
@@ -152,7 +152,7 @@ public class AudioPlayer implements MethodCallHandler {
 		}
 	}
 
-	private void broadcastPlayerState() {
+	private void broadcastPlaybackEvent() {
 		final ArrayList<Object> event = new ArrayList<Object>();
 		event.add(state.ordinal());
 		event.add(updatePosition = getCurrentPosition());
@@ -179,7 +179,7 @@ public class AudioPlayer implements MethodCallHandler {
 		if (oldState != PlaybackState.playing && newState == PlaybackState.playing) {
 			startObservingPosition();
 		}
-		broadcastPlayerState();
+		broadcastPlaybackEvent();
 	}
 
 	private void bgTransition(final PlaybackState newState) {
@@ -319,7 +319,7 @@ public class AudioPlayer implements MethodCallHandler {
 		if (sonic != null) {
 			sonic.setSpeed(speed);
 		}
-		broadcastPlayerState();
+		broadcastPlaybackEvent();
 	}
 
 	// TODO: Test whether this times out the MediaCodec on Ogg files.

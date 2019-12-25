@@ -99,7 +99,7 @@
 	long long drift = position - expectedPosition;
 	// Update if we've drifted or just started observing
 	if (_updateTime == 0L) {
-		[self broadcastPlayerState];
+		[self broadcastPlaybackEvent];
 	} else if (drift < -100) {
 		NSLog(@"time discontinuity detected: %lld", drift);
 		[self setPlaybackState:buffering];
@@ -108,7 +108,7 @@
 	}
 }
 
-- (void)broadcastPlayerState {
+- (void)broadcastPlaybackEvent {
 	long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 	_updatePosition = [self getCurrentPosition];
 	_updateTime = now;
@@ -140,7 +140,7 @@
 	/* if (oldState != playing && state == playing) { */
 	/* 	[self startObservingPosition]; */
 	/* } */
-	[self broadcastPlayerState];
+	[self broadcastPlaybackEvent];
 }
 
 - (void)setUrl:(NSString*)url result:(FlutterResult)result {

@@ -59,13 +59,13 @@ class AudioPlayer {
 
   final _durationSubject = BehaviorSubject<Duration>();
 
-  AudioPlayerState _audioPlayerState;
+  AudioPlaybackEvent _audioPlaybackEvent;
 
-  Stream<AudioPlayerState> _eventChannelStream;
+  Stream<AudioPlaybackEvent> _eventChannelStream;
 
-  StreamSubscription<AudioPlayerState> _eventChannelStreamSubscription;
+  StreamSubscription<AudioPlaybackEvent> _eventChannelStreamSubscription;
 
-  final _playerStateSubject = BehaviorSubject<AudioPlayerState>();
+  final _playbackEventSubject = BehaviorSubject<AudioPlaybackEvent>();
 
   final _playbackStateSubject = BehaviorSubject<AudioPlaybackState>();
 
@@ -80,18 +80,18 @@ class AudioPlayer {
   AudioPlayer._internal(this._id) : _channel = _init(_id) {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
-        .map((data) => _audioPlayerState = AudioPlayerState(
+        .map((data) => _audioPlaybackEvent = AudioPlaybackEvent(
               state: AudioPlaybackState.values[data[0]],
               updatePosition: Duration(milliseconds: data[1]),
               updateTime: Duration(milliseconds: data[2]),
               speed: _speed,
             ));
     _eventChannelStreamSubscription =
-        _eventChannelStream.listen(_playerStateSubject.add);
+        _eventChannelStream.listen(_playbackEventSubject.add);
     _playbackStateSubject
-        .addStream(playerStateStream.map((state) => state.state).distinct());
+        .addStream(playbackEventStream.map((state) => state.state).distinct());
 
-    playerStateStream.listen((state) {
+    playbackEventStream.listen((state) {
       print("state: $state");
     });
   }
@@ -103,21 +103,25 @@ class AudioPlayer {
   /// The duration of any media set via [setUrl], [setFilePath] or [setAsset].
   Stream<Duration> get durationStream => _durationSubject.stream;
 
-  /// The current [AudioPlayerState].
-  AudioPlayerState get playerState => _audioPlayerState;
+  /// The latest [AudioPlaybackEvent].
+  AudioPlaybackEvent get playbackEvent => _audioPlaybackEvent;
 
-  /// The current [AudioPlayerState].
-  Stream<AudioPlayerState> get playerStateStream => _playerStateSubject.stream;
+  /// A stream of [AudioPlaybackEvent]s.
+  Stream<AudioPlaybackEvent> get playbackEventStream =>
+      _playbackEventSubject.stream;
 
   /// The current [AudioPlaybackState].
+  AudioPlaybackState get playbackState => _audioPlaybackEvent.state;
+
+  /// A stream of [AudioPlaybackState]s.
   Stream<AudioPlaybackState> get playbackStateStream =>
       _playbackStateSubject.stream;
 
   /// A stream periodically tracking the current position of this player.
   Stream<Duration> getPositionStream(
           [final Duration period = const Duration(milliseconds: 200)]) =>
-      Rx.combineLatest2<AudioPlayerState, void, Duration>(
-          playerStateStream,
+      Rx.combineLatest2<AudioPlaybackEvent, void, Duration>(
+          playbackEventStream,
           // TODO: emit periodically only in playing state.
           Stream.periodic(period),
           (state, _) => state.position);
@@ -223,7 +227,7 @@ class AudioPlayer {
     await _invokeMethod('dispose');
     await _durationSubject.close();
     await _eventChannelStreamSubscription.cancel();
-    await _playerStateSubject.close();
+    await _playbackEventSubject.close();
   }
 
   Future<dynamic> _invokeMethod(String method, [dynamic args]) async =>
@@ -231,7 +235,7 @@ class AudioPlayer {
 }
 
 /// Encapsulates the playback state and current position of the player.
-class AudioPlayerState {
+class AudioPlaybackEvent {
   /// The current playback state.
   final AudioPlaybackState state;
 
@@ -245,7 +249,7 @@ class AudioPlayerState {
   /// The playback speed.
   final double speed;
 
-  AudioPlayerState({
+  AudioPlaybackEvent({
     @required this.state,
     @required this.updateTime,
     @required this.updatePosition,
@@ -261,7 +265,8 @@ class AudioPlayerState {
       : updatePosition;
 
   @override
-  String toString() => "{state=$state, updateTime=$updateTime, updatePosition=$updatePosition, speed=$speed}";
+  String toString() =>
+      "{state=$state, updateTime=$updateTime, updatePosition=$updatePosition, speed=$speed}";
 }
 
 /// Enumerates the different playback states of a player.
