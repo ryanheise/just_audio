@@ -46,8 +46,8 @@ import 'package:rxdart/rxdart.dart';
 class AudioPlayer {
   static final _mainChannel = MethodChannel('com.ryanheise.just_audio.methods');
 
-  static Future<MethodChannel> _createChannel(int id) async {
-    await _mainChannel.invokeMethod('init', '$id');
+  static Future<MethodChannel> _init(int id) async {
+    await _mainChannel.invokeMethod('init', ['$id']);
     return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
@@ -69,22 +69,31 @@ class AudioPlayer {
 
   final _playbackStateSubject = BehaviorSubject<AudioPlaybackState>();
 
+  double _volume = 1.0;
+
+  double _speed = 1.0;
+
   /// Creates an [AudioPlayer].
   factory AudioPlayer() =>
       AudioPlayer._internal(DateTime.now().microsecondsSinceEpoch);
 
-  AudioPlayer._internal(this._id) : _channel = _createChannel(_id) {
+  AudioPlayer._internal(this._id) : _channel = _init(_id) {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
         .map((data) => _audioPlayerState = AudioPlayerState(
               state: AudioPlaybackState.values[data[0]],
               updatePosition: Duration(milliseconds: data[1]),
               updateTime: Duration(milliseconds: data[2]),
+              speed: _speed,
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playerStateSubject.add);
     _playbackStateSubject
         .addStream(playerStateStream.map((state) => state.state).distinct());
+
+    playerStateStream.listen((state) {
+      print("state: $state");
+    });
   }
 
   /// The duration of any media set via [setUrl], [setFilePath] or [setAsset],
@@ -107,10 +116,17 @@ class AudioPlayer {
   /// A stream periodically tracking the current position of this player.
   Stream<Duration> getPositionStream(
           [final Duration period = const Duration(milliseconds: 200)]) =>
-      Observable.combineLatest2<AudioPlayerState, void, Duration>(
+      Rx.combineLatest2<AudioPlayerState, void, Duration>(
           playerStateStream,
-          Observable.periodic(period),
+          // TODO: emit periodically only in playing state.
+          Stream.periodic(period),
           (state, _) => state.position);
+
+  /// The current volume of the player.
+  double get volume => _volume;
+
+  /// The current speed of the player.
+  double get speed => _speed;
 
   /// Loads audio media from a URL and returns the duration of that audio.
   Future<Duration> setUrl(final String url) async {
@@ -170,10 +186,11 @@ class AudioPlayer {
   }
 
   /// Stops the currently playing media such that the next [play] invocation
-  /// will start from position 0. It is legal to invoke this method from any
-  /// state except for:
+  /// will start from position 0. It is legal to invoke this method only from
+  /// the following states:
   ///
-  /// * [AudioPlaybackState.none]
+  /// * [AudioPlaybackState.playing]
+  /// * [AudioPlaybackState.paused]
   /// * [AudioPlaybackState.stopped]
   Future<void> stop() async {
     await _invokeMethod('stop');
@@ -181,7 +198,14 @@ class AudioPlayer {
 
   /// Sets the volume of this player, where 1.0 is normal volume.
   Future<void> setVolume(final double volume) async {
+    _volume = volume;
     await _invokeMethod('setVolume', [volume]);
+  }
+
+  /// Sets the playback speed of this player, where 1.0 is normal speed.
+  Future<void> setSpeed(final double speed) async {
+    _speed = speed;
+    await _invokeMethod('setSpeed', [speed]);
   }
 
   /// Seeks to a particular position. It is legal to invoke this method
@@ -218,18 +242,26 @@ class AudioPlayerState {
   /// The position at [updateTime].
   final Duration updatePosition;
 
+  /// The playback speed.
+  final double speed;
+
   AudioPlayerState({
     @required this.state,
     @required this.updateTime,
     @required this.updatePosition,
+    @required this.speed,
   });
 
   /// The current position of the player.
   Duration get position => state == AudioPlaybackState.playing
       ? updatePosition +
           (Duration(milliseconds: DateTime.now().millisecondsSinceEpoch) -
-              updateTime)
+                  updateTime) *
+              speed
       : updatePosition;
+
+  @override
+  String toString() => "{state=$state, updateTime=$updateTime, updatePosition=$updatePosition, speed=$speed}";
 }
 
 /// Enumerates the different playback states of a player.

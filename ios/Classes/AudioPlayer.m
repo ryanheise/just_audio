@@ -60,6 +60,9 @@
 	} else if ([@"setVolume" isEqualToString:call.method]) {
 		[self setVolume:(float)[args[0] doubleValue]];
 		result(nil);
+	} else if ([@"setSpeed" isEqualToString:call.method]) {
+		[self setSpeed:(float)[args[0] doubleValue]];
+		result(nil);
 	} else if ([@"seek" isEqualToString:call.method]) {
 		[self seek:[args[0] intValue] result:result];
 		result(nil);
@@ -92,7 +95,7 @@
 	long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 	int position = [self getCurrentPosition];
 	long long timeSinceLastUpdate = now - _updateTime;
-	long long expectedPosition = _updatePosition + timeSinceLastUpdate;
+	long long expectedPosition = _updatePosition + timeSinceLastUpdate; // TODO: * speed
 	long long drift = position - expectedPosition;
 	// Update if we've drifted or just started observing
 	if (_updateTime == 0L) {
@@ -255,6 +258,14 @@
 
 - (void)setVolume:(float)volume {
 	[_player setVolume:volume];
+}
+
+- (void)setSpeed:(float)speed {
+	//if (speed == 1.0
+	//		|| speed < 1.0 && _player.currentItem.canPlaySlowForward
+	//		|| speed > 1.0 && _player.currentItem.canPlayFastForward) {
+	//	_player.rate = speed;
+	//}
 }
 
 - (void)seek:(int)position result:(FlutterResult)result {

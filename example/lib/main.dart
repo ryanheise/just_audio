@@ -1,10 +1,7 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:rxdart/rxdart.dart';
 
 void main() => runApp(MyApp());
 
@@ -14,11 +11,14 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final AudioPlayer _player = AudioPlayer();
+  final _volumeSubject = BehaviorSubject.seeded(1.0);
+  final _speedSubject = BehaviorSubject.seeded(1.0);
+  AudioPlayer _player;
 
   @override
   void initState() {
     super.initState();
+    _player = AudioPlayer();
     _player.setUrl(
         "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3");
   }
@@ -82,6 +82,7 @@ class _MyAppState extends State<MyApp> {
                   );
                 },
               ),
+              Text("Track position"),
               StreamBuilder<Duration>(
                 stream: _player.durationStream,
                 builder: (context, snapshot) {
@@ -100,6 +101,34 @@ class _MyAppState extends State<MyApp> {
                     },
                   );
                 },
+              ),
+              Text("Volume"),
+              StreamBuilder<double>(
+                stream: _volumeSubject.stream,
+                builder: (context, snapshot) => Slider(
+                  divisions: 20,
+                  min: 0.0,
+                  max: 2.0,
+                  value: snapshot.data ?? 1.0,
+                  onChanged: (value) {
+                    _volumeSubject.add(value);
+                    _player.setVolume(value);
+                  },
+                ),
+              ),
+              Text("Speed"),
+              StreamBuilder<double>(
+                stream: _speedSubject.stream,
+                builder: (context, snapshot) => Slider(
+                  divisions: 10,
+                  min: 0.5,
+                  max: 1.5,
+                  value: snapshot.data ?? 1.0,
+                  onChanged: (value) {
+                    _speedSubject.add(value);
+                    _player.setSpeed(value);
+                  },
+                ),
               ),
             ],
           ),

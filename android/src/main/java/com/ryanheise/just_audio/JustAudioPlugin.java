@@ -5,6 +5,7 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
+import java.util.List;
 
 /** JustAudioPlugin */
 public class JustAudioPlugin implements MethodCallHandler {
@@ -24,7 +25,8 @@ public class JustAudioPlugin implements MethodCallHandler {
   public void onMethodCall(MethodCall call, Result result) {
 		switch (call.method) {
 		case "init":
-			String id = (String)call.arguments;
+			final List<?> args = (List<?>)call.arguments;
+			String id = (String)args.get(0);
 			new AudioPlayer(registrar, id);
 			result.success(null);
 			break;
