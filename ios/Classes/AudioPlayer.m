@@ -95,7 +95,7 @@
 	long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 	int position = [self getCurrentPosition];
 	long long timeSinceLastUpdate = now - _updateTime;
-	long long expectedPosition = _updatePosition + timeSinceLastUpdate; // TODO: * speed
+	long long expectedPosition = _updatePosition + (long long)(timeSinceLastUpdate * _player.rate);
 	long long drift = position - expectedPosition;
 	// Update if we've drifted or just started observing
 	if (_updateTime == 0L) {
@@ -164,7 +164,7 @@
 			     queue:nil
 			usingBlock:^(NSNotification* note) {
 				NSLog(@"Reached play end time");
-				[self setPlaybackState:stopped];
+				[self stop];
 			}
 	];
 	if (_player) {
@@ -252,8 +252,10 @@
 
 - (void)stop {
 	[_player pause];
-	[[_player currentItem] seekToTime:CMTimeMake(0, 1000)];
-	[self setPlaybackState:stopped];
+	[_player seekToTime:CMTimeMake(0, 1000)
+	  completionHandler:^(BOOL finished) {
+		  [self setPlaybackState:stopped];
+	  }];
 }
 
 - (void)setVolume:(float)volume {
@@ -261,11 +263,11 @@
 }
 
 - (void)setSpeed:(float)speed {
-	//if (speed == 1.0
-	//		|| speed < 1.0 && _player.currentItem.canPlaySlowForward
-	//		|| speed > 1.0 && _player.currentItem.canPlayFastForward) {
-	//	_player.rate = speed;
-	//}
+	if (speed == 1.0
+			|| speed < 1.0 && _player.currentItem.canPlaySlowForward
+			|| speed > 1.0 && _player.currentItem.canPlayFastForward) {
+		_player.rate = speed;
+	}
 }
 
 - (void)seek:(int)position result:(FlutterResult)result {

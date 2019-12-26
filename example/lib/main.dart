@@ -90,7 +90,10 @@ class _MyAppState extends State<MyApp> {
                   return StreamBuilder<Duration>(
                     stream: _player.getPositionStream(),
                     builder: (context, snapshot) {
-                      final position = snapshot.data ?? Duration.zero;
+                      var position = snapshot.data ?? Duration.zero;
+                      if (position > duration) {
+                        position = duration;
+                      }
                       return SeekBar(
                         duration: duration,
                         position: position,
