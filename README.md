@@ -6,7 +6,7 @@ A Flutter plugin to play audio from streams, files and assets. This plugin can b
 
 * Plays audio from streams, files and assets.
 * Broadcasts state changes helpful in streaming apps such as `buffering` and `connecting` in addition to the typical `playing`, `paused` and `stopped` states.
-* Control audio playback via standard operations: play, pause, stop, setVolume, seek.
+* Control audio playback via standard operations: play, pause, stop, setVolume, setSpeed, seek.
 * Compatible with [audio_service](https://pub.dev/packages/audio_service) to support full background playback, queue management, and controlling playback from the lock screen, notifications and headset buttons.
 
 This plugin has been tested on Android, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).

@@ -155,8 +155,10 @@ class AudioPlayer {
   Future<File> get _cacheFile async => File(p.join(
       (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
 
-  /// Plays the currently loaded media from the current position. It is legal
-  /// to invoke this method only from one of the following states:
+  /// Plays the currently loaded media from the current position, until the
+  /// given position if specified. The [Future] returned by this method
+  /// completes when playback completes or is paused or stopped. It is legal to
+  /// invoke this method only from one of the following states:
   ///
   /// * [AudioPlaybackState.stopped]
   /// * [AudioPlaybackState.paused]
