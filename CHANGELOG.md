@@ -1,3 +1,7 @@
+## 0.0.3
+
+* Feature to change audio speed.
+
 ## 0.0.2
 
 * iOS implementation for testing (may not work).
