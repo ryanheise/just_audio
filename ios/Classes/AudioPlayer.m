@@ -164,7 +164,7 @@
 			     queue:nil
 			usingBlock:^(NSNotification* note) {
 				NSLog(@"Reached play end time");
-				[self stop];
+				[self complete];
 			}
 	];
 	if (_player) {
@@ -255,6 +255,14 @@
 	[_player seekToTime:CMTimeMake(0, 1000)
 	  completionHandler:^(BOOL finished) {
 		  [self setPlaybackState:stopped];
+	  }];
+}
+
+- (void)complete {
+	[_player pause];
+	[_player seekToTime:CMTimeMake(0, 1000)
+	  completionHandler:^(BOOL finished) {
+		  [self setPlaybackState:completed];
 	  }];
 }
 

@@ -199,8 +199,8 @@ public class AudioPlayer implements MethodCallHandler {
 	}
 
 	public void setUrl(final String url, final Result result) throws IOException {
-		if (state != PlaybackState.none && state != PlaybackState.stopped) {
-			throw new IllegalStateException("Can call setUrl only from none and stopped states");
+		if (state != PlaybackState.none && state != PlaybackState.stopped && state != PlaybackState.completed) {
+			throw new IllegalStateException("Can call setUrl only from none/stopped/completed states");
 		}
 		transition(PlaybackState.connecting);
 		this.url = url;
@@ -231,6 +231,7 @@ public class AudioPlayer implements MethodCallHandler {
 		this.untilPosition = untilPosition;
 		switch (state) {
 		case stopped:
+		case completed:
 			ensureStopped();
 			transition(PlaybackState.playing);
 			playThread = new PlayThread();
@@ -243,7 +244,7 @@ public class AudioPlayer implements MethodCallHandler {
 			}
 			break;
 		default:
-			throw new IllegalStateException("Can call play only from stopped and paused states (" + state + ")");
+			throw new IllegalStateException("Can call play only from stopped, completed and paused states (" + state + ")");
 		}
 	}
 
@@ -275,6 +276,9 @@ public class AudioPlayer implements MethodCallHandler {
 	public void stop(final Result result) {
 		switch (state) {
 		case stopped:
+			break;
+		case completed:
+			transition(PlaybackState.stopped);
 			break;
 		// TODO: Allow stopping from buffered state.
 		case playing:
@@ -350,8 +354,8 @@ public class AudioPlayer implements MethodCallHandler {
 	}
 
 	public void dispose() {
-		if (state != PlaybackState.stopped && state != PlaybackState.none) {
-			throw new IllegalStateException("Can call dispose only from stopped and none states");
+		if (state != PlaybackState.stopped && state != PlaybackState.completed && state != PlaybackState.none) {
+			throw new IllegalStateException("Can call dispose only from stopped/completed/none states");
 		}
 		if (extractor != null) {
 			ensureStopped();
@@ -416,7 +420,7 @@ public class AudioPlayer implements MethodCallHandler {
 
 		@Override
 		public void run() {
-
+			boolean reachedEnd = false;
 			int encoding = AudioFormat.ENCODING_PCM_16BIT;
 			int channelFormat = channelCount==1?AudioFormat.CHANNEL_OUT_MONO:AudioFormat.CHANNEL_OUT_STEREO;
 			int minSize = AudioTrack.getMinBufferSize(sampleRate, channelFormat, encoding);
@@ -532,6 +536,7 @@ public class AudioPlayer implements MethodCallHandler {
 							} else {
 								audioTrack.pause();
 								finishedDecoding = true;
+								reachedEnd = true;
 							}
 						} else if (untilPosition != null && currentPosition >= untilPosition) {
 							// NOTE: When streaming audio over bluetooth, it clips off
@@ -570,8 +575,9 @@ public class AudioPlayer implements MethodCallHandler {
 				synchronized (monitor) {
 					start = 0;
 					untilPosition = null;
-					bgTransition(PlaybackState.stopped);
+					bgTransition(reachedEnd ? PlaybackState.completed : PlaybackState.stopped);
 					extractor.seekTo(0L, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+					handler.post(() -> broadcastPlaybackEvent());
 					playThread = null;
 					monitor.notifyAll();
 				}
@@ -624,7 +630,8 @@ public class AudioPlayer implements MethodCallHandler {
 		paused,
 		playing,
 		buffering,
-		connecting
+		connecting,
+		completed
 	}
 
 	class SeekRequest {

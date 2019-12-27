@@ -30,8 +30,7 @@ import 'package:rxdart/rxdart.dart';
 ///
 /// * [AudioPlaybackState.none]: immediately after instantiation.
 /// * [AudioPlaybackState.stopped]: eventually after [setUrl], [setFilePath] or
-/// [setAsset] completes, immediately after [stop], and immediately after
-/// playback naturally reaches the end of the media.
+/// [setAsset] completes, and immediately after [stop].
 /// * [AudioPlaybackState.paused]: after [pause] and after reaching the end of
 /// the requested [play] segment.
 /// * [AudioPlaybackState.playing]: after [play] and after sufficiently
@@ -40,6 +39,8 @@ import 'package:rxdart/rxdart.dart';
 /// during normal playback when the next buffer is not ready to be played.
 /// * [AudioPlaybackState.connecting]: immediately after [setUrl],
 /// [setFilePath] and [setAsset] while waiting for the media to load.
+/// * [AudioPlaybackState.completed]: immediately after playback reaches the
+/// end of the media.
 ///
 /// Additionally, after a [seek] request completes, the state will return to
 /// whatever state the player was in prior to the seek request.
@@ -128,7 +129,12 @@ class AudioPlayer {
   /// The current speed of the player.
   double get speed => _speed;
 
-  /// Loads audio media from a URL and returns the duration of that audio.
+  /// Loads audio media from a URL and returns the duration of that audio. It
+  /// is legal to invoke this method only from one of the following states:
+  ///
+  /// * [AudioPlaybackState.none]
+  /// * [AudioPlaybackState.stopped]
+  /// * [AudioPlaybackState.completed]
   Future<Duration> setUrl(final String url) async {
     _durationFuture =
         _invokeMethod('setUrl', [url]).then((ms) => Duration(milliseconds: ms));
@@ -137,11 +143,21 @@ class AudioPlayer {
     return duration;
   }
 
-  /// Loads audio media from a file and returns the duration of that audio.
+  /// Loads audio media from a file and returns the duration of that audio. It
+  /// is legal to invoke this method only from one of the following states:
+  ///
+  /// * [AudioPlaybackState.none]
+  /// * [AudioPlaybackState.stopped]
+  /// * [AudioPlaybackState.completed]
   Future<Duration> setFilePath(final String filePath) =>
       setUrl('file://$filePath');
 
   /// Loads audio media from an asset and returns the duration of that audio.
+  /// It is legal to invoke this method only from one of the following states:
+  ///
+  /// * [AudioPlaybackState.none]
+  /// * [AudioPlaybackState.stopped]
+  /// * [AudioPlaybackState.completed]
   Future<Duration> setAsset(final String assetPath) async {
     final file = await _cacheFile;
     if (!file.existsSync()) {
@@ -161,6 +177,7 @@ class AudioPlayer {
   /// invoke this method only from one of the following states:
   ///
   /// * [AudioPlaybackState.stopped]
+  /// * [AudioPlaybackState.completed]
   /// * [AudioPlaybackState.paused]
   Future<void> play({final Duration untilPosition}) async {
     StreamSubscription subscription;
@@ -194,6 +211,7 @@ class AudioPlayer {
   /// * [AudioPlaybackState.playing]
   /// * [AudioPlaybackState.paused]
   /// * [AudioPlaybackState.stopped]
+  /// * [AudioPlaybackState.completed]
   Future<void> stop() async {
     await _invokeMethod('stop');
   }
@@ -210,14 +228,20 @@ class AudioPlayer {
     await _invokeMethod('setSpeed', [speed]);
   }
 
-  /// Seeks to a particular position. It is legal to invoke this method
-  /// from any state except for [AudioPlaybackState.none].
+  /// Seeks to a particular position. It is legal to invoke this method from
+  /// any state except for [AudioPlaybackState.none] and
+  /// [AudioPlaybackState.connecting].
   Future<void> seek(final Duration position) async {
     await _invokeMethod('seek', [position.inMilliseconds]);
   }
 
-  /// Release all resources associated with this player. You must invoke
-  /// this after you are done with the player.
+  /// Release all resources associated with this player. You must invoke this
+  /// after you are done with the player. It is legal to invoke this method
+  /// only from the following states:
+  ///
+  /// * [AudioPlaybackState.stopped]
+  /// * [AudioPlaybackState.completed]
+  /// * [AudioPlaybackState.none]
   Future<void> dispose() async {
     if ((await _cacheFile).existsSync()) {
       (await _cacheFile).deleteSync();
@@ -275,4 +299,5 @@ enum AudioPlaybackState {
   playing,
   buffering,
   connecting,
+  completed,
 }

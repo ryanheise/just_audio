@@ -12,5 +12,6 @@ enum PlaybackState {
 	paused,
 	playing,
 	buffering,
-	connecting
+	connecting,
+	completed
 };
