@@ -66,6 +66,7 @@ public class AudioPlayer implements MethodCallHandler {
 	private float volume = 1.0f;
 	private float speed = 1.0f;
 	private Thread mainThread;
+	private byte[] chunk;
 
 	public AudioPlayer(final Registrar registrar, final String id) {
 		mainThread = Thread.currentThread();
@@ -365,6 +366,7 @@ public class AudioPlayer implements MethodCallHandler {
 			codec.stop();
 			codec.release();
 			codec = null;
+			chunk = null;
 		}
 	}
 
@@ -495,8 +497,10 @@ public class AudioPlayer implements MethodCallHandler {
 						if (info.size > 0) {
 							decoderIdleCount = 0;
 
-							final byte[] chunk = new byte[info.size];
-							buf.get(chunk);
+							if (chunk == null || chunk.length < info.size) {
+								chunk = new byte[info.size];
+							}
+							buf.get(chunk, 0, info.size);
 							buf.clear();
 
 							// put decoded data into sonic
