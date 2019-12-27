@@ -107,9 +107,9 @@ class AudioPlayer {
   /// A stream periodically tracking the current position of this player.
   Stream<Duration> getPositionStream(
           [final Duration period = const Duration(milliseconds: 200)]) =>
-      Observable.combineLatest2<AudioPlayerState, void, Duration>(
+      Rx.combineLatest2<AudioPlayerState, void, Duration>(
           playerStateStream,
-          Observable.periodic(period),
+          Stream.periodic(period),
           (state, _) => state.position);
 
   /// Loads audio media from a URL and returns the duration of that audio.
