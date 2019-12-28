@@ -1,3 +1,7 @@
+## 0.0.4
+
+* Remove reseeking hack.
+
 ## 0.0.3
 
 * Feature to change audio speed.
