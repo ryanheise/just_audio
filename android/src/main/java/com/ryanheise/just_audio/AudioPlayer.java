@@ -442,9 +442,6 @@ public class AudioPlayer implements MethodCallHandler {
 			int decoderIdleCount = 0;
 			boolean finishedReading = false;
 			int progress = 0;
-			// The extractor position seems to jump around at the beginning.
-			// This is a hack to address that.
-			long behindStartTime = 0;
 			byte[] sonicOut = new byte[audioTrackBufferSize];
 			try {
 				audioTrack.play();
@@ -460,16 +457,6 @@ public class AudioPlayer implements MethodCallHandler {
 							ByteBuffer inputBuffer = codec.getInputBuffer(inputBufferIndex);
 							long presentationTime = extractor.getSampleTime();
 							int presentationTimeMs = (int)(presentationTime / 1000);
-							if (presentationTimeMs < start) {
-								if (behindStartTime == 0) behindStartTime = System.currentTimeMillis();
-								if (System.currentTimeMillis() - behindStartTime > BEHIND_LIMIT) {
-									System.out.println("Too early, re-seeking");
-									extractor.seekTo(start*1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-									behindStartTime = 0;
-								}
-							} else {
-								behindStartTime = 0;
-							}
 							int sampleSize = extractor.readSampleData(inputBuffer, 0);
 							if (firstSample && sampleSize == 2 && format.getString(MediaFormat.KEY_MIME).equals("audio/mp4a-latm")) {
 								// Skip initial frames.
