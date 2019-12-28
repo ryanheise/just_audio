@@ -108,7 +108,7 @@ class AudioPlayer {
       _playbackEventSubject.stream;
 
   /// The current [AudioPlaybackState].
-  AudioPlaybackState get playbackState => _audioPlaybackEvent.state;
+  AudioPlaybackState get playbackState => _audioPlaybackEvent?.state ?? AudioPlaybackState.none;
 
   /// A stream of [AudioPlaybackState]s.
   Stream<AudioPlaybackState> get playbackStateStream =>
