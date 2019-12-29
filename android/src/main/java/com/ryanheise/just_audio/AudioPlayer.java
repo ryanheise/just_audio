@@ -201,7 +201,7 @@ public class AudioPlayer implements MethodCallHandler {
 
 	public void setUrl(final String url, final Result result) throws IOException {
 		if (state != PlaybackState.none && state != PlaybackState.stopped && state != PlaybackState.completed) {
-			throw new IllegalStateException("Can call setUrl only from none/stopped/completed states");
+			throw new IllegalStateException("Can call setUrl only from none/stopped/completed states (" + state + ")");
 		}
 		ensureStopped();
 		transition(PlaybackState.connecting);
@@ -271,7 +271,7 @@ public class AudioPlayer implements MethodCallHandler {
 			}
 			break;
 		default:
-			throw new IllegalStateException("Can call pause only from playing and buffering states");
+			throw new IllegalStateException("Can call pause only from playing and buffering states (" + state + ")");
 		}
 	}
 
@@ -295,7 +295,7 @@ public class AudioPlayer implements MethodCallHandler {
 				transition(PlaybackState.stopped);
 				if (oldState == PlaybackState.paused) {
 					monitor.notifyAll();
-				} else {
+				} else if (audioTrack != null) {
 					audioTrack.pause();
 				}
 				new Thread(() -> {
@@ -305,7 +305,7 @@ public class AudioPlayer implements MethodCallHandler {
 			}
 			break;
 		default:
-			throw new IllegalStateException("Can call stop only from playing, paused and buffering states");
+			throw new IllegalStateException("Can call stop only from playing, paused and buffering states (" + state + ")");
 		}
 	}
 
@@ -335,7 +335,7 @@ public class AudioPlayer implements MethodCallHandler {
 	public void seek(final int position, final Result result) {
 		synchronized (monitor) {
 			if (state == PlaybackState.none || state == PlaybackState.connecting) {
-				throw new IllegalStateException("Cannot call seek in none or connecting states");
+				throw new IllegalStateException("Cannot call seek in none or connecting states (" + state + ")");
 			}
 			if (state == PlaybackState.stopped) {
 				ensureStopped();
@@ -359,7 +359,7 @@ public class AudioPlayer implements MethodCallHandler {
 
 	public void dispose() {
 		if (state != PlaybackState.stopped && state != PlaybackState.completed && state != PlaybackState.none) {
-			throw new IllegalStateException("Can call dispose only from stopped/completed/none states");
+			throw new IllegalStateException("Can call dispose only from stopped/completed/none states (" + state + ")");
 		}
 		if (extractor != null) {
 			ensureStopped();
