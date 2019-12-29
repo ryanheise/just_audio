@@ -203,6 +203,7 @@ public class AudioPlayer implements MethodCallHandler {
 		if (state != PlaybackState.none && state != PlaybackState.stopped && state != PlaybackState.completed) {
 			throw new IllegalStateException("Can call setUrl only from none/stopped/completed states");
 		}
+		ensureStopped();
 		transition(PlaybackState.connecting);
 		this.url = url;
 		if (extractor != null) {
@@ -277,9 +278,11 @@ public class AudioPlayer implements MethodCallHandler {
 	public void stop(final Result result) {
 		switch (state) {
 		case stopped:
+			result.success(null);
 			break;
 		case completed:
 			transition(PlaybackState.stopped);
+			result.success(null);
 			break;
 		// TODO: Allow stopping from buffered state.
 		case playing:
