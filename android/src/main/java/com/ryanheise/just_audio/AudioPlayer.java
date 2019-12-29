@@ -284,7 +284,7 @@ public class AudioPlayer implements MethodCallHandler {
 			transition(PlaybackState.stopped);
 			result.success(null);
 			break;
-		// TODO: Allow stopping from buffered state.
+		// TODO: Allow stopping from buffered/connecting states.
 		case playing:
 		case paused:
 			synchronized (monitor) {
@@ -305,7 +305,7 @@ public class AudioPlayer implements MethodCallHandler {
 			}
 			break;
 		default:
-			throw new IllegalStateException("Can call stop only from playing, paused and buffering states (" + state + ")");
+			throw new IllegalStateException("Can call stop only from playing/paused/stopped/completed states (" + state + ")");
 		}
 	}
 
