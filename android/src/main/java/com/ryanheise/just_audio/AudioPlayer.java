@@ -8,6 +8,8 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
+import com.google.android.exoplayer2.source.dash.DashMediaSource;
+import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
@@ -236,7 +238,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		prepareResult = result;
 		transition(PlaybackState.connecting);
 		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, Util.getUserAgent(context, "just_audio"));
-		mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url));
+		Uri uri = Uri.parse(url);
+		if (url.toLowerCase().endsWith(".mpd")) {
+			mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
+		} else if (url.toLowerCase().endsWith(".m3u8")) {
+			mediaSource = new HlsMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
+		} else {
+			mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
+		}
 		player.prepare(mediaSource);
 	}
 
