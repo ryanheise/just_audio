@@ -13,9 +13,11 @@ import 'package:rxdart/rxdart.dart';
 /// final player = AudioPlayer();
 /// await player.setUrl('https://foo.com/bar.mp3');
 /// player.play();
-/// await player.pause();
-/// await player.play(untilPosition: Duration(minutes: 1));
-/// await player.stop()
+/// player.pause();
+/// player.play();
+/// await player.stop();
+/// await player.setClip(start: Duration(seconds: 10), end: Duration(seconds: 20));
+/// await player.play();
 /// await player.setUrl('https://foo.com/baz.mp3');
 /// await player.seek(Duration(minutes: 5));
 /// player.play();
@@ -171,27 +173,38 @@ class AudioPlayer {
   Future<File> get _cacheFile async => File(p.join(
       (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
 
-  /// Plays the currently loaded media from the current position, until the
-  /// given position if specified. The [Future] returned by this method
-  /// completes when playback completes or is paused or stopped. It is legal to
-  /// invoke this method only from one of the following states:
+  /// Clip the audio to the given [start] and [end] timestamps.
+  Future<Duration> setClip({Duration start, Duration end}) async {
+    _durationFuture =
+        _invokeMethod('setClip', [start?.inMilliseconds, end?.inMilliseconds])
+            .then((ms) => Duration(milliseconds: ms));
+    final duration = await _durationFuture;
+    _durationSubject.add(duration);
+    return duration;
+  }
+
+  /// Plays the currently loaded media from the current position. The [Future]
+  /// returned by this method completes when playback completes or is paused or
+  /// stopped. It is legal to invoke this method only from one of the following
+  /// states:
   ///
   /// * [AudioPlaybackState.stopped]
   /// * [AudioPlaybackState.completed]
   /// * [AudioPlaybackState.paused]
-  Future<void> play({final Duration untilPosition}) async {
+  Future<void> play() async {
     StreamSubscription subscription;
     Completer completer = Completer();
     subscription = playbackStateStream
         .skip(1)
         .where((state) =>
             state == AudioPlaybackState.paused ||
-            state == AudioPlaybackState.stopped)
+            state == AudioPlaybackState.stopped ||
+            state == AudioPlaybackState.completed)
         .listen((state) {
       subscription.cancel();
       completer.complete();
     });
-    await _invokeMethod('play', [untilPosition?.inMilliseconds]);
+    await _invokeMethod('play');
     await completer.future;
   }
 

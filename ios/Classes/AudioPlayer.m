@@ -48,8 +48,11 @@
 	NSArray* args = (NSArray*)call.arguments;
 	if ([@"setUrl" isEqualToString:call.method]) {
 		[self setUrl:args[0] result:result];
+	} else if ([@"setClip" isEqualToString:call.method]) {
+		[self setClip:args[0] end:args[1]];
+		result(nil);
 	} else if ([@"play" isEqualToString:call.method]) {
-		[self play:args[0]];
+		[self play];
 		result(nil);
 	} else if ([@"pause" isEqualToString:call.method]) {
 		[self pause];
@@ -215,13 +218,14 @@
 	}
 }
 
-- (void)play:(NSNumber*)untilPosition {
+- (void)setClip:(NSNumber*)start end:(NSNumber*)end {
+	// TODO
+}
+
+- (void)play {
 	// TODO: dynamically adjust the lag.
 	//int lag = 6;
-	int start = [self getCurrentPosition];
-	if (untilPosition != [NSNull null] && [untilPosition intValue] <= start) {
-		return;
-	}
+	//int start = [self getCurrentPosition];
 	[_player play];
 	[self setPlaybackState:playing];
 	// TODO: convert this Android code to iOS

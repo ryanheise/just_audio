@@ -17,9 +17,11 @@ This plugin has been tested on Android, and is being made available for testing 
 final player = AudioPlayer();
 await player.setUrl('https://foo.com/bar.mp3');
 player.play();
-await player.pause();
-await player.play(untilPosition: Duration(minutes: 1));
-await player.stop()
+player.pause();
+player.play();
+await player.stop();
+await player.setClip(start: Duration(seconds: 10), end: Duration(seconds: 20));
+await player.play();
 await player.setUrl('https://foo.com/baz.mp3');
 await player.seek(Duration(minutes: 5));
 player.play();
