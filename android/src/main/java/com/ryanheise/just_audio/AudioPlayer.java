@@ -293,9 +293,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		case stopped:
 			result.success(null);
 			break;
-		// TODO: Allow stopping from buffered/connecting states.
+		// TODO: Allow stopping from connecting states.
 		case completed:
 		case playing:
+		case buffering:
 		case paused:
 			player.setPlayWhenReady(false);
 			player.seekTo(0L);

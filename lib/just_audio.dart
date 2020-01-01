@@ -194,15 +194,20 @@ class AudioPlayer {
   Future<void> play() async {
     StreamSubscription subscription;
     Completer completer = Completer();
-    subscription = playbackStateStream
-        .skip(1)
-        .where((state) =>
-            state == AudioPlaybackState.paused ||
-            state == AudioPlaybackState.stopped ||
-            state == AudioPlaybackState.completed)
-        .listen((state) {
-      subscription.cancel();
-      completer.complete();
+    bool startedPlaying = false;
+    subscription = playbackStateStream.listen((state) {
+      // TODO: It will be more reliable to let the platform
+      // side wait for completion since events on the flutter
+      // side can lag behind the platform side.
+      if (startedPlaying &&
+          (state == AudioPlaybackState.paused ||
+              state == AudioPlaybackState.stopped ||
+              state == AudioPlaybackState.completed)) {
+        subscription.cancel();
+        completer.complete();
+      } else if (state == AudioPlaybackState.playing) {
+        startedPlaying = true;
+      }
     });
     await _invokeMethod('play');
     await completer.future;
