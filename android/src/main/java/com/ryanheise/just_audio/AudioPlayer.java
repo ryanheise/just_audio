@@ -239,9 +239,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		transition(PlaybackState.connecting);
 		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, Util.getUserAgent(context, "just_audio"));
 		Uri uri = Uri.parse(url);
-		if (url.toLowerCase().endsWith(".mpd")) {
+		if (uri.getPath().toLowerCase().endsWith(".mpd")) {
 			mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
-		} else if (url.toLowerCase().endsWith(".m3u8")) {
+		} else if (uri.getPath().toLowerCase().endsWith(".m3u8")) {
 			mediaSource = new HlsMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
 		} else {
 			mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
