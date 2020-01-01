@@ -1,3 +1,8 @@
+## 0.0.5
+
+* API change for audio clipping.
+* Performance improvements and bug fixes on Android.
+
 ## 0.0.4
 
 * Remove reseeking hack.
