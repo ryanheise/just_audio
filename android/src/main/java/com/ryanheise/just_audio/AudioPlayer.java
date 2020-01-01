@@ -223,10 +223,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	}
 
 	private void transition(final PlaybackState newState) {
-		transition(state, newState);
-	}
-
-	private void transition(final PlaybackState oldState, final PlaybackState newState) {
+		final PlaybackState oldState = state;
 		state = newState;
 		if (oldState != PlaybackState.playing && newState == PlaybackState.playing) {
 			startObservingPosition();
@@ -235,6 +232,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	}
 
 	public void setUrl(final String url, final Result result) throws IOException {
+		abortExistingConnection();
 		prepareResult = result;
 		transition(PlaybackState.connecting);
 		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, Util.getUserAgent(context, "just_audio"));
@@ -250,6 +248,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	}
 
 	public void setClip(final Long start, final Long end, final Result result) {
+		if (state == PlaybackState.none) {
+			throw new IllegalStateException("Cannot call setClip from none state");
+		}
+		abortExistingConnection();
 		this.start = start;
 		this.end = end;
 		prepareResult = result;
@@ -264,6 +266,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 
 	public void play() {
 		switch (state) {
+		case playing:
+			break;
 		case stopped:
 		case completed:
 		case buffering:
@@ -272,12 +276,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 			transition(PlaybackState.playing);
 			break;
 		default:
-			throw new IllegalStateException("Can call play only from stopped, completed and paused states (" + state + ")");
+			throw new IllegalStateException("Cannot call play from connecting or none states (" + state + ")");
 		}
 	}
 
 	public void pause() {
 		switch (state) {
+		case paused:
+			break;
 		case playing:
 		case buffering:
 			player.setPlayWhenReady(false);
@@ -293,7 +299,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		case stopped:
 			result.success(null);
 			break;
-		// TODO: Allow stopping from connecting states.
+		case connecting:
+			transition(PlaybackState.stopped);
+			result.success(null);
+			break;
 		case completed:
 		case playing:
 		case buffering:
@@ -304,7 +313,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 			result.success(null);
 			break;
 		default:
-			throw new IllegalStateException("Can call stop only from playing/paused/stopped/completed states (" + state + ")");
+			throw new IllegalStateException("Can call stop only from playing/paused/completed states (" + state + ")");
 		}
 	}
 
@@ -320,6 +329,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	}
 
 	public void seek(final long position, final Result result) {
+		if (state == PlaybackState.none || state == PlaybackState.connecting) {
+			throw new IllegalStateException("Cannot call seek from none none/connecting states");
+		}
 		seekPos = position;
 		seekResult = result;
 		if (stateBeforeSeek == null) {
@@ -331,11 +343,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	}
 
 	public void dispose() {
-		if (state != PlaybackState.stopped && state != PlaybackState.completed && state != PlaybackState.none) {
-			throw new IllegalStateException("Can call dispose only from stopped/completed/none states (" + state + ")");
-		}
 		player.release();
 		transition(PlaybackState.none);
+	}
+
+	private void abortExistingConnection() {
+		if (prepareResult != null) {
+			prepareResult.error("setUrl aborted", null, null);
+			prepareResult = null;
+		}
 	}
 
 	private void startObservingPosition() {
