@@ -134,8 +134,8 @@ class AudioPlayer {
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
   Future<Duration> setUrl(final String url) async {
-    _durationFuture =
-        _invokeMethod('setUrl', [url]).then((ms) => Duration(milliseconds: ms));
+    _durationFuture = _invokeMethod('setUrl', [url])
+        .then((ms) => ms == null ? null : Duration(milliseconds: ms));
     final duration = await _durationFuture;
     _durationSubject.add(duration);
     return duration;
@@ -168,7 +168,7 @@ class AudioPlayer {
   Future<Duration> setClip({Duration start, Duration end}) async {
     _durationFuture =
         _invokeMethod('setClip', [start?.inMilliseconds, end?.inMilliseconds])
-            .then((ms) => Duration(milliseconds: ms));
+            .then((ms) => ms == null ? null : Duration(milliseconds: ms));
     final duration = await _durationFuture;
     _durationSubject.add(duration);
     return duration;
