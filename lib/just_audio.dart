@@ -130,7 +130,9 @@ class AudioPlayer {
   /// The current speed of the player.
   double get speed => _speed;
 
-  /// Loads audio media from a URL and returns the duration of that audio.
+  /// Loads audio media from a URL and completes with the duration of that
+  /// audio, or null if this call was interrupted by another call so [setUrl],
+  /// [setFilePath] or [setAsset].
   Future<Duration> setUrl(final String url) async {
     _durationFuture =
         _invokeMethod('setUrl', [url]).then((ms) => Duration(milliseconds: ms));
@@ -139,11 +141,15 @@ class AudioPlayer {
     return duration;
   }
 
-  /// Loads audio media from a file and returns the duration of that audio.
+  /// Loads audio media from a file and completes with the duration of that
+  /// audio, or null if this call was interrupted by another call so [setUrl],
+  /// [setFilePath] or [setAsset].
   Future<Duration> setFilePath(final String filePath) =>
       setUrl('file://$filePath');
 
-  /// Loads audio media from an asset and returns the duration of that audio.
+  /// Loads audio media from an asset and completes with the duration of that
+  /// audio, or null if this call was interrupted by another call so [setUrl],
+  /// [setFilePath] or [setAsset].
   Future<Duration> setAsset(final String assetPath) async {
     final file = await _cacheFile;
     if (!file.existsSync()) {

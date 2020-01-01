@@ -349,7 +349,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 
 	private void abortExistingConnection() {
 		if (prepareResult != null) {
-			prepareResult.error("setUrl aborted", null, null);
+			prepareResult.success(null);
 			prepareResult = null;
 		}
 	}
