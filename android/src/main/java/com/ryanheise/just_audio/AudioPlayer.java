@@ -63,6 +63,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	private Long seekPos;
 	private Result prepareResult;
 	private Result seekResult;
+	private boolean seekProcessed;
 	private MediaSource mediaSource;
 
 	private SimpleExoPlayer player;
@@ -101,6 +102,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 				prepareResult = null;
 				transition(PlaybackState.stopped);
 			}
+			if (seekProcessed) {
+				completeSeek();
+			}
 			break;
 		case Player.STATE_BUFFERING:
 			// TODO: use this instead of checkForDiscontinuity.
@@ -116,12 +120,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	@Override
 	public void onSeekProcessed() {
 		if (seekResult != null) {
-			seekPos = null;
-			transition(stateBeforeSeek);
-			seekResult.success(null);
-			stateBeforeSeek = null;
-			seekResult = null;
+			seekProcessed = true;
+			if (player.getPlaybackState() == Player.STATE_READY) {
+				completeSeek();
+			}
 		}
+	}
+
+	private void completeSeek() {
+		seekProcessed = false;
+		seekPos = null;
+		transition(stateBeforeSeek);
+		seekResult.success(null);
+		stateBeforeSeek = null;
+		seekResult = null;
 	}
 
 	private void checkForDiscontinuity() {
@@ -332,8 +344,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		if (state == PlaybackState.none || state == PlaybackState.connecting) {
 			throw new IllegalStateException("Cannot call seek from none none/connecting states");
 		}
+		if (seekResult != null) {
+			seekResult.success(null);
+		}
 		seekPos = position;
 		seekResult = result;
+		seekProcessed = false;
 		if (stateBeforeSeek == null) {
 			stateBeforeSeek = state;
 		}
