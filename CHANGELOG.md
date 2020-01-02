@@ -1,3 +1,7 @@
+## 0.0.6
+
+* Bug fixes.
+
 ## 0.0.5
 
 * API change for audio clipping.
