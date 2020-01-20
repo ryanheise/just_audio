@@ -156,6 +156,16 @@
 		_endObserver = 0;
 	}
 
+    NSError *error = nil;
+
+    AVAudioSessionCategory category = AVAudioSessionCategoryPlayback;
+    BOOL success = [[AVAudioSession sharedInstance] setCategory:category error:&error];
+
+    if (!success) {
+        NSLog(@"Error setting AVAudioSessionCategoryPlayback: %@", error);
+    }
+    [[AVAudioSession sharedInstance] setActive:YES error:&error];
+
     AVPlayerItem *playerItem;
 
 	//Allow iOs playing both external links and local files.
