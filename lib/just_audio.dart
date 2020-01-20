@@ -61,7 +61,13 @@ class AudioPlayer {
 
   final _durationSubject = BehaviorSubject<Duration>();
 
-  AudioPlaybackEvent _audioPlaybackEvent;
+  // TODO: also broadcast this event on instantiation.
+  AudioPlaybackEvent _audioPlaybackEvent = AudioPlaybackEvent(
+    state: AudioPlaybackState.none,
+    updatePosition: Duration.zero,
+    updateTime: Duration.zero,
+    speed: 1.0,
+  );
 
   Stream<AudioPlaybackEvent> _eventChannelStream;
 
