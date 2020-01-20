@@ -155,7 +155,16 @@
 		[[NSNotificationCenter defaultCenter] removeObserver:_endObserver];
 		_endObserver = 0;
 	}
-	AVPlayerItem* playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
+
+    AVPlayerItem *playerItem;
+
+	//Allow iOs playing both external links and local files.
+    if ([url hasPrefix:@"file://"]) {
+        playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[url substringFromIndex:7]]];
+    } else {
+        playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
+    }
+
 	[playerItem addObserver:self
 		     forKeyPath:@"status"
 			options:NSKeyValueObservingOptionNew
