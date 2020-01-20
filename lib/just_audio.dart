@@ -145,7 +145,7 @@ class AudioPlayer {
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
   Future<Duration> setFilePath(final String filePath) =>
-      setUrl('file://$filePath');
+      setUrl('$filePath');
 
   /// Loads audio media from an asset and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
