@@ -1,6 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="example/lib/main.dart" type="FlutterRunConfigurationType" factoryName="Flutter">
+  <configuration default="false" name="example/lib/main.dart" type="FlutterRunConfigurationType" factoryName="Flutter" singleton="false">
+    <option name="additionalArgs" value="--enable-software-rendering" />
     <option name="filePath" value="$PROJECT_DIR$/example/lib/main.dart" />
-    <method />
+    <method v="2" />
   </configuration>
 </component>
