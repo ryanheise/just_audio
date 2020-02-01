@@ -270,7 +270,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
             prepareResult.error(errorCode, errorMsg, null);
             prepareResult = null;
         }
-        this.dispose();
     }
 
     private void transition(final PlaybackState newState) {
