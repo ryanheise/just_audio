@@ -20,7 +20,9 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _player = AudioPlayer();
     _player.setUrl(
-        "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3");
+      //"https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"
+      "https://dl.espressif.com/dl/audio/ff-16b-2c-44100hz.flac"
+    );
   }
 
   @override
