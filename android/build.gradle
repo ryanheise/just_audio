@@ -17,6 +17,9 @@ rootProject.allprojects {
         google()
         jcenter()
         maven { url 'https://jitpack.io' }
+        flatDir {
+            dirs 'libs'
+        }
     }
 }
 
@@ -41,9 +44,10 @@ android {
 }
 
 dependencies {
-    implementation 'com.github.Marekkon5.ExoPlayer:extension-flac:release-v2-SNAPSHOT'
-    implementation 'com.github.Marekkon5.ExoPlayer:library-core:release-v2-SNAPSHOT'
-    implementation 'com.github.Marekkon5.ExoPlayer:library-dash:release-v2-SNAPSHOT'
-    implementation 'com.github.Marekkon5.ExoPlayer:library-hls:release-v2-SNAPSHOT'
-    implementation 'com.github.Marekkon5.ExoPlayer:library-smoothstreaming:release-v2-SNAPSHOT'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.11.1'
+    implementation 'com.google.android.exoplayer:exoplayer-dash:2.11.1'
+    implementation 'com.google.android.exoplayer:exoplayer-hls:2.11.1'
+    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.11.1'
+    implementation 'com.github.Marekkon5.ExoPlayer:extension-flac:release-v2-SNAPSHOT@aar'
 }
+
