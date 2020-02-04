@@ -285,10 +285,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		case buffering:
 		case paused:
 			player.setPlayWhenReady(true);
-			transition(PlaybackState.playing);
+			if (seekResult != null) {
+				stateBeforeSeek = PlaybackState.playing;
+			} else {
+				transition(PlaybackState.playing);
+			}
 			break;
 		default:
-			throw new IllegalStateException("Cannot call play from connecting or none states (" + state + ")");
+			throw new IllegalStateException("Cannot call play from connecting/none states (" + state + ")");
 		}
 	}
 
@@ -300,6 +304,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		case buffering:
 			player.setPlayWhenReady(false);
 			transition(PlaybackState.paused);
+			if (seekResult != null) {
+				stateBeforeSeek = PlaybackState.paused;
+			}
 			break;
 		default:
 			throw new IllegalStateException("Can call pause only from playing and buffering states (" + state + ")");
@@ -312,12 +319,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 			result.success(null);
 			break;
 		case connecting:
+			abortExistingConnection();
 			transition(PlaybackState.stopped);
 			result.success(null);
 			break;
+		case buffering:
+			abortSeek();
+			// no break
 		case completed:
 		case playing:
-		case buffering:
 		case paused:
 			player.setPlayWhenReady(false);
 			player.seekTo(0L);
@@ -325,7 +335,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 			result.success(null);
 			break;
 		default:
-			throw new IllegalStateException("Can call stop only from playing/paused/completed states (" + state + ")");
+			throw new IllegalStateException("Cannot call stop from none state");
 		}
 	}
 
@@ -344,9 +354,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		if (state == PlaybackState.none || state == PlaybackState.connecting) {
 			throw new IllegalStateException("Cannot call seek from none none/connecting states");
 		}
-		if (seekResult != null) {
-			seekResult.success(null);
-		}
+		abortSeek();
 		seekPos = position;
 		seekResult = result;
 		seekProcessed = false;
@@ -361,6 +369,16 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	public void dispose() {
 		player.release();
 		transition(PlaybackState.none);
+	}
+
+	private void abortSeek() {
+		if (seekResult != null) {
+			seekResult.success(null);
+			seekResult = null;
+			seekPos = null;
+			stateBeforeSeek = null;
+			seekProcessed = false;
+		}
 	}
 
 	private void abortExistingConnection() {
