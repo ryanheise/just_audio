@@ -311,7 +311,7 @@ class AudioPlaybackEvent {
   });
 
   /// The current position of the player.
-  Duration get position => state == AudioPlaybackState.playing
+  Duration get position => state == AudioPlaybackState.playing && !buffering
       ? updatePosition +
           (Duration(milliseconds: DateTime.now().millisecondsSinceEpoch) -
                   updateTime) *
