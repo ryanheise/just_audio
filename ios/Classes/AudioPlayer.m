@@ -114,6 +114,7 @@
 }
 
 - (void)broadcastPlaybackEvent {
+	if (!_eventSink) return;
 	long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 	_updatePosition = [self getCurrentPosition];
 	_updateTime = now;
@@ -148,6 +149,11 @@
 	/* 	[self startObservingPosition]; */
 	/* } */
 	[self broadcastPlaybackEvent];
+}
+
+- (void)setPlaybackBufferingState:(enum PlaybackState)state buffering:(BOOL)buffering {
+	_buffering = buffering;
+	[self setPlaybackState:state];
 }
 
 - (void)setUrl:(NSString*)url result:(FlutterResult)result {
@@ -271,7 +277,7 @@
 	[_player pause];
 	[_player seekToTime:CMTimeMake(0, 1000)
 	  completionHandler:^(BOOL finished) {
-		  [self setPlaybackState:stopped];
+		  [self setPlaybackBufferingState:stopped buffering:NO];
 	  }];
 }
 
@@ -279,7 +285,7 @@
 	[_player pause];
 	[_player seekToTime:CMTimeMake(0, 1000)
 	  completionHandler:^(BOOL finished) {
-		  [self setPlaybackState:completed];
+		  [self setPlaybackBufferingState:completed buffering:NO];
 	  }];
 }
 
