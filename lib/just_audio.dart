@@ -329,6 +329,7 @@ enum AudioPlaybackState {
   stopped,
   paused,
   playing,
+  buffering,
   connecting,
   completed,
 }
