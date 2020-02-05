@@ -323,6 +323,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 
 	public void dispose() {
 		player.release();
+		buffering = false;
 		transition(PlaybackState.none);
 	}
 

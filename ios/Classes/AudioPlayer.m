@@ -323,7 +323,7 @@
 - (void)dispose {
 	if (_state != none) {
 		[self stop];
-		[self setPlaybackState:none];
+		[self setPlaybackBufferingState:none buffering:NO];
 	}
 }
 
