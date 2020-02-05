@@ -34,10 +34,7 @@ import 'package:rxdart/rxdart.dart';
 /// * [AudioPlaybackState.stopped]: eventually after [setUrl], [setFilePath],
 /// [setAsset] or [setClip] completes, and immediately after [stop].
 /// * [AudioPlaybackState.paused]: after [pause].
-/// * [AudioPlaybackState.playing]: after [play] and after sufficiently
-/// buffering during normal playback.
-/// * [AudioPlaybackState.buffering]: immediately after a seek request and
-/// during normal playback when the next buffer is not ready to be played.
+/// * [AudioPlaybackState.playing]: after [play].
 /// * [AudioPlaybackState.connecting]: immediately after [setUrl],
 /// [setFilePath] and [setAsset] while waiting for the media to load.
 /// * [AudioPlaybackState.completed]: immediately after playback reaches the
@@ -64,6 +61,7 @@ class AudioPlayer {
   // TODO: also broadcast this event on instantiation.
   AudioPlaybackEvent _audioPlaybackEvent = AudioPlaybackEvent(
     state: AudioPlaybackState.none,
+    buffering: false,
     updatePosition: Duration.zero,
     updateTime: Duration.zero,
     speed: 1.0,
@@ -76,6 +74,10 @@ class AudioPlayer {
   final _playbackEventSubject = BehaviorSubject<AudioPlaybackEvent>();
 
   final _playbackStateSubject = BehaviorSubject<AudioPlaybackState>();
+
+  final _bufferingSubject = BehaviorSubject<bool>();
+
+  final _fullPlaybackStateSubject = BehaviorSubject<FullAudioPlaybackState>();
 
   double _volume = 1.0;
 
@@ -90,14 +92,22 @@ class AudioPlayer {
         .receiveBroadcastStream()
         .map((data) => _audioPlaybackEvent = AudioPlaybackEvent(
               state: AudioPlaybackState.values[data[0]],
-              updatePosition: Duration(milliseconds: data[1]),
-              updateTime: Duration(milliseconds: data[2]),
+              buffering: data[1],
+              updatePosition: Duration(milliseconds: data[2]),
+              updateTime: Duration(milliseconds: data[3]),
               speed: _speed,
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playbackEventSubject.add);
     _playbackStateSubject
         .addStream(playbackEventStream.map((state) => state.state).distinct());
+    _bufferingSubject.addStream(
+        playbackEventStream.map((state) => state.buffering).distinct());
+    _fullPlaybackStateSubject.addStream(
+        Rx.combineLatest2<AudioPlaybackState, bool, FullAudioPlaybackState>(
+            playbackStateStream,
+            bufferingStream,
+            (state, buffering) => FullAudioPlaybackState(state, buffering)));
   }
 
   /// The duration of any media set via [setUrl], [setFilePath] or [setAsset],
@@ -120,6 +130,16 @@ class AudioPlayer {
   /// A stream of [AudioPlaybackState]s.
   Stream<AudioPlaybackState> get playbackStateStream =>
       _playbackStateSubject.stream;
+
+  /// Whether the player is buffering.
+  bool get buffering => _audioPlaybackEvent.buffering;
+
+  /// A stream of buffering state changes.
+  Stream<bool> get bufferingStream => _bufferingSubject.stream;
+
+  /// A stream of [FullAudioPlaybackState]s.
+  Stream<FullAudioPlaybackState> get fullPlaybackStateStream =>
+      _fullPlaybackStateSubject.stream;
 
   /// A stream periodically tracking the current position of this player.
   Stream<Duration> getPositionStream(
@@ -209,10 +229,7 @@ class AudioPlayer {
   }
 
   /// Pauses the currently playing media. It is legal to invoke this method
-  /// only from the following states:
-  ///
-  /// * [AudioPlaybackState.playing]
-  /// * [AudioPlaybackState.buffering]
+  /// only from the [AudioPlaybackState.playing] state.
   Future<void> pause() async {
     await _invokeMethod('pause');
   }
@@ -272,6 +289,9 @@ class AudioPlaybackEvent {
   /// The current playback state.
   final AudioPlaybackState state;
 
+  /// Whether the player is buffering.
+  final bool buffering;
+
   /// When the last time a position discontinuity happened, as measured in time
   /// since the epoch.
   final Duration updateTime;
@@ -284,6 +304,7 @@ class AudioPlaybackEvent {
 
   AudioPlaybackEvent({
     @required this.state,
+    @required this.buffering,
     @required this.updateTime,
     @required this.updatePosition,
     @required this.speed,
@@ -308,7 +329,13 @@ enum AudioPlaybackState {
   stopped,
   paused,
   playing,
-  buffering,
   connecting,
   completed,
+}
+
+class FullAudioPlaybackState {
+  final AudioPlaybackState state;
+  final bool buffering;
+
+  FullAudioPlaybackState(this.state, this.buffering);
 }

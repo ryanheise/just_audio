@@ -10,11 +10,11 @@
 	NSString* _playerId;
 	AVPlayer* _player;
 	enum PlaybackState _state;
-	enum PlaybackState _stateBeforeSeek;
 	long long _updateTime;
 	int _updatePosition;
 	int _seekPos;
 	FlutterResult _connectionResult;
+	BOOL _buffering;
 	id _endObserver;
 	id _timeObserver;
 }
@@ -32,9 +32,9 @@
 		     binaryMessenger:[registrar messenger]];
 	[_eventChannel setStreamHandler:self];
 	_state = none;
-	_stateBeforeSeek = none;
 	_player = nil;
 	_seekPos = -1;
+	_buffering = NO;
 	_endObserver = 0;
 	_timeObserver = 0;
 	__weak __typeof__(self) weakSelf = self;
@@ -94,7 +94,7 @@
 
 - (void)checkForDiscontinuity {
 	if (!_eventSink) return;
-	if (_state != playing && _state != buffering) return;
+	if ((_state != playing) && !_buffering) return;
 	long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 	int position = [self getCurrentPosition];
 	long long timeSinceLastUpdate = now - _updateTime;
@@ -105,9 +105,11 @@
 		[self broadcastPlaybackEvent];
 	} else if (drift < -100) {
 		NSLog(@"time discontinuity detected: %lld", drift);
-		[self setPlaybackState:buffering];
-	} else if (_state == buffering) {
-		[self setPlaybackState:playing];
+		_buffering = YES;
+		[self broadcastPlaybackEvent];
+	} else if (_buffering) {
+		_buffering = NO;
+		[self broadcastPlaybackEvent];
 	}
 }
 
@@ -118,6 +120,8 @@
 	_eventSink(@[
 		// state
 		@(_state),
+		// buffering
+		@(_buffering),
 		// updatePosition
 		@(_updatePosition),
 		// updateTime
@@ -156,14 +160,14 @@
 		_endObserver = 0;
 	}
 
-    AVPlayerItem *playerItem;
+	AVPlayerItem *playerItem;
 
 	//Allow iOs playing both external links and local files.
-    if ([url hasPrefix:@"file://"]) {
-        playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[url substringFromIndex:7]]];
-    } else {
-        playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
-    }
+	if ([url hasPrefix:@"file://"]) {
+		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[url substringFromIndex:7]]];
+	} else {
+		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
+	}
 
 	[playerItem addObserver:self
 		     forKeyPath:@"status"
@@ -292,10 +296,10 @@
 }
 
 - (void)seek:(int)position result:(FlutterResult)result {
-	_stateBeforeSeek = _state;
 	_seekPos = position;
 	NSLog(@"seek. enter buffering");
-	[self setPlaybackState:buffering];
+	_buffering = YES;
+	[self broadcastPlaybackEvent];
 	[_player seekToTime:CMTimeMake(position, 1000)
 	  completionHandler:^(BOOL finished) {
 		  NSLog(@"seek completed");
@@ -305,8 +309,8 @@
 
 - (void)onSeekCompletion:(FlutterResult)result {
 	_seekPos = -1;
-	[self setPlaybackState:_stateBeforeSeek];
-	_stateBeforeSeek = none;
+	_buffering = NO;
+	[self broadcastPlaybackEvent];
 	result(nil);
 }
 
