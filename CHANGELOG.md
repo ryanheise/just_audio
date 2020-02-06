@@ -1,3 +1,9 @@
+## 0.1.0
+
+* Separate buffering state from PlaybackState.
+* More permissive state transitions.
+* Support playing local files on iOS.
+
 ## 0.0.6
 
 * Bug fixes.
