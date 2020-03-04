@@ -83,6 +83,8 @@ class AudioPlayer {
 
   double _speed = 1.0;
 
+  bool _automaticallyWaitsToMinimizeStalling = true;
+
   /// Creates an [AudioPlayer].
   factory AudioPlayer() =>
       AudioPlayer._internal(DateTime.now().microsecondsSinceEpoch);
@@ -155,6 +157,10 @@ class AudioPlayer {
 
   /// The current speed of the player.
   double get speed => _speed;
+
+  /// Whether the player should automatically delay playback in order to minimize stalling. (iOS 10.0 or later only)
+  bool get automaticallyWaitsToMinimizeStalling =>
+      _automaticallyWaitsToMinimizeStalling;
 
   /// Loads audio media from a URL and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
@@ -255,6 +261,16 @@ class AudioPlayer {
   Future<void> setSpeed(final double speed) async {
     _speed = speed;
     await _invokeMethod('setSpeed', [speed]);
+  }
+
+  /// Sets automaticallyWaitsToMinimizeStalling for AVPlayer in iOS 10.0 or later, defaults to true.
+  /// Has no effect on Android clients
+  Future<void> setAutomaticallyWaitsToMinimizeStalling(
+      final bool automaticallyWaitsToMinimizeStalling) async {
+    _automaticallyWaitsToMinimizeStalling =
+        automaticallyWaitsToMinimizeStalling;
+    await _invokeMethod('setAutomaticallyWaitsToMinimizeStalling',
+        [automaticallyWaitsToMinimizeStalling]);
   }
 
   /// Seeks to a particular position. It is legal to invoke this method from

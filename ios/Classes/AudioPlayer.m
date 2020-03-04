@@ -66,6 +66,9 @@
 	} else if ([@"setSpeed" isEqualToString:call.method]) {
 		[self setSpeed:(float)[args[0] doubleValue]];
 		result(nil);
+	} else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
+		[self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[args[0] boolValue]];
+		result(nil);
 	} else if ([@"seek" isEqualToString:call.method]) {
 		[self seek:[args[0] intValue] result:result];
 		result(nil);
@@ -298,6 +301,12 @@
 			|| speed < 1.0 && _player.currentItem.canPlaySlowForward
 			|| speed > 1.0 && _player.currentItem.canPlayFastForward) {
 		_player.rate = speed;
+	}
+}
+
+-(void)setAutomaticallyWaitsToMinimizeStalling:(bool)automaticallyWaitsToMinimizeStalling {
+	if (@available(iOS 10.0, *)) {
+		_player.automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
 	}
 }
 
