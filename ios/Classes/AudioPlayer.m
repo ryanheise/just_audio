@@ -17,6 +17,7 @@
 	BOOL _buffering;
 	id _endObserver;
 	id _timeObserver;
+	BOOL _automaticallyWaitsToMinimizeStalling;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
@@ -37,6 +38,7 @@
 	_buffering = NO;
 	_endObserver = 0;
 	_timeObserver = 0;
+	_automaticallyWaitsToMinimizeStalling = YES;
 	__weak __typeof__(self) weakSelf = self;
 	[_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
 		  [weakSelf handleMethodCall:call result:result];
@@ -201,6 +203,9 @@
 		[_player removeTimeObserver:_timeObserver];
 		_timeObserver = 0;
 	}
+	if (@available(iOS 10.0, *)) {
+		_player.automaticallyWaitsToMinimizeStalling = _automaticallyWaitsToMinimizeStalling;
+	}
 	// TODO: learn about the different ways to define weakSelf.
 	//__weak __typeof__(self) weakSelf = self;
 	//typeof(self) __weak weakSelf = self;
@@ -305,8 +310,11 @@
 }
 
 -(void)setAutomaticallyWaitsToMinimizeStalling:(bool)automaticallyWaitsToMinimizeStalling {
+	_automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
 	if (@available(iOS 10.0, *)) {
-		_player.automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
+		if(_player) {
+			_player.automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
+		}
 	}
 }
 
