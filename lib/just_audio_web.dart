@@ -107,6 +107,8 @@ abstract class JustAudioPlayer {
       _buffering,
       (getCurrentPosition() * 1000).toInt(),
       updateTime,
+      // TODO: buffered position
+      (getCurrentPosition() * 1000).toInt(),
     ]);
   }
 
