@@ -66,6 +66,7 @@ class AudioPlayer {
     buffering: false,
     updatePosition: Duration.zero,
     updateTime: Duration.zero,
+    bufferedPosition: Duration.zero,
     speed: 1.0,
     duration: Duration.zero,
   );
@@ -79,6 +80,8 @@ class AudioPlayer {
   final _playbackStateSubject = BehaviorSubject<AudioPlaybackState>();
 
   final _bufferingSubject = BehaviorSubject<bool>();
+
+  final _bufferedPositionSubject = BehaviorSubject<Duration>();
 
   final _fullPlaybackStateSubject = BehaviorSubject<FullAudioPlaybackState>();
 
@@ -102,6 +105,7 @@ class AudioPlayer {
               buffering: data[1],
               updatePosition: Duration(milliseconds: data[2]),
               updateTime: Duration(milliseconds: data[3]),
+              bufferedPosition: Duration(milliseconds: data[4]),
               speed: _speed,
               duration: _duration,
             ));
@@ -111,6 +115,8 @@ class AudioPlayer {
         .addStream(playbackEventStream.map((state) => state.state).distinct());
     _bufferingSubject.addStream(
         playbackEventStream.map((state) => state.buffering).distinct());
+    _bufferedPositionSubject.addStream(
+        playbackEventStream.map((state) => state.bufferedPosition).distinct());
     _fullPlaybackStateSubject.addStream(
         Rx.combineLatest2<AudioPlaybackState, bool, FullAudioPlaybackState>(
             playbackStateStream,
@@ -144,6 +150,10 @@ class AudioPlayer {
 
   /// A stream of buffering state changes.
   Stream<bool> get bufferingStream => _bufferingSubject.stream;
+
+  /// A stream of buffered positions.
+  Stream<Duration> get bufferedPositionStream =>
+      _bufferedPositionSubject.stream;
 
   /// A stream of [FullAudioPlaybackState]s.
   Stream<FullAudioPlaybackState> get fullPlaybackStateStream =>
@@ -325,6 +335,9 @@ class AudioPlaybackEvent {
   /// The position at [updateTime].
   final Duration updatePosition;
 
+  /// The buffer position.
+  final Duration bufferedPosition;
+
   /// The playback speed.
   final double speed;
 
@@ -336,6 +349,7 @@ class AudioPlaybackEvent {
     @required this.buffering,
     @required this.updateTime,
     @required this.updatePosition,
+    @required this.bufferedPosition,
     @required this.speed,
     @required this.duration,
   });

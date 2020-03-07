@@ -124,14 +124,12 @@
 	_updatePosition = [self getCurrentPosition];
 	_updateTime = now;
 	_eventSink(@[
-		// state
 		@(_state),
-		// buffering
 		@(_buffering),
-		// updatePosition
 		@(_updatePosition),
-		// updateTime
 		@(_updateTime),
+		// TODO: buffer position
+		@(_updatePosition),
 	]);
 }
 

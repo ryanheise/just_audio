@@ -40,7 +40,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	private volatile PlaybackState state;
 	private long updateTime;
 	private long updatePosition;
-
+	private long bufferedPosition;
 	private long duration;
 	private Long start;
 	private Long end;
@@ -51,9 +51,31 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	private Result seekResult;
 	private boolean seekProcessed;
 	private boolean buffering;
+	private boolean justConnected;
 	private MediaSource mediaSource;
 
-	private SimpleExoPlayer player;
+	private final SimpleExoPlayer player;
+	private final Handler handler = new Handler();
+	private final Runnable bufferWatcher = new Runnable() {
+		@Override
+		public void run() {
+			long newBufferedPosition = Math.min(duration, player.getBufferedPosition());
+			if (newBufferedPosition != bufferedPosition) {
+				bufferedPosition = newBufferedPosition;
+				broadcastPlaybackEvent();
+			}
+			if (duration > 0 && newBufferedPosition >= duration) return;
+			if (buffering) {
+				handler.postDelayed(this, 200);
+			} else if (state == PlaybackState.playing) {
+				handler.postDelayed(this, 500);
+			} else if (state == PlaybackState.paused) {
+				handler.postDelayed(this, 1000);
+			} else if (justConnected) {
+				handler.postDelayed(this, 1000);
+			}
+		}
+	};
 
 	public AudioPlayer(final Registrar registrar, final String id) {
 		this.registrar = registrar;
@@ -79,12 +101,18 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		player.addListener(this);
 	}
 
+	private void startWatchingBuffer() {
+		handler.removeCallbacks(bufferWatcher);
+		handler.post(bufferWatcher);
+	}
+
 	@Override
 	public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
 		switch (playbackState) {
 		case Player.STATE_READY:
 			if (prepareResult != null) {
 				duration = player.getDuration();
+				justConnected = true;
 				prepareResult.success(duration);
 				prepareResult = null;
 				transition(PlaybackState.stopped);
@@ -105,6 +133,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		if (notifyBuffering && (buffering != this.buffering)) {
 			this.buffering = buffering;
 			broadcastPlaybackEvent();
+			if (buffering) {
+				startWatchingBuffer();
+			}
 		}
 	}
 
@@ -194,6 +225,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		event.add(buffering);
 		event.add(updatePosition = getCurrentPosition());
 		event.add(updateTime = System.currentTimeMillis());
+		event.add(Math.max(updatePosition, bufferedPosition));
 		eventSink.success(event);
 	}
 
@@ -214,6 +246,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	}
 
 	public void setUrl(final String url, final Result result) throws IOException {
+		justConnected = false;
 		abortExistingConnection();
 		prepareResult = result;
 		transition(PlaybackState.connecting);
@@ -253,7 +286,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		case stopped:
 		case completed:
 		case paused:
+			justConnected = false;
 			transition(PlaybackState.playing);
+			startWatchingBuffer();
 			player.setPlayWhenReady(true);
 			break;
 		default:
