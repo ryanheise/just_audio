@@ -4,21 +4,21 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 
 ## Features
 
-| Feature              | Android   | iOS        |
-| -------              | :-------: | :-----:    |
-| read from URL        | ✅        | ✅         |
-| read from file       | ✅        | (untested) |
-| read from asset      | ✅        | (untested) |
-| DASH                 | ✅        | (untested) |
-| HLS                  | ✅        | (untested) |
-| play/pause/stop/seek | ✅        | ✅         |
-| set volume           | ✅        | (untested) |
-| set speed            | ✅        | (untested) |
-| custom actions       | ✅        | (untested) |
-| clip audio           | ✅        |            |
-| dispose              | ✅        | ✅         |
+| Feature              | Android   | iOS        | Web        |
+| -------              | :-------: | :-----:    | :-----:    |
+| read from URL        | ✅        | ✅         | ✅         |
+| read from file       | ✅        | (untested) |            |
+| read from asset      | ✅        | (untested) |            |
+| DASH                 | ✅        | (untested) | (untested) |
+| HLS                  | ✅        | (untested) | (untested) |
+| play/pause/stop/seek | ✅        | ✅         | ✅         |
+| set volume           | ✅        | (untested) | (untested) |
+| set speed            | ✅        | (untested) | (untested) |
+| custom actions       | ✅        | (untested) | (untested) |
+| clip audio           | ✅        |            | ✅         |
+| dispose              | ✅        | ✅         | ✅         |
 
-This plugin has been tested on Android, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
+This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
 ## Example
 
@@ -54,5 +54,4 @@ await player.dispose();
 ## Todo
 
 * FLAC support
-* Web support
 * Gapless playback
