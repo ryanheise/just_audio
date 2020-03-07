@@ -83,6 +83,8 @@ class AudioPlayer {
 
   double _speed = 1.0;
 
+  File _cacheFile;
+
   /// Creates an [AudioPlayer].
   factory AudioPlayer() =>
       AudioPlayer._internal(DateTime.now().microsecondsSinceEpoch);
@@ -177,7 +179,8 @@ class AudioPlayer {
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
   Future<Duration> setAsset(final String assetPath) async {
-    final file = await _cacheFile;
+    final file = await _getCacheFile(assetPath);
+    this._cacheFile = file;
     if (!file.existsSync()) {
       await file.create(recursive: true);
     }
@@ -186,8 +189,9 @@ class AudioPlayer {
     return await setFilePath(file.path);
   }
 
-  Future<File> get _cacheFile async => File(p.join(
-      (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
+  /// Get file for caching asset media with proper extension
+  Future<File> _getCacheFile(final String assetPath) async => File(p.join(
+      (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id${p.extension(assetPath)}'));
 
   /// Clip the audio to the given [start] and [end] timestamps. This method
   /// cannot be called from the [AudioPlaybackState.none] state.
@@ -271,8 +275,8 @@ class AudioPlayer {
   /// * [AudioPlaybackState.none]
   /// * [AudioPlaybackState.connecting]
   Future<void> dispose() async {
-    if ((await _cacheFile).existsSync()) {
-      (await _cacheFile).deleteSync();
+    if (this._cacheFile?.existsSync() ?? false) {
+      this._cacheFile?.deleteSync();
     }
     await _invokeMethod('dispose');
     await _durationSubject.close();
