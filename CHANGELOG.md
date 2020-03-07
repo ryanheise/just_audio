@@ -1,3 +1,9 @@
+## 0.1.1
+
+* Web implementation.
+* iOS option to minimize stalling.
+* Fix setAsset on iOS.
+
 ## 0.1.0
 
 * Separate buffering state from PlaybackState.
