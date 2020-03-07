@@ -54,6 +54,8 @@ class AudioPlayer {
 
   final int _id;
 
+  Duration _duration;
+
   Future<Duration> _durationFuture;
 
   final _durationSubject = BehaviorSubject<Duration>();
@@ -65,6 +67,7 @@ class AudioPlayer {
     updatePosition: Duration.zero,
     updateTime: Duration.zero,
     speed: 1.0,
+    duration: Duration.zero,
   );
 
   Stream<AudioPlaybackEvent> _eventChannelStream;
@@ -100,6 +103,7 @@ class AudioPlayer {
               updatePosition: Duration(milliseconds: data[2]),
               updateTime: Duration(milliseconds: data[3]),
               speed: _speed,
+              duration: _duration,
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playbackEventSubject.add);
@@ -152,7 +156,7 @@ class AudioPlayer {
           playbackEventStream,
           // TODO: emit periodically only in playing state.
           Stream.periodic(period),
-          (state, _) => state.position);
+          (state, _) => state.position).distinct();
 
   /// The current volume of the player.
   double get volume => _volume;
@@ -170,9 +174,9 @@ class AudioPlayer {
   Future<Duration> setUrl(final String url) async {
     _durationFuture = _invokeMethod('setUrl', [url])
         .then((ms) => ms == null ? null : Duration(milliseconds: ms));
-    final duration = await _durationFuture;
-    _durationSubject.add(duration);
-    return duration;
+    _duration = await _durationFuture;
+    _durationSubject.add(_duration);
+    return _duration;
   }
 
   /// Loads audio media from a file and completes with the duration of that
@@ -197,7 +201,9 @@ class AudioPlayer {
 
   /// Get file for caching asset media with proper extension
   Future<File> _getCacheFile(final String assetPath) async => File(p.join(
-      (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id${p.extension(assetPath)}'));
+      (await getTemporaryDirectory()).path,
+      'just_audio_asset_cache',
+      '$_id${p.extension(assetPath)}'));
 
   /// Clip the audio to the given [start] and [end] timestamps. This method
   /// cannot be called from the [AudioPlaybackState.none] state.
@@ -322,21 +328,30 @@ class AudioPlaybackEvent {
   /// The playback speed.
   final double speed;
 
+  /// The media duration.
+  final Duration duration;
+
   AudioPlaybackEvent({
     @required this.state,
     @required this.buffering,
     @required this.updateTime,
     @required this.updatePosition,
     @required this.speed,
+    @required this.duration,
   });
 
   /// The current position of the player.
-  Duration get position => state == AudioPlaybackState.playing && !buffering
-      ? updatePosition +
+  Duration get position {
+    if (state == AudioPlaybackState.playing && !buffering) {
+      final result = updatePosition +
           (Duration(milliseconds: DateTime.now().millisecondsSinceEpoch) -
                   updateTime) *
-              speed
-      : updatePosition;
+              speed;
+      return result <= duration ? result : duration;
+    } else {
+      return updatePosition;
+    }
+  }
 
   @override
   String toString() =>
