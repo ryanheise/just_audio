@@ -1,3 +1,7 @@
+## 0.1.2
+
+* Broadcast how much audio has been buffered.
+
 ## 0.1.1
 
 * Web implementation.
