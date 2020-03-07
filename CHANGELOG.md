@@ -1,3 +1,7 @@
+## 0.1.3
+
+* Fix bug in web implementation.
+
 ## 0.1.2
 
 * Broadcast how much audio has been buffered.
