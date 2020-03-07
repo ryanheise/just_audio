@@ -71,7 +71,7 @@ abstract class JustAudioPlayer {
       case 'seek':
         return await seek(args[0]);
       case 'dispose':
-        return await dispose();
+        return dispose();
       default:
         throw PlatformException(code: 'Unimplemented');
     }
@@ -94,7 +94,7 @@ abstract class JustAudioPlayer {
   Future<void> seek(int position);
 
   @mustCallSuper
-  Future<void> dispose() {
+  void dispose() {
     eventController.close();
   }
 
@@ -119,7 +119,6 @@ abstract class JustAudioPlayer {
 class Html5AudioPlayer extends JustAudioPlayer {
   AudioElement _audioElement = AudioElement();
   Completer<num> _durationCompleter;
-  double _volume = 1.0;
   double _startPos = 0.0;
   double _start = 0.0;
   double _end;
@@ -173,8 +172,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _audioElement.play();
     if (duration != null) {
       _playOperation = CancelableOperation.fromFuture(Future.delayed(Duration(
-              milliseconds:
-                  (duration * 1000 / _audioElement.playbackRate).toInt())))
+              milliseconds: duration * 1000 ~/ _audioElement.playbackRate)))
           .then((_) {
         pause();
         _playOperation = null;
@@ -209,7 +207,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<void> setVolume(double volume) async {
-    _volume = volume;
     _audioElement.volume = volume;
   }
 
@@ -229,7 +226,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   double getCurrentPosition() => _audioElement.currentTime;
 
   @override
-  Future<void> dispose() async {
+  void dispose() {
     _interruptPlay();
     _audioElement.pause();
     _audioElement.removeAttribute('src');
