@@ -29,6 +29,8 @@ flutter:
         pluginClass: JustAudioPlugin
       ios:
         pluginClass: JustAudioPlugin
+      macos:
+        pluginClass: JustAudioPlugin
       web:
         pluginClass: JustAudioPlugin
         fileName: just_audio_web.dart
