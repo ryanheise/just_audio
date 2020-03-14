@@ -5,6 +5,10 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.metadata.Metadata;
+import com.google.android.exoplayer2.metadata.MetadataOutput;
+import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
+import com.google.android.exoplayer2.metadata.icy.IcyInfo;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
@@ -53,6 +57,23 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	private boolean buffering;
 	private boolean justConnected;
 	private MediaSource mediaSource;
+	private String icyTitle;
+	private String icyUrl;
+	MetadataOutput metadataOutput = new MetadataOutput() {
+		@Override
+		public void onMetadata(Metadata metadata) {
+			for (int i = 0; i < metadata.length(); i++) {
+				final Metadata.Entry entry = metadata.get(i);
+				if (entry instanceof IcyHeaders) {
+					// TODO
+				} else if (entry instanceof IcyInfo) {
+					icyTitle = ((IcyInfo) entry).title;
+					icyUrl = ((IcyInfo) entry).url;
+				}
+				broadcastPlaybackEvent();
+			}
+		}
+	};
 
 	private final SimpleExoPlayer player;
 	private final Handler handler = new Handler();
@@ -98,6 +119,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		state = PlaybackState.none;
 
 		player = new SimpleExoPlayer.Builder(context).build();
+		player.addMetadataOutput(metadataOutput);
 		player.addListener(this);
 	}
 
@@ -226,6 +248,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		event.add(updatePosition = getCurrentPosition());
 		event.add(updateTime = System.currentTimeMillis());
 		event.add(Math.max(updatePosition, bufferedPosition));
+
+		final ArrayList<Object> icyData = new ArrayList<Object>();
+		final ArrayList<String> icyInfo = new ArrayList<String>();
+		icyInfo.add(icyTitle);
+		icyInfo.add(icyUrl);
+		icyData.add(icyInfo);
+		event.add(icyData);
+
 		eventSink.success(event);
 	}
 
