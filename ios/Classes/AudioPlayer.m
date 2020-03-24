@@ -301,8 +301,8 @@
 
 - (void)setSpeed:(float)speed {
 	if (speed == 1.0
-			|| speed < 1.0 && _player.currentItem.canPlaySlowForward
-			|| speed > 1.0 && _player.currentItem.canPlayFastForward) {
+        || (speed < 1.0 && _player.currentItem.canPlaySlowForward)
+        || (speed > 1.0 && _player.currentItem.canPlayFastForward)) {
 		_player.rate = speed;
 	}
 }
