@@ -165,6 +165,7 @@
 	[self setPlaybackState:connecting];
 	if (_player) {
 		[[_player currentItem] removeObserver:self forKeyPath:@"status"];
+        if (@available(iOS 10.0, *)) {[_player removeObserver:self forKeyPath:@"timeControlStatus"];}
 		[[NSNotificationCenter defaultCenter] removeObserver:_endObserver];
 		_endObserver = 0;
 	}
@@ -203,6 +204,10 @@
 	}
 	if (@available(iOS 10.0, *)) {
 		_player.automaticallyWaitsToMinimizeStalling = _automaticallyWaitsToMinimizeStalling;
+        [_player addObserver:self
+        forKeyPath:@"timeControlStatus"
+           options:NSKeyValueObservingOptionNew
+           context:nil];
 	}
 	// TODO: learn about the different ways to define weakSelf.
 	//__weak __typeof__(self) weakSelf = self;
@@ -241,6 +246,27 @@
 				break;
 		}
 	}
+    if (@available(iOS 10.0, *)) {
+        if ([keyPath isEqualToString:@"timeControlStatus"]) {
+            AVPlayerTimeControlStatus status = AVPlayerTimeControlStatusPaused;
+            NSNumber *statusNumber = change[NSKeyValueChangeNewKey];
+            if ([statusNumber isKindOfClass:[NSNumber class]]) {
+                status = statusNumber.integerValue;
+            }
+            switch (status) {
+                case AVPlayerTimeControlStatusPaused:
+                    [self setPlaybackBufferingState:paused buffering:NO];
+                    break;
+                case AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate:
+                   if (_state != stopped) [self setPlaybackBufferingState:stopped buffering:YES];
+                   else [self setPlaybackBufferingState:connecting buffering:YES];
+                    break;
+                case AVPlayerTimeControlStatusPlaying:
+                    [self setPlaybackBufferingState:playing buffering:NO];
+                    break;
+            }
+        }
+    }
 }
 
 - (void)setClip:(NSNumber*)start end:(NSNumber*)end {
@@ -252,7 +278,7 @@
 	//int lag = 6;
 	//int start = [self getCurrentPosition];
 	[_player play];
-	[self setPlaybackState:playing];
+    if (!@available(iOS 10.0, *)) {[self setPlaybackState:playing];}
 	// TODO: convert this Android code to iOS
 	/* if (endDetector != null) { */
 	/* 	handler.removeCallbacks(endDetector); */
@@ -276,7 +302,7 @@
 
 - (void)pause {
 	[_player pause];
-	[self setPlaybackState:paused];
+    if (!@available(iOS 10.0, *)) {[self setPlaybackState:paused];}
 }
 
 - (void)stop {
