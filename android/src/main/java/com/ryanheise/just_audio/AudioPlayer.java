@@ -12,6 +12,8 @@ import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.util.Util;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.EventChannel.EventSink;
@@ -250,7 +252,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		abortExistingConnection();
 		prepareResult = result;
 		transition(PlaybackState.connecting);
-		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, Util.getUserAgent(context, "just_audio"));
+		String userAgent = Util.getUserAgent(context, "just_audio");
+		DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
+				userAgent,
+				DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
+				DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS, 
+				true
+		);
+		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, httpDataSourceFactory);
 		Uri uri = Uri.parse(url);
 		if (uri.getPath().toLowerCase().endsWith(".mpd")) {
 			mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
