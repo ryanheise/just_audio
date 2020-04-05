@@ -7,8 +7,8 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 | Feature              | Android   | iOS        | Web        |
 | -------              | :-------: | :-----:    | :-----:    |
 | read from URL        | ✅        | ✅         | ✅         |
-| read from file       | ✅        | (untested) |            |
-| read from asset      | ✅        | (untested) |            |
+| read from file       | ✅        | ✅         |            |
+| read from asset      | ✅        | ✅         |            |
 | DASH                 | ✅        | (untested) | (untested) |
 | HLS                  | ✅        | (untested) | (untested) |
 | play/pause/stop/seek | ✅        | ✅         | ✅         |
@@ -49,6 +49,32 @@ Release resources:
 
 ```dart
 await player.dispose();
+```
+
+## Connecting to HTTP URLS
+
+If you wish to connect to HTTP URLS, some additional platform-specific configuration is required.
+
+### iOS
+
+Add the following to your `Info.plist` file:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsForMedia</key>
+    <true/>
+</dict>
+```
+
+### Android
+
+Add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+
+```xml
+    <application ... android:usesCleartextTraffic="true">
 ```
 
 ## Todo
