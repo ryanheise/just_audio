@@ -4,19 +4,19 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 
 ## Features
 
-| Feature              | Android   | iOS        | Web        |
-| -------              | :-------: | :-----:    | :-----:    |
-| read from URL        | ✅        | ✅         | ✅         |
-| read from file       | ✅        | ✅         |            |
-| read from asset      | ✅        | ✅         |            |
-| DASH                 | ✅        | (untested) | (untested) |
-| HLS                  | ✅        | (untested) | (untested) |
-| play/pause/stop/seek | ✅        | ✅         | ✅         |
-| set volume           | ✅        | (untested) | (untested) |
-| set speed            | ✅        | (untested) | (untested) |
-| custom actions       | ✅        | (untested) | (untested) |
-| clip audio           | ✅        |            | ✅         |
-| dispose              | ✅        | ✅         | ✅         |
+| Feature              | Android   | iOS        | MacOS      | Web        |
+| -------              | :-------: | :-----:    | :-----:    | :-----:    |
+| read from URL        | ✅        | ✅         | ✅         | ✅         |
+| read from file       | ✅        | ✅         | ✅         |            |
+| read from asset      | ✅        | ✅         | ✅         |            |
+| DASH                 | ✅        | (untested) | (untested) | (untested) |
+| HLS                  | ✅        | (untested) | (untested) | (untested) |
+| play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |
+| set volume           | ✅        | (untested) | (untested) | (untested) |
+| set speed            | ✅        | (untested) | (untested) | (untested) |
+| custom actions       | ✅        | (untested) | (untested) | (untested) |
+| clip audio           | ✅        |            |            | ✅         |
+| dispose              | ✅        | ✅         | ✅         | ✅         |
 
 This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -51,13 +51,19 @@ Release resources:
 await player.dispose();
 ```
 
-## Connecting to HTTP URLS
+## Platform specific configuration
 
-If you wish to connect to HTTP URLS, some additional platform-specific configuration is required.
+### Android
+
+If you wish to connect to non-HTTPS URLS, add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+
+```xml
+    <application ... android:usesCleartextTraffic="true">
+```
 
 ### iOS
 
-Add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
@@ -69,12 +75,25 @@ Add the following to your `Info.plist` file:
 </dict>
 ```
 
-### Android
+### MacOS
 
-Add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+To allow your MacOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
 
 ```xml
-    <application ... android:usesCleartextTraffic="true">
+    <key>com.apple.security.network.client</key>
+    <true/>
+```
+
+If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsForMedia</key>
+    <true/>
+</dict>
 ```
 
 ## Todo
