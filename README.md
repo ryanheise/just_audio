@@ -13,8 +13,7 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 | HLS                  | ✅        | (untested) | (untested) | (untested) |
 | play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |
 | set volume           | ✅        | (untested) | (untested) | (untested) |
-| set speed            | ✅        | (untested) | (untested) | (untested) |
-| custom actions       | ✅        | (untested) | (untested) | (untested) |
+| set speed            | ✅        | (untested) | (untested) | ✅         |
 | clip audio           | ✅        |            |            | ✅         |
 | dispose              | ✅        | ✅         | ✅         | ✅         |
 
