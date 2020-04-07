@@ -165,7 +165,7 @@
 	[self setPlaybackState:connecting];
 	if (_player) {
 		[[_player currentItem] removeObserver:self forKeyPath:@"status"];
-        if (@available(iOS 10.0, *)) {[_player removeObserver:self forKeyPath:@"timeControlStatus"];}
+        if (@available(macOS 10.12, iOS 10.0, *)) {[_player removeObserver:self forKeyPath:@"timeControlStatus"];}
 		[[NSNotificationCenter defaultCenter] removeObserver:_endObserver];
 		_endObserver = 0;
 	}
@@ -202,7 +202,7 @@
 		[_player removeTimeObserver:_timeObserver];
 		_timeObserver = 0;
 	}
-	if (@available(iOS 10.0, *)) {
+	if (@available(macOS 10.12, iOS 10.0, *)) {
 		_player.automaticallyWaitsToMinimizeStalling = _automaticallyWaitsToMinimizeStalling;
         [_player addObserver:self
         forKeyPath:@"timeControlStatus"
@@ -246,7 +246,7 @@
 				break;
 		}
 	}
-    if (@available(iOS 10.0, *)) {
+    if (@available(macOS 10.12, iOS 10.0, *)) {
         if ([keyPath isEqualToString:@"timeControlStatus"]) {
             AVPlayerTimeControlStatus status = AVPlayerTimeControlStatusPaused;
             NSNumber *statusNumber = change[NSKeyValueChangeNewKey];
@@ -278,7 +278,7 @@
 	//int lag = 6;
 	//int start = [self getCurrentPosition];
 	[_player play];
-    if (!@available(iOS 10.0, *)) {[self setPlaybackState:playing];}
+    if (!@available(macOS 10.12, iOS 10.0, *)) {[self setPlaybackState:playing];}
 	// TODO: convert this Android code to iOS
 	/* if (endDetector != null) { */
 	/* 	handler.removeCallbacks(endDetector); */
@@ -302,7 +302,7 @@
 
 - (void)pause {
 	[_player pause];
-    if (!@available(iOS 10.0, *)) {[self setPlaybackState:paused];}
+    if (!@available(macOS 10.12, iOS 10.0, *)) {[self setPlaybackState:paused];}
 }
 
 - (void)stop {
@@ -335,7 +335,7 @@
 
 -(void)setAutomaticallyWaitsToMinimizeStalling:(bool)automaticallyWaitsToMinimizeStalling {
 	_automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
-	if (@available(iOS 10.0, *)) {
+	if (@available(macOS 10.12, iOS 10.0, *)) {
 		if(_player) {
 			_player.automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
 		}
