@@ -373,6 +373,9 @@ class AudioPlaybackEvent {
 }
 
 /// Enumerates the different playback states of a player.
+///
+/// If you also need access to the buffering state, use
+/// [FullAudioPlaybackState].
 enum AudioPlaybackState {
   none,
   stopped,
@@ -382,6 +385,11 @@ enum AudioPlaybackState {
   completed,
 }
 
+/// Encapsulates the playback state and the buffering state.
+///
+/// These two states vary orthogonally, and so if [buffering] is true, you can
+/// check [state] to determine whether this buffering is occurring during the
+/// playing state or the paused state.
 class FullAudioPlaybackState {
   final AudioPlaybackState state;
   final bool buffering;
