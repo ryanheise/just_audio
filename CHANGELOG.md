@@ -1,3 +1,9 @@
+## 0.1.4
+
+* Add MacOS implementation.
+* Support cross-platform redirects on Android.
+* Bug fixes.
+
 ## 0.1.3
 
 * Fix bug in web implementation.
