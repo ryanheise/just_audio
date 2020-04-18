@@ -196,6 +196,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 				setSpeed((float)((double)((Double)args.get(0))));
 				result.success(null);
 				break;
+			case "setAutomaticallyWaitsToMinimizeStalling":
+				result.success(null);
+				break;
 			case "seek":
 				Object position = args.get(0);
 				if (position instanceof Integer) {
