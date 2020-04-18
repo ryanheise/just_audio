@@ -115,9 +115,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 			if (prepareResult != null) {
 				duration = player.getDuration();
 				justConnected = true;
+				transition(PlaybackState.stopped);
 				prepareResult.success(duration);
 				prepareResult = null;
-				transition(PlaybackState.stopped);
 			}
 			if (seekProcessed) {
 				completeSeek();

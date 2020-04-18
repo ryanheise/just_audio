@@ -233,31 +233,60 @@ class AudioPlayer {
   /// * [AudioPlaybackState.connecting]
   /// * [AudioPlaybackState.none]
   Future<void> play() async {
-    StreamSubscription subscription;
-    Completer completer = Completer();
-    bool startedPlaying = false;
-    subscription = playbackStateStream.listen((state) {
-      // TODO: It will be more reliable to let the platform
-      // side wait for completion since events on the flutter
-      // side can lag behind the platform side.
-      if (startedPlaying &&
-          (state == AudioPlaybackState.paused ||
-              state == AudioPlaybackState.stopped ||
-              state == AudioPlaybackState.completed)) {
-        subscription.cancel();
-        completer.complete();
-      } else if (state == AudioPlaybackState.playing) {
-        startedPlaying = true;
-      }
-    });
-    await _invokeMethod('play');
-    await completer.future;
+    switch (playbackState) {
+      case AudioPlaybackState.playing:
+      case AudioPlaybackState.stopped:
+      case AudioPlaybackState.completed:
+      case AudioPlaybackState.paused:
+        // Update local state immediately so that queries aren't surprised.
+        _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+          state: AudioPlaybackState.playing,
+        );
+        StreamSubscription subscription;
+        Completer completer = Completer();
+        bool startedPlaying = false;
+        subscription = playbackStateStream.listen((state) {
+          // TODO: It will be more reliable to let the platform
+          // side wait for completion since events on the flutter
+          // side can lag behind the platform side.
+          if (startedPlaying &&
+              (state == AudioPlaybackState.paused ||
+                  state == AudioPlaybackState.stopped ||
+                  state == AudioPlaybackState.completed)) {
+            subscription.cancel();
+            completer.complete();
+          } else if (state == AudioPlaybackState.playing) {
+            startedPlaying = true;
+          }
+        });
+        await _invokeMethod('play');
+        await completer.future;
+        break;
+      default:
+        throw Exception(
+            "Cannot call play from connecting/none states ($playbackState)");
+    }
   }
 
   /// Pauses the currently playing media. It is legal to invoke this method
   /// only from the [AudioPlaybackState.playing] state.
   Future<void> pause() async {
-    await _invokeMethod('pause');
+    switch (playbackState) {
+      case AudioPlaybackState.paused:
+        break;
+      case AudioPlaybackState.playing:
+        // Update local state immediately so that queries aren't surprised.
+        _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+          state: AudioPlaybackState.paused,
+        );
+        // TODO: For pause, perhaps modify platform side to ensure new state
+        // is broadcast before this method returns.
+        await _invokeMethod('pause');
+        break;
+      default:
+        throw Exception(
+            "Can call pause only from playing and buffering states ($playbackState)");
+    }
   }
 
   /// Stops the currently playing media such that the next [play] invocation
@@ -268,7 +297,24 @@ class AudioPlayer {
   /// * [AudioPlaybackState.paused]
   /// * [AudioPlaybackState.completed]
   Future<void> stop() async {
-    await _invokeMethod('stop');
+    switch (playbackState) {
+      case AudioPlaybackState.stopped:
+        break;
+      case AudioPlaybackState.connecting:
+      case AudioPlaybackState.completed:
+      case AudioPlaybackState.playing:
+      case AudioPlaybackState.paused:
+        // Update local state immediately so that queries aren't surprised.
+        // NOTE: Android implementation already handles this.
+        // TODO: Do the same for iOS so the line below becomes unnecessary.
+        _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+          state: AudioPlaybackState.paused,
+        );
+        await _invokeMethod('stop');
+        break;
+      default:
+        throw Exception("Cannot call stop from none state");
+    }
   }
 
   /// Sets the volume of this player, where 1.0 is normal volume.
@@ -353,6 +399,25 @@ class AudioPlaybackEvent {
     @required this.speed,
     @required this.duration,
   });
+
+  AudioPlaybackEvent copyWith({
+    AudioPlaybackState state,
+    bool buffering,
+    Duration updateTime,
+    Duration updatePosition,
+    Duration bufferedPosition,
+    double speed,
+    Duration duration,
+  }) =>
+      AudioPlaybackEvent(
+        state: state ?? this.state,
+        buffering: buffering ?? this.buffering,
+        updateTime: updateTime ?? this.updateTime,
+        updatePosition: updatePosition ?? this.updatePosition,
+        bufferedPosition: bufferedPosition ?? this.bufferedPosition,
+        speed: speed ?? this.speed,
+        duration: duration ?? this.duration,
+      );
 
   /// The current position of the player.
   Duration get position {
