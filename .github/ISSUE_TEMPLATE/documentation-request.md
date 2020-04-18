@@ -2,7 +2,7 @@
 name: Documentation request
 about: Suggest an improvement to the documentation
 title: ''
-labels: 0 - Backlog, documentation
+labels: documentation
 assignees: ryanheise
 
 ---
