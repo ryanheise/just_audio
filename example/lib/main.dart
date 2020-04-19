@@ -48,26 +48,28 @@ class _MyAppState extends State<MyApp> {
             children: [
               Text("Science Friday"),
               Text("Science Friday and WNYC Studios"),
-              StreamBuilder<AudioPlaybackState>(
-                stream: _player.playbackStateStream,
+              StreamBuilder<FullAudioPlaybackState>(
+                stream: _player.fullPlaybackStateStream,
                 builder: (context, snapshot) {
-                  final state = snapshot.data;
+                  final fullState = snapshot.data;
+                  final state = fullState?.state;
+                  final buffering = fullState?.buffering;
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (state == AudioPlaybackState.playing)
-                        IconButton(
-                          icon: Icon(Icons.pause),
-                          iconSize: 64.0,
-                          onPressed: _player.pause,
-                        )
-                      else if (state == AudioPlaybackState.buffering ||
-                          state == AudioPlaybackState.connecting)
+                      if (state == AudioPlaybackState.connecting ||
+                          buffering == true)
                         Container(
                           margin: EdgeInsets.all(8.0),
                           width: 64.0,
                           height: 64.0,
                           child: CircularProgressIndicator(),
+                        )
+                      else if (state == AudioPlaybackState.playing)
+                        IconButton(
+                          icon: Icon(Icons.pause),
+                          iconSize: 64.0,
+                          onPressed: _player.pause,
                         )
                       else
                         IconButton(

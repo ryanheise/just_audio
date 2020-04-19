@@ -34,10 +34,7 @@ import 'package:rxdart/rxdart.dart';
 /// * [AudioPlaybackState.stopped]: eventually after [setUrl], [setFilePath],
 /// [setAsset] or [setClip] completes, and immediately after [stop].
 /// * [AudioPlaybackState.paused]: after [pause].
-/// * [AudioPlaybackState.playing]: after [play] and after sufficiently
-/// buffering during normal playback.
-/// * [AudioPlaybackState.buffering]: immediately after a seek request and
-/// during normal playback when the next buffer is not ready to be played.
+/// * [AudioPlaybackState.playing]: after [play].
 /// * [AudioPlaybackState.connecting]: immediately after [setUrl],
 /// [setFilePath] and [setAsset] while waiting for the media to load.
 /// * [AudioPlaybackState.completed]: immediately after playback reaches the
@@ -57,6 +54,8 @@ class AudioPlayer {
 
   final int _id;
 
+  Duration _duration;
+
   Future<Duration> _durationFuture;
 
   final _durationSubject = BehaviorSubject<Duration>();
@@ -64,9 +63,12 @@ class AudioPlayer {
   // TODO: also broadcast this event on instantiation.
   AudioPlaybackEvent _audioPlaybackEvent = AudioPlaybackEvent(
     state: AudioPlaybackState.none,
+    buffering: false,
     updatePosition: Duration.zero,
     updateTime: Duration.zero,
+    bufferedPosition: Duration.zero,
     speed: 1.0,
+    duration: Duration.zero,
   );
 
   Stream<AudioPlaybackEvent> _eventChannelStream;
@@ -77,9 +79,19 @@ class AudioPlayer {
 
   final _playbackStateSubject = BehaviorSubject<AudioPlaybackState>();
 
+  final _bufferingSubject = BehaviorSubject<bool>();
+
+  final _bufferedPositionSubject = BehaviorSubject<Duration>();
+
+  final _fullPlaybackStateSubject = BehaviorSubject<FullAudioPlaybackState>();
+
   double _volume = 1.0;
 
   double _speed = 1.0;
+
+  bool _automaticallyWaitsToMinimizeStalling = true;
+
+  File _cacheFile;
 
   /// Creates an [AudioPlayer].
   factory AudioPlayer() =>
@@ -90,14 +102,26 @@ class AudioPlayer {
         .receiveBroadcastStream()
         .map((data) => _audioPlaybackEvent = AudioPlaybackEvent(
               state: AudioPlaybackState.values[data[0]],
-              updatePosition: Duration(milliseconds: data[1]),
-              updateTime: Duration(milliseconds: data[2]),
+              buffering: data[1],
+              updatePosition: Duration(milliseconds: data[2]),
+              updateTime: Duration(milliseconds: data[3]),
+              bufferedPosition: Duration(milliseconds: data[4]),
               speed: _speed,
+              duration: _duration,
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playbackEventSubject.add);
     _playbackStateSubject
         .addStream(playbackEventStream.map((state) => state.state).distinct());
+    _bufferingSubject.addStream(
+        playbackEventStream.map((state) => state.buffering).distinct());
+    _bufferedPositionSubject.addStream(
+        playbackEventStream.map((state) => state.bufferedPosition).distinct());
+    _fullPlaybackStateSubject.addStream(
+        Rx.combineLatest2<AudioPlaybackState, bool, FullAudioPlaybackState>(
+            playbackStateStream,
+            bufferingStream,
+            (state, buffering) => FullAudioPlaybackState(state, buffering)));
   }
 
   /// The duration of any media set via [setUrl], [setFilePath] or [setAsset],
@@ -121,6 +145,20 @@ class AudioPlayer {
   Stream<AudioPlaybackState> get playbackStateStream =>
       _playbackStateSubject.stream;
 
+  /// Whether the player is buffering.
+  bool get buffering => _audioPlaybackEvent.buffering;
+
+  /// A stream of buffering state changes.
+  Stream<bool> get bufferingStream => _bufferingSubject.stream;
+
+  /// A stream of buffered positions.
+  Stream<Duration> get bufferedPositionStream =>
+      _bufferedPositionSubject.stream;
+
+  /// A stream of [FullAudioPlaybackState]s.
+  Stream<FullAudioPlaybackState> get fullPlaybackStateStream =>
+      _fullPlaybackStateSubject.stream;
+
   /// A stream periodically tracking the current position of this player.
   Stream<Duration> getPositionStream(
           [final Duration period = const Duration(milliseconds: 200)]) =>
@@ -128,13 +166,17 @@ class AudioPlayer {
           playbackEventStream,
           // TODO: emit periodically only in playing state.
           Stream.periodic(period),
-          (state, _) => state.position);
+          (state, _) => state.position).distinct();
 
   /// The current volume of the player.
   double get volume => _volume;
 
   /// The current speed of the player.
   double get speed => _speed;
+
+  /// Whether the player should automatically delay playback in order to minimize stalling. (iOS 10.0 or later only)
+  bool get automaticallyWaitsToMinimizeStalling =>
+      _automaticallyWaitsToMinimizeStalling;
 
   /// Loads audio media from a URL and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
@@ -143,9 +185,9 @@ class AudioPlayer {
     try {
       _durationFuture = _invokeMethod('setUrl', [url])
           .then((ms) => ms == null ? null : Duration(milliseconds: ms));
-      final duration = await _durationFuture;
-      _durationSubject.add(duration);
-      return duration;
+      _duration = await _durationFuture;
+      _durationSubject.add(_duration);
+      return _duration;
     } on PlatformException catch (e) {
       return Future.error(e.message);
     }
@@ -161,7 +203,8 @@ class AudioPlayer {
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
   Future<Duration> setAsset(final String assetPath) async {
-    final file = await _cacheFile;
+    final file = await _getCacheFile(assetPath);
+    this._cacheFile = file;
     if (!file.existsSync()) {
       await file.create(recursive: true);
     }
@@ -170,8 +213,11 @@ class AudioPlayer {
     return await setFilePath(file.path);
   }
 
-  Future<File> get _cacheFile async => File(p.join(
-      (await getTemporaryDirectory()).path, 'just_audio_asset_cache', '$_id'));
+  /// Get file for caching asset media with proper extension
+  Future<File> _getCacheFile(final String assetPath) async => File(p.join(
+      (await getTemporaryDirectory()).path,
+      'just_audio_asset_cache',
+      '$_id${p.extension(assetPath)}'));
 
   /// Clip the audio to the given [start] and [end] timestamps. This method
   /// cannot be called from the [AudioPlaybackState.none] state.
@@ -191,34 +237,60 @@ class AudioPlayer {
   /// * [AudioPlaybackState.connecting]
   /// * [AudioPlaybackState.none]
   Future<void> play() async {
-    StreamSubscription subscription;
-    Completer completer = Completer();
-    bool startedPlaying = false;
-    subscription = playbackStateStream.listen((state) {
-      // TODO: It will be more reliable to let the platform
-      // side wait for completion since events on the flutter
-      // side can lag behind the platform side.
-      if (startedPlaying &&
-          (state == AudioPlaybackState.paused ||
-              state == AudioPlaybackState.stopped ||
-              state == AudioPlaybackState.completed)) {
-        subscription.cancel();
-        completer.complete();
-      } else if (state == AudioPlaybackState.playing) {
-        startedPlaying = true;
-      }
-    });
-    await _invokeMethod('play');
-    await completer.future;
+    switch (playbackState) {
+      case AudioPlaybackState.playing:
+      case AudioPlaybackState.stopped:
+      case AudioPlaybackState.completed:
+      case AudioPlaybackState.paused:
+        // Update local state immediately so that queries aren't surprised.
+        _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+          state: AudioPlaybackState.playing,
+        );
+        StreamSubscription subscription;
+        Completer completer = Completer();
+        bool startedPlaying = false;
+        subscription = playbackStateStream.listen((state) {
+          // TODO: It will be more reliable to let the platform
+          // side wait for completion since events on the flutter
+          // side can lag behind the platform side.
+          if (startedPlaying &&
+              (state == AudioPlaybackState.paused ||
+                  state == AudioPlaybackState.stopped ||
+                  state == AudioPlaybackState.completed)) {
+            subscription.cancel();
+            completer.complete();
+          } else if (state == AudioPlaybackState.playing) {
+            startedPlaying = true;
+          }
+        });
+        await _invokeMethod('play');
+        await completer.future;
+        break;
+      default:
+        throw Exception(
+            "Cannot call play from connecting/none states ($playbackState)");
+    }
   }
 
   /// Pauses the currently playing media. It is legal to invoke this method
-  /// only from the following states:
-  ///
-  /// * [AudioPlaybackState.playing]
-  /// * [AudioPlaybackState.buffering]
+  /// only from the [AudioPlaybackState.playing] state.
   Future<void> pause() async {
-    await _invokeMethod('pause');
+    switch (playbackState) {
+      case AudioPlaybackState.paused:
+        break;
+      case AudioPlaybackState.playing:
+        // Update local state immediately so that queries aren't surprised.
+        _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+          state: AudioPlaybackState.paused,
+        );
+        // TODO: For pause, perhaps modify platform side to ensure new state
+        // is broadcast before this method returns.
+        await _invokeMethod('pause');
+        break;
+      default:
+        throw Exception(
+            "Can call pause only from playing and buffering states ($playbackState)");
+    }
   }
 
   /// Stops the currently playing media such that the next [play] invocation
@@ -229,7 +301,24 @@ class AudioPlayer {
   /// * [AudioPlaybackState.paused]
   /// * [AudioPlaybackState.completed]
   Future<void> stop() async {
-    await _invokeMethod('stop');
+    switch (playbackState) {
+      case AudioPlaybackState.stopped:
+        break;
+      case AudioPlaybackState.connecting:
+      case AudioPlaybackState.completed:
+      case AudioPlaybackState.playing:
+      case AudioPlaybackState.paused:
+        // Update local state immediately so that queries aren't surprised.
+        // NOTE: Android implementation already handles this.
+        // TODO: Do the same for iOS so the line below becomes unnecessary.
+        _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+          state: AudioPlaybackState.paused,
+        );
+        await _invokeMethod('stop');
+        break;
+      default:
+        throw Exception("Cannot call stop from none state");
+    }
   }
 
   /// Sets the volume of this player, where 1.0 is normal volume.
@@ -242,6 +331,16 @@ class AudioPlayer {
   Future<void> setSpeed(final double speed) async {
     _speed = speed;
     await _invokeMethod('setSpeed', [speed]);
+  }
+
+  /// Sets automaticallyWaitsToMinimizeStalling for AVPlayer in iOS 10.0 or later, defaults to true.
+  /// Has no effect on Android clients
+  Future<void> setAutomaticallyWaitsToMinimizeStalling(
+      final bool automaticallyWaitsToMinimizeStalling) async {
+    _automaticallyWaitsToMinimizeStalling =
+        automaticallyWaitsToMinimizeStalling;
+    await _invokeMethod('setAutomaticallyWaitsToMinimizeStalling',
+        [automaticallyWaitsToMinimizeStalling]);
   }
 
   /// Seeks to a particular position. It is legal to invoke this method from
@@ -258,8 +357,8 @@ class AudioPlayer {
   /// * [AudioPlaybackState.none]
   /// * [AudioPlaybackState.connecting]
   Future<void> dispose() async {
-    if ((await _cacheFile).existsSync()) {
-      (await _cacheFile).deleteSync();
+    if (this._cacheFile?.existsSync() ?? false) {
+      this._cacheFile?.deleteSync();
     }
     await _invokeMethod('dispose');
     await _durationSubject.close();
@@ -276,6 +375,9 @@ class AudioPlaybackEvent {
   /// The current playback state.
   final AudioPlaybackState state;
 
+  /// Whether the player is buffering.
+  final bool buffering;
+
   /// When the last time a position discontinuity happened, as measured in time
   /// since the epoch.
   final Duration updateTime;
@@ -283,23 +385,56 @@ class AudioPlaybackEvent {
   /// The position at [updateTime].
   final Duration updatePosition;
 
+  /// The buffer position.
+  final Duration bufferedPosition;
+
   /// The playback speed.
   final double speed;
 
+  /// The media duration.
+  final Duration duration;
+
   AudioPlaybackEvent({
     @required this.state,
+    @required this.buffering,
     @required this.updateTime,
     @required this.updatePosition,
+    @required this.bufferedPosition,
     @required this.speed,
+    @required this.duration,
   });
 
+  AudioPlaybackEvent copyWith({
+    AudioPlaybackState state,
+    bool buffering,
+    Duration updateTime,
+    Duration updatePosition,
+    Duration bufferedPosition,
+    double speed,
+    Duration duration,
+  }) =>
+      AudioPlaybackEvent(
+        state: state ?? this.state,
+        buffering: buffering ?? this.buffering,
+        updateTime: updateTime ?? this.updateTime,
+        updatePosition: updatePosition ?? this.updatePosition,
+        bufferedPosition: bufferedPosition ?? this.bufferedPosition,
+        speed: speed ?? this.speed,
+        duration: duration ?? this.duration,
+      );
+
   /// The current position of the player.
-  Duration get position => state == AudioPlaybackState.playing
-      ? updatePosition +
+  Duration get position {
+    if (state == AudioPlaybackState.playing && !buffering) {
+      final result = updatePosition +
           (Duration(milliseconds: DateTime.now().millisecondsSinceEpoch) -
                   updateTime) *
-              speed
-      : updatePosition;
+              speed;
+      return result <= duration ? result : duration;
+    } else {
+      return updatePosition;
+    }
+  }
 
   @override
   String toString() =>
@@ -307,12 +442,26 @@ class AudioPlaybackEvent {
 }
 
 /// Enumerates the different playback states of a player.
+///
+/// If you also need access to the buffering state, use
+/// [FullAudioPlaybackState].
 enum AudioPlaybackState {
   none,
   stopped,
   paused,
   playing,
-  buffering,
   connecting,
   completed,
+}
+
+/// Encapsulates the playback state and the buffering state.
+///
+/// These two states vary orthogonally, and so if [buffering] is true, you can
+/// check [state] to determine whether this buffering is occurring during the
+/// playing state or the paused state.
+class FullAudioPlaybackState {
+  final AudioPlaybackState state;
+  final bool buffering;
+
+  FullAudioPlaybackState(this.state, this.buffering);
 }

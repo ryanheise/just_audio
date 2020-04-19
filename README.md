@@ -4,22 +4,21 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 
 ## Features
 
-| Feature              | Android   | iOS        |
-| -------              | :-------: | :-----:    |
-| read from URL        | ✅        | ✅         |
-| read from file       | ✅        | (untested) |
-| read from asset      | ✅        | (untested) |
-| DASH                 | ✅        | (untested) |
-| HLS                  | ✅        | (untested) |
-| play/pause/stop/seek | ✅        | ✅         |
-| set volume           | ✅        | (untested) |
-| set speed            | ✅        | (untested) |
-| custom actions       | ✅        | (untested) |
-| clip audio           | ✅        |            |
-| dispose              | ✅        | ✅         |
-| catch player errors  | ✅        |            |
+| Feature              | Android   | iOS        | MacOS      | Web        |
+| -------              | :-------: | :-----:    | :-----:    | :-----:    |
+| read from URL        | ✅        | ✅         | ✅         | ✅         |
+| read from file       | ✅        | ✅         | ✅         |            |
+| read from asset      | ✅        | ✅         | ✅         |            |
+| DASH                 | ✅        | (untested) | (untested) | (untested) |
+| HLS                  | ✅        | (untested) | (untested) | (untested) |
+| play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |
+| set volume           | ✅        | (untested) | (untested) | (untested) |
+| set speed            | ✅        | (untested) | (untested) | ✅         |
+| clip audio           | ✅        |            |            | ✅         |
+| dispose              | ✅        | ✅         | ✅         | ✅         |
+| catch player errors  | ✅        |           |           |           |
 
-This plugin has been tested on Android, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
+This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
 ## Example
 
@@ -61,8 +60,52 @@ player.setUrl("https://s3.amazonaws.com/404-file.mp3").catchError((error) {
 });
 ```
 
+## Platform specific configuration
+
+### Android
+
+If you wish to connect to non-HTTPS URLS, add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+
+```xml
+    <application ... android:usesCleartextTraffic="true">
+```
+
+### iOS
+
+If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsForMedia</key>
+    <true/>
+</dict>
+```
+
+### MacOS
+
+To allow your MacOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
+
+```xml
+    <key>com.apple.security.network.client</key>
+    <true/>
+```
+
+If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsForMedia</key>
+    <true/>
+</dict>
+```
+
 ## Todo
 
 * FLAC support
-* Web support
 * Gapless playback

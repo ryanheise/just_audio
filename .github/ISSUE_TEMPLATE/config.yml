@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Community Support
+    url: https://stackoverflow.com/search?q=just_audio
+    about: Ask for help on Stack Overflow.
+  - name: New to Flutter?
+    url: https://gitter.im/flutter/flutter
+    about: Chat with other Flutter developers on Gitter.

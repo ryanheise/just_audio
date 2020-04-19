@@ -1,3 +1,33 @@
+## 0.1.5
+
+* Update dependencies and documentation.
+
+## 0.1.4
+
+* Add MacOS implementation.
+* Support cross-platform redirects on Android.
+* Bug fixes.
+
+## 0.1.3
+
+* Fix bug in web implementation.
+
+## 0.1.2
+
+* Broadcast how much audio has been buffered.
+
+## 0.1.1
+
+* Web implementation.
+* iOS option to minimize stalling.
+* Fix setAsset on iOS.
+
+## 0.1.0
+
+* Separate buffering state from PlaybackState.
+* More permissive state transitions.
+* Support playing local files on iOS.
+
 ## 0.0.6
 
 * Bug fixes.

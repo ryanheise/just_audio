@@ -14,6 +14,8 @@ import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.util.Util;
 
 import io.flutter.Log;
@@ -44,26 +46,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
     private final MethodChannel methodChannel;
     private final EventChannel eventChannel;
     private EventSink eventSink;
-    private final Handler handler = new Handler();
-    private final Runnable positionObserver = new Runnable() {
-        @Override
-        public void run() {
-            if (state != PlaybackState.playing && state != PlaybackState.buffering)
-                return;
 
-            if (eventSink != null) {
-                checkForDiscontinuity();
-            }
-            handler.postDelayed(this, 200);
-        }
-    };
 
     private final String id;
     private volatile PlaybackState state;
-    private PlaybackState stateBeforeSeek;
-    private long updateTime;
+    private  long updateTime;
     private long updatePosition;
-
+private long bufferedPosition;
     private long duration;
     private Long start;
     private Long end;
@@ -72,10 +61,32 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
     private Long seekPos;
     private Result prepareResult;
     private Result seekResult;
-    private boolean seekProcessed;
+    private boolean seekProcessed;private boolean buffering;
+	private boolean justConnected;
     private MediaSource mediaSource;
 
-    private SimpleExoPlayer player;
+    private final SimpleExoPlayer player;
+	private final Handler handler = new Handler();
+	private final Runnable bufferWatcher = new Runnable() {
+		@Override
+		public void run() {
+			long newBufferedPosition = Math.min(duration, player.getBufferedPosition());
+			if (newBufferedPosition != bufferedPosition) {
+				bufferedPosition = newBufferedPosition;
+				broadcastPlaybackEvent();
+			}
+			if (duration > 0 && newBufferedPosition >= duration) return;
+			if (buffering) {
+				handler.postDelayed(this, 200);
+			} else if (state == PlaybackState.playing) {
+				handler.postDelayed(this, 500);
+			} else if (state == PlaybackState.paused) {
+				handler.postDelayed(this, 1000);
+			} else if (justConnected) {
+				handler.postDelayed(this, 1000);
+			}
+		}
+	};
 
     public AudioPlayer(final Registrar registrar, final String id) {
         this.registrar = registrar;
@@ -101,23 +112,25 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
         player.addListener(this);
     }
 
-    @Override
+    private void startWatchingBuffer() {
+		handler.removeCallbacks(bufferWatcher);
+		handler.post(bufferWatcher);
+	}@Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
         Log.i(TAG, String.valueOf(playbackState));
         switch (playbackState) {
             case Player.STATE_READY:
                 if (prepareResult != null) {
-                    duration = player.getDuration();
+                    duration = player.getDuration();justConnected = true;
+				transition(PlaybackState.stopped);
                     prepareResult.success(duration);
                     prepareResult = null;
-                    transition(PlaybackState.stopped);
+
                 }
                 if (seekProcessed) {
                     completeSeek();
                 }
-                break;
-            case Player.STATE_BUFFERING:
-                // TODO: use this instead of checkForDiscontinuity.
+
                 break;
             case Player.STATE_ENDED:
                 if (state != PlaybackState.completed) {
@@ -125,7 +138,17 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
                 }
                 break;
         }
-    }
+    final boolean buffering = playbackState == Player.STATE_BUFFERING;
+		// don't notify buffering if (buffering && state == stopped)
+		final boolean notifyBuffering = !buffering || state != PlaybackState.stopped;
+		if (notifyBuffering && (buffering != this.buffering)) {
+			this.buffering = buffering;
+			broadcastPlaybackEvent();
+			if (buffering) {
+				startWatchingBuffer();
+			}
+		}
+	}
 
     @Override
     public void onPlayerError(ExoPlaybackException error) {
@@ -161,28 +184,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
     private void completeSeek() {
         seekProcessed = false;
         seekPos = null;
-        transition(stateBeforeSeek);
+
         seekResult.success(null);
-        stateBeforeSeek = null;
+
         seekResult = null;
     }
 
-    private void checkForDiscontinuity() {
-        final long now = System.currentTimeMillis();
-        final long position = getCurrentPosition();
-        final long timeSinceLastUpdate = now - updateTime;
-        final long expectedPosition = updatePosition + (long) (timeSinceLastUpdate * speed);
-        final long drift = position - expectedPosition;
-        // Update if we've drifted or just started observing
-        if (updateTime == 0L) {
-            broadcastPlaybackEvent();
-        } else if (drift < -100) {
-            System.out.println("time discontinuity detected: " + drift);
-            transition(PlaybackState.buffering);
-        } else if (state == PlaybackState.buffering) {
-            transition(PlaybackState.playing);
-        }
-    }
+
 
     @Override
     public void onMethodCall(final MethodCall call, final Result result) {
@@ -219,7 +227,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
                     result.success(null);
                     break;
                 case "setSpeed":
-                    setSpeed((float) ((double) ((Double) args.get(0))));
+                    setSpeed((float) ((double) ((Double) args.get(0))));result.success(null);
+				break;
+			case "setAutomaticallyWaitsToMinimizeStalling":
                     result.success(null);
                     break;
                 case "seek":
@@ -250,10 +260,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
     private void broadcastPlaybackEvent() {
         final ArrayList<Object> event = new ArrayList<Object>();
         event.add(state.ordinal());
-        event.add(updatePosition = getCurrentPosition());
+        event.add(buffering);event.add(updatePosition = getCurrentPosition());
         event.add(updateTime = System.currentTimeMillis());
-        eventSink.success(event);
-    }
+        event.add(Math.max(updatePosition, bufferedPosition));
+		if (eventSink != null) {eventSink.success(event);
+    }}
 
     private long getCurrentPosition() {
         if (state == PlaybackState.none || state == PlaybackState.connecting) {
@@ -275,17 +286,21 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
     private void transition(final PlaybackState newState) {
         final PlaybackState oldState = state;
         state = newState;
-        if (oldState != PlaybackState.playing && newState == PlaybackState.playing) {
-            startObservingPosition();
-        }
+
         broadcastPlaybackEvent();
     }
 
     public void setUrl(final String url, final Result result) throws IOException {
-        abortExistingConnection();
+        justConnected = false;abortExistingConnection();
         prepareResult = result;
-        transition(PlaybackState.connecting);
-        DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, Util.getUserAgent(context, "just_audio"));
+        transition(PlaybackState.connecting);String userAgent = Util.getUserAgent(context, "just_audio");
+		DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
+				userAgent,
+				DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
+				DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
+				true
+		);
+        DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, httpDataSourceFactory);
         Uri uri = Uri.parse(url);
         if (uri.getPath().toLowerCase().endsWith(".mpd")) {
             mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
@@ -320,13 +335,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
                 break;
             case stopped:
             case completed:
-            case buffering:
-            case paused:
-                player.setPlayWhenReady(true);
+            case  paused:
+                justConnected = false;
                 transition(PlaybackState.playing);
-                break;
+                startWatchingBuffer();
+			player.setPlayWhenReady(true);break;
             default:
-                throw new IllegalStateException("Cannot call play from connecting or none states (" + state + ")");
+                throw new IllegalStateException("Cannot call play from connecting / none states (" + state + ")");
         }
     }
 
@@ -335,7 +350,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
             case paused:
                 break;
             case playing:
-            case buffering:
+
                 player.setPlayWhenReady(false);
                 transition(PlaybackState.paused);
                 break;
@@ -350,20 +365,21 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
                 result.success(null);
                 break;
             case connecting:
-                transition(PlaybackState.stopped);
+                abortExistingConnection();
+			buffering = false;transition(PlaybackState.stopped);
                 result.success(null);
                 break;
             case completed:
             case playing:
-            case buffering:
+
             case paused:
-                player.setPlayWhenReady(false);
-                player.seekTo(0L);
-                transition(PlaybackState.stopped);
+                abortSeek();player.setPlayWhenReady(false);
+                transition(PlaybackState.stopped);player.seekTo(0L);
+
                 result.success(null);
                 break;
             default:
-                throw new IllegalStateException("Can call stop only from playing/paused/completed states (" + state + ")");
+                throw new IllegalStateException("Cannot call stop from none state");
         }
     }
 
@@ -382,43 +398,41 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
         if (state == PlaybackState.none || state == PlaybackState.connecting) {
             throw new IllegalStateException("Cannot call seek from none none/connecting states");
         }
-        if (seekResult != null) {
-            seekResult.success(null);
-        }
+        abortSeek();
         seekPos = position;
         seekResult = result;
         seekProcessed = false;
-        if (stateBeforeSeek == null) {
-            stateBeforeSeek = state;
-        }
-        handler.removeCallbacks(positionObserver);
-        transition(PlaybackState.buffering);
+
         player.seekTo(position);
     }
 
     public void dispose() {
         player.release();
-        transition(PlaybackState.none);
+        buffering = false;transition(PlaybackState.none);
     }
 
-    private void abortExistingConnection() {
+    private void abortSeek() {
+		if (seekResult != null) {
+			seekResult.success(null);
+			seekResult = null;
+			seekPos = null;
+			seekProcessed = false;
+		}
+	}private void abortExistingConnection() {
         if (prepareResult != null) {
             prepareResult.success(null);
             prepareResult = null;
         }
     }
 
-    private void startObservingPosition() {
-        handler.removeCallbacks(positionObserver);
-        handler.post(positionObserver);
-    }
+
 
     enum PlaybackState {
         none,
         stopped,
         paused,
         playing,
-        buffering,
+
         connecting,
         completed
     }
