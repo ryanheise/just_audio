@@ -147,7 +147,6 @@ class AudioPlayer {
       _durationSubject.add(duration);
       return duration;
     } on PlatformException catch (e) {
-      print('onError $e');
       return Future.error(e.message);
     }
   }

@@ -21,12 +21,11 @@ class _MyAppState extends State<MyApp> {
     _player = AudioPlayer();
     _player
         .setUrl(
-            "http://softarthosting.com/irwane/derous/ramadan2019/100alquran.mp3")
+            "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")
         .catchError((error) {
-          // catch audio error ex: 404 url, wrong url ...
+      // catch audio error ex: 404 url, wrong url ...
       print(error);
     });
-//        "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3");
   }
 
   @override
