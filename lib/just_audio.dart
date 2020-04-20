@@ -182,11 +182,15 @@ class AudioPlayer {
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
   Future<Duration> setUrl(final String url) async {
-    _durationFuture = _invokeMethod('setUrl', [url])
-        .then((ms) => ms == null ? null : Duration(milliseconds: ms));
-    _duration = await _durationFuture;
-    _durationSubject.add(_duration);
-    return _duration;
+    try {
+      _durationFuture = _invokeMethod('setUrl', [url])
+          .then((ms) => ms == null ? null : Duration(milliseconds: ms));
+      _duration = await _durationFuture;
+      _durationSubject.add(_duration);
+      return _duration;
+    } on PlatformException catch (e) {
+      return Future.error(e.message);
+    }
   }
 
   /// Loads audio media from a file and completes with the duration of that

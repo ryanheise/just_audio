@@ -16,6 +16,7 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 | set speed            | ✅        | (untested) | (untested) | ✅         |
 | clip audio           | ✅        |            |            | ✅         |
 | dispose              | ✅        | ✅         | ✅         | ✅         |
+| catch player errors  | ✅        |           |           |           |
 
 This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -48,6 +49,15 @@ Release resources:
 
 ```dart
 await player.dispose();
+```
+
+Catch player error: 
+
+```dart
+player.setUrl("https://s3.amazonaws.com/404-file.mp3").catchError((error) {
+  // catch audio error ex: 404 url, wrong url ...
+  print(error);
+});
 ```
 
 ## Platform specific configuration
