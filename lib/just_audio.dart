@@ -69,7 +69,15 @@ class AudioPlayer {
     bufferedPosition: Duration.zero,
     speed: 1.0,
     duration: Duration.zero,
-    icyMetadata: IcyMetadata(info: IcyInfo(title: null, url: null)),
+    icyMetadata: IcyMetadata(
+        info: IcyInfo(title: null, url: null),
+        headers: IcyHeaders(
+            bitrate: null,
+            genre: null,
+            name: null,
+            metadataInterval: null,
+            url: null,
+            isPublic: null)),
   );
 
   Stream<AudioPlaybackEvent> _eventChannelStream;
@@ -112,7 +120,14 @@ class AudioPlayer {
               speed: _speed,
               duration: _duration,
               icyMetadata: IcyMetadata(
-                  info: IcyInfo(title: data[5][0][0], url: data[5][0][1])),
+                  info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
+                  headers: IcyHeaders(
+                      bitrate: data[5][1][0],
+                      genre: data[5][1][1],
+                      name: data[5][1][2],
+                      metadataInterval: data[5][1][3],
+                      url: data[5][1][4],
+                      isPublic: data[5][1][5])),
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playbackEventSubject.add);
@@ -413,8 +428,26 @@ class IcyInfo {
   IcyInfo({@required this.title, @required this.url});
 }
 
+class IcyHeaders {
+  final int bitrate;
+  final String genre;
+  final String name;
+  final int metadataInterval;
+  final String url;
+  final bool isPublic;
+
+  IcyHeaders(
+      {@required this.bitrate,
+      @required this.genre,
+      @required this.name,
+      @required this.metadataInterval,
+      @required this.url,
+      @required this.isPublic});
+}
+
 class IcyMetadata {
   final IcyInfo info;
+  final IcyHeaders headers;
 
-  IcyMetadata({@required this.info});
+  IcyMetadata({@required this.info, @required this.headers});
 }

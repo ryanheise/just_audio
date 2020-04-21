@@ -2,6 +2,7 @@ package com.ryanheise.just_audio;
 
 import android.os.Handler;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -12,8 +13,10 @@ import com.google.android.exoplayer2.metadata.icy.IcyInfo;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
+import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
+import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
@@ -25,15 +28,13 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
+import java.util.Collections;
 import android.content.Context;
 import android.net.Uri;
 import java.util.List;
 
-public class AudioPlayer implements MethodCallHandler, Player.EventListener {
+public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
 	private final Registrar registrar;
 	private final Context context;
 	private final MethodChannel methodChannel;
@@ -57,23 +58,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 	private boolean buffering;
 	private boolean justConnected;
 	private MediaSource mediaSource;
-	private String icyTitle;
-	private String icyUrl;
-	MetadataOutput metadataOutput = new MetadataOutput() {
-		@Override
-		public void onMetadata(Metadata metadata) {
-			for (int i = 0; i < metadata.length(); i++) {
-				final Metadata.Entry entry = metadata.get(i);
-				if (entry instanceof IcyHeaders) {
-					// TODO
-				} else if (entry instanceof IcyInfo) {
-					icyTitle = ((IcyInfo) entry).title;
-					icyUrl = ((IcyInfo) entry).url;
-				}
-				broadcastPlaybackEvent();
-			}
-		}
-	};
+	private IcyInfo icyInfo;
+	private IcyHeaders icyHeaders;
 
 	private final SimpleExoPlayer player;
 	private final Handler handler = new Handler();
@@ -119,13 +105,41 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		state = PlaybackState.none;
 
 		player = new SimpleExoPlayer.Builder(context).build();
-		player.addMetadataOutput(metadataOutput);
+		player.addMetadataOutput(this);
 		player.addListener(this);
 	}
 
 	private void startWatchingBuffer() {
 		handler.removeCallbacks(bufferWatcher);
 		handler.post(bufferWatcher);
+	}
+
+	@Override
+	public void onMetadata(Metadata metadata) {
+		for (int i = 0; i < metadata.length(); i++) {
+			final Metadata.Entry entry = metadata.get(i);
+			if (entry instanceof IcyInfo) {
+				icyInfo = (IcyInfo) entry;
+				broadcastPlaybackEvent();
+			}
+		}
+	}
+
+	@Override
+	public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+		if (trackGroups.length > 0 && trackGroups.get(0).length > 0) {
+			Format format = trackGroups.get(0).getFormat(0);
+
+			if (format.metadata != null) {
+				for (int i = 0; i < format.metadata.length(); i++) {
+					final Metadata.Entry entry = format.metadata.get(i);
+					if (entry instanceof IcyHeaders) {
+						icyHeaders = (IcyHeaders) entry;
+						broadcastPlaybackEvent();
+					}
+				}
+			}
+		}
 	}
 
 	@Override
@@ -249,11 +263,29 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener {
 		event.add(updateTime = System.currentTimeMillis());
 		event.add(Math.max(updatePosition, bufferedPosition));
 
-		final ArrayList<Object> icyData = new ArrayList<Object>();
-		final ArrayList<String> icyInfo = new ArrayList<String>();
-		icyInfo.add(icyTitle);
-		icyInfo.add(icyUrl);
-		icyData.add(icyInfo);
+		final ArrayList<Object> icyData = new ArrayList<>();
+		final ArrayList<String> info;
+		final ArrayList<Object> headers;
+		if (icyInfo != null) {
+			info = new ArrayList<>();
+			info.add(icyInfo.title);
+			info.add(icyInfo.url);
+		} else {
+			info = new ArrayList<>(Collections.nCopies(2, null));
+		}
+		if (icyHeaders != null) {
+			headers = new ArrayList<>();
+			headers.add(icyHeaders.bitrate);
+			headers.add(icyHeaders.genre);
+			headers.add(icyHeaders.name);
+			headers.add(icyHeaders.metadataInterval);
+			headers.add(icyHeaders.url);
+			headers.add(icyHeaders.isPublic);
+		} else {
+			headers = new ArrayList<>(Collections.nCopies(6, null));
+		}
+		icyData.add(info);
+		icyData.add(headers);
 		event.add(icyData);
 
 		eventSink.success(event);
