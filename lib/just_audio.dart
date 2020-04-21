@@ -119,7 +119,7 @@ class AudioPlayer {
               bufferedPosition: Duration(milliseconds: data[4]),
               speed: _speed,
               duration: _duration,
-              icyMetadata: IcyMetadata(
+              icyMetadata: data[5] == null ? null : IcyMetadata(
                   info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
                   headers: IcyHeaders(
                       bitrate: data[5][1][0],

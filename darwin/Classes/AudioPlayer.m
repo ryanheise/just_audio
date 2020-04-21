@@ -130,6 +130,8 @@
 		@(_updateTime),
 		// TODO: buffer position
 		@(_updatePosition),
+		// TODO: Icy Metadata
+		[NSNull null],
 	]);
 }
 
