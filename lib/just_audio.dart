@@ -69,6 +69,15 @@ class AudioPlayer {
     bufferedPosition: Duration.zero,
     speed: 1.0,
     duration: Duration.zero,
+    icyMetadata: IcyMetadata(
+        info: IcyInfo(title: null, url: null),
+        headers: IcyHeaders(
+            bitrate: null,
+            genre: null,
+            name: null,
+            metadataInterval: null,
+            url: null,
+            isPublic: null)),
   );
 
   Stream<AudioPlaybackEvent> _eventChannelStream;
@@ -82,6 +91,8 @@ class AudioPlayer {
   final _bufferingSubject = BehaviorSubject<bool>();
 
   final _bufferedPositionSubject = BehaviorSubject<Duration>();
+
+  final _icyMetadataSubject = BehaviorSubject<IcyMetadata>();
 
   final _fullPlaybackStateSubject = BehaviorSubject<FullAudioPlaybackState>();
 
@@ -108,6 +119,15 @@ class AudioPlayer {
               bufferedPosition: Duration(milliseconds: data[4]),
               speed: _speed,
               duration: _duration,
+              icyMetadata: IcyMetadata(
+                  info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
+                  headers: IcyHeaders(
+                      bitrate: data[5][1][0],
+                      genre: data[5][1][1],
+                      name: data[5][1][2],
+                      metadataInterval: data[5][1][3],
+                      url: data[5][1][4],
+                      isPublic: data[5][1][5])),
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playbackEventSubject.add);
@@ -117,11 +137,15 @@ class AudioPlayer {
         playbackEventStream.map((state) => state.buffering).distinct());
     _bufferedPositionSubject.addStream(
         playbackEventStream.map((state) => state.bufferedPosition).distinct());
-    _fullPlaybackStateSubject.addStream(
-        Rx.combineLatest2<AudioPlaybackState, bool, FullAudioPlaybackState>(
-            playbackStateStream,
-            bufferingStream,
-            (state, buffering) => FullAudioPlaybackState(state, buffering)));
+    _icyMetadataSubject.addStream(
+        playbackEventStream.map((state) => state.icyMetadata).distinct());
+    _fullPlaybackStateSubject.addStream(Rx.combineLatest3<AudioPlaybackState,
+            bool, IcyMetadata, FullAudioPlaybackState>(
+        playbackStateStream,
+        bufferingStream,
+        icyMetadataStream,
+        (state, buffering, icyMetadata) =>
+            FullAudioPlaybackState(state, buffering, icyMetadata)));
   }
 
   /// The duration of any media set via [setUrl], [setFilePath] or [setAsset],
@@ -148,8 +172,12 @@ class AudioPlayer {
   /// Whether the player is buffering.
   bool get buffering => _audioPlaybackEvent.buffering;
 
+  IcyMetadata get icyMetadata => _audioPlaybackEvent.icyMetadata;
+
   /// A stream of buffering state changes.
   Stream<bool> get bufferingStream => _bufferingSubject.stream;
+
+  Stream<IcyMetadata> get icyMetadataStream => _icyMetadataSubject.stream;
 
   /// A stream of buffered positions.
   Stream<Duration> get bufferedPositionStream =>
@@ -394,6 +422,8 @@ class AudioPlaybackEvent {
   /// The media duration.
   final Duration duration;
 
+  final IcyMetadata icyMetadata;
+
   AudioPlaybackEvent({
     @required this.state,
     @required this.buffering,
@@ -402,6 +432,7 @@ class AudioPlaybackEvent {
     @required this.bufferedPosition,
     @required this.speed,
     @required this.duration,
+    @required this.icyMetadata,
   });
 
   AudioPlaybackEvent copyWith({
@@ -462,6 +493,38 @@ enum AudioPlaybackState {
 class FullAudioPlaybackState {
   final AudioPlaybackState state;
   final bool buffering;
+  final IcyMetadata icyMetadata;
 
-  FullAudioPlaybackState(this.state, this.buffering);
+  FullAudioPlaybackState(this.state, this.buffering, this.icyMetadata);
+}
+
+class IcyInfo {
+  final String title;
+  final String url;
+
+  IcyInfo({@required this.title, @required this.url});
+}
+
+class IcyHeaders {
+  final int bitrate;
+  final String genre;
+  final String name;
+  final int metadataInterval;
+  final String url;
+  final bool isPublic;
+
+  IcyHeaders(
+      {@required this.bitrate,
+      @required this.genre,
+      @required this.name,
+      @required this.metadataInterval,
+      @required this.url,
+      @required this.isPublic});
+}
+
+class IcyMetadata {
+  final IcyInfo info;
+  final IcyHeaders headers;
+
+  IcyMetadata({@required this.info, @required this.headers});
 }
