@@ -2,7 +2,6 @@ package com.ryanheise.just_audio;
 
 import android.os.Handler;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -13,6 +12,7 @@ import com.google.android.exoplayer2.metadata.icy.IcyInfo;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
+import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
@@ -127,15 +127,19 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 
 	@Override
 	public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-		if (trackGroups.length > 0 && trackGroups.get(0).length > 0) {
-			Format format = trackGroups.get(0).getFormat(0);
+		for (int i = 0; i < trackGroups.length; i++) {
+			TrackGroup trackGroup = trackGroups.get(i);
 
-			if (format.metadata != null) {
-				for (int i = 0; i < format.metadata.length(); i++) {
-					final Metadata.Entry entry = format.metadata.get(i);
-					if (entry instanceof IcyHeaders) {
-						icyHeaders = (IcyHeaders) entry;
-						broadcastPlaybackEvent();
+			for (int j = 0; j < trackGroup.length; j++) {
+				Metadata metadata = trackGroup.getFormat(j).metadata;
+
+				if (metadata != null) {
+					for (int k = 0; k < metadata.length(); k++) {
+						final Metadata.Entry entry = metadata.get(k);
+						if (entry instanceof IcyHeaders) {
+							icyHeaders = (IcyHeaders) entry;
+							broadcastPlaybackEvent();
+						}
 					}
 				}
 			}
