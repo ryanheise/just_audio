@@ -300,7 +300,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		event.add(updatePosition = getCurrentPosition());
 		event.add(updateTime = System.currentTimeMillis());
 		event.add(Math.max(updatePosition, bufferedPosition));
+		event.add(collectIcyMetadata());
 
+		if (eventSink != null) {
+			eventSink.success(event);
+		}
+	}
+
+	private ArrayList<Object> collectIcyMetadata() {
 		final ArrayList<Object> icyData = new ArrayList<>();
 		final ArrayList<String> info;
 		final ArrayList<Object> headers;
@@ -324,11 +331,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 		icyData.add(info);
 		icyData.add(headers);
-		event.add(icyData);
-
-		if (eventSink != null) {
-			eventSink.success(event);
-		}
+		return icyData;
 	}
 
 	private long getCurrentPosition() {
