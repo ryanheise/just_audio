@@ -1,7 +1,9 @@
 package com.ryanheise.just_audio;
 
 import android.os.Handler;
+
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -19,7 +21,11 @@ import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.util.Util;
+
+import io.flutter.Log;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.EventChannel.EventSink;
 import io.flutter.plugin.common.MethodCall;
@@ -27,14 +33,18 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import android.content.Context;
 import android.net.Uri;
+
 import java.util.List;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
+	static final String TAG = "AudioPlayer";
+
 	private final Registrar registrar;
 	private final Context context;
 	private final MethodChannel methodChannel;
@@ -153,9 +163,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			if (prepareResult != null) {
 				duration = player.getDuration();
 				justConnected = true;
+				transition(PlaybackState.stopped);
 				prepareResult.success(duration);
 				prepareResult = null;
-				transition(PlaybackState.stopped);
 			}
 			if (seekProcessed) {
 				completeSeek();
@@ -177,6 +187,27 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				startWatchingBuffer();
 			}
 		}
+	}
+
+	@Override
+	public void onPlayerError(ExoPlaybackException error) {
+		switch (error.type) {
+		case ExoPlaybackException.TYPE_SOURCE:
+			Log.e(TAG, "TYPE_SOURCE: " + error.getSourceException().getMessage());
+			break;
+
+		case ExoPlaybackException.TYPE_RENDERER:
+			Log.e(TAG, "TYPE_RENDERER: " + error.getRendererException().getMessage());
+			break;
+
+		case ExoPlaybackException.TYPE_UNEXPECTED:
+			Log.e(TAG, "TYPE_UNEXPECTED: " + error.getUnexpectedException().getMessage());
+			break;
+
+		default:
+			Log.e(TAG, "default: " + error.getUnexpectedException().getMessage());
+		}
+		this.setError(String.valueOf(error.type), error.getMessage());
 	}
 
 	@Override
@@ -232,6 +263,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				break;
 			case "setSpeed":
 				setSpeed((float)((double)((Double)args.get(0))));
+				result.success(null);
+				break;
+			case "setAutomaticallyWaitsToMinimizeStalling":
 				result.success(null);
 				break;
 			case "seek":
@@ -292,7 +326,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		icyData.add(headers);
 		event.add(icyData);
 
-		eventSink.success(event);
+		if (eventSink != null) {
+			eventSink.success(event);
+		}
 	}
 
 	private long getCurrentPosition() {
@@ -302,6 +338,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			return seekPos;
 		} else {
 			return player.getCurrentPosition();
+		}
+	}
+
+	private void setError(String errorCode, String errorMsg) {
+		if (prepareResult != null) {
+			prepareResult.error(errorCode, errorMsg, null);
+			prepareResult = null;
 		}
 	}
 
@@ -316,7 +359,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		abortExistingConnection();
 		prepareResult = result;
 		transition(PlaybackState.connecting);
-		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, Util.getUserAgent(context, "just_audio"));
+		String userAgent = Util.getUserAgent(context, "just_audio");
+		DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
+				userAgent,
+				DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
+				DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
+				true
+		);
+		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, httpDataSourceFactory);
 		Uri uri = Uri.parse(url);
 		if (uri.getPath().toLowerCase().endsWith(".mpd")) {
 			mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
