@@ -196,8 +196,8 @@ class AudioPlayer {
   /// Loads audio media from a file and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
-  Future<Duration> setFilePath(final String filePath) =>
-      setUrl('file://$filePath');
+  Future<Duration> setFilePath(final String filePath) => setUrl(
+      Platform.isAndroid ? File(filePath).uri.toString() : 'file://$filePath');
 
   /// Loads audio media from an asset and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
