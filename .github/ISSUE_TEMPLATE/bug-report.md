@@ -2,10 +2,27 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: bug, 1 backlog
+labels: 1 backlog, bug
 assignees: ryanheise
 
 ---
+
+<!--
+
+        PLEASE READ CAREFULLY!
+
+
+
+
+
+        FOR YOUR BUG REPORT TO BE PROCESSED, YOU WILL NEED
+        TO FILL IN ALL SECTIONS BELOW. DON'T DELETE THE HEADINGS.
+
+
+        THANK YOU :-D
+
+
+-->
 
 **Describe the bug**
 A clear and concise description of what the bug is.
