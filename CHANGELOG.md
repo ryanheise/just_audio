@@ -1,3 +1,10 @@
+## 0.1.6
+
+* Eliminate event lag over method channels.
+* Report setUrl errors on Android.
+* Report Icy Metadata on Android.
+* Bug fixes.
+
 ## 0.1.5
 
 * Update dependencies and documentation.
