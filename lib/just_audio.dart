@@ -132,7 +132,7 @@ class AudioPlayer {
                           isPublic: data[5][1][5])),
             ));
     _eventChannelStreamSubscription =
-        _eventChannelStream.listen(_playbackEventSubject.add);
+        _eventChannelStream.listen(_playbackEventSubject.add, onError: _playbackEventSubject.addError);
     _playbackStateSubject
         .addStream(playbackEventStream.map((state) => state.state).distinct());
     _bufferingSubject.addStream(
