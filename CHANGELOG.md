@@ -1,3 +1,7 @@
+## 0.1.7
+
+* Minor bug fixes.
+
 ## 0.1.6
 
 * Eliminate event lag over method channels.
