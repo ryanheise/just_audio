@@ -119,15 +119,17 @@ class AudioPlayer {
               bufferedPosition: Duration(milliseconds: data[4]),
               speed: _speed,
               duration: _duration,
-              icyMetadata: data[5] == null ? null : IcyMetadata(
-                  info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
-                  headers: IcyHeaders(
-                      bitrate: data[5][1][0],
-                      genre: data[5][1][1],
-                      name: data[5][1][2],
-                      metadataInterval: data[5][1][3],
-                      url: data[5][1][4],
-                      isPublic: data[5][1][5])),
+              icyMetadata: data[5] == null
+                  ? null
+                  : IcyMetadata(
+                      info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
+                      headers: IcyHeaders(
+                          bitrate: data[5][1][0],
+                          genre: data[5][1][1],
+                          name: data[5][1][2],
+                          metadataInterval: data[5][1][3],
+                          url: data[5][1][4],
+                          isPublic: data[5][1][5])),
             ));
     _eventChannelStreamSubscription =
         _eventChannelStream.listen(_playbackEventSubject.add);
@@ -443,6 +445,7 @@ class AudioPlaybackEvent {
     Duration bufferedPosition,
     double speed,
     Duration duration,
+    IcyMetadata icyMetadata,
   }) =>
       AudioPlaybackEvent(
         state: state ?? this.state,
@@ -452,6 +455,7 @@ class AudioPlaybackEvent {
         bufferedPosition: bufferedPosition ?? this.bufferedPosition,
         speed: speed ?? this.speed,
         duration: duration ?? this.duration,
+        icyMetadata: icyMetadata ?? this.icyMetadata,
       );
 
   /// The current position of the player.
