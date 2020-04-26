@@ -118,7 +118,8 @@ class AudioPlayer {
               updateTime: Duration(milliseconds: data[3]),
               bufferedPosition: Duration(milliseconds: data[4]),
               speed: _speed,
-              duration: _duration,
+              duration: _duration =
+                  data[6] < 0 ? null : Duration(milliseconds: data[6]),
               icyMetadata: data[5] == null
                   ? null
                   : IcyMetadata(
@@ -213,8 +214,8 @@ class AudioPlayer {
   /// [setFilePath] or [setAsset].
   Future<Duration> setUrl(final String url) async {
     try {
-      _durationFuture = _invokeMethod('setUrl', [url])
-          .then((ms) => ms == null ? null : Duration(milliseconds: ms));
+      _durationFuture = _invokeMethod('setUrl', [url]).then(
+          (ms) => (ms == null || ms < 0) ? null : Duration(milliseconds: ms));
       _duration = await _durationFuture;
       _durationSubject.add(_duration);
       return _duration;

@@ -161,7 +161,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		switch (playbackState) {
 		case Player.STATE_READY:
 			if (prepareResult != null) {
-				duration = player.getDuration();
+				duration = getDuration();
 				justConnected = true;
 				transition(PlaybackState.stopped);
 				prepareResult.success(duration);
@@ -301,6 +301,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		event.add(updateTime = System.currentTimeMillis());
 		event.add(Math.max(updatePosition, bufferedPosition));
 		event.add(collectIcyMetadata());
+		event.add(duration = getDuration());
 
 		if (eventSink != null) {
 			eventSink.success(event);
@@ -341,6 +342,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			return seekPos;
 		} else {
 			return player.getCurrentPosition();
+		}
+	}
+
+	private long getDuration() {
+		if (state == PlaybackState.none || state == PlaybackState.connecting) {
+			return C.TIME_UNSET;
+		} else {
+			return player.getDuration();
 		}
 	}
 
