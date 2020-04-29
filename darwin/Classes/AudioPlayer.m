@@ -181,6 +181,12 @@
 		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
 	}
 
+	if (@available(macOS 10.13, iOS 11.0, *)) {
+		// This does the best at reducing distortion on voice
+		// with speeds below 1.0
+		playerItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
+	}
+
 	[playerItem addObserver:self
 		     forKeyPath:@"status"
 			options:NSKeyValueObservingOptionNew
