@@ -371,14 +371,25 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		);
 		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, httpDataSourceFactory);
 		Uri uri = Uri.parse(url);
-		if (uri.getPath().toLowerCase().endsWith(".mpd")) {
+		String extension = getLowerCaseExtension(uri);
+		if (extension.equals("mpd")) {
 			mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
-		} else if (uri.getPath().toLowerCase().endsWith(".m3u8")) {
+		} else if (extension.equals("m3u8")) {
 			mediaSource = new HlsMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
 		} else {
 			mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
 		}
 		player.prepare(mediaSource);
+	}
+
+	private String getLowerCaseExtension(Uri uri) {
+		// Until ExoPlayer provides automatic detection of media source types, we
+		// rely on the file extension. When this is absent, as a temporary
+		// workaround we allow the app to supply a fake extension in the URL
+		// fragment. e.g.  https://somewhere.com/somestream?x=etc#.m3u8
+		String fragment = uri.getFragment();
+		String filename = fragment != null && fragment.contains(".") ? fragment : uri.getPath();
+		return filename.replaceAll("^.*\\.", "").toLowerCase();
 	}
 
 	public void setClip(final Long start, final Long end, final Result result) {
