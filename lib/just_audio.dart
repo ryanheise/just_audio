@@ -132,15 +132,15 @@ class AudioPlayer {
                           isPublic: data[5][1][5])),
             ));
     _eventChannelStreamSubscription =
-        _eventChannelStream.listen(_playbackEventSubject.add);
+        _eventChannelStream.listen(_playbackEventSubject.add, onError: _playbackEventSubject.addError);
     _playbackStateSubject
-        .addStream(playbackEventStream.map((state) => state.state).distinct());
+        .addStream(playbackEventStream.map((state) => state.state).distinct().handleError((err,stack){ /* noop */ }));
     _bufferingSubject.addStream(
-        playbackEventStream.map((state) => state.buffering).distinct());
+        playbackEventStream.map((state) => state.buffering).distinct().handleError((err,stack){ /* noop */ }));
     _bufferedPositionSubject.addStream(
-        playbackEventStream.map((state) => state.bufferedPosition).distinct());
+        playbackEventStream.map((state) => state.bufferedPosition).distinct().handleError((err,stack){ /* noop */ }));
     _icyMetadataSubject.addStream(
-        playbackEventStream.map((state) => state.icyMetadata).distinct());
+        playbackEventStream.map((state) => state.icyMetadata).distinct().handleError((err,stack){ /* noop */ }));
     _fullPlaybackStateSubject.addStream(Rx.combineLatest3<AudioPlaybackState,
             bool, IcyMetadata, FullAudioPlaybackState>(
         playbackStateStream,

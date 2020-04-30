@@ -349,6 +349,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			prepareResult.error(errorCode, errorMsg, null);
 			prepareResult = null;
 		}
+
+		if (eventSink != null) {
+			eventSink.error(errorCode, errorMsg, null);
+		}
 	}
 
 	private void transition(final PlaybackState newState) {
