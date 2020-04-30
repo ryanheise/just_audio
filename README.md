@@ -107,5 +107,4 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 
 ## Todo
 
-* FLAC support
 * Gapless playback
