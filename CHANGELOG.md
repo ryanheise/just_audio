@@ -1,3 +1,7 @@
+## 0.1.8
+
+* Reduce distortion at slow speeds on iOS
+
 ## 0.1.7
 
 * Minor bug fixes.
