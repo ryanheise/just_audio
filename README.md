@@ -10,13 +10,13 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 | read from file       | ✅        | ✅         | ✅         |            |
 | read from asset      | ✅        | ✅         | ✅         |            |
 | DASH                 | ✅        | (untested) | (untested) | (untested) |
-| HLS                  | ✅        | (untested) | (untested) | (untested) |
+| HLS                  | ✅        | ✅         | (untested) | (untested) |
 | play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |
 | set volume           | ✅        | (untested) | (untested) | (untested) |
-| set speed            | ✅        | (untested) | (untested) | ✅         |
+| set speed            | ✅        | ✅         | ✅         | ✅         |
 | clip audio           | ✅        |            |            | ✅         |
 | dispose              | ✅        | ✅         | ✅         | ✅         |
-| catch player errors  | ✅        |           |           |           |
+| catch player errors  | ✅        |            |            |            |
 
 This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 

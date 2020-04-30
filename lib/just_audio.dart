@@ -204,13 +204,21 @@ class AudioPlayer {
   /// The current speed of the player.
   double get speed => _speed;
 
-  /// Whether the player should automatically delay playback in order to minimize stalling. (iOS 10.0 or later only)
+  /// Whether the player should automatically delay playback in order to
+  /// minimize stalling. (iOS 10.0 or later only)
   bool get automaticallyWaitsToMinimizeStalling =>
       _automaticallyWaitsToMinimizeStalling;
 
   /// Loads audio media from a URL and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
+  ///
+  /// On Android, DASH and HLS streams are detected only when the URL's path
+  /// has an "mpd" or "m3u8" extension. If the URL does not have such an
+  /// extension and you have no control over the server, and you also know the
+  /// type of the stream in advance, you may as a workaround supply the
+  /// extension as a URL fragment. e.g.
+  /// https://somewhere.com/somestream?x=etc#.m3u8
   Future<Duration> setUrl(final String url) async {
     try {
       _durationFuture = _invokeMethod('setUrl', [url])
