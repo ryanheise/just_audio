@@ -8,7 +8,7 @@ environment:
   flutter: ">=1.12.8 <2.0.0"
 
 dependencies:
-  rxdart: ^0.24.0
+  rxdart: ^0.24.1
   path: ^1.6.4
   path_provider: ^1.5.1
   async: ^2.4.0
