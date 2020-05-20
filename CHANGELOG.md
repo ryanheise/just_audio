@@ -1,3 +1,7 @@
+## 0.1.10
+
+* Option to set audio session category on iOS.
+
 ## 0.1.9
 
 * Bug fixes.
