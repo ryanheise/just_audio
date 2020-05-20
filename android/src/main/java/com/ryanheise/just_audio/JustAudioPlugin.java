@@ -30,6 +30,9 @@ public class JustAudioPlugin implements MethodCallHandler {
 			new AudioPlayer(registrar, id);
 			result.success(null);
 			break;
+		case "setIosCategory":
+			result.success(null);
+			break;
 		default:
 			result.notImplemented();
 			break;

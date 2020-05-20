@@ -50,6 +50,22 @@ class AudioPlayer {
     return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
+  /// Configure the audio session category on iOS. Has no effect on Android.
+  ///
+  /// Note that the default category on iOS is [IosCategory.soloAmbient], but
+  /// for a typical media app, you will probably want to change this to
+  /// [IosCategory.playback].  If you wish to override the default, call this
+  /// method before playing any audio.
+  ///
+  /// Note: If you use other audio plugins in conjunction with this one, it is
+  /// possible that the other audio plugin may override the setting you choose
+  /// here. (You may consider asking the developer of each other plugin you use
+  /// to provide a similar method so that you can configure the same category
+  /// universally.)
+  static Future<void> setIosCategory(IosCategory category) async {
+    await _mainChannel.invokeMethod('setIosCategory', category.index);
+  }
+
   final Future<MethodChannel> _channel;
 
   final int _id;
@@ -539,4 +555,15 @@ class IcyMetadata {
   final IcyHeaders headers;
 
   IcyMetadata({@required this.info, @required this.headers});
+}
+
+/// The audio session categories on iOS, to be used with
+/// [AudioPlayer.setIosCategory].
+enum IosCategory {
+  ambient,
+  soloAmbient,
+  playback,
+  record,
+  playAndRecord,
+  multiRoute,
 }
