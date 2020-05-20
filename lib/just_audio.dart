@@ -50,18 +50,22 @@ class AudioPlayer {
     return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
-  /// Configure the audio session category on iOS. Has no effect on Android.
+  /// Configure the audio session category on iOS. This method should be called
+  /// before playing any audio. It has no effect on Android or Flutter for Web.
   ///
   /// Note that the default category on iOS is [IosCategory.soloAmbient], but
-  /// for a typical media app, you will probably want to change this to
-  /// [IosCategory.playback].  If you wish to override the default, call this
-  /// method before playing any audio.
+  /// for a typical media app, Apple recommends setting this to
+  /// [IosCategory.playback]. If you don't call this method, `just_audio` will
+  /// respect any prior category that was already set on your app's audio
+  /// session and will leave it alone. If it hasn't been previously set, this
+  /// will be [IosCategory.soloAmbient]. But if another audio plugin in your
+  /// app has configured a particular category, that will also be left alone.
   ///
   /// Note: If you use other audio plugins in conjunction with this one, it is
-  /// possible that the other audio plugin may override the setting you choose
-  /// here. (You may consider asking the developer of each other plugin you use
-  /// to provide a similar method so that you can configure the same category
-  /// universally.)
+  /// possible that each of those audio plugins may override the setting you
+  /// choose here. (You may consider asking the developers of the other plugins
+  /// to provide similar configurability so that you have complete control over
+  /// setting the overall category that you want for your app.)
   static Future<void> setIosCategory(IosCategory category) async {
     await _mainChannel.invokeMethod('setIosCategory', category.index);
   }
@@ -147,16 +151,25 @@ class AudioPlayer {
                           url: data[5][1][4],
                           isPublic: data[5][1][5])),
             ));
-    _eventChannelStreamSubscription =
-        _eventChannelStream.listen(_playbackEventSubject.add, onError: _playbackEventSubject.addError);
-    _playbackStateSubject
-        .addStream(playbackEventStream.map((state) => state.state).distinct().handleError((err,stack){ /* noop */ }));
-    _bufferingSubject.addStream(
-        playbackEventStream.map((state) => state.buffering).distinct().handleError((err,stack){ /* noop */ }));
-    _bufferedPositionSubject.addStream(
-        playbackEventStream.map((state) => state.bufferedPosition).distinct().handleError((err,stack){ /* noop */ }));
-    _icyMetadataSubject.addStream(
-        playbackEventStream.map((state) => state.icyMetadata).distinct().handleError((err,stack){ /* noop */ }));
+    _eventChannelStreamSubscription = _eventChannelStream.listen(
+        _playbackEventSubject.add,
+        onError: _playbackEventSubject.addError);
+    _playbackStateSubject.addStream(playbackEventStream
+        .map((state) => state.state)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _bufferingSubject.addStream(playbackEventStream
+        .map((state) => state.buffering)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _bufferedPositionSubject.addStream(playbackEventStream
+        .map((state) => state.bufferedPosition)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _icyMetadataSubject.addStream(playbackEventStream
+        .map((state) => state.icyMetadata)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
     _fullPlaybackStateSubject.addStream(Rx.combineLatest3<AudioPlaybackState,
             bool, IcyMetadata, FullAudioPlaybackState>(
         playbackStateStream,

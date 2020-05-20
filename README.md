@@ -84,6 +84,24 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 </dict>
 ```
 
+By default, iOS will mute your app's audio when your phone is switched to
+silent mode. Depending on the requirements of your app, you can change the
+default audio session category using `AudioPlayer.setIosCategory`. For example,
+if you are writing a media app, Apple recommends that you set the category to
+`AVAudioSessionCategoryPlayback`, which you can achieve by adding the following
+code to your app's initialisation:
+
+```dart
+AudioPlayer.setIosCategory(IosCategory.playback);
+```
+
+Note: If your app uses a number of different audio plugins in combination, e.g.
+for audio recording, or text to speech, or background audio, it is possible
+that those plugins may internally override the setting you choose here. You may
+consider asking the developer of each other plugin you use to provide a similar
+method so that you can configure the same audio session category universally
+across all plugins you use.
+
 ### MacOS
 
 To allow your MacOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
