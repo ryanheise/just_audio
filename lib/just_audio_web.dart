@@ -154,7 +154,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _audioElement.src = url;
     _audioElement.preload = 'auto';
     _audioElement.load();
-    final duration = await _durationCompleter.future;
+    var duration = await _durationCompleter.future;
+    duration = duration != double.infinity ? duration : 0;
     transition(AudioPlaybackState.stopped);
     return (duration * 1000).toInt();
   }
