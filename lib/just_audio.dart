@@ -203,6 +203,9 @@ class AudioPlayer {
   /// Whether the player is buffering.
   bool get buffering => _audioPlaybackEvent.buffering;
 
+  /// The current position of the player.
+  Duration get position => _audioPlaybackEvent.position;
+
   IcyMetadata get icyMetadata => _audioPlaybackEvent.icyMetadata;
 
   /// A stream of buffering state changes.
