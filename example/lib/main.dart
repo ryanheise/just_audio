@@ -18,6 +18,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    AudioPlayer.setIosCategory(IosCategory.playback);
     _player = AudioPlayer();
     _player
         .setUrl(

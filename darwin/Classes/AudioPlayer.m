@@ -18,13 +18,15 @@
 	id _endObserver;
 	id _timeObserver;
 	BOOL _automaticallyWaitsToMinimizeStalling;
+	BOOL _configuredSession;
 }
 
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam configuredSession:(BOOL)configuredSession {
 	self = [super init];
 	NSAssert(self, @"super init cannot be nil");
 	_registrar = registrar;
 	_playerId = idParam;
+	_configuredSession = configuredSession;
 	_methodChannel = [FlutterMethodChannel
 		methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
 		      binaryMessenger:[registrar messenger]];
@@ -181,6 +183,12 @@
 		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
 	}
 
+	if (@available(macOS 10.13, iOS 11.0, *)) {
+		// This does the best at reducing distortion on voice
+		// with speeds below 1.0
+		playerItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
+	}
+
 	[playerItem addObserver:self
 		     forKeyPath:@"status"
 			options:NSKeyValueObservingOptionNew
@@ -279,6 +287,9 @@
 	// TODO: dynamically adjust the lag.
 	//int lag = 6;
 	//int start = [self getCurrentPosition];
+	if (_configuredSession) {
+		[[AVAudioSession sharedInstance] setActive:YES error:nil];
+	}
 	[_player play];
     if (!@available(macOS 10.12, iOS 10.0, *)) {[self setPlaybackState:playing];}
 	// TODO: convert this Android code to iOS

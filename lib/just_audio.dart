@@ -50,6 +50,26 @@ class AudioPlayer {
     return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
+  /// Configure the audio session category on iOS. This method should be called
+  /// before playing any audio. It has no effect on Android or Flutter for Web.
+  ///
+  /// Note that the default category on iOS is [IosCategory.soloAmbient], but
+  /// for a typical media app, Apple recommends setting this to
+  /// [IosCategory.playback]. If you don't call this method, `just_audio` will
+  /// respect any prior category that was already set on your app's audio
+  /// session and will leave it alone. If it hasn't been previously set, this
+  /// will be [IosCategory.soloAmbient]. But if another audio plugin in your
+  /// app has configured a particular category, that will also be left alone.
+  ///
+  /// Note: If you use other audio plugins in conjunction with this one, it is
+  /// possible that each of those audio plugins may override the setting you
+  /// choose here. (You may consider asking the developers of the other plugins
+  /// to provide similar configurability so that you have complete control over
+  /// setting the overall category that you want for your app.)
+  static Future<void> setIosCategory(IosCategory category) async {
+    await _mainChannel.invokeMethod('setIosCategory', category.index);
+  }
+
   final Future<MethodChannel> _channel;
 
   final int _id;
@@ -110,8 +130,9 @@ class AudioPlayer {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
         .map((data) {
-      final duration = Duration(milliseconds: data[6] < 0 ? -1 : data[6]);
-      _audioPlaybackEvent = AudioPlaybackEvent(
+      final duration =
+          Duration(milliseconds: data.length < 7 || data[6] < 0 ? -1 : data[6]);
+      return _audioPlaybackEvent = AudioPlaybackEvent(
         state: AudioPlaybackState.values[data[0]],
         buffering: data[1],
         updatePosition: Duration(milliseconds: data[2]),
@@ -119,7 +140,7 @@ class AudioPlayer {
         bufferedPosition: Duration(milliseconds: data[4]),
         speed: _speed,
         duration: duration,
-        icyMetadata: data[5] == null
+        icyMetadata: data.length < 6 || data[5] == null
             ? null
             : IcyMetadata(
                 info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
@@ -131,19 +152,26 @@ class AudioPlayer {
                     url: data[5][1][4],
                     isPublic: data[5][1][5])),
       );
-      _durationSubject.add(duration);
-      return _audioPlaybackEvent;
     });
-    _eventChannelStreamSubscription =
-        _eventChannelStream.listen(_playbackEventSubject.add);
-    _playbackStateSubject
-        .addStream(playbackEventStream.map((state) => state.state).distinct());
-    _bufferingSubject.addStream(
-        playbackEventStream.map((state) => state.buffering).distinct());
-    _bufferedPositionSubject.addStream(
-        playbackEventStream.map((state) => state.bufferedPosition).distinct());
-    _icyMetadataSubject.addStream(
-        playbackEventStream.map((state) => state.icyMetadata).distinct());
+    _eventChannelStreamSubscription = _eventChannelStream.listen(
+        _playbackEventSubject.add,
+        onError: _playbackEventSubject.addError);
+    _playbackStateSubject.addStream(playbackEventStream
+        .map((state) => state.state)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _bufferingSubject.addStream(playbackEventStream
+        .map((state) => state.buffering)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _bufferedPositionSubject.addStream(playbackEventStream
+        .map((state) => state.bufferedPosition)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _icyMetadataSubject.addStream(playbackEventStream
+        .map((state) => state.icyMetadata)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
     _fullPlaybackStateSubject.addStream(Rx.combineLatest3<AudioPlaybackState,
             bool, IcyMetadata, FullAudioPlaybackState>(
         playbackStateStream,
@@ -177,6 +205,9 @@ class AudioPlayer {
   /// Whether the player is buffering.
   bool get buffering => _audioPlaybackEvent.buffering;
 
+  /// The current position of the player.
+  Duration get position => _audioPlaybackEvent.position;
+
   IcyMetadata get icyMetadata => _audioPlaybackEvent.icyMetadata;
 
   /// A stream of buffering state changes.
@@ -207,13 +238,21 @@ class AudioPlayer {
   /// The current speed of the player.
   double get speed => _speed;
 
-  /// Whether the player should automatically delay playback in order to minimize stalling. (iOS 10.0 or later only)
+  /// Whether the player should automatically delay playback in order to
+  /// minimize stalling. (iOS 10.0 or later only)
   bool get automaticallyWaitsToMinimizeStalling =>
       _automaticallyWaitsToMinimizeStalling;
 
   /// Loads audio media from a URL and completes with the duration of that
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
+  ///
+  /// On Android, DASH and HLS streams are detected only when the URL's path
+  /// has an "mpd" or "m3u8" extension. If the URL does not have such an
+  /// extension and you have no control over the server, and you also know the
+  /// type of the stream in advance, you may as a workaround supply the
+  /// extension as a URL fragment. e.g.
+  /// https://somewhere.com/somestream?x=etc#.m3u8
   Future<Duration> setUrl(final String url) async {
     try {
       _durationFuture = _invokeMethod('setUrl', [url]).then((ms) =>
@@ -538,4 +577,15 @@ class IcyMetadata {
   final IcyHeaders headers;
 
   IcyMetadata({@required this.info, @required this.headers});
+}
+
+/// The audio session categories on iOS, to be used with
+/// [AudioPlayer.setIosCategory].
+enum IosCategory {
+  ambient,
+  soloAmbient,
+  playback,
+  record,
+  playAndRecord,
+  multiRoute,
 }

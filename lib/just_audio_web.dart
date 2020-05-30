@@ -27,6 +27,8 @@ class JustAudioPlugin {
         final String id = call.arguments[0];
         new Html5AudioPlayer(id: id, registrar: registrar);
         return null;
+      case 'setIosCategory':
+        return null;
       default:
         throw PlatformException(code: 'Unimplemented');
     }
