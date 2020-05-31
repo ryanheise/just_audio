@@ -132,6 +132,7 @@ class AudioPlayer {
         .map((data) {
       final duration =
           Duration(milliseconds: data.length < 7 || data[6] < 0 ? -1 : data[6]);
+      _durationFuture = Future.value(duration);
       _durationSubject.add(duration);
       return _audioPlaybackEvent = AudioPlaybackEvent(
         state: AudioPlaybackState.values[data[0]],
