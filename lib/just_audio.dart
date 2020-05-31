@@ -129,27 +129,31 @@ class AudioPlayer {
   AudioPlayer._internal(this._id) : _channel = _init(_id) {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
-        .map((data) => _audioPlaybackEvent = AudioPlaybackEvent(
-              state: AudioPlaybackState.values[data[0]],
-              buffering: data[1],
-              updatePosition: Duration(milliseconds: data[2]),
-              updateTime: Duration(milliseconds: data[3]),
-              bufferedPosition: Duration(milliseconds: data[4]),
-              speed: _speed,
-              duration: Duration(
-                  milliseconds: data.length < 7 || data[6] < 0 ? -1 : data[6]),
-              icyMetadata: data.length < 6 || data[5] == null
-                  ? null
-                  : IcyMetadata(
-                      info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
-                      headers: IcyHeaders(
-                          bitrate: data[5][1][0],
-                          genre: data[5][1][1],
-                          name: data[5][1][2],
-                          metadataInterval: data[5][1][3],
-                          url: data[5][1][4],
-                          isPublic: data[5][1][5])),
-            ));
+        .map((data) {
+      final duration =
+          Duration(milliseconds: data.length < 7 || data[6] < 0 ? -1 : data[6]);
+      _durationSubject.add(duration);
+      return _audioPlaybackEvent = AudioPlaybackEvent(
+        state: AudioPlaybackState.values[data[0]],
+        buffering: data[1],
+        updatePosition: Duration(milliseconds: data[2]),
+        updateTime: Duration(milliseconds: data[3]),
+        bufferedPosition: Duration(milliseconds: data[4]),
+        speed: _speed,
+        duration: duration,
+        icyMetadata: data.length < 6 || data[5] == null
+            ? null
+            : IcyMetadata(
+                info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
+                headers: IcyHeaders(
+                    bitrate: data[5][1][0],
+                    genre: data[5][1][1],
+                    name: data[5][1][2],
+                    metadataInterval: data[5][1][3],
+                    url: data[5][1][4],
+                    isPublic: data[5][1][5])),
+      );
+    });
     _eventChannelStreamSubscription = _eventChannelStream.listen(
         _playbackEventSubject.add,
         onError: _playbackEventSubject.addError);
