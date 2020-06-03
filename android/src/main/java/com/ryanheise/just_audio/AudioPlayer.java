@@ -233,7 +233,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		try {
 			switch (call.method) {
 			case "setUrl":
-				setUrl((String)args.get(0), result);
+				setUrl((String)args.get(0), result,,(Map)args.get(1));
 				break;
 			case "setClip":
 				Object start = args.get(0);
@@ -361,7 +361,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		broadcastPlaybackEvent();
 	}
 
-	public void setUrl(final String url, final Result result) throws IOException {
+	public void setUrl(final String url, final Result result,final Map headers) throws IOException {
 		justConnected = false;
 		abortExistingConnection();
 		prepareResult = result;
@@ -381,7 +381,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		} else if (extension.equals("m3u8")) {
 			mediaSource = new HlsMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
 		} else {
+			//Use old method if no headers provided
+			if(headers==null)
 			mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
+			else
+			{
+							mediaSource =  new ProgressiveMediaSource.Factory(
+					() -> {
+						HttpDataSource dataSource =
+								new DefaultHttpDataSource(userAgent);
+						headers.forEach((k,v)->dataSource.setRequestProperty(k.toString(),v.toString()));
+						return dataSource;
+					})
+					.createMediaSource(uri);
+			}
 		}
 		player.prepare(mediaSource);
 	}
