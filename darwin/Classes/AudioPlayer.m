@@ -51,7 +51,7 @@
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
 	NSArray* args = (NSArray*)call.arguments;
 	if ([@"setUrl" isEqualToString:call.method]) {
-		[self setUrl:args[0] result:result];
+		[self setUrl:args[0] headers:args[1] result:result];
 	} else if ([@"setClip" isEqualToString:call.method]) {
 		[self setClip:args[0] end:args[1]];
 		result(nil);
@@ -163,7 +163,7 @@
 	[self setPlaybackState:state];
 }
 
-- (void)setUrl:(NSString*)url result:(FlutterResult)result {
+- (void)setUrl:(NSString*)url headers:(NSDictionary *)headers result:(FlutterResult)result {
 	// TODO: error if already connecting
 	_connectionResult = result;
 	[self setPlaybackState:connecting];
@@ -179,8 +179,19 @@
 	//Allow iOs playing both external links and local files.
 	if ([url hasPrefix:@"file://"]) {
 		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[url substringFromIndex:7]]];
-	} else {
-		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
+	} else { 
+		//Use old method if no headers provided
+		if(headers==nil)
+		{
+			playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
+		}
+		else{
+			NSMutableDictionary *assetOptions = [[NSMutableDictionary alloc] init];
+			[assetOptions setObject:headers forKey:@"AVURLAssetHTTPHeaderFieldsKey"];
+			NSURL *audioUrl =[NSURL URLWithString:url];
+			AVURLAsset * asset = [AVURLAsset URLAssetWithURL:audioUrl options:assetOptions]; 
+			playerItem = [AVPlayerItem playerItemWithAsset:asset];
+		}
 	}
 
 	if (@available(macOS 10.13, iOS 11.0, *)) {
