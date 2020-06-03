@@ -74,8 +74,6 @@ class AudioPlayer {
 
   final int _id;
 
-  Duration _duration;
-
   Future<Duration> _durationFuture;
 
   final _durationSubject = BehaviorSubject<Duration>();
@@ -131,26 +129,32 @@ class AudioPlayer {
   AudioPlayer._internal(this._id) : _channel = _init(_id) {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
-        .map((data) => _audioPlaybackEvent = AudioPlaybackEvent(
-              state: AudioPlaybackState.values[data[0]],
-              buffering: data[1],
-              updatePosition: Duration(milliseconds: data[2]),
-              updateTime: Duration(milliseconds: data[3]),
-              bufferedPosition: Duration(milliseconds: data[4]),
-              speed: _speed,
-              duration: _duration,
-              icyMetadata: data.length < 6 || data[5] == null
-                  ? null
-                  : IcyMetadata(
-                      info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
-                      headers: IcyHeaders(
-                          bitrate: data[5][1][0],
-                          genre: data[5][1][1],
-                          name: data[5][1][2],
-                          metadataInterval: data[5][1][3],
-                          url: data[5][1][4],
-                          isPublic: data[5][1][5])),
-            ));
+        .map((data) {
+      final duration =
+          Duration(milliseconds: data.length < 7 || data[6] < 0 ? -1 : data[6]);
+      _durationFuture = Future.value(duration);
+      _durationSubject.add(duration);
+      return _audioPlaybackEvent = AudioPlaybackEvent(
+        state: AudioPlaybackState.values[data[0]],
+        buffering: data[1],
+        updatePosition: Duration(milliseconds: data[2]),
+        updateTime: Duration(milliseconds: data[3]),
+        bufferedPosition: Duration(milliseconds: data[4]),
+        speed: _speed,
+        duration: duration,
+        icyMetadata: data.length < 6 || data[5] == null
+            ? null
+            : IcyMetadata(
+                info: IcyInfo(title: data[5][0][0], url: data[5][0][1]),
+                headers: IcyHeaders(
+                    bitrate: data[5][1][0],
+                    genre: data[5][1][1],
+                    name: data[5][1][2],
+                    metadataInterval: data[5][1][3],
+                    url: data[5][1][4],
+                    isPublic: data[5][1][5])),
+      );
+    });
     _eventChannelStreamSubscription = _eventChannelStream.listen(
         _playbackEventSubject.add,
         onError: _playbackEventSubject.addError);
@@ -253,11 +257,13 @@ class AudioPlayer {
   /// https://somewhere.com/somestream?x=etc#.m3u8
   Future<Duration> setUrl(final String url) async {
     try {
-      _durationFuture = _invokeMethod('setUrl', [url])
-          .then((ms) => ms == null ? null : Duration(milliseconds: ms));
-      _duration = await _durationFuture;
-      _durationSubject.add(_duration);
-      return _duration;
+      _durationFuture = _invokeMethod('setUrl', [url]).then((ms) =>
+          (ms == null || ms < 0)
+              ? const Duration(milliseconds: -1)
+              : Duration(milliseconds: ms));
+      final duration = await _durationFuture;
+      _durationSubject.add(duration);
+      return duration;
     } on PlatformException catch (e) {
       return Future.error(e.message);
     }
@@ -294,7 +300,9 @@ class AudioPlayer {
   Future<Duration> setClip({Duration start, Duration end}) async {
     _durationFuture =
         _invokeMethod('setClip', [start?.inMilliseconds, end?.inMilliseconds])
-            .then((ms) => ms == null ? null : Duration(milliseconds: ms));
+            .then((ms) => (ms == null || ms < 0)
+                ? const Duration(milliseconds: -1)
+                : Duration(milliseconds: ms));
     final duration = await _durationFuture;
     _durationSubject.add(duration);
     return duration;

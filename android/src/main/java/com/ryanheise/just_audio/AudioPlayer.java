@@ -1,11 +1,13 @@
 package com.ryanheise.just_audio;
 
+import android.content.Context;
+import android.net.Uri;
 import android.os.Handler;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.PlaybackParameters;
+import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
@@ -21,9 +23,14 @@ import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import io.flutter.Log;
 import io.flutter.plugin.common.EventChannel;
@@ -33,14 +40,6 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import android.content.Context;
-import android.net.Uri;
-
-import java.util.List;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
 	static final String TAG = "AudioPlayer";
@@ -76,12 +75,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private final Runnable bufferWatcher = new Runnable() {
 		@Override
 		public void run() {
-			long newBufferedPosition = Math.min(duration, player.getBufferedPosition());
+			long newBufferedPosition = player.getBufferedPosition();
 			if (newBufferedPosition != bufferedPosition) {
 				bufferedPosition = newBufferedPosition;
 				broadcastPlaybackEvent();
 			}
-			if (duration > 0 && newBufferedPosition >= duration) return;
 			if (buffering) {
 				handler.postDelayed(this, 200);
 			} else if (state == PlaybackState.playing) {
@@ -161,7 +159,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		switch (playbackState) {
 		case Player.STATE_READY:
 			if (prepareResult != null) {
-				duration = player.getDuration();
+				duration = getDuration();
 				justConnected = true;
 				transition(PlaybackState.stopped);
 				prepareResult.success(duration);
@@ -301,6 +299,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		event.add(updateTime = System.currentTimeMillis());
 		event.add(Math.max(updatePosition, bufferedPosition));
 		event.add(collectIcyMetadata());
+		event.add(duration = getDuration());
 
 		if (eventSink != null) {
 			eventSink.success(event);
@@ -341,6 +340,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			return seekPos;
 		} else {
 			return player.getCurrentPosition();
+		}
+	}
+
+	private long getDuration() {
+		if (state == PlaybackState.none || state == PlaybackState.connecting) {
+			return C.TIME_UNSET;
+		} else {
+			return player.getDuration();
 		}
 	}
 
