@@ -179,17 +179,15 @@
 	//Allow iOs playing both external links and local files.
 	if ([url hasPrefix:@"file://"]) {
 		playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[url substringFromIndex:7]]];
-	} else { 
+	} else {
 		//Use old method if no headers provided
-		if(headers==nil)
+		if(headers == [NSNull null])
 		{
 			playerItem = [[AVPlayerItem alloc] initWithURL:[NSURL URLWithString:url]];
 		}
 		else{
-			NSMutableDictionary *assetOptions = [[NSMutableDictionary alloc] init];
-			[assetOptions setObject:headers forKey:@"AVURLAssetHTTPHeaderFieldsKey"];
 			NSURL *audioUrl =[NSURL URLWithString:url];
-			AVURLAsset * asset = [AVURLAsset URLAssetWithURL:audioUrl options:assetOptions]; 
+			AVURLAsset * asset = [AVURLAsset URLAssetWithURL:audioUrl options:@{@"AVURLAssetHTTPHeaderFieldsKey" : headers}];
 			playerItem = [AVPlayerItem playerItemWithAsset:asset];
 		}
 	}

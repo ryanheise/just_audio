@@ -23,6 +23,7 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
+import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.util.Util;
 
 import io.flutter.Log;
@@ -41,6 +42,7 @@ import android.content.Context;
 import android.net.Uri;
 
 import java.util.List;
+import java.util.Map;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
 	static final String TAG = "AudioPlayer";
@@ -233,7 +235,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		try {
 			switch (call.method) {
 			case "setUrl":
-				setUrl((String)args.get(0), result,,(Map)args.get(1));
+				setUrl((String)args.get(0), result,(Map)args.get(1));
 				break;
 			case "setClip":
 				Object start = args.get(0);
