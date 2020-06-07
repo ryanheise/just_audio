@@ -47,7 +47,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private final EventChannel eventChannel;
 	private EventSink eventSink;
 
-	private final String id;
 	private volatile PlaybackState state;
 	private long updateTime;
 	private long updatePosition;
@@ -89,10 +88,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	};
 
+	private final Runnable onDispose;
+
 	public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger,
-			final String id) {
+			final int id, final Runnable onDispose) {
 		this.context = applicationContext;
-		this.id = id;
+		this.onDispose = onDispose;
 		methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
 		methodChannel.setMethodCallHandler(this);
 		eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
@@ -512,6 +513,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			buffering = false;
 			transition(PlaybackState.none);
 		}
+
+		onDispose.run();
 	}
 
 	private void abortSeek() {
