@@ -12,45 +12,46 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
  */
 public class JustAudioPlugin implements FlutterPlugin {
 
-  private MethodChannel channel;
-  private MethodCallHandlerImpl methodCallHandler;
+	private MethodChannel channel;
+	private MethodCallHandlerImpl methodCallHandler;
 
-  public JustAudioPlugin() {
-  }
+	public JustAudioPlugin() {
+	}
 
-  /**
-   * Plugin registration.
-   */
-  public static void registerWith(Registrar registrar) {
-    final JustAudioPlugin plugin = new JustAudioPlugin();
-    plugin.startListening(registrar.context(), registrar.messenger());
-    registrar.addViewDestroyListener(view -> {
-      plugin.stopListening();
-      return false;
-    });
-  }
+	/**
+	 * Plugin registration.
+	 */
+	public static void registerWith(Registrar registrar) {
+		final JustAudioPlugin plugin = new JustAudioPlugin();
+		plugin.startListening(registrar.context(), registrar.messenger());
+		registrar.addViewDestroyListener(
+				view -> {
+					plugin.stopListening();
+					return false;
+				});
+	}
 
-  @Override
-  public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
-    startListening(binding.getApplicationContext(), binding.getBinaryMessenger());
-  }
+	@Override
+	public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
+		startListening(binding.getApplicationContext(), binding.getBinaryMessenger());
+	}
 
-  @Override
-  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    stopListening();
-  }
+	@Override
+	public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
+		stopListening();
+	}
 
-  private void startListening(Context applicationContext, BinaryMessenger messenger) {
-    methodCallHandler = new MethodCallHandlerImpl(applicationContext, messenger);
+	private void startListening(Context applicationContext, BinaryMessenger messenger) {
+		methodCallHandler = new MethodCallHandlerImpl(applicationContext, messenger);
 
-    channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
-    channel.setMethodCallHandler(methodCallHandler);
-  }
+		channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
+		channel.setMethodCallHandler(methodCallHandler);
+	}
 
-  private void stopListening() {
-    methodCallHandler.dispose();
-    methodCallHandler = null;
+	private void stopListening() {
+		methodCallHandler.dispose();
+		methodCallHandler = null;
 
-    channel.setMethodCallHandler(null);
-  }
+		channel.setMethodCallHandler(null);
+	}
 }
