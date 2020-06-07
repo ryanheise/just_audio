@@ -1,3 +1,9 @@
+## 0.1.11
+
+* Android: Support Android Embedding V2
+* Android: Lazy-load the audio player object for decreased application startup
+  time
+
 ## 0.1.10
 
 * Option to set audio session category on iOS.
