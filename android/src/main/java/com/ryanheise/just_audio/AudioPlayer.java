@@ -267,11 +267,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				result.success(null);
 				break;
 			case "seek":
-				Long position = args.get(0);
-				if (position == -2) {
-					position = C.TIME_UNSET;
+				Object position = args.get(0);
+				long position2;
+				if (position instanceof Integer) {
+					position2 = (Integer)position;
+				} else {
+					position2 = (Long)position;
 				}
-				seek(position, result);
+				seek(position2 == -2 ? C.TIME_UNSET : position2, result);
 				break;
 			case "dispose":
 				dispose();
