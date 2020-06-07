@@ -27,6 +27,7 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 
+import io.flutter.plugin.common.BinaryMessenger;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,7 +45,6 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
 	static final String TAG = "AudioPlayer";
 
-	private final Registrar registrar;
 	private final Context context;
 	private final MethodChannel methodChannel;
 	private final EventChannel eventChannel;
@@ -70,7 +70,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private IcyInfo icyInfo;
 	private IcyHeaders icyHeaders;
 
-	private final SimpleExoPlayer player;
+	private SimpleExoPlayer player;
 	private final Handler handler = new Handler();
 	private final Runnable bufferWatcher = new Runnable() {
 		@Override
@@ -92,13 +92,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	};
 
-	public AudioPlayer(final Registrar registrar, final String id) {
-		this.registrar = registrar;
-		this.context = registrar.activeContext();
+	public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id) {
+		this.context = applicationContext;
 		this.id = id;
-		methodChannel = new MethodChannel(registrar.messenger(), "com.ryanheise.just_audio.methods." + id);
+		methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
 		methodChannel.setMethodCallHandler(this);
-		eventChannel = new EventChannel(registrar.messenger(), "com.ryanheise.just_audio.events." + id);
+		eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
 		eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
 			@Override
 			public void onListen(final Object arguments, final EventSink eventSink) {
@@ -111,10 +110,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			}
 		});
 		state = PlaybackState.none;
-
-		player = new SimpleExoPlayer.Builder(context).build();
-		player.addMetadataOutput(this);
-		player.addListener(this);
 	}
 
 	private void startWatchingBuffer() {
@@ -227,6 +222,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 
 	@Override
 	public void onMethodCall(final MethodCall call, final Result result) {
+		ensurePlayerInitialized();
+
 		final List<?> args = (List<?>)call.arguments;
 		try {
 			switch (call.method) {
@@ -290,6 +287,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		} catch (Exception e) {
 			e.printStackTrace();
 			result.error("Error: " + e, null, null);
+		}
+	}
+
+	private void ensurePlayerInitialized() {
+		if (player == null) {
+			player = new SimpleExoPlayer.Builder(context).build();
+			player.addMetadataOutput(this);
+			player.addListener(this);
 		}
 	}
 
@@ -500,7 +505,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	public void dispose() {
-		player.release();
+    if (player != null) {
+      player.release();
+      player = null;
+		}
+
 		buffering = false;
 		transition(PlaybackState.none);
 	}
