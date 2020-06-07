@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
@@ -71,6 +72,8 @@ class AudioPlayer {
   }
 
   final Future<MethodChannel> _channel;
+
+  _ProxyHttpServer _proxy;
 
   final int _id;
 
@@ -249,14 +252,25 @@ class AudioPlayer {
   /// audio, or null if this call was interrupted by another call so [setUrl],
   /// [setFilePath] or [setAsset].
   ///
+  /// On platforms other than the web, the supplied [headers] will be passed
+  /// with the request. Currently headers are not recursively applied to items
+  /// within playlist files such as m3u8.
+  ///
   /// On Android, DASH and HLS streams are detected only when the URL's path
   /// has an "mpd" or "m3u8" extension. If the URL does not have such an
   /// extension and you have no control over the server, and you also know the
   /// type of the stream in advance, you may as a workaround supply the
   /// extension as a URL fragment. e.g.
   /// https://somewhere.com/somestream?x=etc#.m3u8
-  Future<Duration> setUrl(final String url) async {
+  Future<Duration> setUrl(String url, {Map<String, String> headers}) async {
     try {
+      if (!kIsWeb && headers != null) {
+        if (_proxy == null) {
+          _proxy = _ProxyHttpServer();
+          await _proxy.start();
+        }
+        url = _proxy.addUrl(url, headers);
+      }
       _durationFuture = _invokeMethod('setUrl', [url]).then((ms) =>
           (ms == null || ms < 0)
               ? const Duration(milliseconds: -1)
@@ -437,10 +451,11 @@ class AudioPlayer {
   /// * [AudioPlaybackState.none]
   /// * [AudioPlaybackState.connecting]
   Future<void> dispose() async {
-    if (this._cacheFile?.existsSync() ?? false) {
-      this._cacheFile?.deleteSync();
-    }
     await _invokeMethod('dispose');
+    if (_cacheFile?.existsSync() == true) {
+      _cacheFile?.deleteSync();
+    }
+    _proxy?.stop();
     await _durationSubject.close();
     await _eventChannelStreamSubscription.cancel();
     await _playbackEventSubject.close();
@@ -592,4 +607,67 @@ enum IosCategory {
   record,
   playAndRecord,
   multiRoute,
+}
+
+/// A local proxy HTTP server for making remote GET requests with headers.
+///
+/// TODO: Recursively attach headers to items in playlists like m3u8.
+class _ProxyHttpServer {
+  HttpServer _server;
+
+  /// Maps request keys to [_ProxyRequest]s.
+  final Map<String, _ProxyRequest> _uriMap = {};
+
+  /// The port this server is bound to on localhost. This is set only after
+  /// [start] has completed.
+  int get port => _server.port;
+
+  /// Associate headers with a URL. This may be called only after [start] has
+  /// completed.
+  String addUrl(String url, Map<String, String> headers) {
+    final uri = Uri.parse(url);
+    final path = _requestKey(uri);
+    _uriMap[path] = _ProxyRequest(uri, headers);
+    return uri
+        .replace(
+          scheme: 'http',
+          host: InternetAddress.loopbackIPv4.address,
+          port: port,
+        )
+        .toString();
+  }
+
+  /// A unique key for each request that can be processed by this proxy,
+  /// made up of the URL path and query string. It is not possible to
+  /// simultaneously track requests that have the same URL path and query
+  /// but differ in other respects such as the port or headers.
+  String _requestKey(Uri uri) => '${uri.path}?${uri.query}';
+
+  /// Starts the server.
+  Future start() async {
+    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    _server.listen((request) async {
+      if (request.method == 'GET') {
+        final path = _requestKey(request.uri);
+        final proxyRequest = _uriMap[path];
+        final originRequest = await HttpClient().getUrl(proxyRequest.uri);
+        for (var name in proxyRequest.headers.keys) {
+          originRequest.headers.add(name, proxyRequest.headers[name]);
+        }
+        final originResponse = await originRequest.close();
+        await originResponse.pipe(request.response);
+      }
+    });
+  }
+
+  /// Stops the server
+  Future stop() => _server.close();
+}
+
+/// A request for a URL and headers made by a [_ProxyHttpServer].
+class _ProxyRequest {
+  final Uri uri;
+  final Map<String, String> headers;
+
+  _ProxyRequest(this.uri, this.headers);
 }
