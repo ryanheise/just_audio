@@ -24,27 +24,27 @@ public class MethodCallHandlerImpl implements MethodCallHandler {
 	@Override
 	public void onMethodCall(MethodCall call, @NonNull Result result) {
 		switch (call.method) {
-			case "init": {
-				String id = call.argument("id");
-				players.put(Integer.parseInt(id), new AudioPlayer(applicationContext, messenger, id));
-				result.success(null);
-				break;
-			}
-			case "dispose": {
-				final Integer id = call.argument("id");
-				final AudioPlayer player = players.get(id);
+		case "init": {
+			String id = call.argument("id");
+			players.put(Integer.parseInt(id), new AudioPlayer(applicationContext, messenger, id));
+			result.success(null);
+			break;
+		}
+		case "dispose": {
+			final Integer id = call.argument("id");
+			final AudioPlayer player = players.get(id);
 
-				if (player != null) {
-					player.dispose();
-					players.remove(id);
-				}
+			if (player != null) {
+				player.dispose();
+				players.remove(id);
 			}
-			case "setIosCategory":
-				result.success(null);
-				break;
-			default:
-				result.notImplemented();
-				break;
+		}
+		case "setIosCategory":
+			result.success(null);
+			break;
+		default:
+			result.notImplemented();
+			break;
 		}
 	}
 
