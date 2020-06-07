@@ -505,13 +505,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	public void dispose() {
-    if (player != null) {
-      player.release();
-      player = null;
+		if (player != null) {
+			player.release();
+			player = null;
+			buffering = false;
+			transition(PlaybackState.none);
 		}
-
-		buffering = false;
-		transition(PlaybackState.none);
 	}
 
 	private void abortSeek() {
