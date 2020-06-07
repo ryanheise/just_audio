@@ -268,11 +268,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				break;
 			case "seek":
 				Object position = args.get(0);
+				long position2;
 				if (position instanceof Integer) {
-					seek((Integer)position, result);
+					position2 = (Integer)position;
 				} else {
-					seek((Long)position, result);
+					position2 = (Long)position;
 				}
+				seek(position2 == -2 ? C.TIME_UNSET : position2, result);
 				break;
 			case "dispose":
 				dispose();
@@ -336,7 +338,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private long getCurrentPosition() {
 		if (state == PlaybackState.none || state == PlaybackState.connecting) {
 			return 0;
-		} else if (seekPos != null) {
+		} else if (seekPos != null && seekPos != C.TIME_UNSET) {
 			return seekPos;
 		} else {
 			return player.getCurrentPosition();
