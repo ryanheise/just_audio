@@ -85,7 +85,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.1.11"
+    version: "0.1.10"
   matcher:
     dependency: transitive
     description:
