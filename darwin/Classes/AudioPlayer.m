@@ -140,7 +140,7 @@
 - (int)getCurrentPosition {
 	if (_state == none || _state == connecting) {
 		return 0;
-	} else if (_seekPos != -1) {
+	} else if (_seekPos >= 0) {
 		return _seekPos;
 	} else {
 		return (int)(1000 * CMTimeGetSeconds([_player currentTime]));
@@ -360,11 +360,19 @@
 	NSLog(@"seek. enter buffering");
 	_buffering = YES;
 	[self broadcastPlaybackEvent];
-	[_player seekToTime:CMTimeMake(position, 1000)
-	  completionHandler:^(BOOL finished) {
-		  NSLog(@"seek completed");
-		  [self onSeekCompletion:result];
-	  }];
+	if (position == -2) {
+        [_player seekToTime:kCMTimePositiveInfinity
+          completionHandler:^(BOOL finished) {
+              NSLog(@"seek completed");
+              [self onSeekCompletion:result];
+          }];
+	} else {
+        [_player seekToTime:CMTimeMake(position, 1000)
+          completionHandler:^(BOOL finished) {
+              NSLog(@"seek completed");
+              [self onSeekCompletion:result];
+          }];
+	}
 }
 
 - (void)onSeekCompletion:(FlutterResult)result {

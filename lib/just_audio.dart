@@ -421,11 +421,13 @@ class AudioPlayer {
         [automaticallyWaitsToMinimizeStalling]);
   }
 
-  /// Seeks to a particular position. It is legal to invoke this method from
+  /// Seeks to a particular position. Specify [null] to seek to the end of live streams.
+  /// It is legal to invoke this method from
   /// any state except for [AudioPlaybackState.none] and
   /// [AudioPlaybackState.connecting].
   Future<void> seek(final Duration position) async {
-    await _invokeMethod('seek', [position.inMilliseconds]);
+    await _invokeMethod(
+        'seek', [position != null ? position.inMilliseconds : -2]);
   }
 
   /// Release all resources associated with this player. You must invoke this
