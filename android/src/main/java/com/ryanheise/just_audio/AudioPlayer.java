@@ -71,6 +71,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private final Runnable bufferWatcher = new Runnable() {
 		@Override
 		public void run() {
+			if (player == null) {
+				return;
+			}
+
 			long newBufferedPosition = player.getBufferedPosition();
 			if (newBufferedPosition != bufferedPosition) {
 				bufferedPosition = newBufferedPosition;
@@ -91,7 +95,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private final Runnable onDispose;
 
 	public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger,
-			final int id, final Runnable onDispose) {
+			final String id, final Runnable onDispose) {
 		this.context = applicationContext;
 		this.onDispose = onDispose;
 		methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);

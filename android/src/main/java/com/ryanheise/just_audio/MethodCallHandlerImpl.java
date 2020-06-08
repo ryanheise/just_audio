@@ -1,19 +1,21 @@
 package com.ryanheise.just_audio;
 
 import android.content.Context;
-import android.util.SparseArray;
 import androidx.annotation.NonNull;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MethodCallHandlerImpl implements MethodCallHandler {
 
 	private final Context applicationContext;
 	private final BinaryMessenger messenger;
 
-	private final SparseArray<AudioPlayer> players = new SparseArray<>();
+	private final Map<String, AudioPlayer> players = new HashMap<>();
 
 	public MethodCallHandlerImpl(Context applicationContext,
 			BinaryMessenger messenger) {
@@ -25,7 +27,8 @@ public class MethodCallHandlerImpl implements MethodCallHandler {
 	public void onMethodCall(MethodCall call, @NonNull Result result) {
 		switch (call.method) {
 		case "init":
-			int id = Integer.parseInt(call.argument("id"));
+			final List<String> ids = call.arguments();
+			String id = ids.get(0);
 			players.put(id, new AudioPlayer(applicationContext, messenger, id,
 					() -> players.remove(id)
 			));
@@ -41,9 +44,7 @@ public class MethodCallHandlerImpl implements MethodCallHandler {
 	}
 
 	void dispose() {
-		final int size = players.size();
-		for (int i = 0; i < size; i++) {
-			final AudioPlayer player = players.valueAt(i);
+		for (AudioPlayer player : players.values()) {
 			player.dispose();
 		}
 
