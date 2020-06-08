@@ -74,7 +74,8 @@
 		[self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[args[0] boolValue]];
 		result(nil);
 	} else if ([@"seek" isEqualToString:call.method]) {
-		[self seek:[args[0] intValue] result:result];
+		int position = args[0] == [NSNull null] ? -2 : [args[0] intValue];
+		[self seek:position result:result];
 		result(nil);
 	} else if ([@"dispose" isEqualToString:call.method]) {
 		[self dispose];

@@ -267,14 +267,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				result.success(null);
 				break;
 			case "seek":
-				Object position = args.get(0);
-				long position2;
-				if (position instanceof Integer) {
-					position2 = (Integer) position;
-				} else {
-					position2 = (Long) position;
-				}
-				seek(position2 == -2 ? C.TIME_UNSET : position2, result);
+				Long position = getLong(args.get(0));
+				seek(position == null ? C.TIME_UNSET : position, result);
 				break;
 			case "dispose":
 				dispose();
@@ -531,6 +525,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 
 	private void abortExistingConnection() {
 		sendError("abort", "Connection aborted");
+	}
+
+	public static Long getLong(Object o) {
+		return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
 	}
 
 	enum PlaybackState {

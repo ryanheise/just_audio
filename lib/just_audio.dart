@@ -441,8 +441,7 @@ class AudioPlayer {
   /// any state except for [AudioPlaybackState.none] and
   /// [AudioPlaybackState.connecting].
   Future<void> seek(final Duration position) async {
-    await _invokeMethod(
-        'seek', [position != null ? position.inMilliseconds : -2]);
+    await _invokeMethod('seek', [position?.inMilliseconds]);
   }
 
   /// Release all resources associated with this player. You must invoke this
