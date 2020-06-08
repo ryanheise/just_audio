@@ -89,7 +89,7 @@ class AudioPlayer {
     updateTime: Duration.zero,
     bufferedPosition: Duration.zero,
     speed: 1.0,
-    duration: Duration.zero,
+    duration: null,
     icyMetadata: IcyMetadata(
         info: IcyInfo(title: null, url: null),
         headers: IcyHeaders(
@@ -133,8 +133,9 @@ class AudioPlayer {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
         .map((data) {
-      final duration =
-          Duration(milliseconds: data.length < 7 || data[6] < 0 ? -1 : data[6]);
+      final duration = data.length < 7 || data[6] < 0
+          ? null
+          : Duration(milliseconds: data[6]);
       _durationFuture = Future.value(duration);
       _durationSubject.add(duration);
       return _audioPlaybackEvent = AudioPlaybackEvent(
@@ -252,6 +253,8 @@ class AudioPlayer {
   /// audio, or a [PlatformException] if this call was interrupted by another
   /// call to [setUrl], [setFilePath], [setAsset] or [stop].
   ///
+  /// If the duration is unknown, null will be returned.
+  ///
   /// On platforms except for the web, the supplied [headers] will be passed
   /// with the request. Currently headers are not recursively applied to items
   /// within playlist files such as m3u8.
@@ -271,10 +274,8 @@ class AudioPlayer {
         }
         url = _proxy.addUrl(url, headers);
       }
-      _durationFuture = _invokeMethod('setUrl', [url]).then((ms) =>
-          (ms == null || ms < 0)
-              ? const Duration(milliseconds: -1)
-              : Duration(milliseconds: ms));
+      _durationFuture = _invokeMethod('setUrl', [url]).then(
+          (ms) => (ms == null || ms < 0) ? null : Duration(milliseconds: ms));
       final duration = await _durationFuture;
       _durationSubject.add(duration);
       return duration;
@@ -486,7 +487,7 @@ class AudioPlaybackEvent {
   /// The playback speed.
   final double speed;
 
-  /// The media duration.
+  /// The media duration, or null if unknown.
   final Duration duration;
 
   final IcyMetadata icyMetadata;
@@ -530,7 +531,7 @@ class AudioPlaybackEvent {
           (Duration(milliseconds: DateTime.now().millisecondsSinceEpoch) -
                   updateTime) *
               speed;
-      return result <= duration ? result : duration;
+      return duration == null || result <= duration ? result : duration;
     } else {
       return updatePosition;
     }
