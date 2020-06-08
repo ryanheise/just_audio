@@ -278,7 +278,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				break;
 			case "dispose":
 				dispose();
-				onDispose.run();
 				result.success(null);
 				break;
 			default:
@@ -518,6 +517,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			buffering = false;
 			transition(PlaybackState.none);
 		}
+		onDispose.run();
 	}
 
 	private void abortSeek() {

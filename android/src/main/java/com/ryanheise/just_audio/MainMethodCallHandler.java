@@ -8,16 +8,17 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 
-public class MethodCallHandlerImpl implements MethodCallHandler {
+public class MainMethodCallHandler implements MethodCallHandler {
 
 	private final Context applicationContext;
 	private final BinaryMessenger messenger;
 
 	private final Map<String, AudioPlayer> players = new HashMap<>();
 
-	public MethodCallHandlerImpl(Context applicationContext,
+	public MainMethodCallHandler(Context applicationContext,
 			BinaryMessenger messenger) {
 		this.applicationContext = applicationContext;
 		this.messenger = messenger;
@@ -44,10 +45,8 @@ public class MethodCallHandlerImpl implements MethodCallHandler {
 	}
 
 	void dispose() {
-		for (AudioPlayer player : players.values()) {
+		for (AudioPlayer player : new ArrayList<AudioPlayer>(players.values())) {
 			player.dispose();
 		}
-
-		players.clear();
 	}
 }

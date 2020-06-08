@@ -451,7 +451,7 @@ class AudioPlayer {
   /// * [AudioPlaybackState.none]
   /// * [AudioPlaybackState.connecting]
   Future<void> dispose() async {
-    await _invokeMethod('dispose', [_id]);
+    await _invokeMethod('dispose');
     if (_cacheFile?.existsSync() == true) {
       _cacheFile?.deleteSync();
     }

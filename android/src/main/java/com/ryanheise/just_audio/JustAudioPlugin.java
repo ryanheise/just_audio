@@ -13,13 +13,13 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 public class JustAudioPlugin implements FlutterPlugin {
 
 	private MethodChannel channel;
-	private MethodCallHandlerImpl methodCallHandler;
+	private MainMethodCallHandler methodCallHandler;
 
 	public JustAudioPlugin() {
 	}
 
 	/**
-	 * Plugin registration.
+	 * v1 plugin registration.
 	 */
 	public static void registerWith(Registrar registrar) {
 		final JustAudioPlugin plugin = new JustAudioPlugin();
@@ -42,7 +42,7 @@ public class JustAudioPlugin implements FlutterPlugin {
 	}
 
 	private void startListening(Context applicationContext, BinaryMessenger messenger) {
-		methodCallHandler = new MethodCallHandlerImpl(applicationContext, messenger);
+		methodCallHandler = new MainMethodCallHandler(applicationContext, messenger);
 
 		channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
 		channel.setMethodCallHandler(methodCallHandler);
