@@ -9,6 +9,7 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 | read from URL        | ✅        | ✅         | ✅         | ✅         |
 | read from file       | ✅        | ✅         | ✅         |            |
 | read from asset      | ✅        | ✅         | ✅         |            |
+| pass headers         | ✅        | ✅         | ✅         |            |
 | DASH                 | ✅        | (untested) | (untested) | (untested) |
 | HLS                  | ✅        | ✅         | (untested) | (untested) |
 | play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |

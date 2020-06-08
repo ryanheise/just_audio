@@ -249,10 +249,10 @@ class AudioPlayer {
       _automaticallyWaitsToMinimizeStalling;
 
   /// Loads audio media from a URL and completes with the duration of that
-  /// audio, or null if this call was interrupted by another call so [setUrl],
-  /// [setFilePath] or [setAsset].
+  /// audio, or a [PlatformException] if this call was interrupted by another
+  /// call to [setUrl], [setFilePath], [setAsset] or [stop].
   ///
-  /// On platforms other than the web, the supplied [headers] will be passed
+  /// On platforms except for the web, the supplied [headers] will be passed
   /// with the request. Currently headers are not recursively applied to items
   /// within playlist files such as m3u8.
   ///

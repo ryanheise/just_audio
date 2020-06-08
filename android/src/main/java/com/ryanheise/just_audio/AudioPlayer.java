@@ -205,7 +205,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		default:
 			Log.e(TAG, "default: " + error.getUnexpectedException().getMessage());
 		}
-		this.setError(String.valueOf(error.type), error.getMessage());
+		sendError(String.valueOf(error.type), error.getMessage());
 	}
 
 	@Override
@@ -353,7 +353,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	}
 
-	private void setError(String errorCode, String errorMsg) {
+	private void sendError(String errorCode, String errorMsg) {
 		if (prepareResult != null) {
 			prepareResult.error(errorCode, errorMsg, null);
 			prepareResult = null;
@@ -515,10 +515,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private void abortExistingConnection() {
-		if (prepareResult != null) {
-			prepareResult.success(null);
-			prepareResult = null;
-		}
+		sendError("abort", "Connection aborted");
 	}
 
 	enum PlaybackState {
