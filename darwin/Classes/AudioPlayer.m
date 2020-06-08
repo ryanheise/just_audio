@@ -12,7 +12,7 @@
 	enum PlaybackState _state;
 	long long _updateTime;
 	int _updatePosition;
-	int _seekPos;
+	CMTime _seekPos;
 	FlutterResult _connectionResult;
 	BOOL _buffering;
 	id _endObserver;
@@ -36,7 +36,7 @@
 	[_eventChannel setStreamHandler:self];
 	_state = none;
 	_player = nil;
-	_seekPos = -1;
+	_seekPos = kCMTimeInvalid;
 	_buffering = NO;
 	_endObserver = 0;
 	_timeObserver = 0;
@@ -74,7 +74,7 @@
 		[self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[args[0] boolValue]];
 		result(nil);
 	} else if ([@"seek" isEqualToString:call.method]) {
-		int position = args[0] == [NSNull null] ? -2 : [args[0] intValue];
+		CMTime position = args[0] == [NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([args[0] intValue], 1000);
 		[self seek:position result:result];
 		result(nil);
 	} else if ([@"dispose" isEqualToString:call.method]) {
@@ -135,16 +135,25 @@
 		@(_updatePosition),
 		// TODO: Icy Metadata
 		[NSNull null],
+		@([self getDuration]),
 	]);
 }
 
 - (int)getCurrentPosition {
 	if (_state == none || _state == connecting) {
 		return 0;
-	} else if (_seekPos >= 0) {
-		return _seekPos;
+	} else if (CMTIME_IS_VALID(_seekPos)) {
+		return (int)(1000 * CMTimeGetSeconds(_seekPos));
 	} else {
 		return (int)(1000 * CMTimeGetSeconds([_player currentTime]));
+	}
+}
+
+- (int)getDuration {
+	if (_state == none || _state == connecting) {
+		return -1;
+	} else {
+		return (int)(1000 * CMTimeGetSeconds([[_player currentItem] duration]));
 	}
 }
 
@@ -247,11 +256,14 @@
 		switch (status) {
 			case AVPlayerItemStatusReadyToPlay:
 				[self setPlaybackState:stopped];
-				_connectionResult(@((int)(1000 * CMTimeGetSeconds([[_player currentItem] duration]))));
+				_connectionResult(@([self getDuration]));
 				break;
 			case AVPlayerItemStatusFailed:
 				NSLog(@"AVPlayerItemStatusFailed");
-				_connectionResult(nil);
+				_connectionResult([FlutterError errorWithCode:[NSString stringWithFormat:@"%d", _player.currentItem.error]
+								      message:_player.currentItem.error.localizedDescription
+								      details:nil
+				]);
 				break;
 			case AVPlayerItemStatusUnknown:
 				break;
@@ -356,28 +368,20 @@
 	}
 }
 
-- (void)seek:(int)position result:(FlutterResult)result {
+- (void)seek:(CMTime)position result:(FlutterResult)result {
 	_seekPos = position;
 	NSLog(@"seek. enter buffering");
 	_buffering = YES;
 	[self broadcastPlaybackEvent];
-	if (position == -2) {
-        [_player seekToTime:kCMTimePositiveInfinity
+        [_player seekToTime:position
           completionHandler:^(BOOL finished) {
               NSLog(@"seek completed");
               [self onSeekCompletion:result];
           }];
-	} else {
-        [_player seekToTime:CMTimeMake(position, 1000)
-          completionHandler:^(BOOL finished) {
-              NSLog(@"seek completed");
-              [self onSeekCompletion:result];
-          }];
-	}
 }
 
 - (void)onSeekCompletion:(FlutterResult)result {
-	_seekPos = -1;
+	_seekPos = kCMTimeInvalid;
 	_buffering = NO;
 	[self broadcastPlaybackEvent];
 	result(nil);
