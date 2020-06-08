@@ -3,7 +3,6 @@ package com.ryanheise.just_audio;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Handler;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -26,31 +25,28 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import io.flutter.Log;
+import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.EventChannel.EventSink;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
+
 	static final String TAG = "AudioPlayer";
 
-	private final Registrar registrar;
 	private final Context context;
 	private final MethodChannel methodChannel;
 	private final EventChannel eventChannel;
 	private EventSink eventSink;
 
-	private final String id;
 	private volatile PlaybackState state;
 	private long updateTime;
 	private long updatePosition;
@@ -70,11 +66,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private IcyInfo icyInfo;
 	private IcyHeaders icyHeaders;
 
-	private final SimpleExoPlayer player;
+	private SimpleExoPlayer player;
 	private final Handler handler = new Handler();
 	private final Runnable bufferWatcher = new Runnable() {
 		@Override
 		public void run() {
+			if (player == null) {
+				return;
+			}
+
 			long newBufferedPosition = player.getBufferedPosition();
 			if (newBufferedPosition != bufferedPosition) {
 				bufferedPosition = newBufferedPosition;
@@ -92,13 +92,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	};
 
-	public AudioPlayer(final Registrar registrar, final String id) {
-		this.registrar = registrar;
-		this.context = registrar.activeContext();
-		this.id = id;
-		methodChannel = new MethodChannel(registrar.messenger(), "com.ryanheise.just_audio.methods." + id);
+	private final Runnable onDispose;
+
+	public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger,
+			final String id, final Runnable onDispose) {
+		this.context = applicationContext;
+		this.onDispose = onDispose;
+		methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
 		methodChannel.setMethodCallHandler(this);
-		eventChannel = new EventChannel(registrar.messenger(), "com.ryanheise.just_audio.events." + id);
+		eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
 		eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
 			@Override
 			public void onListen(final Object arguments, final EventSink eventSink) {
@@ -111,10 +113,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			}
 		});
 		state = PlaybackState.none;
-
-		player = new SimpleExoPlayer.Builder(context).build();
-		player.addMetadataOutput(this);
-		player.addListener(this);
 	}
 
 	private void startWatchingBuffer() {
@@ -227,22 +225,24 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 
 	@Override
 	public void onMethodCall(final MethodCall call, final Result result) {
-		final List<?> args = (List<?>)call.arguments;
+		ensurePlayerInitialized();
+
+		final List<?> args = (List<?>) call.arguments;
 		try {
 			switch (call.method) {
 			case "setUrl":
-				setUrl((String)args.get(0), result);
+				setUrl((String) args.get(0), result);
 				break;
 			case "setClip":
 				Object start = args.get(0);
 				if (start != null && start instanceof Integer) {
-					start = new Long((Integer)start);
+					start = new Long((Integer) start);
 				}
 				Object end = args.get(1);
 				if (end != null && end instanceof Integer) {
-					end = new Long((Integer)end);
+					end = new Long((Integer) end);
 				}
-				setClip((Long)start, (Long)end, result);
+				setClip((Long) start, (Long) end, result);
 				break;
 			case "play":
 				play();
@@ -256,11 +256,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				stop(result);
 				break;
 			case "setVolume":
-				setVolume((float)((double)((Double)args.get(0))));
+				setVolume((float) ((double) ((Double) args.get(0))));
 				result.success(null);
 				break;
 			case "setSpeed":
-				setSpeed((float)((double)((Double)args.get(0))));
+				setSpeed((float) ((double) ((Double) args.get(0))));
 				result.success(null);
 				break;
 			case "setAutomaticallyWaitsToMinimizeStalling":
@@ -270,14 +270,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				Object position = args.get(0);
 				long position2;
 				if (position instanceof Integer) {
-					position2 = (Integer)position;
+					position2 = (Integer) position;
 				} else {
-					position2 = (Long)position;
+					position2 = (Long) position;
 				}
 				seek(position2 == -2 ? C.TIME_UNSET : position2, result);
 				break;
 			case "dispose":
 				dispose();
+				onDispose.run();
 				result.success(null);
 				break;
 			default:
@@ -290,6 +291,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		} catch (Exception e) {
 			e.printStackTrace();
 			result.error("Error: " + e, null, null);
+		}
+	}
+
+	private void ensurePlayerInitialized() {
+		if (player == null) {
+			player = new SimpleExoPlayer.Builder(context).build();
+			player.addMetadataOutput(this);
+			player.addListener(this);
 		}
 	}
 
@@ -382,7 +391,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
 				true
 		);
-		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context, httpDataSourceFactory);
+		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context,
+				httpDataSourceFactory);
 		Uri uri = Uri.parse(url);
 		String extension = getLowerCaseExtension(uri);
 		if (extension.equals("mpd")) {
@@ -415,8 +425,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		prepareResult = result;
 		if (start != null || end != null) {
 			player.prepare(new ClippingMediaSource(mediaSource,
-						(start != null ? start : 0) * 1000L,
-						(end != null ? end : C.TIME_END_OF_SOURCE) * 1000L));
+					(start != null ? start : 0) * 1000L,
+					(end != null ? end : C.TIME_END_OF_SOURCE) * 1000L));
 		} else {
 			player.prepare(mediaSource);
 		}
@@ -435,7 +445,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			player.setPlayWhenReady(true);
 			break;
 		default:
-			throw new IllegalStateException("Cannot call play from connecting/none states (" + state + ")");
+			throw new IllegalStateException(
+					"Cannot call play from connecting/none states (" + state + ")");
 		}
 	}
 
@@ -448,7 +459,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			transition(PlaybackState.paused);
 			break;
 		default:
-			throw new IllegalStateException("Can call pause only from playing and buffering states (" + state + ")");
+			throw new IllegalStateException(
+					"Can call pause only from playing and buffering states (" + state + ")");
 		}
 	}
 
@@ -500,9 +512,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	public void dispose() {
-		player.release();
-		buffering = false;
-		transition(PlaybackState.none);
+		if (player != null) {
+			player.release();
+			player = null;
+			buffering = false;
+			transition(PlaybackState.none);
+		}
 	}
 
 	private void abortSeek() {
