@@ -9,9 +9,9 @@ environment:
 
 dependencies:
   rxdart: ^0.24.1
-  path: ^1.6.4
-  path_provider: ^1.5.1
-  async: ^2.4.0
+  path: ^1.7.0
+  path_provider: ^1.6.10
+  async: ^2.4.1
   flutter:
     sdk: flutter
   flutter_web_plugins:
