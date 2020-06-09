@@ -652,7 +652,12 @@ class _ProxyHttpServer {
         final proxyRequest = _uriMap[path];
         final originRequest = await HttpClient().getUrl(proxyRequest.uri);
         for (var name in proxyRequest.headers.keys) {
-          originRequest.headers.add(name, proxyRequest.headers[name]);
+          final value = proxyRequest.headers[name];
+          if (value != null) {
+            originRequest.headers.set(name, value);
+          } else {
+            originRequest.headers.removeAll(name);
+          }
         }
         final originResponse = await originRequest.close();
         await originResponse.pipe(request.response);
