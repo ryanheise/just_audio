@@ -651,15 +651,29 @@ class _ProxyHttpServer {
         final path = _requestKey(request.uri);
         final proxyRequest = _uriMap[path];
         final originRequest = await HttpClient().getUrl(proxyRequest.uri);
+
+        // Rewrite request headers
+        final host = originRequest.headers.value('host');
+        print("saved host from request headers: $host");
+        originRequest.headers.clear();
+        request.headers.forEach((name, value) {
+          originRequest.headers.set(name, value);
+        });
         for (var name in proxyRequest.headers.keys) {
-          final value = proxyRequest.headers[name];
-          if (value != null) {
-            originRequest.headers.set(name, value);
-          } else {
-            originRequest.headers.removeAll(name);
-          }
+          originRequest.headers.set(name, proxyRequest.headers[name]);
         }
+        originRequest.headers.set('host', host);
+
+        // Make request
         final originResponse = await originRequest.close();
+
+        // Rewrite response headers
+        request.response.headers.clear();
+        originResponse.headers.forEach((name, value) {
+          request.response.headers.set(name, value);
+        });
+
+        // Pipe response
         await originResponse.pipe(request.response);
       }
     });
