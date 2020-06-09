@@ -102,15 +102,27 @@ abstract class JustAudioPlayer {
 
   double getCurrentPosition();
 
+  int getCurrentPositionMs() => (getCurrentPosition() * 1000).toInt();
+
+  double getDuration();
+
+  int getDurationMs() {
+    final duration = getDuration();
+    return duration.isFinite ? (duration * 1000).toInt() : -1;
+  }
+
   broadcastPlaybackEvent() {
     var updateTime = DateTime.now().millisecondsSinceEpoch;
     eventController.add([
       _state.index,
       _buffering,
-      (getCurrentPosition() * 1000).toInt(),
+      getCurrentPositionMs(),
       updateTime,
       // TODO: buffered position
-      (getCurrentPosition() * 1000).toInt(),
+      getCurrentPositionMs(),
+      // TODO: Icy Metadata
+      null,
+      getDurationMs(),
     ]);
   }
 
@@ -131,7 +143,10 @@ class Html5AudioPlayer extends JustAudioPlayer {
   Html5AudioPlayer({@required String id, @required Registrar registrar})
       : super(id: id, registrar: registrar) {
     _audioElement.addEventListener('durationchange', (event) {
-      _durationCompleter?.complete(_audioElement.duration);
+      _durationCompleter?.complete(getDuration());
+    });
+    _audioElement.addEventListener('error', (event) {
+      _durationCompleter?.completeError(_audioElement.error);
     });
     _audioElement.addEventListener('ended', (event) {
       transition(AudioPlaybackState.completed);
@@ -154,9 +169,15 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _audioElement.src = url;
     _audioElement.preload = 'auto';
     _audioElement.load();
-    final duration = await _durationCompleter.future;
+    try {
+      await _durationCompleter.future;
+    } on MediaError catch (e) {
+      throw PlatformException(code: "${e.code}", message: "Failed to load URL");
+    } finally {
+      _durationCompleter = null;
+    }
     transition(AudioPlaybackState.stopped);
-    return (duration * 1000).toInt();
+    return getDurationMs();
   }
 
   @override
@@ -228,6 +249,9 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   double getCurrentPosition() => _audioElement.currentTime;
+
+  @override
+  double getDuration() => _audioElement.duration;
 
   @override
   void dispose() {
