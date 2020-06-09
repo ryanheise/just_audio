@@ -1,3 +1,13 @@
+## 0.2.0
+
+* Support dynamic duration
+* Support seeking to end of live streams
+* Support request headers
+* V2 implementation
+* Report setUrl errors on iOS
+* setUrl throws exception if interrupted
+* Return null when duration is unknown
+
 ## 0.1.10
 
 * Option to set audio session category on iOS.
