@@ -1,3 +1,8 @@
+## 0.2.1
+
+* Improve handling of headers.
+* Report setUrl errors and duration on web.
+
 ## 0.2.0
 
 * Support dynamic duration
