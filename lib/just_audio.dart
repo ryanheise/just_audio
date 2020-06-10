@@ -654,7 +654,6 @@ class _ProxyHttpServer {
 
         // Rewrite request headers
         final host = originRequest.headers.value('host');
-        print("saved host from request headers: $host");
         originRequest.headers.clear();
         request.headers.forEach((name, value) {
           originRequest.headers.set(name, value);
@@ -664,17 +663,58 @@ class _ProxyHttpServer {
         }
         originRequest.headers.set('host', host);
 
-        // Make request
-        final originResponse = await originRequest.close();
+        // Try to make normal request
+        try {
+          final originResponse = await originRequest.close();
 
-        // Rewrite response headers
-        request.response.headers.clear();
-        originResponse.headers.forEach((name, value) {
-          request.response.headers.set(name, value);
-        });
+          request.response.headers.clear();
+          originResponse.headers.forEach((name, value) {
+            request.response.headers.set(name, value);
+          });
 
-        // Pipe response
-        await originResponse.pipe(request.response);
+          // Pipe response
+          await originResponse.pipe(request.response);
+        } on HttpException {
+          // We likely are dealing with a streaming protocol
+          if (proxyRequest.uri.scheme == 'http') {
+            // Try parsing HTTP 0.9 response
+            //request.response.headers.clear();
+            final socket = await Socket.connect(
+                proxyRequest.uri.host, proxyRequest.uri.port);
+            final clientSocket =
+                await request.response.detachSocket(writeHeaders: false);
+            Completer done = Completer();
+            socket.listen(
+              clientSocket.add,
+              onDone: () async {
+                await clientSocket.flush();
+                socket.close();
+                clientSocket.close();
+                done.complete();
+              },
+            );
+            // Rewrite headers
+            final headers = <String, String>{};
+            request.headers.forEach((name, value) {
+              if (name.toLowerCase() != 'host') {
+                headers[name] = value.join(",");
+              }
+            });
+            for (var name in proxyRequest.headers.keys) {
+              headers[name] = proxyRequest.headers[name];
+            }
+            socket.write("GET ${proxyRequest.uri.path} HTTP/1.1\n");
+            if (host != null) {
+              socket.write("Host: $host\n");
+            }
+            for (var name in headers.keys) {
+              socket.write("$name: ${headers[name]}\n");
+            }
+            socket.write("\n");
+            await socket.flush();
+            await done.future;
+          }
+        }
       }
     });
   }
