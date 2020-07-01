@@ -7,30 +7,16 @@ assignees: ryanheise
 
 ---
 
-<!--
-
-        PLEASE READ CAREFULLY!
-
-
-
-
-
-        FOR YOUR BUG REPORT TO BE PROCESSED, YOU WILL NEED
-        TO FILL IN ALL SECTIONS BELOW. DON'T DELETE THE HEADINGS.
-
-
-        THANK YOU :-D
-
-
--->
-
-**Describe the bug**
-A clear and concise description of what the bug is.
+<!--    ALL SECTIONS BELOW MUST BE COMPLETED   -->
+**Which API doesn't behave as documented, and how does it misbehave?**
+Name here the specific methods or fields that are not behaving as documented, and explain clearly what is happening.
 
 **Minimal reproduction project**
-If the example project exhibits the bug, please mention that here, otherwise fork this project and modify the example to reproduce the bug. Provide the link to your repository here.
+Provide a link here using one of two options:
+1. Fork this repository and modify the example to reproduce the bug, then provide a link here.
+2. If the unmodified official example already reproduces the bug, just write "The example".
 
-**To Reproduce**
+**To Reproduce (i.e. user steps, not code)**
 Steps to reproduce the behavior:
 1. Go to '...'
 2. Click on '....'
@@ -40,11 +26,12 @@ Steps to reproduce the behavior:
 **Error messages**
 
 ```
-If applicable, copy & paste error message here.
+If applicable, copy & paste error message here, within the triple quotes to preserve formatting.
 ```
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
+
 
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
