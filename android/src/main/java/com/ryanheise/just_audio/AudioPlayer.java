@@ -8,13 +8,18 @@ import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
 import com.google.android.exoplayer2.metadata.icy.IcyInfo;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
+import com.google.android.exoplayer2.source.LoopingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
+import com.google.android.exoplayer2.source.ShuffleOrder;
+import com.google.android.exoplayer2.source.ShuffleOrder.DefaultShuffleOrder;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
@@ -36,11 +41,17 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.stream.Collectors;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
 
 	static final String TAG = "AudioPlayer";
+
+	private static Random random = new Random();
 
 	private final Context context;
 	private final MethodChannel methodChannel;
@@ -62,11 +73,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private boolean seekProcessed;
 	private boolean buffering;
 	private boolean justConnected;
-	private MediaSource mediaSource;
+	private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
 	private IcyInfo icyInfo;
 	private IcyHeaders icyHeaders;
 
 	private SimpleExoPlayer player;
+	private MediaSource mediaSource;
+	private Integer currentIndex;
+	private Map<LoopingMediaSource, MediaSource> loopingChildren = new HashMap<>();
+	private Map<LoopingMediaSource, Integer> loopingCounts = new HashMap<>();
 	private final Handler handler = new Handler();
 	private final Runnable bufferWatcher = new Runnable() {
 		@Override
@@ -153,6 +168,31 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	@Override
+	public void onPositionDiscontinuity(int reason) {
+		switch (reason) {
+		case Player.DISCONTINUITY_REASON_PERIOD_TRANSITION:
+		case Player.DISCONTINUITY_REASON_SEEK:
+			onItemMayHaveChanged();
+			break;
+		}
+	}
+
+	@Override
+	public void onTimelineChanged(Timeline timeline, int reason) {
+		if (reason == Player.TIMELINE_CHANGE_REASON_DYNAMIC) {
+			onItemMayHaveChanged();
+		}
+	}
+
+	private void onItemMayHaveChanged() {
+		Integer newIndex = player.getCurrentWindowIndex();
+		if (newIndex != currentIndex) {
+			currentIndex = newIndex;
+		}
+		broadcastPlaybackEvent();
+	}
+
+	@Override
 	public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
 		switch (playbackState) {
 		case Player.STATE_READY:
@@ -169,6 +209,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			break;
 		case Player.STATE_ENDED:
 			if (state != PlaybackState.completed) {
+				player.setPlayWhenReady(false);
 				transition(PlaybackState.completed);
 			}
 			break;
@@ -230,19 +271,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		final List<?> args = (List<?>) call.arguments;
 		try {
 			switch (call.method) {
-			case "setUrl":
-				setUrl((String) args.get(0), result);
-				break;
-			case "setClip":
-				Object start = args.get(0);
-				if (start != null && start instanceof Integer) {
-					start = new Long((Integer) start);
-				}
-				Object end = args.get(1);
-				if (end != null && end instanceof Integer) {
-					end = new Long((Integer) end);
-				}
-				setClip((Long) start, (Long) end, result);
+			case "load":
+				load(getAudioSource(args.get(0)), result);
 				break;
 			case "play":
 				play();
@@ -263,16 +293,56 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				setSpeed((float) ((double) ((Double) args.get(0))));
 				result.success(null);
 				break;
+			case "setLoopMode":
+				setLoopMode((Integer) args.get(0));
+				result.success(null);
+				break;
+			case "setShuffleModeEnabled":
+				setShuffleModeEnabled((Boolean) args.get(0));
+				result.success(null);
+				break;
 			case "setAutomaticallyWaitsToMinimizeStalling":
 				result.success(null);
 				break;
 			case "seek":
 				Long position = getLong(args.get(0));
-				seek(position == null ? C.TIME_UNSET : position, result);
+				Integer index = (Integer)args.get(1);
+				seek(position == null ? C.TIME_UNSET : position, result, index);
 				break;
 			case "dispose":
 				dispose();
 				result.success(null);
+				break;
+			case "concatenating.add":
+				concatenating(args.get(0))
+						.addMediaSource(getAudioSource(args.get(1)), null, () -> result.success(null));
+				break;
+			case "concatenating.insert":
+				concatenating(args.get(0))
+						.addMediaSource((Integer)args.get(1), getAudioSource(args.get(2)), null, () -> result.success(null));
+				break;
+			case "concatenating.addAll":
+				concatenating(args.get(0))
+						.addMediaSources(getAudioSources(args.get(1)), null, () -> result.success(null));
+				break;
+			case "concatenating.insertAll":
+				concatenating(args.get(0))
+						.addMediaSources((Integer)args.get(1), getAudioSources(args.get(2)), null, () -> result.success(null));
+				break;
+			case "concatenating.removeAt":
+				concatenating(args.get(0))
+						.removeMediaSource((Integer)args.get(1), null, () -> result.success(null));
+				break;
+			case "concatenating.removeRange":
+				concatenating(args.get(0))
+						.removeMediaSourceRange((Integer)args.get(1), (Integer)args.get(2), null, () -> result.success(null));
+				break;
+			case "concatenating.move":
+				concatenating(args.get(0))
+						.moveMediaSource((Integer)args.get(1), (Integer)args.get(2), null, () -> result.success(null));
+				break;
+			case "concatenating.clear":
+				concatenating(args.get(0)).clear(null, () -> result.success(null));
 				break;
 			default:
 				result.notImplemented();
@@ -287,6 +357,169 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	}
 
+	// Set the shuffle order for mediaSource, with currentIndex at
+	// the first position. Traverse the tree incrementing index at each
+	// node.
+	private int setShuffleOrder(MediaSource mediaSource, int index) {
+		if (mediaSource instanceof ConcatenatingMediaSource) {
+			final ConcatenatingMediaSource source = (ConcatenatingMediaSource)mediaSource;
+			// Find which child is current
+			Integer currentChildIndex = null;
+			for (int i = 0; i < source.getSize(); i++) {
+				final int indexBefore = index;
+				final MediaSource child = source.getMediaSource(i);
+				index = setShuffleOrder(child, index);
+				// If currentIndex falls within this child, make this child come first.
+				if (currentIndex >= indexBefore && currentIndex < index) {
+					currentChildIndex = i;
+				}
+			}
+			// Shuffle so that the current child is first in the shuffle order
+			source.setShuffleOrder(createShuffleOrder(source.getSize(), currentChildIndex));
+		} else if (mediaSource instanceof LoopingMediaSource) {
+			final LoopingMediaSource source = (LoopingMediaSource)mediaSource;
+			// The ExoPlayer API doesn't provide accessors for these so we have
+			// to index them ourselves.
+			MediaSource child = loopingChildren.get(source);
+			int count = loopingCounts.get(source);
+			for (int i = 0; i < count; i++) {
+				index = setShuffleOrder(child, index);
+			}
+		} else {
+			// An actual media item takes up one spot in the playlist.
+			index++;
+		}
+		return index;
+	}
+
+	private static int[] shuffle(int length, Integer firstIndex) {
+		final int[] shuffleOrder = new int[length];
+		for (int i = 0; i < length; i++) {
+			final int j = random.nextInt(i + 1);
+			shuffleOrder[i] = shuffleOrder[j];
+			shuffleOrder[j] = i;
+		}
+		if (firstIndex != null) {
+			for (int i = 1; i < length; i++) {
+				if (shuffleOrder[i] == firstIndex) {
+					final int v = shuffleOrder[0];
+					shuffleOrder[0] = shuffleOrder[i];
+					shuffleOrder[i] = v;
+					break;
+				}
+			}
+		}
+		return shuffleOrder;
+	}
+
+	// Create a shuffle order optionally fixing the first index.
+	private ShuffleOrder createShuffleOrder(int length, Integer firstIndex) {
+		int[] shuffleIndices = shuffle(length, firstIndex);
+		return new DefaultShuffleOrder(shuffleIndices, random.nextLong());
+	}
+
+	private ConcatenatingMediaSource concatenating(final Object index) {
+		return (ConcatenatingMediaSource)mediaSources.get((Integer)index);
+	}
+
+	private MediaSource getAudioSource(final Object json) {
+		Map<?, ?> map = (Map<?, ?>)json;
+		String id = (String)map.get("id");
+		MediaSource mediaSource = mediaSources.get(id);
+		if (mediaSource == null) {
+			mediaSource = decodeAudioSource(map);
+			mediaSources.put(id, mediaSource);
+		}
+		return mediaSource;
+	}
+
+	private MediaSource decodeAudioSource(final Object json) {
+		Map<?, ?> map = (Map<?, ?>)json;
+		String id = (String)map.get("id");
+		switch ((String)map.get("type")) {
+		case "progressive":
+			return new ProgressiveMediaSource.Factory(buildDataSourceFactory())
+					.setTag(id)
+					.createMediaSource(Uri.parse((String)map.get("uri")));
+		case "dash":
+			return new DashMediaSource.Factory(buildDataSourceFactory())
+					.setTag(id)
+					.createMediaSource(Uri.parse((String)map.get("uri")));
+		case "hls":
+			return new HlsMediaSource.Factory(buildDataSourceFactory())
+					.setTag(id)
+					.createMediaSource(Uri.parse((String)map.get("uri")));
+		case "concatenating":
+			List<Object> audioSources = (List<Object>)map.get("audioSources");
+			return new ConcatenatingMediaSource(
+					false, // isAtomic
+					(Boolean)map.get("useLazyPreparation"),
+					new DefaultShuffleOrder(audioSources.size()),
+							audioSources
+									.stream()
+									.map(s -> getAudioSource(s))
+									.toArray(MediaSource[]::new));
+		case "clipping":
+			Long start = getLong(map.get("start"));
+			Long end = getLong(map.get("end"));
+			return new ClippingMediaSource(getAudioSource(map.get("audioSource")),
+					(start != null ? start : 0) * 1000L,
+					(end != null ? end : C.TIME_END_OF_SOURCE) * 1000L);
+		case "looping":
+			Integer count = (Integer)map.get("count");
+			MediaSource looperChild = getAudioSource(map.get("audioSource"));
+			LoopingMediaSource looper = new LoopingMediaSource(looperChild, count);
+			// TODO: store both in a single map
+			loopingChildren.put(looper, looperChild);
+			loopingCounts.put(looper, count);
+			return looper;
+		default:
+			throw new IllegalArgumentException("Unknown AudioSource type: " + map.get("type"));
+		}
+	}
+
+	private List<MediaSource> getAudioSources(final Object json) {
+		return ((List<Object>)json)
+				.stream()
+				.map(s -> getAudioSource(s))
+				.collect(Collectors.toList());
+	}
+
+	private DataSource.Factory buildDataSourceFactory() {
+		String userAgent = Util.getUserAgent(context, "just_audio");
+		DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
+				userAgent,
+				DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
+				DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
+				true
+		);
+		return new DefaultDataSourceFactory(context, httpDataSourceFactory);
+	}
+
+	private void load(final MediaSource mediaSource, final Result result) {
+		justConnected = false;
+		switch (state) {
+		case none:
+			break;
+		case connecting:
+			abortExistingConnection();
+			player.stop();
+			player.setPlayWhenReady(false);
+			break;
+		default:
+			player.stop();
+			player.setPlayWhenReady(false);
+			break;
+		}
+		prepareResult = result;
+		transition(PlaybackState.connecting);
+		if (player.getShuffleModeEnabled()) {
+			setShuffleOrder(mediaSource, 0);
+		}
+		this.mediaSource = mediaSource;
+		player.prepare(mediaSource);
+	}
+
 	private void ensurePlayerInitialized() {
 		if (player == null) {
 			player = new SimpleExoPlayer.Builder(context).build();
@@ -296,44 +529,39 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private void broadcastPlaybackEvent() {
-		final ArrayList<Object> event = new ArrayList<Object>();
-		event.add(state.ordinal());
-		event.add(buffering);
-		event.add(updatePosition = getCurrentPosition());
-		event.add(updateTime = System.currentTimeMillis());
-		event.add(Math.max(updatePosition, bufferedPosition));
-		event.add(collectIcyMetadata());
-		event.add(duration = getDuration());
+		final Map<String, Object> event = new HashMap<String, Object>();
+		event.put("state", state.ordinal());
+		event.put("buffering", buffering);
+		event.put("updatePosition", updatePosition = getCurrentPosition());
+		event.put("updateTime", updateTime = System.currentTimeMillis());
+		event.put("bufferedPosition", Math.max(updatePosition, bufferedPosition));
+		event.put("icyMetadata", collectIcyMetadata());
+		event.put("duration", duration = getDuration());
+		event.put("currentIndex", currentIndex);
 
 		if (eventSink != null) {
 			eventSink.success(event);
 		}
 	}
 
-	private ArrayList<Object> collectIcyMetadata() {
-		final ArrayList<Object> icyData = new ArrayList<>();
-		final ArrayList<String> info;
-		final ArrayList<Object> headers;
+	private Map<String, Object> collectIcyMetadata() {
+		final Map<String, Object> icyData = new HashMap<>();
 		if (icyInfo != null) {
-			info = new ArrayList<>();
-			info.add(icyInfo.title);
-			info.add(icyInfo.url);
-		} else {
-			info = new ArrayList<>(Collections.nCopies(2, null));
+			final Map<String, String> info = new HashMap<>();
+			info.put("title", icyInfo.title);
+			info.put("url", icyInfo.url);
+			icyData.put("info", info);
 		}
 		if (icyHeaders != null) {
-			headers = new ArrayList<>();
-			headers.add(icyHeaders.bitrate);
-			headers.add(icyHeaders.genre);
-			headers.add(icyHeaders.name);
-			headers.add(icyHeaders.metadataInterval);
-			headers.add(icyHeaders.url);
-			headers.add(icyHeaders.isPublic);
-		} else {
-			headers = new ArrayList<>(Collections.nCopies(6, null));
+			final Map<String, Object> headers = new HashMap<>();
+			headers.put("bitrate", icyHeaders.bitrate);
+			headers.put("genre", icyHeaders.genre);
+			headers.put("name", icyHeaders.name);
+			headers.put("metadataInterval", icyHeaders.metadataInterval);
+			headers.put("url", icyHeaders.url);
+			headers.put("isPublic", icyHeaders.isPublic);
+			icyData.put("headers", headers);
 		}
-		icyData.add(info);
-		icyData.add(headers);
 		return icyData;
 	}
 
@@ -372,32 +600,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		broadcastPlaybackEvent();
 	}
 
-	public void setUrl(final String url, final Result result) throws IOException {
-		justConnected = false;
-		abortExistingConnection();
-		prepareResult = result;
-		transition(PlaybackState.connecting);
-		String userAgent = Util.getUserAgent(context, "just_audio");
-		DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
-				userAgent,
-				DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
-				DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
-				true
-		);
-		DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context,
-				httpDataSourceFactory);
-		Uri uri = Uri.parse(url);
-		String extension = getLowerCaseExtension(uri);
-		if (extension.equals("mpd")) {
-			mediaSource = new DashMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
-		} else if (extension.equals("m3u8")) {
-			mediaSource = new HlsMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
-		} else {
-			mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(uri);
-		}
-		player.prepare(mediaSource);
-	}
-
 	private String getLowerCaseExtension(Uri uri) {
 		// Until ExoPlayer provides automatic detection of media source types, we
 		// rely on the file extension. When this is absent, as a temporary
@@ -406,23 +608,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		String fragment = uri.getFragment();
 		String filename = fragment != null && fragment.contains(".") ? fragment : uri.getPath();
 		return filename.replaceAll("^.*\\.", "").toLowerCase();
-	}
-
-	public void setClip(final Long start, final Long end, final Result result) {
-		if (state == PlaybackState.none) {
-			throw new IllegalStateException("Cannot call setClip from none state");
-		}
-		abortExistingConnection();
-		this.start = start;
-		this.end = end;
-		prepareResult = result;
-		if (start != null || end != null) {
-			player.prepare(new ClippingMediaSource(mediaSource,
-					(start != null ? start : 0) * 1000L,
-					(end != null ? end : C.TIME_END_OF_SOURCE) * 1000L));
-		} else {
-			player.prepare(mediaSource);
-		}
 	}
 
 	public void play() {
@@ -493,7 +678,18 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		broadcastPlaybackEvent();
 	}
 
-	public void seek(final long position, final Result result) {
+	public void setLoopMode(final int mode) {
+		player.setRepeatMode(mode);
+	}
+
+	public void setShuffleModeEnabled(final boolean enabled) {
+		if (enabled) {
+			setShuffleOrder(mediaSource, 0);
+		}
+		player.setShuffleModeEnabled(enabled);
+	}
+
+	public void seek(final long position, final Result result, final Integer index) {
 		if (state == PlaybackState.none || state == PlaybackState.connecting) {
 			throw new IllegalStateException("Cannot call seek from none none/connecting states");
 		}
@@ -501,10 +697,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		seekPos = position;
 		seekResult = result;
 		seekProcessed = false;
-		player.seekTo(position);
+		int windowIndex = index != null ? index : player.getCurrentWindowIndex();
+		player.seekTo(windowIndex, position);
 	}
 
 	public void dispose() {
+		mediaSources.clear();
+		mediaSource = null;
+		loopingChildren.clear();
 		if (player != null) {
 			player.release();
 			player = null;

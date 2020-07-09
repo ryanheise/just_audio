@@ -1,6 +1,6 @@
 # just_audio
 
-A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. This plugin can be used with [audio_service](https://pub.dev/packages/audio_service) to play audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
+A Flutter plugin to play audio from URLs, files, assets, DASH/HLS streams and playlists. This plugin can be used with [audio_service](https://pub.dev/packages/audio_service) to play audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
 
 ## Features
 
@@ -18,6 +18,10 @@ A Flutter plugin to play audio from URLs, files, assets and DASH/HLS streams. Th
 | clip audio           | ✅        |            |            | ✅         |
 | dispose              | ✅        | ✅         | ✅         | ✅         |
 | report player errors | ✅        | ✅         | ✅         | ✅         |
+| playlists            | ✅        |            |            | ✅         |
+| looping              | ✅        |            |            | ✅         |
+| shuffle              | ✅        |            |            | ✅         |
+| gapless playback     | ✅        |            |            |            |
 
 This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -123,7 +127,3 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
     <true/>
 </dict>
 ```
-
-## Todo
-
-* Gapless playback

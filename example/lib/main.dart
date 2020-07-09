@@ -14,19 +14,57 @@ class _MyAppState extends State<MyApp> {
   final _volumeSubject = BehaviorSubject.seeded(1.0);
   final _speedSubject = BehaviorSubject.seeded(1.0);
   AudioPlayer _player;
+  ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(audioSources: [
+    LoopingAudioSource(
+      count: 2,
+      audioSource: ClippingAudioSource(
+        start: Duration(seconds: 60),
+        end: Duration(seconds: 65),
+        audioSource: AudioSource.uri(Uri.parse(
+            "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
+        tag: AudioMetadata(
+          album: "Science Friday",
+          title: "A Salute To Head-Scratching Science (5 seconds)",
+        ),
+      ),
+    ),
+    AudioSource.uri(
+      Uri.parse(
+          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
+      tag: AudioMetadata(
+        album: "Science Friday",
+        title: "A Salute To Head-Scratching Science (full)",
+      ),
+    ),
+    AudioSource.uri(
+      Uri.parse("https://s3.amazonaws.com/scifri-segments/scifri201711241.mp3"),
+      tag: AudioMetadata(
+        album: "Science Friday",
+        title: "From Cat Rheology To Operatic Incompetence",
+      ),
+    ),
+  ]);
+
+  List<IndexedAudioSource> get _sequence => _playlist.sequence;
+
+  List<AudioMetadata> get _metadataSequence =>
+      _sequence.map((s) => s.tag as AudioMetadata).toList();
 
   @override
   void initState() {
     super.initState();
     AudioPlayer.setIosCategory(IosCategory.playback);
     _player = AudioPlayer();
-    _player
-        .setUrl(
-            "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")
-        .catchError((error) {
+    _loadAudio();
+  }
+
+  _loadAudio() async {
+    try {
+      await _player.load(_playlist);
+    } catch (e) {
       // catch audio error ex: 404 url, wrong url ...
-      print(error);
-    });
+      print("$e");
+    }
   }
 
   @override
@@ -47,8 +85,21 @@ class _MyAppState extends State<MyApp> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text("Science Friday"),
-              Text("Science Friday and WNYC Studios"),
+              StreamBuilder<int>(
+                stream: _player.currentIndexStream,
+                builder: (context, snapshot) {
+                  final index = snapshot.data ?? 0;
+                  final metadata = _metadataSequence[index];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(metadata.album ?? '',
+                          style: Theme.of(context).textTheme.headline6),
+                      Text(metadata.title ?? ''),
+                    ],
+                  );
+                },
+              ),
               StreamBuilder<FullAudioPlaybackState>(
                 stream: _player.fullPlaybackStateStream,
                 builder: (context, snapshot) {
@@ -141,6 +192,77 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
               ),
+              Row(
+                children: [
+                  StreamBuilder<LoopMode>(
+                    stream: _player.loopModeStream,
+                    builder: (context, snapshot) {
+                      final loopMode = snapshot.data ?? LoopMode.off;
+                      const icons = [
+                        Icon(Icons.repeat, color: Colors.grey),
+                        Icon(Icons.repeat, color: Colors.orange),
+                        Icon(Icons.repeat_one, color: Colors.orange),
+                      ];
+                      const cycleModes = [
+                        LoopMode.off,
+                        LoopMode.all,
+                        LoopMode.one,
+                      ];
+                      final index = cycleModes.indexOf(loopMode);
+                      return IconButton(
+                        icon: icons[index],
+                        onPressed: () {
+                          _player.setLoopMode(cycleModes[
+                              (cycleModes.indexOf(loopMode) + 1) %
+                                  cycleModes.length]);
+                        },
+                      );
+                    },
+                  ),
+                  Expanded(
+                    child: Text(
+                      "Playlist",
+                      style: Theme.of(context).textTheme.headline6,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  StreamBuilder<bool>(
+                    stream: _player.shuffleModeEnabledStream,
+                    builder: (context, snapshot) {
+                      final shuffleModeEnabled = snapshot.data ?? false;
+                      return IconButton(
+                        icon: shuffleModeEnabled
+                            ? Icon(Icons.shuffle, color: Colors.orange)
+                            : Icon(Icons.shuffle, color: Colors.grey),
+                        onPressed: () {
+                          _player.setShuffleModeEnabled(!shuffleModeEnabled);
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+              Expanded(
+                child: StreamBuilder<int>(
+                  stream: _player.currentIndexStream,
+                  builder: (context, snapshot) {
+                    final currentIndex = snapshot.data ?? 0;
+                    return ListView.builder(
+                      itemCount: _metadataSequence.length,
+                      itemBuilder: (context, index) => Material(
+                        color:
+                            index == currentIndex ? Colors.grey.shade300 : null,
+                        child: ListTile(
+                          title: Text(_metadataSequence[index].title),
+                          onTap: () {
+                            _player.seek(Duration.zero, index: index);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -191,4 +313,11 @@ class _SeekBarState extends State<SeekBar> {
       },
     );
   }
+}
+
+class AudioMetadata {
+  final String album;
+  final String title;
+
+  AudioMetadata({this.album, this.title});
 }
