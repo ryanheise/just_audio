@@ -14,3 +14,9 @@ enum PlaybackState {
 	connecting,
 	completed
 };
+
+enum LoopMode {
+	loopOff,
+	loopOne,
+	loopAll
+};

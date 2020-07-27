@@ -136,25 +136,33 @@ class AudioPlayer {
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
         .receiveBroadcastStream()
         .map((data) {
-      final duration = (data['duration'] ?? -1) < 0
-          ? null
-          : Duration(milliseconds: data['duration']);
-      _durationFuture = Future.value(duration);
-      _durationSubject.add(duration);
-      _audioPlaybackEvent = AudioPlaybackEvent(
-        state: AudioPlaybackState.values[data['state']],
-        buffering: data['buffering'],
-        updatePosition: Duration(milliseconds: data['updatePosition']),
-        updateTime: Duration(milliseconds: data['updateTime']),
-        bufferedPosition: Duration(milliseconds: data['bufferedPosition']),
-        speed: _speed,
-        duration: duration,
-        icyMetadata: data['icyMetadata'] == null
+      try {
+        //print("received raw event: $data");
+        final duration = (data['duration'] ?? -1) < 0
             ? null
-            : IcyMetadata.fromJson(data['icyMetadata']),
-        currentIndex: data['currentIndex'],
-      );
-      return _audioPlaybackEvent;
+            : Duration(milliseconds: data['duration']);
+        _durationFuture = Future.value(duration);
+        _durationSubject.add(duration);
+        _audioPlaybackEvent = AudioPlaybackEvent(
+          state: AudioPlaybackState.values[data['state']],
+          buffering: data['buffering'],
+          updatePosition: Duration(milliseconds: data['updatePosition']),
+          updateTime: Duration(milliseconds: data['updateTime']),
+          bufferedPosition: Duration(milliseconds: data['bufferedPosition']),
+          speed: _speed,
+          duration: duration,
+          icyMetadata: data['icyMetadata'] == null
+              ? null
+              : IcyMetadata.fromJson(data['icyMetadata']),
+          currentIndex: data['currentIndex'],
+        );
+        //print("created event object with state: ${_audioPlaybackEvent.state}");
+        return _audioPlaybackEvent;
+      } catch (e, stacktrace) {
+        print("Error parsing event: $e");
+        print("$stacktrace");
+        rethrow;
+      }
     });
     _eventChannelStreamSubscription = _eventChannelStream.listen(
         _playbackEventSubject.add,

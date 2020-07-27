@@ -77,6 +77,8 @@ abstract class JustAudioPlayer {
           return await setLoopMode(args[0]);
         case 'setShuffleModeEnabled':
           return await setShuffleModeEnabled(args[0]);
+        case 'setAutomaticallyWaitsToMinimizeStalling':
+          return null;
         case 'seek':
           return await seek(args[0], args[1]);
         case 'dispose':

@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:math';
 
+import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -28,6 +29,27 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
     ),
+    //LoopingAudioSource(
+    //  count: 2,
+    //  audioSource: AudioSource.uri(
+    //    Uri.parse(
+    //        "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
+    //    tag: AudioMetadata(
+    //      album: "Science Friday",
+    //      title: "A Salute To Head-Scratching Science (full)",
+    //    ),
+    //  ),
+    //),
+    //ClippingAudioSource(
+    //  start: Duration(seconds: 60),
+    //  end: Duration(seconds: 65),
+    //  audioSource: AudioSource.uri(Uri.parse(
+    //      "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
+    //  tag: AudioMetadata(
+    //    album: "Science Friday",
+    //    title: "A Salute To Head-Scratching Science (5 seconds)",
+    //  ),
+    //),
     AudioSource.uri(
       Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
@@ -296,7 +318,8 @@ class _SeekBarState extends State<SeekBar> {
     return Slider(
       min: 0.0,
       max: widget.duration.inMilliseconds.toDouble(),
-      value: _dragValue ?? widget.position.inMilliseconds.toDouble(),
+      value: min(_dragValue ?? widget.position.inMilliseconds.toDouble(),
+          widget.duration.inMilliseconds.toDouble()),
       onChanged: (value) {
         setState(() {
           _dragValue = value;

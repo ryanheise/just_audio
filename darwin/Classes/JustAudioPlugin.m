@@ -1,6 +1,5 @@
 #import "JustAudioPlugin.h"
 #import "AudioPlayer.h"
-#import "AudioPlayer.h"
 #import <AVFoundation/AVFoundation.h>
 
 @implementation JustAudioPlugin {
