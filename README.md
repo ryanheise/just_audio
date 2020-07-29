@@ -15,13 +15,13 @@ A Flutter plugin to play audio from URLs, files, assets, DASH/HLS streams and pl
 | play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |
 | set volume           | ✅        | ✅         | (untested) | ✅         |
 | set speed            | ✅        | ✅         | ✅         | ✅         |
-| clip audio           | ✅        |            |            | ✅         |
-| dispose              | ✅        | ✅         | ✅         | ✅         |
+| clip audio           | ✅        | ✅         | (untested) | ✅         |
+| playlists            | ✅        | ✅         | (untested) | ✅         |
+| looping              | ✅        | ✅         | (untested) | ✅         |
+| shuffle              | ✅        | ✅         | (untested) | ✅         |
+| compose audio        | ✅        | ✅         | (untested) | ✅         |
+| gapless playback     | ✅        | ✅         | (untested) |            |
 | report player errors | ✅        | ✅         | ✅         | ✅         |
-| playlists            | ✅        |            |            | ✅         |
-| looping              | ✅        |            |            | ✅         |
-| shuffle              | ✅        |            |            | ✅         |
-| gapless playback     | ✅        |            |            |            |
 
 This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -37,7 +37,7 @@ var duration = await player.setUrl('https://foo.com/bar.mp3');
 Standard controls:
 
 ```dart
-player.play();
+player.play(); // Usually you don't want to wait for playback to finish.
 await player.seek(Duration(seconds: 10));
 await player.pause();
 await player.stop();
@@ -50,18 +50,101 @@ await player.setClip(start: Duration(seconds: 10), end: Duration(seconds: 20));
 await player.play(); // Waits for playback to finish
 ```
 
-Release resources:
+Gapless playlists:
+
+```dart
+await player.load(
+  ConcatenatingAudioSource(
+    audioSources: [
+      AudioSource.uri(Uri.parse("https://example.com/track1.mp3")),
+      AudioSource.uri(Uri.parse("https://example.com/track2.mp3")),
+      AudioSource.uri(Uri.parse("https://example.com/track3.mp3")),
+    ],
+  ),
+);
+// Jump to the beginning of track3.mp3.
+player.seek(Duration(milliseconds: 0), index: 2);
+```
+
+Looping and shuffling:
+
+```dart
+player.setLoopMode(LoopMode.off); // no looping (default)
+player.setLoopMode(LoopMode.all); // loop playlist
+player.setLoopMode(LoopMode.one); // loop current item
+player.setShuffleModeEnabled(true); // shuffle except for current item
+```
+
+Composing audio sources:
+
+```dart
+player.load(
+  // Loop its child 4 times
+  LoopingAudioSource(
+    count: 4,
+    // Play children one after the other
+    audioSource: ConcatenatingAudioSource(
+      audioSources: [
+        // Play a regular media file
+        ProgressiveAudioSource(Uri.parse("https://example.com/foo.mp3")),
+        // Play a DASH stream
+        DashAudioSource(Uri.parse("https://example.com/audio.mdp")),
+        // Play an HLS stream
+        HlsAudioSource(Uri.parse("https://example.com/audio.m3u8")),
+        // Play a segment of the child
+        ClippingAudioSource(
+          audioSource: ProgressiveAudioSource(Uri.parse("https://w.xyz/p.mp3")),
+          start: Duration(seconds: 25),
+          end: Duration(seconds: 30),
+        ),
+      ],
+    ),
+  ),
+);
+```
+
+Releasing resources:
 
 ```dart
 await player.dispose();
 ```
 
-Catch player error: 
+Catching player errors: 
 
 ```dart
-player.setUrl("https://s3.amazonaws.com/404-file.mp3").catchError((error) {
-  // catch audio error ex: 404 url, wrong url ...
-  print(error);
+try {
+  await player.setUrl("https://s3.amazonaws.com/404-file.mp3");
+} catch (e) {
+  print("Error: $e");
+}
+```
+
+Listening to state changes:
+
+- AudioPlayer.playbackStateStream
+- AudioPlayer.durationStream
+- AudioPlayer.bufferingStream
+- AudioPlayer.icyMetadataStream
+- AudioPlayer.bufferedPositionStream
+- AudioPlayer.fullPlaybackStateStream
+- AudioPlayer.playbackEventStream
+- AudioPlayer.currentIndexStream
+- AudioPlayer.loopModeStream
+- AudioPlayer.shuffleModeEnabledStream
+- AudioPlayer.durationStream
+
+e.g.
+
+```dart
+player.playbackStateStream.listen((state) {
+  switch (state) {
+    case AudioPlaybackState.none: ...
+    case AudioPlaybackState.stopped: ...
+    case AudioPlaybackState.paused: ...
+    case AudioPlaybackState.playing: ...
+    case AudioPlaybackState.connecting: ...
+    case AudioPlaybackState.completed: ...
+  }
 });
 ```
 
