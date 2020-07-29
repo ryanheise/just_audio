@@ -55,7 +55,7 @@ Gapless playlists:
 ```dart
 await player.load(
   ConcatenatingAudioSource(
-    audioSources: [
+    children: [
       AudioSource.uri(Uri.parse("https://example.com/track1.mp3")),
       AudioSource.uri(Uri.parse("https://example.com/track2.mp3")),
       AudioSource.uri(Uri.parse("https://example.com/track3.mp3")),
@@ -83,8 +83,8 @@ player.load(
   LoopingAudioSource(
     count: 4,
     // Play children one after the other
-    audioSource: ConcatenatingAudioSource(
-      audioSources: [
+    child: ConcatenatingAudioSource(
+      children: [
         // Play a regular media file
         ProgressiveAudioSource(Uri.parse("https://example.com/foo.mp3")),
         // Play a DASH stream
@@ -93,7 +93,7 @@ player.load(
         HlsAudioSource(Uri.parse("https://example.com/audio.m3u8")),
         // Play a segment of the child
         ClippingAudioSource(
-          audioSource: ProgressiveAudioSource(Uri.parse("https://w.xyz/p.mp3")),
+          child: ProgressiveAudioSource(Uri.parse("https://w.xyz/p.mp3")),
           start: Duration(seconds: 25),
           end: Duration(seconds: 30),
         ),

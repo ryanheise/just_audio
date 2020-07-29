@@ -15,13 +15,13 @@ class _MyAppState extends State<MyApp> {
   final _volumeSubject = BehaviorSubject.seeded(1.0);
   final _speedSubject = BehaviorSubject.seeded(1.0);
   AudioPlayer _player;
-  ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(audioSources: [
+  ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
     LoopingAudioSource(
       count: 2,
-      audioSource: ClippingAudioSource(
+      child: ClippingAudioSource(
         start: Duration(seconds: 60),
         end: Duration(seconds: 65),
-        audioSource: AudioSource.uri(Uri.parse(
+        child: AudioSource.uri(Uri.parse(
             "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
         tag: AudioMetadata(
           album: "Science Friday",
@@ -31,7 +31,7 @@ class _MyAppState extends State<MyApp> {
     ),
     //LoopingAudioSource(
     //  count: 2,
-    //  audioSource: AudioSource.uri(
+    //  child: AudioSource.uri(
     //    Uri.parse(
     //        "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
     //    tag: AudioMetadata(
@@ -43,7 +43,7 @@ class _MyAppState extends State<MyApp> {
     //ClippingAudioSource(
     //  start: Duration(seconds: 60),
     //  end: Duration(seconds: 65),
-    //  audioSource: AudioSource.uri(Uri.parse(
+    //  child: AudioSource.uri(Uri.parse(
     //      "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
     //  tag: AudioMetadata(
     //    album: "Science Friday",

@@ -353,7 +353,7 @@ class AudioPlayer {
     final duration = await _load(start == null && end == null
         ? _audioSource
         : ClippingAudioSource(
-            audioSource: _audioSource,
+            child: _audioSource,
             start: start,
             end: end,
           ));
@@ -880,12 +880,12 @@ abstract class AudioSource {
         return HlsAudioSource(Uri.parse(json['uri']), headers: json['headers']);
       case "concatenating":
         return ConcatenatingAudioSource(
-            audioSources: (json['audioSources'] as List)
+            children: (json['audioSources'] as List)
                 .map((s) => AudioSource.fromJson(s))
                 .toList());
       case "clipping":
         return ClippingAudioSource(
-            audioSource: AudioSource.fromJson(json['audioSource']),
+            child: AudioSource.fromJson(json['audioSource']),
             start: Duration(milliseconds: json['start']),
             end: Duration(milliseconds: json['end']));
       default:
@@ -1025,25 +1025,25 @@ class HlsAudioSource extends UriAudioSource {
 /// be played in succession. This can be used to create playlists. Audio sources
 /// can be dynamically added, removed and reordered while the audio is playing.
 class ConcatenatingAudioSource extends AudioSource {
-  final List<AudioSource> audioSources;
+  final List<AudioSource> children;
   final bool useLazyPreparation;
 
   ConcatenatingAudioSource({
-    @required this.audioSources,
+    @required this.children,
     this.useLazyPreparation = false,
   });
 
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
-    for (var source in audioSources) {
+    for (var source in children) {
       await source._setup(player);
     }
   }
 
   /// Appends an [AudioSource].
   Future<void> add(AudioSource audioSource) async {
-    audioSources.add(audioSource);
+    children.add(audioSource);
     if (_player != null) {
       await _player
           ._invokeMethod('concatenating.add', [_id, audioSource.toJson()]);
@@ -1052,7 +1052,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// Inserts an [AudioSource] at [index].
   Future<void> insert(int index, AudioSource audioSource) async {
-    audioSources.insert(index, audioSource);
+    children.insert(index, audioSource);
     if (_player != null) {
       await _player._invokeMethod(
           'concatenating.insert', [_id, index, audioSource.toJson()]);
@@ -1060,27 +1060,27 @@ class ConcatenatingAudioSource extends AudioSource {
   }
 
   /// Appends multiple [AudioSource]s.
-  Future<void> addAll(List<AudioSource> audioSources) async {
-    this.audioSources.addAll(audioSources);
+  Future<void> addAll(List<AudioSource> children) async {
+    this.children.addAll(children);
     if (_player != null) {
       await _player._invokeMethod('concatenating.addAll',
-          [_id, audioSources.map((s) => s.toJson()).toList()]);
+          [_id, children.map((s) => s.toJson()).toList()]);
     }
   }
 
   /// Insert multiple [AudioSource]s at [index].
-  Future<void> insertAll(int index, List<AudioSource> audioSources) async {
-    audioSources.insertAll(index, audioSources);
+  Future<void> insertAll(int index, List<AudioSource> children) async {
+    this.children.insertAll(index, children);
     if (_player != null) {
       await _player._invokeMethod('concatenating.insertAll',
-          [_id, index, audioSources.map((s) => s.toJson()).toList()]);
+          [_id, index, children.map((s) => s.toJson()).toList()]);
     }
   }
 
   /// Dynmaically remove an [AudioSource] at [index] after this
   /// [ConcatenatingAudioSource] has already been loaded.
   Future<void> removeAt(int index) async {
-    audioSources.removeAt(index);
+    children.removeAt(index);
     if (_player != null) {
       await _player._invokeMethod('concatenating.removeAt', [_id, index]);
     }
@@ -1089,7 +1089,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// Removes a range of [AudioSource]s from index [start] inclusive to [end]
   /// exclusive.
   Future<void> removeRange(int start, int end) async {
-    audioSources.removeRange(start, end);
+    children.removeRange(start, end);
     if (_player != null) {
       await _player
           ._invokeMethod('concatenating.removeRange', [_id, start, end]);
@@ -1098,7 +1098,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// Moves an [AudioSource] from [currentIndex] to [newIndex].
   Future<void> move(int currentIndex, int newIndex) async {
-    audioSources.insert(newIndex, audioSources.removeAt(currentIndex));
+    children.insert(newIndex, children.removeAt(currentIndex));
     if (_player != null) {
       await _player
           ._invokeMethod('concatenating.move', [_id, currentIndex, newIndex]);
@@ -1107,30 +1107,30 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// Removes all [AudioSources].
   Future<void> clear() async {
-    audioSources.clear();
+    children.clear();
     if (_player != null) {
       await _player._invokeMethod('concatenating.clear', [_id]);
     }
   }
 
   /// The number of [AudioSource]s.
-  int get length => audioSources.length;
+  int get length => children.length;
 
-  operator [](int index) => audioSources[index];
+  operator [](int index) => children[index];
 
   @override
   List<IndexedAudioSource> get sequence =>
-      audioSources.expand((s) => s.sequence).toList();
+      children.expand((s) => s.sequence).toList();
 
   @override
   bool get _requiresHeaders =>
-      audioSources.any((source) => source._requiresHeaders);
+      children.any((source) => source._requiresHeaders);
 
   @override
   Map toJson() => {
         'id': _id,
         'type': 'concatenating',
-        'audioSources': audioSources.map((source) => source.toJson()).toList(),
+        'audioSources': children.map((source) => source.toJson()).toList(),
         'useLazyPreparation': useLazyPreparation,
       };
 }
@@ -1138,12 +1138,12 @@ class ConcatenatingAudioSource extends AudioSource {
 /// An [AudioSource] that clips the audio of a [UriAudioSource] between a
 /// certain start and end time.
 class ClippingAudioSource extends IndexedAudioSource {
-  final UriAudioSource audioSource;
+  final UriAudioSource child;
   final Duration start;
   final Duration end;
 
   ClippingAudioSource({
-    @required this.audioSource,
+    @required this.child,
     this.start,
     this.end,
     Object tag,
@@ -1152,17 +1152,17 @@ class ClippingAudioSource extends IndexedAudioSource {
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
-    await audioSource._setup(player);
+    await child._setup(player);
   }
 
   @override
-  bool get _requiresHeaders => audioSource._requiresHeaders;
+  bool get _requiresHeaders => child._requiresHeaders;
 
   @override
   Map toJson() => {
         'id': _id,
         'type': 'clipping',
-        'audioSource': audioSource.toJson(),
+        'audioSource': child.toJson(),
         'start': start?.inMilliseconds,
         'end': end?.inMilliseconds,
       };
@@ -1171,28 +1171,26 @@ class ClippingAudioSource extends IndexedAudioSource {
 // An [AudioSource] that loops a nested [AudioSource] a
 // specified number of times.
 class LoopingAudioSource extends AudioSource {
-  AudioSource audioSource;
+  AudioSource child;
   final int count;
 
   LoopingAudioSource({
-    @required this.audioSource,
+    @required this.child,
     this.count,
   }) : super();
 
   @override
   List<IndexedAudioSource> get sequence =>
-      List.generate(count, (i) => audioSource)
-          .expand((s) => s.sequence)
-          .toList();
+      List.generate(count, (i) => child).expand((s) => s.sequence).toList();
 
   @override
-  bool get _requiresHeaders => audioSource._requiresHeaders;
+  bool get _requiresHeaders => child._requiresHeaders;
 
   @override
   Map toJson() => {
         'id': _id,
         'type': 'looping',
-        'audioSource': audioSource.toJson(),
+        'audioSource': child.toJson(),
         'count': count,
       };
 }
