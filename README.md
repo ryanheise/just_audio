@@ -23,7 +23,7 @@ A Flutter plugin to play audio from URLs, files, assets, DASH/HLS streams and pl
 | gapless playback     | ✅        | ✅         | (untested) |            |
 | report player errors | ✅        | ✅         | ✅         | ✅         |
 
-This plugin has been tested on Android and Web, and is being made available for testing on iOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
+This plugin has been tested on Android and Web, and is being made available for testing on iOS and MacOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
 ## Example
 
@@ -121,20 +121,6 @@ try {
 
 Listening to state changes:
 
-- AudioPlayer.playbackStateStream
-- AudioPlayer.durationStream
-- AudioPlayer.bufferingStream
-- AudioPlayer.icyMetadataStream
-- AudioPlayer.bufferedPositionStream
-- AudioPlayer.fullPlaybackStateStream
-- AudioPlayer.playbackEventStream
-- AudioPlayer.currentIndexStream
-- AudioPlayer.loopModeStream
-- AudioPlayer.shuffleModeEnabledStream
-- AudioPlayer.durationStream
-
-e.g.
-
 ```dart
 player.playbackStateStream.listen((state) {
   switch (state) {
@@ -146,6 +132,18 @@ player.playbackStateStream.listen((state) {
     case AudioPlaybackState.completed: ...
   }
 });
+
+// See also:
+// - durationStream
+// - bufferingStream
+// - icyMetadataStream
+// - bufferedPositionStream
+// - fullPlaybackStateStream
+// - playbackEventStream
+// - currentIndexStream
+// - loopModeStream
+// - shuffleModeEnabledStream
+// - durationStream
 ```
 
 ## Platform specific configuration
