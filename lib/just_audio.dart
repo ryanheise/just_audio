@@ -308,7 +308,11 @@ class AudioPlayer {
   Future<Duration> load(AudioSource source) async {
     try {
       _audioSource = source;
-      return await _load(source);
+      final duration = await _load(source);
+      // Wait for connecting state to pass.
+      await playbackStateStream
+          .firstWhere((state) => state != AudioPlaybackState.connecting);
+      return duration;
     } catch (e) {
       _audioSource = null;
       _audioSources.clear();
@@ -345,14 +349,19 @@ class AudioPlayer {
   /// original [AudioSource]. If [end] is null, it will be reset to the end of
   /// the original [AudioSource]. This method cannot be called from the
   /// [AudioPlaybackState.none] state.
-  Future<Duration> setClip({Duration start, Duration end}) =>
-      _load(start == null && end == null
-          ? _audioSource
-          : ClippingAudioSource(
-              audioSource: _audioSource,
-              start: start,
-              end: end,
-            ));
+  Future<Duration> setClip({Duration start, Duration end}) async {
+    final duration = await _load(start == null && end == null
+        ? _audioSource
+        : ClippingAudioSource(
+            audioSource: _audioSource,
+            start: start,
+            end: end,
+          ));
+    // Wait for connecting state to pass.
+    await playbackStateStream
+        .firstWhere((state) => state != AudioPlaybackState.connecting);
+    return duration;
+  }
 
   /// Plays the currently loaded media from the current position. The [Future]
   /// returned by this method completes when playback completes or is paused or
