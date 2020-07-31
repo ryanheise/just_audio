@@ -29,33 +29,12 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
     ),
-    //LoopingAudioSource(
-    //  count: 2,
-    //  child: AudioSource.uri(
-    //    Uri.parse(
-    //        "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
-    //    tag: AudioMetadata(
-    //      album: "Science Friday",
-    //      title: "A Salute To Head-Scratching Science (full)",
-    //    ),
-    //  ),
-    //),
-    //ClippingAudioSource(
-    //  start: Duration(seconds: 60),
-    //  end: Duration(seconds: 65),
-    //  child: AudioSource.uri(Uri.parse(
-    //      "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
-    //  tag: AudioMetadata(
-    //    album: "Science Friday",
-    //    title: "A Salute To Head-Scratching Science (5 seconds)",
-    //  ),
-    //),
     AudioSource.uri(
       Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
       tag: AudioMetadata(
         album: "Science Friday",
-        title: "A Salute To Head-Scratching Science (full)",
+        title: "A Salute To Head-Scratching Science",
       ),
     ),
     AudioSource.uri(
@@ -84,7 +63,7 @@ class _MyAppState extends State<MyApp> {
     try {
       await _player.load(_playlist);
     } catch (e) {
-      // catch audio error ex: 404 url, wrong url ...
+      // catch load errors: 404 url, wrong url ...
       print("$e");
     }
   }

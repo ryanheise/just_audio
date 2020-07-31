@@ -141,11 +141,6 @@
     } else {
         result(FlutterMethodNotImplemented);
     }
-    // TODO
-    /* } catch (Exception e) { */
-    /*     e.printStackTrace(); */
-    /*     result.error("Error", null, null); */
-    /* } */
 }
 
 // Untested
@@ -467,7 +462,14 @@
 }
 
 - (void)load:(NSDictionary *)source result:(FlutterResult)result {
-    // TODO: error if already connecting
+    if (_state == connecting) {
+        [self abortExistingConnection];
+        _playing = NO;
+        [_player pause];
+    } else if (_state == playing) {
+        _playing = NO;
+        [_player pause];
+    }
     _connectionResult = result;
     _index = 0;
     [self updatePosition];
@@ -671,13 +673,7 @@
             }
             case AVPlayerItemStatusFailed: {
                 NSLog(@"AVPlayerItemStatusFailed");
-                if (playerItem != _player.currentItem) return;
-                if (_connectionResult) {
-                    _connectionResult([FlutterError errorWithCode:[NSString stringWithFormat:@"%d", _player.currentItem.error]
-                                                          message:_player.currentItem.error.localizedDescription
-                                                          details:nil]);
-                    _connectionResult = nil;
-                }
+                [self sendErrorForItem:playerItem];
                 break;
             }
             case AVPlayerItemStatusUnknown:
@@ -775,6 +771,31 @@
             }
         }
     }
+}
+
+- (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
+    FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%d", playerItem.error]
+                                                     message:playerItem.error.localizedDescription
+                                                     details:nil];
+    [self sendError:flutterError playerItem:playerItem];
+}
+
+- (void)sendError:(FlutterError *)flutterError playerItem:(IndexedPlayerItem *)playerItem {
+    if (_connectionResult && playerItem == _player.currentItem) {
+        _connectionResult(flutterError);
+        _connectionResult = nil;
+    }
+    if (_eventSink) {
+        // Broadcast all errors even if they aren't on the current item.
+        _eventSink(flutterError);
+    }
+}
+
+- (void)abortExistingConnection {
+    FlutterError *flutterError = [FlutterError errorWithCode:@"abort"
+                                                     message:@"Connection aborted"
+                                                     details:nil];
+    [self sendError:flutterError playerItem:nil];
 }
 
 - (int)indexForItem:(IndexedPlayerItem *)playerItem {
