@@ -494,6 +494,12 @@ class AudioPlayer {
   /// from any state except for [AudioPlaybackState.none] and
   /// [AudioPlaybackState.connecting].
   Future<void> seek(final Duration position, {int index}) async {
+    // Update local state immediately so that queries aren't surprised.
+    _audioPlaybackEvent = _audioPlaybackEvent.copyWith(
+      updatePosition: position,
+      updateTime: Duration(milliseconds: DateTime.now().millisecondsSinceEpoch),
+    );
+    _playbackEventSubject.add(_audioPlaybackEvent);
     await _invokeMethod('seek', [position?.inMilliseconds, index]);
   }
 

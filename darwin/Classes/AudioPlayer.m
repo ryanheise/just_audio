@@ -293,6 +293,7 @@
         } else if (drift < -100) {
             NSLog(@"stall detected: %lld", drift);
             _buffering = YES;
+            [self updatePosition];
             [self broadcastPlaybackEvent];
         }
     }
@@ -347,6 +348,7 @@
 
 - (void)setPlaybackBufferingState:(enum PlaybackState)state buffering:(BOOL)buffering {
     _buffering = buffering;
+    [self updatePosition];
     [self setPlaybackState:state];
 }
 
@@ -453,6 +455,7 @@
 
     if (skipMode) {
         _buffering = _player.currentItem.playbackBufferEmpty; // || !_player.currentItem.playbackLikelyToKeepUp;
+        [self updatePosition];
     }
 }
 
@@ -648,16 +651,19 @@
                 if (_playing) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {
                         _buffering = _player.timeControlStatus == AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate;
+                        [self updatePosition];
                     } else {
                         // If this happens when we're playing, check whether buffer is confirmed
                         if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
                             // Stay in bufering
                         } else {
                             _buffering = _player.currentItem.playbackBufferEmpty;// || !_player.currentItem.playbackLikelyToKeepUp;
+                            [self updatePosition];
                         }
                     }
                 } else {
                     _buffering = _player.currentItem.playbackBufferEmpty;// || !_player.currentItem.playbackLikelyToKeepUp;
+                    [self updatePosition];
                 }
                 // XXX: Maybe if _state == connecting?
                 // Although then make sure connecting is only used for this purpose.
@@ -693,6 +699,7 @@
                 if (_bufferUnconfirmed && playerItem.playbackBufferFull) {
                     _bufferUnconfirmed = NO;
                     _buffering = NO;
+                    [self updatePosition];
                     NSLog(@"Buffering confirmed! leaving buffering");
                     [self broadcastPlaybackEvent];
                 }
@@ -700,10 +707,12 @@
         } else {
             if (playerItem.playbackBufferEmpty) {
                 _buffering = YES;
+                [self updatePosition];
                 NSLog(@"[%d] BUFFERING YES: playbackBufferEmpty = %d, playbackBufferFull = %d", [self indexForItem:playerItem], playerItem.playbackBufferEmpty, playerItem.playbackBufferFull);
                 [self broadcastPlaybackEvent];
             } else if (!playerItem.playbackBufferEmpty || playerItem.playbackBufferFull) {
                 _buffering = NO;
+                [self updatePosition];
                 NSLog(@"[%d] BUFFERING NO:  playbackBufferEmpty = %d, playbackBufferFull = %d", [self indexForItem:playerItem], playerItem.playbackBufferEmpty, playerItem.playbackBufferFull);
                 [self broadcastPlaybackEvent];
             }
@@ -756,9 +765,11 @@
                     [_player pause];
                 }
                 _buffering = YES;
+                [self updatePosition];
                 [self broadcastPlaybackEvent];
                 [source seek:kCMTimeZero completionHandler:^(BOOL finished) {
                     _buffering = NO;
+                    [self updatePosition];
                     [self broadcastPlaybackEvent];
                     if (shouldResumePlayback) {
                         _player.actionAtItemEnd = originalEndAction;
@@ -936,6 +947,7 @@
             IndexedAudioSource *source = _indexedAudioSources[_index];
             if (abs((int)(1000 * CMTimeGetSeconds(CMTimeSubtract(source.position, position)))) > 100) {
                 _buffering = YES;
+                [self updatePosition];
                 [self broadcastPlaybackEvent];
                 [source seek:position completionHandler:^(BOOL finished) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {
@@ -946,6 +958,7 @@
                                 // Stay in buffering
                             } else if (source.playerItem.status == AVPlayerItemStatusReadyToPlay) {
                                 _buffering = NO;
+                                [self updatePosition];
                                 [self broadcastPlaybackEvent];
                             }
                         }
@@ -954,6 +967,7 @@
                             // Stay in buffering
                         } else if (source.playerItem.status == AVPlayerItemStatusReadyToPlay) {
                             _buffering = NO;
+                            [self updatePosition];
                             [self broadcastPlaybackEvent];
                         }
                     }
@@ -983,6 +997,7 @@
         // TODO: Move this into a separate method so it can also
         // be used in skip.
         _buffering = YES;
+        [self updatePosition];
         [self broadcastPlaybackEvent];
         [_indexedAudioSources[_index] seek:position completionHandler:^(BOOL finished) {
             [self updatePosition];
@@ -997,6 +1012,7 @@
                 // !playbackBufferEmpty. Although this always seems to
                 // be full even right after a seek.
                 _buffering = _player.currentItem.playbackBufferEmpty;
+                [self updatePosition];
                 if (!_buffering) {
                     [self broadcastPlaybackEvent];
                 }
