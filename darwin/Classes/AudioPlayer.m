@@ -479,7 +479,26 @@
         }
     }
     // Decode audio source
-    _audioSource = [self decodeAudioSource:source];
+    if (_audioSource && [@"clipping" isEqualToString:source[@"type"]]) {
+        // Check if we're clipping an audio source that was previously loaded.
+        UriAudioSource *child = nil;
+        if ([_audioSource isKindOfClass:[ClippingAudioSource class]]) {
+            ClippingAudioSource *clipper = (ClippingAudioSource *)_audioSource;
+            child = clipper.audioSource;
+        } else if ([_audioSource isKindOfClass:[UriAudioSource class]]) {
+            child = (UriAudioSource *)_audioSource;
+        }
+        if (child) {
+            _audioSource = [[ClippingAudioSource alloc] initWithId:source[@"id"]
+                                                       audioSource:child
+                                                             start:source[@"start"]
+                                                               end:source[@"end"]];
+        } else {
+            _audioSource = [self decodeAudioSource:source];
+        }
+    } else {
+        _audioSource = [self decodeAudioSource:source];
+    }
     _indexedAudioSources = [[NSMutableArray alloc] init];
     [_audioSource buildSequence:_indexedAudioSources treeIndex:0];
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -523,7 +542,12 @@
         [_indexedAudioSources[i] attach:_player];
     }
 
-    // We send result after the playerItem is ready in observeValueForKeyPath.
+    if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
+        _connectionResult(@([self getDuration]));
+        _connectionResult = nil;
+    } else {
+        // We send result after the playerItem is ready in observeValueForKeyPath.
+    }
 }
 
 - (void)updateOrder {

@@ -19,6 +19,10 @@
     return self;
 }
 
+- (UriAudioSource *)audioSource {
+    return _audioSource;
+}
+
 - (void)findById:(NSString *)sourceId matches:(NSMutableArray<AudioSource *> *)matches {
     [super findById:sourceId matches:matches];
     [_audioSource findById:sourceId matches:matches];
