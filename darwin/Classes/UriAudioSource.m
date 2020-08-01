@@ -63,4 +63,15 @@
     return _playerItem.currentTime;
 }
 
+- (CMTime)bufferedPosition {
+    NSValue *last = _playerItem.loadedTimeRanges.lastObject;
+    if (last) {
+        CMTimeRange timeRange = [last CMTimeRangeValue];
+        return CMTimeAdd(timeRange.start, timeRange.duration);
+    } else {
+        return _playerItem.currentTime;
+    }
+    return kCMTimeInvalid;
+}
+
 @end

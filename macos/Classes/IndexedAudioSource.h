@@ -8,6 +8,7 @@
 @property (readonly, nonatomic) IndexedPlayerItem *playerItem;
 @property (readwrite, nonatomic) CMTime duration;
 @property (readonly, nonatomic) CMTime position;
+@property (readonly, nonatomic) CMTime bufferedPosition;
 @property (readonly, nonatomic) BOOL isAttached;
 
 - (void)attach:(AVQueuePlayer *)player;

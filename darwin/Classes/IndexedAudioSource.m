@@ -61,4 +61,8 @@
     return kCMTimeInvalid;
 }
 
+- (CMTime)bufferedPosition {
+    return kCMTimeInvalid;
+}
+
 @end

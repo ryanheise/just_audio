@@ -28,6 +28,7 @@
     long long _updateTime;
     int _updatePosition;
     int _lastPosition;
+    int _bufferedPosition;
     // Set when the current item hasn't been played yet so we aren't sure whether sufficient audio has been buffered.
     BOOL _bufferUnconfirmed;
     CMTime _seekPos;
@@ -67,6 +68,7 @@
     _updatePosition = 0;
     _updateTime = 0;
     _lastPosition = 0;
+    _bufferedPosition = 0;
     _bufferUnconfirmed = NO;
     _playing = NO;
     _automaticallyWaitsToMinimizeStalling = YES;
@@ -330,6 +332,18 @@
     }
 }
 
+- (int)getBufferedPosition {
+    if (_state == none || _state == connecting) {
+        return 0;
+    } else if (_indexedAudioSources) {
+        int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].bufferedPosition));
+        if (ms < 0) ms = 0;
+        return ms;
+    } else {
+        return 0;
+    }
+}
+
 - (int)getDuration {
     if (_state == none) {
         return -1;
@@ -368,6 +382,7 @@
     // Get notified of the buffer state
     [playerItem addObserver:self forKeyPath:@"playbackBufferEmpty" options:NSKeyValueObservingOptionNew context:nil];
     [playerItem addObserver:self forKeyPath:@"playbackBufferFull" options:NSKeyValueObservingOptionNew context:nil];
+    [playerItem addObserver:self forKeyPath:@"loadedTimeRanges" options:NSKeyValueObservingOptionNew context:nil];
     //[playerItem addObserver:self forKeyPath:@"playbackLikelyToKeepUp" options:NSKeyValueObservingOptionNew context:nil];
     // Get notified when playback has reached the end
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onComplete:) name:AVPlayerItemDidPlayToEndTimeNotification object:playerItem];
@@ -780,6 +795,14 @@
             } else {
                 // Already at zero, no need to seek.
             }
+        }
+    } else if ([keyPath isEqualToString:@"loadedTimeRanges"]) {
+        IndexedPlayerItem *playerItem = (IndexedPlayerItem *)object;
+        if (playerItem != _player.currentItem) return;
+        int pos = [self getBufferedPosition];
+        if (pos != _bufferedPosition) {
+            _bufferedPosition = pos;
+            [self broadcastPlaybackEvent];
         }
     }
 }

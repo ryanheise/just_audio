@@ -68,4 +68,10 @@
     return CMTimeSubtract(self.playerItem.currentTime, _start);
 }
 
+- (CMTime)bufferedPosition {
+    CMTime pos = CMTimeSubtract(_audioSource.bufferedPosition, _start);
+    CMTime dur = [self duration];
+    return CMTimeCompare(pos, dur) >= 0 ? dur : pos;
+}
+
 @end
