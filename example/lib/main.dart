@@ -101,24 +101,29 @@ class _MyAppState extends State<MyApp> {
                   );
                 },
               ),
-              StreamBuilder<FullAudioPlaybackState>(
-                stream: _player.fullPlaybackStateStream,
+              StreamBuilder<PlayerState>(
+                stream: _player.playerStateStream,
                 builder: (context, snapshot) {
-                  final fullState = snapshot.data;
-                  final state = fullState?.state;
-                  final buffering = fullState?.buffering;
+                  final playerState = snapshot.data;
+                  final processingState = playerState?.processingState;
+                  final playing = playerState?.playing;
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (state == AudioPlaybackState.connecting ||
-                          buffering == true)
+                      if (processingState == ProcessingState.buffering)
                         Container(
                           margin: EdgeInsets.all(8.0),
                           width: 64.0,
                           height: 64.0,
                           child: CircularProgressIndicator(),
                         )
-                      else if (state == AudioPlaybackState.playing)
+                      else if (playing != true)
+                        IconButton(
+                          icon: Icon(Icons.play_arrow),
+                          iconSize: 64.0,
+                          onPressed: _player.play,
+                        )
+                      else if (processingState != ProcessingState.completed)
                         IconButton(
                           icon: Icon(Icons.pause),
                           iconSize: 64.0,
@@ -126,18 +131,11 @@ class _MyAppState extends State<MyApp> {
                         )
                       else
                         IconButton(
-                          icon: Icon(Icons.play_arrow),
+                          icon: Icon(Icons.replay),
                           iconSize: 64.0,
-                          onPressed: _player.play,
+                          onPressed: () =>
+                              _player.seek(Duration.zero, index: 0),
                         ),
-                      IconButton(
-                        icon: Icon(Icons.stop),
-                        iconSize: 64.0,
-                        onPressed: state == AudioPlaybackState.stopped ||
-                                state == AudioPlaybackState.none
-                            ? null
-                            : _player.stop,
-                      ),
                     ],
                   );
                 },
@@ -148,7 +146,7 @@ class _MyAppState extends State<MyApp> {
                 builder: (context, snapshot) {
                   final duration = snapshot.data ?? Duration.zero;
                   return StreamBuilder<Duration>(
-                    stream: _player.getPositionStream(),
+                    stream: _player.positionStream,
                     builder: (context, snapshot) {
                       var position = snapshot.data ?? Duration.zero;
                       if (position > duration) {
@@ -308,10 +306,10 @@ class _SeekBarState extends State<SeekBar> {
         }
       },
       onChangeEnd: (value) {
-        _dragValue = null;
         if (widget.onChangeEnd != null) {
           widget.onChangeEnd(Duration(milliseconds: value.round()));
         }
+        _dragValue = null;
       },
     );
   }

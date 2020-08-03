@@ -4,26 +4,27 @@ A Flutter plugin to play audio from URLs, files, assets, DASH/HLS streams and pl
 
 ## Features
 
-| Feature              | Android   | iOS        | MacOS      | Web        |
-| -------              | :-------: | :-----:    | :-----:    | :-----:    |
-| read from URL        | ✅        | ✅         | ✅         | ✅         |
-| read from file       | ✅        | ✅         | ✅         |            |
-| read from asset      | ✅        | ✅         | ✅         |            |
-| request headers      | ✅        | ✅         | ✅         |            |
-| DASH                 | ✅        | (untested) | (untested) | (untested) |
-| HLS                  | ✅        | ✅         | (untested) | (untested) |
-| play/pause/stop/seek | ✅        | ✅         | ✅         | ✅         |
-| set volume           | ✅        | ✅         | (untested) | ✅         |
-| set speed            | ✅        | ✅         | ✅         | ✅         |
-| clip audio           | ✅        | ✅         | (untested) | ✅         |
-| playlists            | ✅        | ✅         | (untested) | ✅         |
-| looping              | ✅        | ✅         | (untested) | ✅         |
-| shuffle              | ✅        | ✅         | (untested) | ✅         |
-| compose audio        | ✅        | ✅         | (untested) | ✅         |
-| gapless playback     | ✅        | ✅         | (untested) |            |
-| report player errors | ✅        | ✅         | ✅         | ✅         |
+| Feature                | Android   | iOS        | MacOS      | Web        |
+| -------                | :-------: | :-----:    | :-----:    | :-----:    |
+| read from URL          | ✅        | ✅         | ✅         | ✅         |
+| read from file         | ✅        | ✅         | ✅         |            |
+| read from asset        | ✅        | ✅         | ✅         |            |
+| request headers        | ✅        | ✅         | ✅         |            |
+| DASH                   | ✅        | (untested) | (untested) | (untested) |
+| HLS                    | ✅        | ✅         | (untested) | (untested) |
+| buffer status/position | ✅        | ✅         | (untested) | ✅         |
+| play/pause/seek        | ✅        | ✅         | ✅         | ✅         |
+| set volume             | ✅        | ✅         | (untested) | ✅         |
+| set speed              | ✅        | ✅         | ✅         | ✅         |
+| clip audio             | ✅        | ✅         | (untested) | ✅         |
+| playlists              | ✅        | ✅         | (untested) | ✅         |
+| looping                | ✅        | ✅         | (untested) | ✅         |
+| shuffle                | ✅        | ✅         | (untested) | ✅         |
+| compose audio          | ✅        | ✅         | (untested) | ✅         |
+| gapless playback       | ✅        | ✅         | (untested) |            |
+| report player errors   | ✅        | ✅         | ✅         | ✅         |
 
-This plugin has been tested on Android and Web, and is being made available for testing on iOS and MacOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
+This plugin has been tested on Android, iOS and Web, and is being made available for testing on MacOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
 ## Example
 
@@ -40,7 +41,6 @@ Standard controls:
 player.play(); // Usually you don't want to wait for playback to finish.
 await player.seek(Duration(seconds: 10));
 await player.pause();
-await player.stop();
 ```
 
 Clipping audio:
@@ -122,28 +122,30 @@ try {
 Listening to state changes:
 
 ```dart
-player.playbackStateStream.listen((state) {
-  switch (state) {
+player.playerStateStream.listen((state) {
+  if (state.playing) ...  else ...
+  switch (state.processingState) {
     case AudioPlaybackState.none: ...
-    case AudioPlaybackState.stopped: ...
-    case AudioPlaybackState.paused: ...
-    case AudioPlaybackState.playing: ...
-    case AudioPlaybackState.connecting: ...
+    case AudioPlaybackState.loading: ...
+    case AudioPlaybackState.buffering: ...
+    case AudioPlaybackState.ready: ...
     case AudioPlaybackState.completed: ...
   }
 });
 
 // See also:
 // - durationStream
-// - bufferingStream
-// - icyMetadataStream
+// - positionStream
 // - bufferedPositionStream
-// - fullPlaybackStateStream
-// - playbackEventStream
 // - currentIndexStream
+// - icyMetadataStream
+// - playingStream
+// - processingStateStream
 // - loopModeStream
 // - shuffleModeEnabledStream
-// - durationStream
+// - volumeStream
+// - speedStream
+// - playbackEventStream
 ```
 
 ## Platform specific configuration

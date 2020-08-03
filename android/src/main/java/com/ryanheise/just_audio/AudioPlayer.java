@@ -58,21 +58,19 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private final EventChannel eventChannel;
 	private EventSink eventSink;
 
-	private volatile PlaybackState state;
+	private ProcessingState processingState;
 	private long updateTime;
 	private long updatePosition;
 	private long bufferedPosition;
 	private long duration;
 	private Long start;
 	private Long end;
-	private float volume = 1.0f;
-	private float speed = 1.0f;
 	private Long seekPos;
 	private Result prepareResult;
+	private Result playResult;
 	private Result seekResult;
 	private boolean seekProcessed;
-	private boolean buffering;
-	private boolean justConnected;
+	private boolean playing;
 	private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
 	private IcyInfo icyInfo;
 	private IcyHeaders icyHeaders;
@@ -95,14 +93,17 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				bufferedPosition = newBufferedPosition;
 				broadcastPlaybackEvent();
 			}
-			if (buffering) {
+			switch (processingState) {
+			case buffering:
 				handler.postDelayed(this, 200);
-			} else if (state == PlaybackState.playing) {
-				handler.postDelayed(this, 500);
-			} else if (state == PlaybackState.paused) {
-				handler.postDelayed(this, 1000);
-			} else if (justConnected) {
-				handler.postDelayed(this, 1000);
+				break;
+			case ready:
+				if (playing) {
+					handler.postDelayed(this, 500);
+				} else {
+					handler.postDelayed(this, 1000);
+				}
+				break;
 			}
 		}
 	};
@@ -127,7 +128,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				eventSink = null;
 			}
 		});
-		state = PlaybackState.none;
+		processingState = ProcessingState.none;
 	}
 
 	private void startWatchingBuffer() {
@@ -198,31 +199,31 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		case Player.STATE_READY:
 			if (prepareResult != null) {
 				duration = getDuration();
-				justConnected = true;
-				transition(PlaybackState.stopped);
+				transition(ProcessingState.ready);
 				prepareResult.success(duration);
 				prepareResult = null;
+			} else {
+				transition(ProcessingState.ready);
 			}
 			if (seekProcessed) {
 				completeSeek();
 			}
 			break;
-		case Player.STATE_ENDED:
-			if (state != PlaybackState.completed) {
-				player.setPlayWhenReady(false);
-				transition(PlaybackState.completed);
-			}
-			break;
-		}
-		final boolean buffering = playbackState == Player.STATE_BUFFERING;
-		// don't notify buffering if (buffering && state == stopped)
-		final boolean notifyBuffering = !buffering || state != PlaybackState.stopped;
-		if (notifyBuffering && (buffering != this.buffering)) {
-			this.buffering = buffering;
-			broadcastPlaybackEvent();
-			if (buffering) {
+		case Player.STATE_BUFFERING:
+			if (processingState != ProcessingState.buffering) {
+				transition(ProcessingState.buffering);
 				startWatchingBuffer();
 			}
+			break;
+		case Player.STATE_ENDED:
+			if (processingState != ProcessingState.completed) {
+				transition(ProcessingState.completed);
+			}
+			if (playResult != null) {
+				playResult.success(null);
+				playResult = null;
+			}
+			break;
 		}
 	}
 
@@ -275,15 +276,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				load(getAudioSource(args.get(0)), result);
 				break;
 			case "play":
-				play();
-				result.success(null);
+				play(result);
 				break;
 			case "pause":
 				pause();
 				result.success(null);
-				break;
-			case "stop":
-				stop(result);
 				break;
 			case "setVolume":
 				setVolume((float) ((double) ((Double) args.get(0))));
@@ -497,22 +494,19 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private void load(final MediaSource mediaSource, final Result result) {
-		justConnected = false;
-		switch (state) {
+		switch (processingState) {
 		case none:
 			break;
-		case connecting:
+		case loading:
 			abortExistingConnection();
 			player.stop();
-			player.setPlayWhenReady(false);
 			break;
 		default:
 			player.stop();
-			player.setPlayWhenReady(false);
 			break;
 		}
 		prepareResult = result;
-		transition(PlaybackState.connecting);
+		transition(ProcessingState.loading);
 		if (player.getShuffleModeEnabled()) {
 			setShuffleOrder(mediaSource, 0);
 		}
@@ -530,8 +524,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 
 	private void broadcastPlaybackEvent() {
 		final Map<String, Object> event = new HashMap<String, Object>();
-		event.put("state", state.ordinal());
-		event.put("buffering", buffering);
+		event.put("processingState", processingState.ordinal());
 		event.put("updatePosition", updatePosition = getCurrentPosition());
 		event.put("updateTime", updateTime = System.currentTimeMillis());
 		event.put("bufferedPosition", Math.max(updatePosition, bufferedPosition));
@@ -566,7 +559,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private long getCurrentPosition() {
-		if (state == PlaybackState.none || state == PlaybackState.connecting) {
+		if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
 			return 0;
 		} else if (seekPos != null && seekPos != C.TIME_UNSET) {
 			return seekPos;
@@ -576,7 +569,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private long getDuration() {
-		if (state == PlaybackState.none || state == PlaybackState.connecting) {
+		if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
 			return C.TIME_UNSET;
 		} else {
 			return player.getDuration();
@@ -594,9 +587,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	}
 
-	private void transition(final PlaybackState newState) {
-		final PlaybackState oldState = state;
-		state = newState;
+	private void transition(final ProcessingState newState) {
+		processingState = newState;
 		broadcastPlaybackEvent();
 	}
 
@@ -610,70 +602,35 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		return filename.replaceAll("^.*\\.", "").toLowerCase();
 	}
 
-	public void play() {
-		switch (state) {
-		case playing:
-			break;
-		case stopped:
-		case completed:
-		case paused:
-			justConnected = false;
-			transition(PlaybackState.playing);
-			startWatchingBuffer();
-			player.setPlayWhenReady(true);
-			break;
-		default:
-			throw new IllegalStateException(
-					"Cannot call play from connecting/none states (" + state + ")");
+	public void play(Result result) {
+		if (player.getPlayWhenReady()) return;
+		if (playResult != null) {
+			result.success(null);
+		} else {
+			playResult = result;
+		}
+		startWatchingBuffer();
+		player.setPlayWhenReady(true);
+		if (processingState == ProcessingState.completed && playResult != null) {
+			playResult.success(null);
+			playResult = null;
 		}
 	}
 
 	public void pause() {
-		switch (state) {
-		case paused:
-			break;
-		case playing:
-			player.setPlayWhenReady(false);
-			transition(PlaybackState.paused);
-			break;
-		default:
-			throw new IllegalStateException(
-					"Can call pause only from playing and buffering states (" + state + ")");
-		}
-	}
-
-	public void stop(final Result result) {
-		switch (state) {
-		case stopped:
-			result.success(null);
-			break;
-		case connecting:
-			abortExistingConnection();
-			buffering = false;
-			transition(PlaybackState.stopped);
-			result.success(null);
-			break;
-		case completed:
-		case playing:
-		case paused:
-			abortSeek();
-			player.setPlayWhenReady(false);
-			transition(PlaybackState.stopped);
-			player.seekTo(0L);
-			result.success(null);
-			break;
-		default:
-			throw new IllegalStateException("Cannot call stop from none state");
+		if (!player.getPlayWhenReady()) return;
+		player.setPlayWhenReady(false);
+		if (playResult != null) {
+			playResult.success(null);
+			playResult = null;
 		}
 	}
 
 	public void setVolume(final float volume) {
-		this.volume = volume;
 		player.setVolume(volume);
 	}
 
 	public void setSpeed(final float speed) {
-		this.speed = speed;
 		player.setPlaybackParameters(new PlaybackParameters(speed));
 		broadcastPlaybackEvent();
 	}
@@ -690,8 +647,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	public void seek(final long position, final Result result, final Integer index) {
-		if (state == PlaybackState.none || state == PlaybackState.connecting) {
-			throw new IllegalStateException("Cannot call seek from none none/connecting states");
+		if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
+			return;
 		}
 		abortSeek();
 		seekPos = position;
@@ -708,8 +665,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		if (player != null) {
 			player.release();
 			player = null;
-			buffering = false;
-			transition(PlaybackState.none);
+			transition(ProcessingState.none);
 		}
 		onDispose.run();
 	}
@@ -731,12 +687,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
 	}
 
-	enum PlaybackState {
+	enum ProcessingState {
 		none,
-		stopped,
-		paused,
-		playing,
-		connecting,
+		loading,
+		buffering,
+		ready,
 		completed
 	}
 }
