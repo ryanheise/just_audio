@@ -605,10 +605,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	public void play(Result result) {
 		if (player.getPlayWhenReady()) return;
 		if (playResult != null) {
-			result.success(null);
-		} else {
-			playResult = result;
+			playResult.success(null);
 		}
+		playResult = result;
 		startWatchingBuffer();
 		player.setPlayWhenReady(true);
 		if (processingState == ProcessingState.completed && playResult != null) {

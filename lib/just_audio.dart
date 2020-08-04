@@ -1181,8 +1181,9 @@ class ClippingAudioSource extends IndexedAudioSource {
       };
 }
 
-// An [AudioSource] that loops a nested [AudioSource] a
-// specified number of times.
+// An [AudioSource] that loops a nested [AudioSource] a finite number of times.
+// Note that this can be inefficient when using a large loop count. If you wish
+// to loop an infinite number of times, use [AudioPlayer.setLoopMode].
 class LoopingAudioSource extends AudioSource {
   AudioSource child;
   final int count;
