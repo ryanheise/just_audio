@@ -6,12 +6,11 @@
 
 @end
 
-enum PlaybackState {
+enum ProcessingState {
 	none,
-	stopped,
-	paused,
-	playing,
-	connecting,
+	loading,
+	buffering,
+	ready,
 	completed
 };
 

@@ -49,7 +49,9 @@
 }
 
 - (void)seek:(CMTime)position completionHandler:(void (^)(BOOL))completionHandler {
-    [_playerItem seekToTime:position toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
+    if (!completionHandler || (_playerItem.status == AVPlayerItemStatusReadyToPlay)) {
+        [_playerItem seekToTime:position toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
+    }
 }
 
 - (CMTime)duration {

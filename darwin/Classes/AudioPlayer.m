@@ -22,7 +22,7 @@
     NSMutableArray<NSNumber *> *_order;
     NSMutableArray<NSNumber *> *_orderInv;
     int _index;
-    enum PlaybackState _state;
+    enum ProcessingState _processingState;
     enum LoopMode _loopMode;
     BOOL _shuffleModeEnabled;
     long long _updateTime;
@@ -32,8 +32,8 @@
     // Set when the current item hasn't been played yet so we aren't sure whether sufficient audio has been buffered.
     BOOL _bufferUnconfirmed;
     CMTime _seekPos;
-    FlutterResult _connectionResult;
-    BOOL _buffering;
+    FlutterResult _loadResult;
+    FlutterResult _playResult;
     id _timeObserver;
     BOOL _automaticallyWaitsToMinimizeStalling;
     BOOL _configuredSession;
@@ -54,7 +54,7 @@
                                   binaryMessenger:[registrar messenger]];
     [_eventChannel setStreamHandler:self];
     _index = 0;
-    _state = none;
+    _processingState = none;
     _loopMode = loopOff;
     _shuffleModeEnabled = NO;
     _player = nil;
@@ -63,7 +63,6 @@
     _order = nil;
     _orderInv = nil;
     _seekPos = kCMTimeInvalid;
-    _buffering = NO;
     _timeObserver = 0;
     _updatePosition = 0;
     _updateTime = 0;
@@ -71,6 +70,8 @@
     _bufferedPosition = 0;
     _bufferUnconfirmed = NO;
     _playing = NO;
+    _loadResult = nil;
+    _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
     __weak __typeof__(self) weakSelf = self;
     [_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
@@ -84,13 +85,9 @@
     if ([@"load" isEqualToString:call.method]) {
         [self load:args[0] result:result];
     } else if ([@"play" isEqualToString:call.method]) {
-        [self play];
-        result(nil);
+        [self play:result];
     } else if ([@"pause" isEqualToString:call.method]) {
         [self pause];
-        result(nil);
-    } else if ([@"stop" isEqualToString:call.method]) {
-        [self stop];
         result(nil);
     } else if ([@"setVolume" isEqualToString:call.method]) {
         [self setVolume:(float)[args[0] doubleValue]];
@@ -191,7 +188,7 @@
     } else {
         _index = 0;
     }
-    [self enqueueFrom:_index skipMode:NO];
+    [self enqueueFrom:_index];
     // Notify each new IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         if (!_indexedAudioSources[i].isAttached) {
@@ -236,7 +233,7 @@
     [self updateOrder];
     if (_index >= _indexedAudioSources.count) _index = _indexedAudioSources.count - 1;
     if (_index < 0) _index = 0;
-    [self enqueueFrom:_index skipMode:NO];
+    [self enqueueFrom:_index];
     [self broadcastPlaybackEvent];
 }
 
@@ -274,12 +271,11 @@
 
 - (void)checkForDiscontinuity {
     if (!_eventSink) return;
-    if (!_playing || CMTIME_IS_VALID(_seekPos)) return;
+    if (!_playing || CMTIME_IS_VALID(_seekPos) || _processingState == completed) return;
     int position = [self getCurrentPosition];
-    if (_buffering) {
+    if (_processingState == buffering) {
         if (position > _lastPosition) {
-            NSLog(@"stall ended");
-            _buffering = NO;
+            [self leaveBuffering:@"stall ended"];
             [self updatePosition];
             [self broadcastPlaybackEvent];
         }
@@ -293,8 +289,8 @@
         if (_updateTime == 0L) {
             [self broadcastPlaybackEvent];
         } else if (drift < -100) {
-            NSLog(@"stall detected: %lld", drift);
-            _buffering = YES;
+            [self enterBuffering:@"stalling"];
+            NSLog(@"Drift: %lld", drift);
             [self updatePosition];
             [self broadcastPlaybackEvent];
         }
@@ -302,11 +298,20 @@
     _lastPosition = position;
 }
 
+- (void)enterBuffering:(NSString *)reason {
+    NSLog(@"ENTER BUFFERING: %@", reason);
+    _processingState = buffering;
+}
+
+- (void)leaveBuffering:(NSString *)reason {
+    NSLog(@"LEAVE BUFFERING: %@", reason);
+    _processingState = ready;
+}
+
 - (void)broadcastPlaybackEvent {
     if (!_eventSink) return;
     _eventSink(@{
-            @"state": @(_state),
-            @"buffering": @(_buffering),
+            @"processingState": @(_processingState),
             @"updatePosition": @(_updatePosition),
             @"updateTime": @(_updateTime),
             // TODO: buffer position
@@ -319,7 +324,7 @@
 }
 
 - (int)getCurrentPosition {
-    if (_state == none || _state == connecting) {
+    if (_processingState == none || _processingState == loading) {
         return 0;
     } else if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
@@ -333,7 +338,7 @@
 }
 
 - (int)getBufferedPosition {
-    if (_state == none || _state == connecting) {
+    if (_processingState == none || _processingState == loading) {
         return 0;
     } else if (_indexedAudioSources) {
         int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].bufferedPosition));
@@ -345,7 +350,7 @@
 }
 
 - (int)getDuration {
-    if (_state == none) {
+    if (_processingState == none) {
         return -1;
     } else if (_indexedAudioSources) {
         int v = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].duration));
@@ -353,17 +358,6 @@
     } else {
         return 0;
     }
-}
-
-- (void)setPlaybackState:(enum PlaybackState)state {
-    _state = state;
-    [self broadcastPlaybackEvent];
-}
-
-- (void)setPlaybackBufferingState:(enum PlaybackState)state buffering:(BOOL)buffering {
-    _buffering = buffering;
-    [self updatePosition];
-    [self setPlaybackState:state];
 }
 
 - (void)removeItemObservers:(AVPlayerItem *)playerItem {
@@ -429,8 +423,7 @@
     }
 }
 
-// TODO: remove the skipMode parameter after testing
-- (void)enqueueFrom:(int)index skipMode:(BOOL)skipMode {
+- (void)enqueueFrom:(int)index {
     _index = index;
 
     // Update the queue while keeping the currently playing item untouched.
@@ -439,6 +432,7 @@
     /* [self dumpQueue]; */
 
     // First, remove all _player items except for the currently playing one (if any).
+    IndexedPlayerItem *oldItem = _player.currentItem;
     IndexedPlayerItem *existingItem = nil;
     NSArray *oldPlayerItems = [NSArray arrayWithArray:_player.items];
     for (int i = 0; i < oldPlayerItems.count; i++) {
@@ -458,9 +452,6 @@
         int si = [_order[i] intValue];
         if (si == _index) include = YES;
         if (include && _indexedAudioSources[si].playerItem != existingItem) {
-            if (!skipMode) {
-                [_indexedAudioSources[si] seek:kCMTimeZero];
-            }
             [_player insertItem:_indexedAudioSources[si].playerItem afterItem:nil];
         }
     }
@@ -468,8 +459,13 @@
     /* NSLog(@"after reorder: _player.items.count: ", _player.items.count); */
     /* [self dumpQueue]; */
 
-    if (skipMode) {
-        _buffering = _player.currentItem.playbackBufferEmpty; // || !_player.currentItem.playbackLikelyToKeepUp;
+    if (_processingState != loading && oldItem != _indexedAudioSources[_index].playerItem) {
+        // || !_player.currentItem.playbackLikelyToKeepUp;
+        if (_player.currentItem.playbackBufferEmpty) {
+            [self enterBuffering:@"enqueueFrom playbackBufferEmpty"];
+        } else {
+            [self leaveBuffering:@"enqueueFrom !playbackBufferEmpty"];
+        }
         [self updatePosition];
     }
 }
@@ -480,18 +476,17 @@
 }
 
 - (void)load:(NSDictionary *)source result:(FlutterResult)result {
-    if (_state == connecting) {
-        [self abortExistingConnection];
-        _playing = NO;
-        [_player pause];
-    } else if (_state == playing) {
-        _playing = NO;
+    if (!_playing) {
         [_player pause];
     }
-    _connectionResult = result;
+    if (_processingState == loading) {
+        [self abortExistingConnection];
+    }
+    _loadResult = result;
     _index = 0;
     [self updatePosition];
-    [self setPlaybackState:connecting];
+    _processingState = loading;
+    [self broadcastPlaybackEvent];
     // Remove previous observers
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -556,18 +551,19 @@
         }
     }
     // Initialise the AVQueuePlayer with items.
-    [self enqueueFrom:0 skipMode:YES];
+    [self enqueueFrom:0];
     // Notify each IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         [_indexedAudioSources[i] attach:_player];
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
-        _connectionResult(@([self getDuration]));
-        _connectionResult = nil;
+        _loadResult(@([self getDuration]));
+        _loadResult = nil;
     } else {
         // We send result after the playerItem is ready in observeValueForKeyPath.
     }
+    [self broadcastPlaybackEvent];
 }
 
 - (void)updateOrder {
@@ -633,10 +629,12 @@
                 // For now we just do a seek back to the start.
                 if ([_order count] == 1) {
                     [self seek:kCMTimeZero index:[NSNull null] completionHandler:^(BOOL finished) {
+                        // XXX: Necessary?
                         [self play];
                     }];
                 } else {
                     [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
+                        // XXX: Necessary?
                         [self play];
                     }];
                 }
@@ -665,30 +663,40 @@
                 // Detect buffering in different ways depending on whether we're playing
                 if (_playing) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {
-                        _buffering = _player.timeControlStatus == AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate;
+                        if (_player.timeControlStatus == AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate) {
+                            [self enterBuffering:@"ready to play: playing, waitingToPlay"];
+                        } else {
+                            [self leaveBuffering:@"ready to play: playing, !waitingToPlay"];
+                        }
                         [self updatePosition];
                     } else {
                         // If this happens when we're playing, check whether buffer is confirmed
                         if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
-                            // Stay in bufering
+                            // Stay in bufering - XXX Test
+                            [self enterBuffering:@"ready to play: playing, bufferUnconfirmed && !playbackBufferFull"];
                         } else {
-                            _buffering = _player.currentItem.playbackBufferEmpty;// || !_player.currentItem.playbackLikelyToKeepUp;
+                            if (_player.currentItem.playbackBufferEmpty) {
+                                // !_player.currentItem.playbackLikelyToKeepUp;
+                                [self enterBuffering:@"ready to play: playing, playbackBufferEmpty"];
+                            } else {
+                                [self leaveBuffering:@"ready to play: playing, !playbackBufferEmpty"];
+                            }
                             [self updatePosition];
                         }
                     }
                 } else {
-                    _buffering = _player.currentItem.playbackBufferEmpty;// || !_player.currentItem.playbackLikelyToKeepUp;
+                    if (_player.currentItem.playbackBufferEmpty) {
+                        [self enterBuffering:@"ready to play: !playing, playbackBufferEmpty"];
+                        // || !_player.currentItem.playbackLikelyToKeepUp;
+                    } else {
+                        [self leaveBuffering:@"ready to play: !playing, !playbackBufferEmpty"];
+                    }
                     [self updatePosition];
                 }
-                // XXX: Maybe if _state == connecting?
-                // Although then make sure connecting is only used for this purpose.
-                if (!_playing) {
-                    _state = stopped;
-                }
                 [self broadcastPlaybackEvent];
-                if (_connectionResult) {
-                    _connectionResult(@([self getDuration]));
-                    _connectionResult = nil;
+                if (_loadResult) {
+                    _loadResult(@([self getDuration]));
+                    _loadResult = nil;
                 }
                 break;
             }
@@ -713,7 +721,7 @@
             } else {
                 if (_bufferUnconfirmed && playerItem.playbackBufferFull) {
                     _bufferUnconfirmed = NO;
-                    _buffering = NO;
+                    [self leaveBuffering:@"playing, _bufferUnconfirmed && playbackBufferFull"];
                     [self updatePosition];
                     NSLog(@"Buffering confirmed! leaving buffering");
                     [self broadcastPlaybackEvent];
@@ -721,14 +729,13 @@
             }
         } else {
             if (playerItem.playbackBufferEmpty) {
-                _buffering = YES;
+                [self enterBuffering:@"!playing, playbackBufferEmpty"];
                 [self updatePosition];
-                NSLog(@"[%d] BUFFERING YES: playbackBufferEmpty = %d, playbackBufferFull = %d", [self indexForItem:playerItem], playerItem.playbackBufferEmpty, playerItem.playbackBufferFull);
                 [self broadcastPlaybackEvent];
             } else if (!playerItem.playbackBufferEmpty || playerItem.playbackBufferFull) {
-                _buffering = NO;
+                _processingState = ready;
+                [self leaveBuffering:@"!playing, !playbackBufferEmpty || playbackBufferFull"];
                 [self updatePosition];
-                NSLog(@"[%d] BUFFERING NO:  playbackBufferEmpty = %d, playbackBufferFull = %d", [self indexForItem:playerItem], playerItem.playbackBufferEmpty, playerItem.playbackBufferFull);
                 [self broadcastPlaybackEvent];
             }
         }
@@ -746,13 +753,16 @@
                     break;
                 case AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate:
                     //NSLog(@"AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate");
-                    _buffering = YES;
-                    [self updatePosition];
-                    [self broadcastPlaybackEvent];
+                    if (_processingState != completed) {
+                        [self enterBuffering:@"timeControlStatus"];
+                        [self updatePosition];
+                        [self broadcastPlaybackEvent];
+                    } else {
+                        NSLog(@"Ignoring wait signal because we reached the end");
+                    }
                     break;
                 case AVPlayerTimeControlStatusPlaying:
-                    //NSLog(@"AVPlayerTimeControlStatusPlaying");
-                    _buffering = NO;
+                    [self leaveBuffering:@"timeControlStatus"];
                     [self updatePosition];
                     [self broadcastPlaybackEvent];
                     break;
@@ -779,11 +789,11 @@
                     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
                     [_player pause];
                 }
-                _buffering = YES;
+                [self enterBuffering:@"currentItem changed, seeking"];
                 [self updatePosition];
                 [self broadcastPlaybackEvent];
                 [source seek:kCMTimeZero completionHandler:^(BOOL finished) {
-                    _buffering = NO;
+                    [self leaveBuffering:@"currentItem changed, finished seek"];
                     [self updatePosition];
                     [self broadcastPlaybackEvent];
                     if (shouldResumePlayback) {
@@ -815,9 +825,9 @@
 }
 
 - (void)sendError:(FlutterError *)flutterError playerItem:(IndexedPlayerItem *)playerItem {
-    if (_connectionResult && playerItem == _player.currentItem) {
-        _connectionResult(flutterError);
-        _connectionResult = nil;
+    if (_loadResult && playerItem == _player.currentItem) {
+        _loadResult(flutterError);
+        _loadResult = nil;
     }
     if (_eventSink) {
         // Broadcast all errors even if they aren't on the current item.
@@ -842,46 +852,52 @@
 }
 
 - (void)play {
+    [self play:nil];
+}
+
+- (void)play:(FlutterResult)result {
+    if (result) {
+        if (_playResult) {
+            NSLog(@"INTERRUPTING PLAY");
+            _playResult(nil);
+        }
+        _playResult = result;
+    }
     _playing = YES;
     if (_configuredSession) {
         [[AVAudioSession sharedInstance] setActive:YES error:nil];
     }
     [_player play];
+    [self updatePosition];
     if (!@available(macOS 10.12, iOS 10.0, *)) {
         if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
-            _buffering = YES;
+            [self enterBuffering:@"play, _bufferUnconfirmed && !playbackBufferFull"];
+            [self broadcastPlaybackEvent];
         }
     }
-    [self updatePosition];
-    [self setPlaybackState:playing];
 }
 
 - (void)pause {
     _playing = NO;
     [_player pause];
     [self updatePosition];
-    [self setPlaybackState:paused];
-}
-
-- (void)stop {
-    _playing = NO;
-    [_player pause];
-    [self updatePosition];
-    [_indexedAudioSources[_index] seek:kCMTimeZero
-      completionHandler:^(BOOL finished) {
-          [self updatePosition];
-          [self setPlaybackBufferingState:stopped buffering:NO];
-      }];
+    [self broadcastPlaybackEvent];
+    if (_playResult) {
+        NSLog(@"PLAY FINISHED DUE TO PAUSE");
+        _playResult(nil);
+        _playResult = nil;
+    }
 }
 
 - (void)complete {
-    _playing = NO;
-    [_player pause];
-    [self enqueueFrom:_index skipMode:YES];
-    [_indexedAudioSources[_index] seek:kCMTimeZero
-      completionHandler:^(BOOL finished) {
-          [self setPlaybackBufferingState:completed buffering:NO];
-      }];
+    [self updatePosition];
+    _processingState = completed;
+    [self broadcastPlaybackEvent];
+    if (_playResult) {
+        NSLog(@"PLAY FINISHED DUE TO COMPLETE");
+        _playResult(nil);
+        _playResult = nil;
+    }
 }
 
 - (void)setVolume:(float)volume {
@@ -894,6 +910,7 @@
             || (speed > 1.0 && _player.currentItem.canPlayFastForward)) {
         _player.rate = speed;
     }
+    [self updatePosition];
 }
 
 - (void)setLoopMode:(int)loopMode {
@@ -916,7 +933,7 @@
 
     [self updateOrder];
 
-    [self enqueueFrom:_index skipMode:NO];
+    [self enqueueFrom:_index];
 }
 
 - (void)dumpQueue {
@@ -966,10 +983,10 @@
             // The "currentItem" key observer will respect that a seek is already in progress
             _seekPos = position;
             [self updatePosition];
-            [self enqueueFrom:index skipMode:YES];
+            [self enqueueFrom:index];
             IndexedAudioSource *source = _indexedAudioSources[_index];
             if (abs((int)(1000 * CMTimeGetSeconds(CMTimeSubtract(source.position, position)))) > 100) {
-                _buffering = YES;
+                [self enterBuffering:@"seek to index"];
                 [self updatePosition];
                 [self broadcastPlaybackEvent];
                 [source seek:position completionHandler:^(BOOL finished) {
@@ -980,7 +997,7 @@
                             if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
                                 // Stay in buffering
                             } else if (source.playerItem.status == AVPlayerItemStatusReadyToPlay) {
-                                _buffering = NO;
+                                [self leaveBuffering:@"seek to index finished, (!bufferUnconfirmed || playbackBufferFull) && ready to play"];
                                 [self updatePosition];
                                 [self broadcastPlaybackEvent];
                             }
@@ -989,7 +1006,7 @@
                         if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
                             // Stay in buffering
                         } else if (source.playerItem.status == AVPlayerItemStatusReadyToPlay) {
-                            _buffering = NO;
+                            [self leaveBuffering:@"seek to index finished, (!bufferUnconfirmed || playbackBufferFull) && ready to play"];
                             [self updatePosition];
                             [self broadcastPlaybackEvent];
                         }
@@ -1019,7 +1036,7 @@
         //NSLog(@"seek. enter buffering. pos = %d", (int)(1000*CMTimeGetSeconds(_indexedAudioSources[_index].position)));
         // TODO: Move this into a separate method so it can also
         // be used in skip.
-        _buffering = YES;
+        [self enterBuffering:@"seek"];
         [self updatePosition];
         [self broadcastPlaybackEvent];
         [_indexedAudioSources[_index] seek:position completionHandler:^(BOOL finished) {
@@ -1034,9 +1051,13 @@
                 // when buffering has completed, so we use
                 // !playbackBufferEmpty. Although this always seems to
                 // be full even right after a seek.
-                _buffering = _player.currentItem.playbackBufferEmpty;
+                if (_player.currentItem.playbackBufferEmpty) {
+                    [self enterBuffering:@"seek finished, playbackBufferEmpty"];
+                } else {
+                    [self leaveBuffering:@"seek finished, !playbackBufferEmpty"];
+                }
                 [self updatePosition];
-                if (!_buffering) {
+                if (_processingState != buffering) {
                     [self broadcastPlaybackEvent];
                 }
             }
@@ -1050,9 +1071,10 @@
 }
 
 - (void)dispose {
-    if (_state != none) {
-        [self stop];
-        [self setPlaybackBufferingState:none buffering:NO];
+    if (_processingState != none) {
+        [_player pause];
+        _processingState = none;
+        [self broadcastPlaybackEvent];
     }
     if (_timeObserver) {
         [_player removeTimeObserver:_timeObserver];

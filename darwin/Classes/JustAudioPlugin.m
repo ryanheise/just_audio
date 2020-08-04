@@ -26,7 +26,7 @@
 	if ([@"init" isEqualToString:call.method]) {
 		NSArray* args = (NSArray*)call.arguments;
 		NSString* playerId = args[0];
-		AudioPlayer* player = [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId configuredSession:_configuredSession];
+		/*AudioPlayer* player =*/ [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId configuredSession:_configuredSession];
 		result(nil);
 	} else if ([@"setIosCategory" isEqualToString:call.method]) {
 		NSNumber* categoryIndex = (NSNumber*)call.arguments;

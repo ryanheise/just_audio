@@ -30,7 +30,7 @@
 
 - (NSArray *)getShuffleOrder {
     NSMutableArray *order = [NSMutableArray new];
-    int offset = [order count];
+    int offset = (int)[order count];
     for (int i = 0; i < [_audioSources count]; i++) {
         AudioSource *audioSource = _audioSources[i];
         NSArray *childShuffleOrder = [audioSource getShuffleOrder];

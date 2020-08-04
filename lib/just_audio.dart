@@ -432,7 +432,6 @@ class AudioPlayer {
   Future<void> play() async {
     if (playing) return;
     _playingSubject.add(true);
-    // TODO: Make platform side wait for playback to stop on iOS.
     await _invokeMethod('play');
   }
 

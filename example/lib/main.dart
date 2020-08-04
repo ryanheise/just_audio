@@ -110,7 +110,8 @@ class _MyAppState extends State<MyApp> {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (processingState == ProcessingState.buffering)
+                      if (processingState == ProcessingState.loading ||
+                          processingState == ProcessingState.buffering)
                         Container(
                           margin: EdgeInsets.all(8.0),
                           width: 64.0,
