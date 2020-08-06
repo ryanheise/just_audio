@@ -222,6 +222,16 @@ class AudioPlayer {
   /// A stream broadcasting the current item.
   Stream<int> get currentIndexStream => _currentIndexSubject.stream;
 
+  /// Whether there is another item after the current index.
+  bool get hasNext =>
+      _audioSource != null &&
+      currentIndex != null &&
+      currentIndex + 1 < _audioSource.sequence.length;
+
+  /// Whether there is another item before the current index.
+  bool get hasPrevious =>
+      _audioSource != null && currentIndex != null && currentIndex > 0;
+
   /// The current loop mode.
   LoopMode get loopMode => _loopModeSubject.value;
 
@@ -268,7 +278,7 @@ class AudioPlayer {
       _positionSubject.addStream(createPositionStream(
           steps: 800,
           minPeriod: Duration(milliseconds: 16),
-          maxPeriod: Duration(milliseconds: 11200)));
+          maxPeriod: Duration(milliseconds: 200)));
     }
     return _positionSubject.stream;
   }
@@ -512,6 +522,20 @@ class AudioPlayer {
         );
         _playbackEventSubject.add(_playbackEvent);
         await _invokeMethod('seek', [position?.inMilliseconds, index]);
+    }
+  }
+
+  /// Seek to the next item.
+  Future<void> seekToNext() async {
+    if (hasNext) {
+      await seek(Duration.zero, index: currentIndex + 1);
+    }
+  }
+
+  /// Seek to the previous item.
+  Future<void> seekToPrevious() async {
+    if (hasPrevious) {
+      await seek(Duration.zero, index: currentIndex - 1);
     }
   }
 

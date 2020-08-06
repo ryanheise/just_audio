@@ -62,6 +62,8 @@ await player.load(
     ],
   ),
 );
+player.seekToNext();
+player.seekToPrevious();
 // Jump to the beginning of track3.mp3.
 player.seek(Duration(milliseconds: 0), index: 2);
 ```

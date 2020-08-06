@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:rxdart/rxdart.dart';
 
 void main() => runApp(MyApp());
 
@@ -12,8 +12,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _volumeSubject = BehaviorSubject.seeded(1.0);
-  final _speedSubject = BehaviorSubject.seeded(1.0);
   AudioPlayer _player;
   ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
     LoopingAudioSource(
@@ -26,6 +24,8 @@ class _MyAppState extends State<MyApp> {
         tag: AudioMetadata(
           album: "Science Friday",
           title: "A Salute To Head-Scratching Science (5 seconds)",
+          artwork:
+              "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
         ),
       ),
     ),
@@ -35,6 +35,8 @@ class _MyAppState extends State<MyApp> {
       tag: AudioMetadata(
         album: "Science Friday",
         title: "A Salute To Head-Scratching Science",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
     AudioSource.uri(
@@ -42,6 +44,8 @@ class _MyAppState extends State<MyApp> {
       tag: AudioMetadata(
         album: "Science Friday",
         title: "From Cat Rheology To Operatic Incompetence",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
   ]);
@@ -56,6 +60,9 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     AudioPlayer.setIosCategory(IosCategory.playback);
     _player = AudioPlayer();
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.black,
+    ));
     _loadAudio();
   }
 
@@ -77,29 +84,36 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Audio Player Demo'),
-        ),
-        body: Center(
+        body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              StreamBuilder<int>(
-                stream: _player.currentIndexStream,
-                builder: (context, snapshot) {
-                  final index = snapshot.data ?? 0;
-                  final metadata = _metadataSequence[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(metadata.album ?? '',
-                          style: Theme.of(context).textTheme.headline6),
-                      Text(metadata.title ?? ''),
-                    ],
-                  );
-                },
+              Expanded(
+                child: StreamBuilder<int>(
+                  stream: _player.currentIndexStream,
+                  builder: (context, snapshot) {
+                    final index = snapshot.data ?? 0;
+                    final metadata = _metadataSequence[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child:
+                                Center(child: Image.network(metadata.artwork)),
+                          ),
+                        ),
+                        Text(metadata.album ?? '',
+                            style: Theme.of(context).textTheme.headline6),
+                        Text(metadata.title ?? ''),
+                      ],
+                    );
+                  },
+                ),
               ),
               StreamBuilder<PlayerState>(
                 stream: _player.playerStateStream,
@@ -110,6 +124,25 @@ class _MyAppState extends State<MyApp> {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      IconButton(
+                        icon: Icon(Icons.volume_up),
+                        onPressed: () {
+                          _showSliderDialog(
+                            context: context,
+                            title: "Adjust volume",
+                            divisions: 10,
+                            min: 0.0,
+                            max: 1.0,
+                            stream: _player.volumeStream,
+                            onChanged: _player.setVolume,
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.skip_previous),
+                        onPressed:
+                            _player.hasPrevious ? _player.seekToPrevious : null,
+                      ),
                       if (processingState == ProcessingState.loading ||
                           processingState == ProcessingState.buffering)
                         Container(
@@ -137,11 +170,32 @@ class _MyAppState extends State<MyApp> {
                           onPressed: () =>
                               _player.seek(Duration.zero, index: 0),
                         ),
+                      IconButton(
+                        icon: Icon(Icons.skip_next),
+                        onPressed: _player.hasNext ? _player.seekToNext : null,
+                      ),
+                      IconButton(
+                        icon: StreamBuilder<double>(
+                            stream: _player.speedStream,
+                            builder: (context, snapshot) => Text(
+                                "${snapshot.data?.toStringAsFixed(1)}x",
+                                style: TextStyle(fontWeight: FontWeight.bold))),
+                        onPressed: () {
+                          _showSliderDialog(
+                            context: context,
+                            title: "Adjust speed",
+                            divisions: 10,
+                            min: 0.5,
+                            max: 1.5,
+                            stream: _player.speedStream,
+                            onChanged: _player.setSpeed,
+                          );
+                        },
+                      ),
                     ],
                   );
                 },
               ),
-              Text("Track position"),
               StreamBuilder<Duration>(
                 stream: _player.durationStream,
                 builder: (context, snapshot) {
@@ -164,34 +218,7 @@ class _MyAppState extends State<MyApp> {
                   );
                 },
               ),
-              Text("Volume"),
-              StreamBuilder<double>(
-                stream: _volumeSubject.stream,
-                builder: (context, snapshot) => Slider(
-                  divisions: 20,
-                  min: 0.0,
-                  max: 2.0,
-                  value: snapshot.data ?? 1.0,
-                  onChanged: (value) {
-                    _volumeSubject.add(value);
-                    _player.setVolume(value);
-                  },
-                ),
-              ),
-              Text("Speed"),
-              StreamBuilder<double>(
-                stream: _speedSubject.stream,
-                builder: (context, snapshot) => Slider(
-                  divisions: 10,
-                  min: 0.5,
-                  max: 1.5,
-                  value: snapshot.data ?? 1.0,
-                  onChanged: (value) {
-                    _speedSubject.add(value);
-                    _player.setSpeed(value);
-                  },
-                ),
-              ),
+              SizedBox(height: 8.0),
               Row(
                 children: [
                   StreamBuilder<LoopMode>(
@@ -242,7 +269,8 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ],
               ),
-              Expanded(
+              Container(
+                height: 240.0,
                 child: StreamBuilder<int>(
                   stream: _player.currentIndexStream,
                   builder: (context, snapshot) {
@@ -293,32 +321,89 @@ class _SeekBarState extends State<SeekBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Slider(
-      min: 0.0,
-      max: widget.duration.inMilliseconds.toDouble(),
-      value: min(_dragValue ?? widget.position.inMilliseconds.toDouble(),
-          widget.duration.inMilliseconds.toDouble()),
-      onChanged: (value) {
-        setState(() {
-          _dragValue = value;
-        });
-        if (widget.onChanged != null) {
-          widget.onChanged(Duration(milliseconds: value.round()));
-        }
-      },
-      onChangeEnd: (value) {
-        if (widget.onChangeEnd != null) {
-          widget.onChangeEnd(Duration(milliseconds: value.round()));
-        }
-        _dragValue = null;
-      },
+    return Stack(
+      children: [
+        Slider(
+          min: 0.0,
+          max: widget.duration.inMilliseconds.toDouble(),
+          value: min(_dragValue ?? widget.position.inMilliseconds.toDouble(),
+              widget.duration.inMilliseconds.toDouble()),
+          onChanged: (value) {
+            setState(() {
+              _dragValue = value;
+            });
+            if (widget.onChanged != null) {
+              widget.onChanged(Duration(milliseconds: value.round()));
+            }
+          },
+          onChangeEnd: (value) {
+            if (widget.onChangeEnd != null) {
+              widget.onChangeEnd(Duration(milliseconds: value.round()));
+            }
+            _dragValue = null;
+          },
+        ),
+        Positioned(
+          right: 16.0,
+          bottom: 0.0,
+          child: Text(
+              RegExp(r'((^0*[1-9]\d*:)?\d{2}:\d{2})\.\d+$')
+                      .firstMatch("$_remaining")
+                      ?.group(1) ??
+                  '$_remaining',
+              style: Theme.of(context).textTheme.caption),
+        ),
+      ],
     );
   }
+
+  Duration get _remaining => widget.duration - widget.position;
+}
+
+_showSliderDialog({
+  BuildContext context,
+  String title,
+  int divisions,
+  double min,
+  double max,
+  String valueSuffix = '',
+  Stream<double> stream,
+  ValueChanged<double> onChanged,
+}) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title, textAlign: TextAlign.center),
+      content: StreamBuilder<double>(
+        stream: stream,
+        builder: (context, snapshot) => Container(
+          height: 100.0,
+          child: Column(
+            children: [
+              Text('${snapshot.data?.toStringAsFixed(1)}$valueSuffix',
+                  style: TextStyle(
+                      fontFamily: 'Fixed',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24.0)),
+              Slider(
+                divisions: divisions,
+                min: min,
+                max: max,
+                value: snapshot.data ?? 1.0,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class AudioMetadata {
   final String album;
   final String title;
+  final String artwork;
 
-  AudioMetadata({this.album, this.title});
+  AudioMetadata({this.album, this.title, this.artwork});
 }
