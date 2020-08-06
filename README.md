@@ -12,19 +12,19 @@ A Flutter plugin to play audio from URLs, files, assets, DASH/HLS streams and pl
 | request headers        | ✅        | ✅         | ✅         |            |
 | DASH                   | ✅        | (untested) | (untested) | (untested) |
 | HLS                    | ✅        | ✅         | (untested) | (untested) |
-| buffer status/position | ✅        | ✅         | (untested) | ✅         |
+| buffer status/position | ✅        | ✅         | ✅         | ✅         |
 | play/pause/seek        | ✅        | ✅         | ✅         | ✅         |
-| set volume             | ✅        | ✅         | (untested) | ✅         |
+| set volume             | ✅        | ✅         | ✅         | ✅         |
 | set speed              | ✅        | ✅         | ✅         | ✅         |
-| clip audio             | ✅        | ✅         | (untested) | ✅         |
-| playlists              | ✅        | ✅         | (untested) | ✅         |
-| looping                | ✅        | ✅         | (untested) | ✅         |
-| shuffle                | ✅        | ✅         | (untested) | ✅         |
-| compose audio          | ✅        | ✅         | (untested) | ✅         |
-| gapless playback       | ✅        | ✅         | (untested) |            |
+| clip audio             | ✅        | ✅         | ✅         | ✅         |
+| playlists              | ✅        | ✅         | ✅         | ✅         |
+| looping                | ✅        | ✅         | ✅         | ✅         |
+| shuffle                | ✅        | ✅         | ✅         | ✅         |
+| compose audio          | ✅        | ✅         | ✅         | ✅         |
+| gapless playback       | ✅        | ✅         | ✅         |            |
 | report player errors   | ✅        | ✅         | ✅         | ✅         |
 
-This plugin has been tested on Android, iOS and Web, and is being made available for testing on MacOS. Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
+Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
 ## Example
 

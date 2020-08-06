@@ -1,6 +1,7 @@
 #import "JustAudioPlugin.h"
 #import "AudioPlayer.h"
 #import <AVFoundation/AVFoundation.h>
+#include <TargetConditionals.h>
 
 @implementation JustAudioPlugin {
 	NSObject<FlutterPluginRegistrar>* _registrar;
@@ -10,7 +11,7 @@
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
 	FlutterMethodChannel* channel = [FlutterMethodChannel
 		methodChannelWithName:@"com.ryanheise.just_audio.methods"
-					binaryMessenger:[registrar messenger]];
+              binaryMessenger:[registrar messenger]];
 	JustAudioPlugin* instance = [[JustAudioPlugin alloc] initWithRegistrar:registrar];
 	[registrar addMethodCallDelegate:instance channel:channel];
 }
@@ -29,20 +30,22 @@
 		/*AudioPlayer* player =*/ [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId configuredSession:_configuredSession];
 		result(nil);
 	} else if ([@"setIosCategory" isEqualToString:call.method]) {
-		NSNumber* categoryIndex = (NSNumber*)call.arguments;
-		AVAudioSessionCategory category = nil;
-		switch (categoryIndex.integerValue) {
-			case 0: category = AVAudioSessionCategoryAmbient; break;
-			case 1: category = AVAudioSessionCategorySoloAmbient; break;
-			case 2: category = AVAudioSessionCategoryPlayback; break;
-			case 3: category = AVAudioSessionCategoryRecord; break;
-			case 4: category = AVAudioSessionCategoryPlayAndRecord; break;
-			case 5: category = AVAudioSessionCategoryMultiRoute; break;
-		}
-		if (category) {
-			_configuredSession = YES;
-		}
-		[[AVAudioSession sharedInstance] setCategory:category error:nil];
+#if TARGET_OS_IPHONE
+        NSNumber* categoryIndex = (NSNumber*)call.arguments;
+        AVAudioSessionCategory category = nil;
+        switch (categoryIndex.integerValue) {
+            case 0: category = AVAudioSessionCategoryAmbient; break;
+            case 1: category = AVAudioSessionCategorySoloAmbient; break;
+            case 2: category = AVAudioSessionCategoryPlayback; break;
+            case 3: category = AVAudioSessionCategoryRecord; break;
+            case 4: category = AVAudioSessionCategoryPlayAndRecord; break;
+            case 5: category = AVAudioSessionCategoryMultiRoute; break;
+        }
+        if (category) {
+            _configuredSession = YES;
+        }
+        [[AVAudioSession sharedInstance] setCategory:category error:nil];
+#endif
 		result(nil);
 	} else {
 		result(FlutterMethodNotImplemented);

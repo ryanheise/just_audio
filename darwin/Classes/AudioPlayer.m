@@ -7,6 +7,7 @@
 #import "ClippingAudioSource.h"
 #import <AVFoundation/AVFoundation.h>
 #import <stdlib.h>
+#include <TargetConditionals.h>
 
 // TODO: Check for and report invalid state transitions.
 // TODO: Apply Apple's guidance on seeking: https://developer.apple.com/library/archive/qa/qa1820/_index.html
@@ -865,9 +866,11 @@
         _playResult = result;
     }
     _playing = YES;
+#if TARGET_OS_IPHONE
     if (_configuredSession) {
         [[AVAudioSession sharedInstance] setActive:YES error:nil];
     }
+#endif
     [_player play];
     [self updatePosition];
     if (@available(macOS 10.12, iOS 10.0, *)) {}
