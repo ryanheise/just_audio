@@ -28,6 +28,8 @@ This plugin has been tested on Android, iOS and Web, and is being made available
 
 ## Example
 
+![just_audio](https://user-images.githubusercontent.com/19899190/89558581-bf369080-d857-11ea-9376-3a5055284bab.png)
+
 Initialisation:
 
 ```dart
