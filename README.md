@@ -51,6 +51,12 @@ Clipping audio:
 await player.setClip(start: Duration(seconds: 10), end: Duration(seconds: 20));
 await player.play(); // Waits for playback to finish
 ```
+Adjusting audio:
+
+```dart
+await player.setSpeed(2.0); // Double speed
+await player.setVolume(0.5); // Halve volume
+```
 
 Gapless playlists:
 
