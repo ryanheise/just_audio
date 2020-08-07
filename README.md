@@ -1,6 +1,6 @@
 # just_audio
 
-This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and playlists. Furthermore, it can also clip, loop, shuffle, concatenate and compose audio into complex arrangements with gapless playback. This plugin can be used with [audio_service](https://pub.dev/packages/audio_service) to play audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
+This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and playlists. Furthermore, it can clip, concatenate, loop, shuffle and compose audio into complex arrangements with gapless playback. This plugin can be used with [audio_service](https://pub.dev/packages/audio_service) to play audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
 
 ## Features
 
