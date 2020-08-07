@@ -364,11 +364,13 @@ class AudioPlayer {
       load(AudioSource.uri(Uri.parse('asset://$assetPath')));
 
   /// Loads audio from an [AudioSource] and completes when the audio is ready
-  /// to play with the duration of that audio, or an exception if this call was
-  /// interrupted by another call to [load], or if for any reason the audio
-  /// source was unable to be loaded.
+  /// to play with the duration of that audio, or null if the duration is unknown.
   ///
-  /// If the duration is unknown, null will be returned.
+  /// This method throws:
+  ///
+  /// * [PlayerException] if the audio source was unable to be loaded.
+  /// * [PlayerInterruptedException] if another call to [load] happened before
+  /// this call completed.
   Future<Duration> load(AudioSource source) async {
     try {
       _audioSource = source;
@@ -403,8 +405,15 @@ class AudioPlayer {
       _durationSubject.add(duration);
       return duration;
     } on PlatformException catch (e) {
-      // TODO: Create own exception type.
-      throw Exception(e.message);
+      try {
+        throw PlayerException(int.parse(e.code), e.message);
+      } on FormatException catch (_) {
+        if (e.code == 'abort') {
+          throw PlayerInterruptedException(e.message);
+        } else {
+          throw PlayerException(9999999, e.message);
+        }
+      }
     }
   }
 
@@ -569,6 +578,30 @@ class AudioPlayer {
 
   Future<dynamic> _invokeMethod(String method, [dynamic args]) async =>
       (await _channel).invokeMethod(method, args);
+}
+
+/// Captures the details of any error accessing, loading or playing an audio
+/// source, including an invalid or inaccessible URL, or an audio encoding that
+/// could not be understood.
+class PlayerException {
+  /// On iOS and macOS, maps to `NSError.code`. On Android, maps to
+  /// `ExoPlaybackException.type`. On Web, maps to `MediaError.code`.
+  final int code;
+
+  /// On iOS and macOS, maps to `NSError.localizedDescription`. On Android,
+  /// maps to `ExoPlaybackException.getMessage()`. On Web, a generic message
+  /// is provided.
+  final String message;
+
+  PlayerException(this.code, this.message);
+}
+
+/// An error that occurs when one operation on the player has been interrupted
+/// (e.g. by another simultaneous operation).
+class PlayerInterruptedException {
+  final String message;
+
+  PlayerInterruptedException(this.message);
 }
 
 /// Encapsulates the playback state and current position of the player.

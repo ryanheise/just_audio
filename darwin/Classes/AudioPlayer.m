@@ -820,7 +820,7 @@
 }
 
 - (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
-    FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%d", playerItem.error]
+    FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%d", playerItem.error.code]
                                                      message:playerItem.error.localizedDescription
                                                      details:nil];
     [self sendError:flutterError playerItem:playerItem];
