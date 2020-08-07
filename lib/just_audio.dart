@@ -896,7 +896,7 @@ abstract class AudioSource {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
-    if (hasExtension(uri, 'mdp')) {
+    if (hasExtension(uri, 'mpd')) {
       return DashAudioSource(uri, headers: headers, tag: tag);
     } else if (hasExtension(uri, 'm3u8')) {
       return HlsAudioSource(uri, headers: headers, tag: tag);
