@@ -425,6 +425,7 @@
 }
 
 - (void)enqueueFrom:(int)index {
+    int oldIndex = _index;
     _index = index;
 
     // Update the queue while keeping the currently playing item untouched.
@@ -436,12 +437,22 @@
     IndexedPlayerItem *oldItem = _player.currentItem;
     IndexedPlayerItem *existingItem = nil;
     NSArray *oldPlayerItems = [NSArray arrayWithArray:_player.items];
+    // In the first pass, preserve the old and new items.
     for (int i = 0; i < oldPlayerItems.count; i++) {
-        if (oldPlayerItems[i] != _indexedAudioSources[_index].playerItem) {
-            [_player removeItem:oldPlayerItems[i]];
-        } else {
+        if (oldPlayerItems[i] == _indexedAudioSources[_index].playerItem) {
+            // Preserve and tag new item if it is already in the queue.
             existingItem = oldPlayerItems[i];
+        } else if (oldPlayerItems[i] == oldItem) {
+            // Temporarily preserve old item, just to avoid jumping to
+            // intermediate queue positions unnecessarily. We only want to jump
+            // once to _index.
+        } else {
+            [_player removeItem:oldPlayerItems[i]];
         }
+    }
+    // In the second pass, remove the old item (if different from new item).
+    if (_index != oldIndex) {
+        [_player removeItem:oldItem];
     }
 
     /* NSLog(@"inter order: _player.items.count: ", _player.items.count); */
@@ -601,6 +612,7 @@
 }
 
 - (void)onComplete:(NSNotification *)notification {
+    NSLog(@"onComplete");
     if (_loopMode == loopOne) {
         [self seek:kCMTimeZero index:@(_index) completionHandler:^(BOOL finished) {
             // XXX: Not necessary?
@@ -771,11 +783,31 @@
             }
         }
     } else if ([keyPath isEqualToString:@"currentItem"] && _player.currentItem) {
+        if (_player.currentItem.status == AVPlayerItemStatusFailed) {
+            if ([_orderInv[_index] intValue] + 1 < [_order count]) {
+                // account for automatic move to next item
+                _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
+                NSLog(@"advance to next on error: index = %d", _index);
+                [self broadcastPlaybackEvent];
+            } else {
+                NSLog(@"error on last item");
+            }
+            return;
+        } else {
+            int expectedIndex = [self indexForItem:_player.currentItem];
+            if (_index != expectedIndex) {
+                // AVQueuePlayer will sometimes skip over error items without
+                // notifying this observer.
+                NSLog(@"Queue change detected. Adjusting index from %d -> %d", _index, expectedIndex);
+                _index = expectedIndex;
+                [self broadcastPlaybackEvent];
+            }
+        }
         //NSLog(@"currentItem changed. _index=%d", _index);
         _bufferUnconfirmed = YES;
         // If we've skipped or transitioned to a new item and we're not
         // currently in the middle of a seek
-        if (_player.currentItem && CMTIME_IS_INVALID(_seekPos) && _player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
+        if (CMTIME_IS_INVALID(_seekPos) && _player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
             [self updatePosition];
             IndexedAudioSource *source = ((IndexedPlayerItem *)_player.currentItem).audioSource;
             // We should already be at position zero but for
@@ -827,6 +859,7 @@
 }
 
 - (void)sendError:(FlutterError *)flutterError playerItem:(IndexedPlayerItem *)playerItem {
+    NSLog(@"sendError");
     if (_loadResult && playerItem == _player.currentItem) {
         _loadResult(flutterError);
         _loadResult = nil;

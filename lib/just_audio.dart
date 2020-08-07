@@ -311,15 +311,18 @@ class AudioPlayer {
     StreamController<Duration> controller = StreamController.broadcast();
     Timer currentTimer;
     StreamSubscription durationSubscription;
+    StreamSubscription playbackEventSubscription;
     void yieldPosition(Timer timer) {
       if (controller.isClosed) {
         timer.cancel();
-        durationSubscription.cancel();
+        durationSubscription?.cancel();
+        playbackEventSubscription?.cancel();
         return;
       }
       if (_durationSubject.isClosed) {
         timer.cancel();
-        durationSubscription.cancel();
+        durationSubscription?.cancel();
+        playbackEventSubscription?.cancel();
         controller.close();
         return;
       }
@@ -331,9 +334,10 @@ class AudioPlayer {
       currentTimer.cancel();
       currentTimer = Timer.periodic(step(), yieldPosition);
     });
-    return Rx.combineLatest2<void, void, Duration>(
-            playbackEventStream, controller.stream, (event, period) => position)
-        .distinct();
+    playbackEventSubscription = playbackEventStream.listen((event) {
+      controller.add(position);
+    });
+    return controller.stream.distinct();
   }
 
   /// Convenience method to load audio from a URL with optional headers,
