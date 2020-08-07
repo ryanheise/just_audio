@@ -1,3 +1,17 @@
+## 0.3.0
+
+* Playlists
+* Looping
+* Shuffling
+* Composing
+* Clipping support added for iOS/macOS
+* New player state model consisting of:
+  * playing: true/false
+  * processingState: none/loading/buffering/ready/completed
+* Feature complete on iOS and macOS (except for DASH)
+* Improved example
+* Exception classes
+
 ## 0.2.2
 
 * Fix dependencies for stable channel.
