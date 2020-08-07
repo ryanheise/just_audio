@@ -484,7 +484,12 @@ class AudioPlayer {
     await _invokeMethod('setSpeed', [speed]);
   }
 
-  /// Sets the [LoopMode].
+  /// Sets the [LoopMode]. The gapless looping support is as follows:
+  ///
+  /// * Android: supported
+  /// * iOS/macOS: not supported, however, gapless looping can be achieved by
+  /// using [LoopingAudioSource].
+  /// * Web: not supported
   Future<void> setLoopMode(LoopMode mode) async {
     _loopModeSubject.add(mode);
     await _invokeMethod('setLoopMode', [mode.index]);
@@ -966,6 +971,7 @@ abstract class IndexedAudioSource extends AudioSource {
   List<IndexedAudioSource> get sequence => [this];
 }
 
+/// An abstract class representing audio sources that are loaded from a URI.
 abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
   final Map headers;
@@ -1059,8 +1065,12 @@ class HlsAudioSource extends UriAudioSource {
 }
 
 /// An [AudioSource] representing a concatenation of multiple audio sources to
-/// be played in succession. This can be used to create playlists. Audio sources
-/// can be dynamically added, removed and reordered while the audio is playing.
+/// be played in succession. This can be used to create playlists. Playback
+/// between items will be gapless on Android, iOS and macOS, while there will
+/// be a slight gap on Web.
+///
+/// (Untested) Audio sources can be dynamically added, removed and reordered
+/// while the audio is playing.
 class ConcatenatingAudioSource extends AudioSource {
   final List<AudioSource> children;
   final bool useLazyPreparation;
@@ -1078,7 +1088,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Appends an [AudioSource].
+  /// (Untested) Appends an [AudioSource].
   Future<void> add(AudioSource audioSource) async {
     children.add(audioSource);
     if (_player != null) {
@@ -1087,7 +1097,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Inserts an [AudioSource] at [index].
+  /// (Untested) Inserts an [AudioSource] at [index].
   Future<void> insert(int index, AudioSource audioSource) async {
     children.insert(index, audioSource);
     if (_player != null) {
@@ -1096,7 +1106,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Appends multiple [AudioSource]s.
+  /// (Untested) Appends multiple [AudioSource]s.
   Future<void> addAll(List<AudioSource> children) async {
     this.children.addAll(children);
     if (_player != null) {
@@ -1105,7 +1115,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Insert multiple [AudioSource]s at [index].
+  /// (Untested) Insert multiple [AudioSource]s at [index].
   Future<void> insertAll(int index, List<AudioSource> children) async {
     this.children.insertAll(index, children);
     if (_player != null) {
@@ -1114,7 +1124,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Dynmaically remove an [AudioSource] at [index] after this
+  /// (Untested) Dynmaically remove an [AudioSource] at [index] after this
   /// [ConcatenatingAudioSource] has already been loaded.
   Future<void> removeAt(int index) async {
     children.removeAt(index);
@@ -1123,8 +1133,8 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Removes a range of [AudioSource]s from index [start] inclusive to [end]
-  /// exclusive.
+  /// (Untested) Removes a range of [AudioSource]s from index [start] inclusive
+  /// to [end] exclusive.
   Future<void> removeRange(int start, int end) async {
     children.removeRange(start, end);
     if (_player != null) {
@@ -1133,7 +1143,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Moves an [AudioSource] from [currentIndex] to [newIndex].
+  /// (Untested) Moves an [AudioSource] from [currentIndex] to [newIndex].
   Future<void> move(int currentIndex, int newIndex) async {
     children.insert(newIndex, children.removeAt(currentIndex));
     if (_player != null) {
@@ -1142,7 +1152,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// Removes all [AudioSources].
+  /// (Untested) Removes all [AudioSources].
   Future<void> clear() async {
     children.clear();
     if (_player != null) {
@@ -1179,6 +1189,9 @@ class ClippingAudioSource extends IndexedAudioSource {
   final Duration start;
   final Duration end;
 
+  /// Creates an audio source that clips [child] to the range [start]..[end],
+  /// where [start] and [end] default to the beginning and end of the original
+  /// [child] source.
   ClippingAudioSource({
     @required this.child,
     this.start,
@@ -1206,8 +1219,12 @@ class ClippingAudioSource extends IndexedAudioSource {
 }
 
 // An [AudioSource] that loops a nested [AudioSource] a finite number of times.
-// Note that this can be inefficient when using a large loop count. If you wish
-// to loop an infinite number of times, use [AudioPlayer.setLoopMode].
+// NOTE: this can be inefficient when using a large loop count. If you wish to
+// loop an infinite number of times, use [AudioPlayer.setLoopMode].
+//
+// On iOS and macOS, note that [LoopingAudioSource] will provide gapless
+// playback while [AudioPlayer.setLoopMode] will not. (This will be supported
+// in a future release.)
 class LoopingAudioSource extends AudioSource {
   AudioSource child;
   final int count;
