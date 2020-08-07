@@ -248,12 +248,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 		sendError(String.valueOf(error.type), error.getMessage());
 		errorCount++;
-		if (player.hasNext()) {
-			if (errorCount <= 5) {
-				int nextIndex = currentIndex + 1;
-				player.prepare(mediaSource);
-				player.seekTo(nextIndex, 0);
-			}
+		if (player.hasNext() && currentIndex != null && errorCount <= 5) {
+			int nextIndex = currentIndex + 1;
+			player.prepare(mediaSource);
+			player.seekTo(nextIndex, 0);
 		}
 	}
 

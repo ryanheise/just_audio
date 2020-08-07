@@ -598,6 +598,9 @@ class PlayerException {
   final String message;
 
   PlayerException(this.code, this.message);
+
+  @override
+  String toString() => "($code) $message";
 }
 
 /// An error that occurs when one operation on the player has been interrupted
@@ -606,6 +609,9 @@ class PlayerInterruptedException {
   final String message;
 
   PlayerInterruptedException(this.message);
+
+  @override
+  String toString() => "$message";
 }
 
 /// Encapsulates the playback state and current position of the player.

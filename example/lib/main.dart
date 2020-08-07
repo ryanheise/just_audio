@@ -71,7 +71,7 @@ class _MyAppState extends State<MyApp> {
       await _player.load(_playlist);
     } catch (e) {
       // catch load errors: 404, invalid url ...
-      print("An error occured (${e.code}): ${e.message}");
+      print("An error occured $e");
     }
   }
 
