@@ -74,6 +74,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
 	private IcyInfo icyInfo;
 	private IcyHeaders icyHeaders;
+	private int errorCount;
 
 	private SimpleExoPlayer player;
 	private MediaSource mediaSource;
@@ -246,6 +247,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			Log.e(TAG, "default: " + error.getUnexpectedException().getMessage());
 		}
 		sendError(String.valueOf(error.type), error.getMessage());
+		errorCount++;
+		if (player.hasNext()) {
+			if (errorCount <= 5) {
+				int nextIndex = currentIndex + 1;
+				player.prepare(mediaSource);
+				player.seekTo(nextIndex, 0);
+			}
+		}
 	}
 
 	@Override
@@ -505,6 +514,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			player.stop();
 			break;
 		}
+		errorCount = 0;
 		prepareResult = result;
 		transition(ProcessingState.loading);
 		if (player.getShuffleModeEnabled()) {
