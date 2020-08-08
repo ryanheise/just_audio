@@ -567,14 +567,11 @@ class AudioPlayer {
     _proxy?.stop();
     await _durationSubject.close();
     await _eventChannelStreamSubscription.cancel();
-    await _playbackEventSubject.close();
     await _loopModeSubject.close();
     await _shuffleModeEnabledSubject.close();
     await _playingSubject.close();
     await _volumeSubject.close();
     await _speedSubject.close();
-    await _playerStateSubject.drain();
-    await _playerStateSubject.close();
     if (_positionSubject != null) {
       await _positionSubject.close();
     }

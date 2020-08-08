@@ -674,6 +674,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			player = null;
 			transition(ProcessingState.none);
 		}
+		if (eventSink != null) {
+			eventSink.endOfStream();
+		}
 		onDispose.run();
 	}
 
