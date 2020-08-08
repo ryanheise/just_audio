@@ -1,3 +1,7 @@
+## 0.3.1
+
+* Prevent hang in dispose
+
 ## 0.3.0
 
 * Playlists
