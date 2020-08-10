@@ -423,7 +423,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private ConcatenatingMediaSource concatenating(final Object index) {
-		return (ConcatenatingMediaSource)mediaSources.get(index);
+		return (ConcatenatingMediaSource)mediaSources.get((String)index);
 	}
 
 	private MediaSource getAudioSource(final Object json) {
