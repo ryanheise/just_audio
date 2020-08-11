@@ -147,6 +147,8 @@ player.playerStateStream.listen((state) {
 // - durationStream
 // - positionStream
 // - bufferedPositionStream
+// - sequenceStateStream
+// - sequenceStream
 // - currentIndexStream
 // - icyMetadataStream
 // - playingStream

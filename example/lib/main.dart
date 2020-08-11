@@ -50,11 +50,6 @@ class _MyAppState extends State<MyApp> {
     ),
   ]);
 
-  List<IndexedAudioSource> get _sequence => _playlist.sequence;
-
-  List<AudioMetadata> get _metadataSequence =>
-      _sequence.map((s) => s.tag as AudioMetadata).toList();
-
   @override
   void initState() {
     super.initState();
@@ -92,11 +87,12 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Expanded(
-                child: StreamBuilder<int>(
-                  stream: _player.currentIndexStream,
+                child: StreamBuilder<SequenceState>(
+                  stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
-                    final index = snapshot.data ?? 0;
-                    final metadata = _metadataSequence[index];
+                    final state = snapshot.data;
+                    if (state?.sequence?.isEmpty ?? true) return SizedBox();
+                    final metadata = state.currentSource.tag as AudioMetadata;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -191,17 +187,19 @@ class _MyAppState extends State<MyApp> {
               ),
               Container(
                 height: 240.0,
-                child: StreamBuilder<int>(
-                  stream: _player.currentIndexStream,
+                child: StreamBuilder<SequenceState>(
+                  stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
-                    final currentIndex = snapshot.data ?? 0;
+                    final state = snapshot.data;
+                    final sequence = state?.sequence ?? [];
                     return ListView.builder(
-                      itemCount: _metadataSequence.length,
+                      itemCount: sequence.length,
                       itemBuilder: (context, index) => Material(
-                        color:
-                            index == currentIndex ? Colors.grey.shade300 : null,
+                        color: index == state.currentIndex
+                            ? Colors.grey.shade300
+                            : null,
                         child: ListTile(
-                          title: Text(_metadataSequence[index].title),
+                          title: Text(sequence[index].tag.title),
                           onTap: () {
                             _player.seek(Duration.zero, index: index);
                           },
@@ -243,8 +241,8 @@ class ControlButtons extends StatelessWidget {
             );
           },
         ),
-        StreamBuilder<int>(
-          stream: player.currentIndexStream,
+        StreamBuilder<SequenceState>(
+          stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_previous),
             onPressed: player.hasPrevious ? player.seekToPrevious : null,
@@ -285,8 +283,8 @@ class ControlButtons extends StatelessWidget {
             }
           },
         ),
-        StreamBuilder(
-          stream: player.currentIndexStream,
+        StreamBuilder<SequenceState>(
+          stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_next),
             onPressed: player.hasNext ? player.seekToNext : null,

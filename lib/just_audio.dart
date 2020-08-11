@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -76,7 +77,9 @@ class AudioPlayer {
   final _bufferedPositionSubject = BehaviorSubject<Duration>();
   final _icyMetadataSubject = BehaviorSubject<IcyMetadata>();
   final _playerStateSubject = BehaviorSubject<PlayerState>();
+  final _sequenceSubject = BehaviorSubject<List<IndexedAudioSource>>();
   final _currentIndexSubject = BehaviorSubject<int>();
+  final _sequenceStateSubject = BehaviorSubject<SequenceState>();
   final _loopModeSubject = BehaviorSubject<LoopMode>();
   final _shuffleModeEnabledSubject = BehaviorSubject<bool>();
   BehaviorSubject<Duration> _positionSubject;
@@ -127,10 +130,6 @@ class AudioPlayer {
         rethrow;
       }
     });
-    _eventChannelStreamSubscription = _eventChannelStream.listen(
-      _playbackEventSubject.add,
-      onError: _playbackEventSubject.addError,
-    );
     _processingStateSubject.addStream(playbackEventStream
         .map((event) => event.processingState)
         .distinct()
@@ -147,6 +146,17 @@ class AudioPlayer {
         .map((event) => event.currentIndex)
         .distinct()
         .handleError((err, stack) {/* noop */}));
+    _sequenceStateSubject.addStream(
+        Rx.combineLatest2<List<IndexedAudioSource>, int, SequenceState>(
+      sequenceStream,
+      currentIndexStream,
+      (sequence, currentIndex) {
+        if (sequence == null) return null;
+        if (currentIndex == null) currentIndex = 0;
+        currentIndex = min(sequence.length - 1, max(0, currentIndex));
+        return SequenceState(sequence, currentIndex);
+      },
+    ).distinct().handleError((err, stack) {/* noop */}));
     _playerStateSubject.addStream(
         Rx.combineLatest2<bool, PlaybackEvent, PlayerState>(
                 playingStream,
@@ -154,6 +164,11 @@ class AudioPlayer {
                 (playing, event) => PlayerState(playing, event.processingState))
             .distinct()
             .handleError((err, stack) {/* noop */}));
+    _eventChannelStreamSubscription = _eventChannelStream.listen(
+      _playbackEventSubject.add,
+      onError: _playbackEventSubject.addError,
+    );
+    _sequenceSubject.add(null);
   }
 
   /// The latest [PlaybackEvent].
@@ -216,17 +231,31 @@ class AudioPlayer {
   /// A stream of [PlayerState]s.
   Stream<PlayerState> get playerStateStream => _playerStateSubject.stream;
 
+  /// The current sequence of indexed audio sources.
+  List<IndexedAudioSource> get sequence => _sequenceSubject.value;
+
+  /// A stream broadcasting the current sequence of indexed audio sources.
+  Stream<List<IndexedAudioSource>> get sequenceStream =>
+      _sequenceSubject.stream;
+
   /// The index of the current item.
   int get currentIndex => _currentIndexSubject.value;
 
   /// A stream broadcasting the current item.
   Stream<int> get currentIndexStream => _currentIndexSubject.stream;
 
+  /// The current [SequenceState], or `null` if either [sequence]] or
+  /// [currentIndex] is `null`.
+  SequenceState get sequenceState => _sequenceStateSubject.value;
+
+  /// A stream broadcasting the current [SequenceState].
+  Stream<SequenceState> get sequenceStateStream => _sequenceStateSubject.stream;
+
   /// Whether there is another item after the current index.
   bool get hasNext =>
       _audioSource != null &&
       currentIndex != null &&
-      currentIndex + 1 < _audioSource.sequence.length;
+      currentIndex + 1 < sequence.length;
 
   /// Whether there is another item before the current index.
   bool get hasPrevious =>
@@ -378,6 +407,7 @@ class AudioPlayer {
   Future<Duration> load(AudioSource source) async {
     try {
       _audioSource = source;
+      _broadcastSequence();
       final duration = await _load(source);
       // Wait for loading state to pass.
       await processingStateStream
@@ -388,6 +418,10 @@ class AudioPlayer {
       _audioSources.clear();
       rethrow;
     }
+  }
+
+  void _broadcastSequence() {
+    _sequenceSubject.add(_audioSource?.sequence);
   }
 
   _registerAudioSource(AudioSource source) {
@@ -572,6 +606,7 @@ class AudioPlayer {
     await _playingSubject.close();
     await _volumeSubject.close();
     await _speedSubject.close();
+    await _sequenceSubject.close();
     if (_positionSubject != null) {
       await _positionSubject.close();
     }
@@ -790,6 +825,23 @@ class IcyMetadata {
       other is IcyMetadata && other?.info == info && other?.headers == headers;
 }
 
+/// Encapsulates the [sequence] and [currentIndex] state and ensures
+/// consistency such that [currentIndex] is within the range of
+/// [sequence.length]. If [sequence.length] is 0, then [currentIndex] is also
+/// 0.
+class SequenceState {
+  /// The sequence of the current [AudioSource].
+  final List<IndexedAudioSource> sequence;
+
+  /// The index of the current source in the sequence.
+  final int currentIndex;
+
+  SequenceState(this.sequence, this.currentIndex);
+
+  /// The current source in the sequence.
+  IndexedAudioSource get currentSource => sequence[currentIndex];
+}
+
 /// The audio session categories on iOS, to be used with
 /// [AudioPlayer.setIosCategory].
 enum IosCategory {
@@ -937,7 +989,7 @@ abstract class AudioSource {
   /// stream type on Android. If you know in advance what type of audio stream
   /// it is, you should instantiate [DashAudioSource] or [HlsAudioSource]
   /// directly.
-  static AudioSource uri(Uri uri, {Map headers, Object tag}) {
+  static AudioSource uri(Uri uri, {Map headers, dynamic tag}) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
@@ -1003,7 +1055,7 @@ abstract class AudioSource {
 
 /// An [AudioSource] that can appear in a sequence.
 abstract class IndexedAudioSource extends AudioSource {
-  final Object tag;
+  final dynamic tag;
 
   IndexedAudioSource(this.tag);
 
@@ -1019,7 +1071,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Uri _overrideUri;
   File _cacheFile;
 
-  UriAudioSource(this.uri, {this.headers, Object tag, @required String type})
+  UriAudioSource(this.uri, {this.headers, dynamic tag, @required String type})
       : _type = type,
         super(tag);
 
@@ -1081,7 +1133,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request.
 class ProgressiveAudioSource extends UriAudioSource {
-  ProgressiveAudioSource(Uri uri, {Map headers, Object tag})
+  ProgressiveAudioSource(Uri uri, {Map headers, dynamic tag})
       : super(uri, headers: headers, tag: tag, type: 'progressive');
 }
 
@@ -1091,7 +1143,7 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// the HTTP(S) request. Currently headers are not recursively applied to items
 /// the HTTP(S) request. Currently headers are not applied recursively.
 class DashAudioSource extends UriAudioSource {
-  DashAudioSource(Uri uri, {Map headers, Object tag})
+  DashAudioSource(Uri uri, {Map headers, dynamic tag})
       : super(uri, headers: headers, tag: tag, type: 'dash');
 }
 
@@ -1100,7 +1152,7 @@ class DashAudioSource extends UriAudioSource {
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request. Currently headers are not applied recursively.
 class HlsAudioSource extends UriAudioSource {
-  HlsAudioSource(Uri uri, {Map headers, Object tag})
+  HlsAudioSource(Uri uri, {Map headers, dynamic tag})
       : super(uri, headers: headers, tag: tag, type: 'hls');
 }
 
@@ -1131,6 +1183,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Appends an [AudioSource].
   Future<void> add(AudioSource audioSource) async {
     children.add(audioSource);
+    _player._broadcastSequence();
     if (_player != null) {
       await _player
           ._invokeMethod('concatenating.add', [_id, audioSource.toJson()]);
@@ -1140,6 +1193,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Inserts an [AudioSource] at [index].
   Future<void> insert(int index, AudioSource audioSource) async {
     children.insert(index, audioSource);
+    _player._broadcastSequence();
     if (_player != null) {
       await _player._invokeMethod(
           'concatenating.insert', [_id, index, audioSource.toJson()]);
@@ -1149,6 +1203,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Appends multiple [AudioSource]s.
   Future<void> addAll(List<AudioSource> children) async {
     this.children.addAll(children);
+    _player._broadcastSequence();
     if (_player != null) {
       await _player._invokeMethod('concatenating.addAll',
           [_id, children.map((s) => s.toJson()).toList()]);
@@ -1158,6 +1213,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Insert multiple [AudioSource]s at [index].
   Future<void> insertAll(int index, List<AudioSource> children) async {
     this.children.insertAll(index, children);
+    _player._broadcastSequence();
     if (_player != null) {
       await _player._invokeMethod('concatenating.insertAll',
           [_id, index, children.map((s) => s.toJson()).toList()]);
@@ -1168,6 +1224,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// [ConcatenatingAudioSource] has already been loaded.
   Future<void> removeAt(int index) async {
     children.removeAt(index);
+    _player._broadcastSequence();
     if (_player != null) {
       await _player._invokeMethod('concatenating.removeAt', [_id, index]);
     }
@@ -1177,6 +1234,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// to [end] exclusive.
   Future<void> removeRange(int start, int end) async {
     children.removeRange(start, end);
+    _player._broadcastSequence();
     if (_player != null) {
       await _player
           ._invokeMethod('concatenating.removeRange', [_id, start, end]);
@@ -1186,6 +1244,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Moves an [AudioSource] from [currentIndex] to [newIndex].
   Future<void> move(int currentIndex, int newIndex) async {
     children.insert(newIndex, children.removeAt(currentIndex));
+    _player._broadcastSequence();
     if (_player != null) {
       await _player
           ._invokeMethod('concatenating.move', [_id, currentIndex, newIndex]);
@@ -1195,6 +1254,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Removes all [AudioSources].
   Future<void> clear() async {
     children.clear();
+    _player._broadcastSequence();
     if (_player != null) {
       await _player._invokeMethod('concatenating.clear', [_id]);
     }
@@ -1236,7 +1296,7 @@ class ClippingAudioSource extends IndexedAudioSource {
     @required this.child,
     this.start,
     this.end,
-    Object tag,
+    dynamic tag,
   }) : super(tag);
 
   @override
