@@ -127,7 +127,7 @@
         [self concatenatingInsertAll:(NSString*)args[0] index:[args[1] intValue] sources:(NSArray*)args[2]];
         result(nil);
     } else if ([@"concatenating.removeAt" isEqualToString:call.method]) {
-        [self concatenatingRemoveAt:(NSString*)args[0] index:(int)args[1]];
+        [self concatenatingRemoveAt:(NSString*)args[0] index:[args[1] intValue]];
         result(nil);
     } else if ([@"concatenating.removeRange" isEqualToString:call.method]) {
         [self concatenatingRemoveRange:(NSString*)args[0] start:[args[1] intValue] end:[args[2] intValue]];
@@ -251,7 +251,8 @@
     // Re-index the audio sources.
     _indexedAudioSources = [[NSMutableArray alloc] init];
     [_audioSource buildSequence:_indexedAudioSources treeIndex:0];
-    _index = [self indexForItem:_player.currentItem];
+    [self updateOrder];
+    [self enqueueFrom:[self indexForItem:_player.currentItem]];
     [self broadcastPlaybackEvent];
 }
 
@@ -329,7 +330,7 @@
         return 0;
     } else if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
-    } else if (_indexedAudioSources) {
+    } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
         int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].position));
         if (ms < 0) ms = 0;
         return ms;
@@ -341,7 +342,7 @@
 - (int)getBufferedPosition {
     if (_processingState == none || _processingState == loading) {
         return 0;
-    } else if (_indexedAudioSources) {
+    } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
         int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].bufferedPosition));
         if (ms < 0) ms = 0;
         return ms;
@@ -353,7 +354,7 @@
 - (int)getDuration {
     if (_processingState == none) {
         return -1;
-    } else if (_indexedAudioSources) {
+    } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
         int v = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].duration));
         return v;
     } else {
@@ -425,7 +426,6 @@
 }
 
 - (void)enqueueFrom:(int)index {
-    int oldIndex = _index;
     _index = index;
 
     // Update the queue while keeping the currently playing item untouched.
@@ -436,22 +436,27 @@
     // First, remove all _player items except for the currently playing one (if any).
     IndexedPlayerItem *oldItem = _player.currentItem;
     IndexedPlayerItem *existingItem = nil;
+    IndexedPlayerItem *newItem = _indexedAudioSources.count > 0 ? _indexedAudioSources[_index].playerItem : nil;
     NSArray *oldPlayerItems = [NSArray arrayWithArray:_player.items];
     // In the first pass, preserve the old and new items.
     for (int i = 0; i < oldPlayerItems.count; i++) {
-        if (oldPlayerItems[i] == _indexedAudioSources[_index].playerItem) {
+        if (oldPlayerItems[i] == newItem) {
             // Preserve and tag new item if it is already in the queue.
             existingItem = oldPlayerItems[i];
+            //NSLog(@"Preserving existing item %d", [self indexForItem:existingItem]);
         } else if (oldPlayerItems[i] == oldItem) {
+            //NSLog(@"Preserving old item %d", [self indexForItem:oldItem]);
             // Temporarily preserve old item, just to avoid jumping to
             // intermediate queue positions unnecessarily. We only want to jump
             // once to _index.
         } else {
+            //NSLog(@"Removing item %d", [self indexForItem:oldPlayerItems[i]]);
             [_player removeItem:oldPlayerItems[i]];
         }
     }
     // In the second pass, remove the old item (if different from new item).
-    if (_index != oldIndex) {
+    if (oldItem && newItem != oldItem) {
+        //NSLog(@"removing old item %d", [self indexForItem:oldItem]);
         [_player removeItem:oldItem];
     }
 
@@ -464,6 +469,7 @@
         int si = [_order[i] intValue];
         if (si == _index) include = YES;
         if (include && _indexedAudioSources[si].playerItem != existingItem) {
+            //NSLog(@"inserting item %d", si);
             [_player insertItem:_indexedAudioSources[si].playerItem afterItem:nil];
         }
     }
@@ -471,7 +477,7 @@
     /* NSLog(@"after reorder: _player.items.count: ", _player.items.count); */
     /* [self dumpQueue]; */
 
-    if (_processingState != loading && oldItem != _indexedAudioSources[_index].playerItem) {
+    if (_processingState != loading && oldItem != newItem) {
         // || !_player.currentItem.playbackLikelyToKeepUp;
         if (_player.currentItem.playbackBufferEmpty) {
             [self enterBuffering:@"enqueueFrom playbackBufferEmpty"];
