@@ -319,34 +319,34 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 				break;
 			case "concatenating.add":
 				concatenating(args.get(0))
-						.addMediaSource(getAudioSource(args.get(1)), null, () -> result.success(null));
+						.addMediaSource(getAudioSource(args.get(1)), handler, () -> result.success(null));
 				break;
 			case "concatenating.insert":
 				concatenating(args.get(0))
-						.addMediaSource((Integer)args.get(1), getAudioSource(args.get(2)), null, () -> result.success(null));
+						.addMediaSource((Integer)args.get(1), getAudioSource(args.get(2)), handler, () -> result.success(null));
 				break;
 			case "concatenating.addAll":
 				concatenating(args.get(0))
-						.addMediaSources(getAudioSources(args.get(1)), null, () -> result.success(null));
+						.addMediaSources(getAudioSources(args.get(1)), handler, () -> result.success(null));
 				break;
 			case "concatenating.insertAll":
 				concatenating(args.get(0))
-						.addMediaSources((Integer)args.get(1), getAudioSources(args.get(2)), null, () -> result.success(null));
+						.addMediaSources((Integer)args.get(1), getAudioSources(args.get(2)), handler, () -> result.success(null));
 				break;
 			case "concatenating.removeAt":
 				concatenating(args.get(0))
-						.removeMediaSource((Integer)args.get(1), null, () -> result.success(null));
+						.removeMediaSource((Integer)args.get(1), handler, () -> result.success(null));
 				break;
 			case "concatenating.removeRange":
 				concatenating(args.get(0))
-						.removeMediaSourceRange((Integer)args.get(1), (Integer)args.get(2), null, () -> result.success(null));
+						.removeMediaSourceRange((Integer)args.get(1), (Integer)args.get(2), handler, () -> result.success(null));
 				break;
 			case "concatenating.move":
 				concatenating(args.get(0))
-						.moveMediaSource((Integer)args.get(1), (Integer)args.get(2), null, () -> result.success(null));
+						.moveMediaSource((Integer)args.get(1), (Integer)args.get(2), handler, () -> result.success(null));
 				break;
 			case "concatenating.clear":
-				concatenating(args.get(0)).clear(null, () -> result.success(null));
+				concatenating(args.get(0)).clear(handler, () -> result.success(null));
 				break;
 			default:
 				result.notImplemented();
@@ -423,7 +423,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	}
 
 	private ConcatenatingMediaSource concatenating(final Object index) {
-		return (ConcatenatingMediaSource)mediaSources.get((Integer)index);
+		return (ConcatenatingMediaSource)mediaSources.get((String)index);
 	}
 
 	private MediaSource getAudioSource(final Object json) {
