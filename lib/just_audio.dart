@@ -391,10 +391,10 @@ class AudioPlayer {
   /// Convenience method to load audio from an asset, equivalent to:
   ///
   /// ```
-  /// load(AudioSource.uri(Uri.parse('asset://$filePath')));
+  /// load(AudioSource.uri(Uri.parse('asset:///$assetPath')));
   /// ```
   Future<Duration> setAsset(String assetPath) =>
-      load(AudioSource.uri(Uri.parse('asset://$assetPath')));
+      load(AudioSource.uri(Uri.parse('asset:///$assetPath')));
 
   /// Loads audio from an [AudioSource] and completes when the audio is ready
   /// to play with the duration of that audio, or null if the duration is unknown.
@@ -1079,7 +1079,8 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
     if (uri.scheme == 'asset') {
-      _overrideUri = Uri.file((await _loadAsset(uri.path)).path);
+      _overrideUri = Uri.file(
+          (await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''))).path);
     } else if (headers != null) {
       _overrideUri = player._proxy.addUrl(uri, headers);
     }
