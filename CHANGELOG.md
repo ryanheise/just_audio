@@ -1,3 +1,9 @@
+## 0.3.2
+
+* Fix dynamic methods on ConcatenatingAudioSource for iOS/Android
+* Add sequenceStream/sequenceStateStream
+* Change asset URI from asset:// to asset:///
+
 ## 0.3.1
 
 * Prevent hang in dispose
