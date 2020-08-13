@@ -45,7 +45,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.stream.Collectors;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
 
@@ -454,15 +453,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 					.setTag(id)
 					.createMediaSource(Uri.parse((String)map.get("uri")));
 		case "concatenating":
-			List<Object> audioSources = (List<Object>)map.get("audioSources");
+			MediaSource[] mediaSources = getAudioSourcesArray(map.get("audioSources"));
 			return new ConcatenatingMediaSource(
 					false, // isAtomic
 					(Boolean)map.get("useLazyPreparation"),
-					new DefaultShuffleOrder(audioSources.size()),
-							audioSources
-									.stream()
-									.map(s -> getAudioSource(s))
-									.toArray(MediaSource[]::new));
+					new DefaultShuffleOrder(mediaSources.length),
+					mediaSources);
 		case "clipping":
 			Long start = getLong(map.get("start"));
 			Long end = getLong(map.get("end"));
@@ -482,11 +478,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		}
 	}
 
+	private MediaSource[] getAudioSourcesArray(final Object json) {
+		List<MediaSource> mediaSources = getAudioSources(json);
+		MediaSource[] mediaSourcesArray = new MediaSource[mediaSources.size()];
+		mediaSources.toArray(mediaSourcesArray);
+		return mediaSourcesArray;
+	}
+
 	private List<MediaSource> getAudioSources(final Object json) {
-		return ((List<Object>)json)
-				.stream()
-				.map(s -> getAudioSource(s))
-				.collect(Collectors.toList());
+		List<Object> audioSources = (List<Object>)json;
+		List<MediaSource> mediaSources = new ArrayList<MediaSource>();
+		for (int i = 0 ; i < audioSources.size(); i++) {
+			mediaSources.add(getAudioSource(audioSources.get(i)));
+		}
+		return mediaSources;
 	}
 
 	private DataSource.Factory buildDataSourceFactory() {
