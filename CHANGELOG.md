@@ -1,3 +1,7 @@
+## 0.3.3
+
+* Remove dependency on Java streams API
+
 ## 0.3.2
 
 * Fix dynamic methods on ConcatenatingAudioSource for iOS/Android
