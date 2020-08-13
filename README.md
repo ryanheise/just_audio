@@ -35,6 +35,8 @@ Initialisation:
 ```dart
 final player = AudioPlayer();
 var duration = await player.setUrl('https://foo.com/bar.mp3');
+var duration = await player.setFilePath('/path/to/file.mp3');
+var duration = await player.setAsset('path/to/asset.mp3');
 ```
 
 Standard controls:

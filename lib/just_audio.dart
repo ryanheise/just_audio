@@ -1123,7 +1123,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       };
 }
 
-/// An [AudioSource] representing a regular media file such asn an MP3 or M4A
+/// An [AudioSource] representing a regular media file such as an MP3 or M4A
 /// file. The following URI schemes are supported:
 ///
 /// * file: loads from a local file (provided you give your app permission to
@@ -1138,7 +1138,13 @@ class ProgressiveAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, type: 'progressive');
 }
 
-/// An [AudioSource] representing a DASH stream.
+/// An [AudioSource] representing a DASH stream. The following URI schemes are
+/// supported:
+///
+/// * file: loads from a local file (provided you give your app permission to
+/// access that file).
+/// * asset: loads from a Flutter asset (not supported on Web).
+/// * http(s): loads from an HTTP(S) resource.
 ///
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request. Currently headers are not recursively applied to items
@@ -1148,7 +1154,13 @@ class DashAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, type: 'dash');
 }
 
-/// An [AudioSource] representing an HLS stream.
+/// An [AudioSource] representing an HLS stream. The following URI schemes are
+/// supported:
+///
+/// * file: loads from a local file (provided you give your app permission to
+/// access that file).
+/// * asset: loads from a Flutter asset (not supported on Web).
+/// * http(s): loads from an HTTP(S) resource.
 ///
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request. Currently headers are not applied recursively.
