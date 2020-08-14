@@ -172,6 +172,19 @@ If you wish to connect to non-HTTPS URLS, add the following attribute to the `ap
     <application ... android:usesCleartextTraffic="true">
 ```
 
+If you want to set the Android AudioAttributes, use (all parameter values just examples only):
+
+```dart
+player.setAndroidAudioAttributes(AndroidAudioAttributes(
+  contentType: AndroidAudioContentType.music,
+  flags: AndroidAudioAttributes.FLAG_AUDIBILITY_ENFORCED,
+  usage: AndroidAudioUsage.media,
+  allowedCapturePolicy: AndroidAudioAllowedCapturePolicy.all,
+));
+```
+
+If you need access to the player's AudioSession ID, you can listen to `AudioPlayer.androidAudioSessionIdStream`. Note that the AudioSession ID will change whenever you set new AudioAttributes.
+
 ### iOS
 
 If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
@@ -186,23 +199,13 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 </dict>
 ```
 
-By default, iOS will mute your app's audio when your phone is switched to
-silent mode. Depending on the requirements of your app, you can change the
-default audio session category using `AudioPlayer.setIosCategory`. For example,
-if you are writing a media app, Apple recommends that you set the category to
-`AVAudioSessionCategoryPlayback`, which you can achieve by adding the following
-code to your app's initialisation:
+By default, iOS will mute your app's audio when your phone is switched to silent mode. Depending on the requirements of your app, you can change the default audio session category using `AudioPlayer.setIosCategory`. For example, if you are writing a media app, Apple recommends that you set the category to `AVAudioSessionCategoryPlayback`, which you can achieve by adding the following code to your app's initialisation:
 
 ```dart
 AudioPlayer.setIosCategory(IosCategory.playback);
 ```
 
-Note: If your app uses a number of different audio plugins in combination, e.g.
-for audio recording, or text to speech, or background audio, it is possible
-that those plugins may internally override the setting you choose here. You may
-consider asking the developer of each other plugin you use to provide a similar
-method so that you can configure the same audio session category universally
-across all plugins you use.
+Note: If your app uses a number of different audio plugins in combination, e.g. for audio recording, or text to speech, or background audio, it is possible that those plugins may internally override the setting you choose here. You may consider asking the developer of each other plugin you use to provide a similar method so that you can configure the same audio session category universally across all plugins you use.
 
 ### MacOS
 
