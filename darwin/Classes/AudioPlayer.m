@@ -138,6 +138,8 @@
     } else if ([@"concatenating.clear" isEqualToString:call.method]) {
         [self concatenatingClear:(NSString*)args[0]];
         result(nil);
+    } else if ([@"setAndroidAudioAttributes" isEqualToString:call.method]) {
+        result(nil);
     } else {
         result(FlutterMethodNotImplemented);
     }

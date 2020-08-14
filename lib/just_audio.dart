@@ -82,6 +82,7 @@ class AudioPlayer {
   final _sequenceStateSubject = BehaviorSubject<SequenceState>();
   final _loopModeSubject = BehaviorSubject<LoopMode>();
   final _shuffleModeEnabledSubject = BehaviorSubject<bool>();
+  final _androidAudioSessionIdSubject = BehaviorSubject<int>();
   BehaviorSubject<Duration> _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
 
@@ -97,6 +98,7 @@ class AudioPlayer {
       duration: null,
       icyMetadata: null,
       currentIndex: null,
+      androidAudioSessionId: null,
     );
     _playbackEventSubject.add(_playbackEvent);
     _eventChannelStream = EventChannel('com.ryanheise.just_audio.events.$_id')
@@ -121,6 +123,7 @@ class AudioPlayer {
               ? null
               : IcyMetadata.fromJson(data['icyMetadata']),
           currentIndex: data['currentIndex'],
+          androidAudioSessionId: data['androidAudioSessionId'],
         );
         //print("created event object with state: ${_playbackEvent.state}");
         return _playbackEvent;
@@ -144,6 +147,10 @@ class AudioPlayer {
         .handleError((err, stack) {/* noop */}));
     _currentIndexSubject.addStream(playbackEventStream
         .map((event) => event.currentIndex)
+        .distinct()
+        .handleError((err, stack) {/* noop */}));
+    _androidAudioSessionIdSubject.addStream(playbackEventStream
+        .map((event) => event.androidAudioSessionId)
         .distinct()
         .handleError((err, stack) {/* noop */}));
     _sequenceStateSubject.addStream(
@@ -273,6 +280,13 @@ class AudioPlayer {
   /// A stream of the shuffle mode status.
   Stream<bool> get shuffleModeEnabledStream =>
       _shuffleModeEnabledSubject.stream;
+
+  /// The current Android AudioSession ID or `null` if not set.
+  int get androidAudioSessionId => _playbackEvent.androidAudioSessionId;
+
+  /// Broadcasts the current Android AudioSession ID or `null` if not set.
+  Stream<int> get androidAudioSessionIdStream =>
+      _androidAudioSessionIdSubject.stream;
 
   /// Whether the player should automatically delay playback in order to
   /// minimize stalling. (iOS 10.0 or later only)
@@ -591,6 +605,14 @@ class AudioPlayer {
     }
   }
 
+  /// Set the Android audio attributes for this player. Has no effect on other
+  /// platforms. This will cause a new Android AudioSession ID to be generated.
+  Future<void> setAndroidAudioAttributes(
+      AndroidAudioAttributes audioAttributes) async {
+    await _invokeMethod(
+        'setAndroidAudioAttributes', [audioAttributes.toJson()]);
+  }
+
   /// Release all resources associated with this player. You must invoke this
   /// after you are done with the player.
   Future<void> dispose() async {
@@ -670,6 +692,9 @@ class PlaybackEvent {
   /// The index of the currently playing item.
   final int currentIndex;
 
+  /// The current Android AudioSession ID.
+  final int androidAudioSessionId;
+
   PlaybackEvent({
     @required this.processingState,
     @required this.updateTime,
@@ -678,6 +703,7 @@ class PlaybackEvent {
     @required this.duration,
     @required this.icyMetadata,
     @required this.currentIndex,
+    @required this.androidAudioSessionId,
   });
 
   PlaybackEvent copyWith({
@@ -689,6 +715,7 @@ class PlaybackEvent {
     Duration duration,
     IcyMetadata icyMetadata,
     UriAudioSource currentIndex,
+    int androidAudioSessionId,
   }) =>
       PlaybackEvent(
         processingState: processingState ?? this.processingState,
@@ -698,6 +725,8 @@ class PlaybackEvent {
         duration: duration ?? this.duration,
         icyMetadata: icyMetadata ?? this.icyMetadata,
         currentIndex: currentIndex ?? this.currentIndex,
+        androidAudioSessionId:
+            androidAudioSessionId ?? this.androidAudioSessionId,
       );
 
   @override
@@ -852,6 +881,56 @@ enum IosCategory {
   playAndRecord,
   multiRoute,
 }
+
+/// The Android AudioAttributes to use with a player.
+class AndroidAudioAttributes {
+  static const FLAG_AUDIBILITY_ENFORCED = 0x1 << 0;
+  final AndroidAudioContentType contentType;
+  final int flags;
+  final AndroidAudioUsage usage;
+  final AndroidAudioAllowedCapturePolicy allowedCapturePolicy;
+
+  AndroidAudioAttributes({
+    this.contentType = AndroidAudioContentType.unknown,
+    this.flags = 0,
+    this.usage = AndroidAudioUsage.unknown,
+    this.allowedCapturePolicy = AndroidAudioAllowedCapturePolicy.all,
+  });
+
+  Map toJson() => {
+        'contentType': contentType.index,
+        'flags': flags,
+        'usage': usage.index,
+        // The Android constant values for this enum are 1-indexed
+        'allowedCapturePolicy': allowedCapturePolicy.index + 1,
+      };
+}
+
+/// The content type options for [AndroidAudioAttributes].
+enum AndroidAudioContentType { unknown, speech, music, movie, sonification }
+
+/// The usage options for [AndroidAudioAttributes].
+enum AndroidAudioUsage {
+  unknown,
+  media,
+  voiceCommunication,
+  voiceCommunicationSignalling,
+  alarm,
+  notification,
+  notificationRingtone,
+  notificationCommunicationRequest,
+  notificationCommunicationInstant,
+  notificationCommunicationDelayed,
+  notificationEvent,
+  assistanceAccessibility,
+  assistanceNavigationGuidance,
+  assistanceSonification,
+  unused_1,
+  assistant,
+}
+
+/// The allowed capture policy options for [AndroidAudioAttributes].
+enum AndroidAudioAllowedCapturePolicy { all, system, none }
 
 /// A local proxy HTTP server for making remote GET requests with headers.
 ///

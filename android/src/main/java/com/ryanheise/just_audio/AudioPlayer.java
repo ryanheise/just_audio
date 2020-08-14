@@ -9,6 +9,8 @@ import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.audio.AudioListener;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
@@ -46,7 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-public class AudioPlayer implements MethodCallHandler, Player.EventListener, MetadataOutput {
+public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
 
 	static final String TAG = "AudioPlayer";
 
@@ -76,6 +78,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private int errorCount;
 
 	private SimpleExoPlayer player;
+	private Integer audioSessionId;
 	private MediaSource mediaSource;
 	private Integer currentIndex;
 	private Map<LoopingMediaSource, MediaSource> loopingChildren = new HashMap<>();
@@ -134,6 +137,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 	private void startWatchingBuffer() {
 		handler.removeCallbacks(bufferWatcher);
 		handler.post(bufferWatcher);
+	}
+
+	@Override
+	public void onAudioSessionId(int audioSessionId) {
+		if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) {
+			this.audioSessionId = null;
+		} else {
+			this.audioSessionId = audioSessionId;
+		}
 	}
 
 	@Override
@@ -347,6 +359,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			case "concatenating.clear":
 				concatenating(args.get(0)).clear(handler, () -> result.success(null));
 				break;
+			case "setAndroidAudioAttributes":
+				setAudioAttributes((Map<?, ?>)args.get(0));
+				result.success(null);
+				break;
 			default:
 				result.notImplemented();
 				break;
@@ -532,7 +548,17 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 			player = new SimpleExoPlayer.Builder(context).build();
 			player.addMetadataOutput(this);
 			player.addListener(this);
+			player.addAudioListener(this);
 		}
+	}
+
+	private void setAudioAttributes(Map<?, ?> json) {
+		AudioAttributes.Builder builder = new AudioAttributes.Builder();
+		builder.setContentType((Integer)json.get("contentType"));
+		builder.setFlags((Integer)json.get("flags"));
+		builder.setUsage((Integer)json.get("usage"));
+		builder.setAllowedCapturePolicy((Integer)json.get("allowedCapturePolicy"));
+		player.setAudioAttributes(builder.build());
 	}
 
 	private void broadcastPlaybackEvent() {
@@ -544,6 +570,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Met
 		event.put("icyMetadata", collectIcyMetadata());
 		event.put("duration", duration = getDuration());
 		event.put("currentIndex", currentIndex);
+		event.put("androidAudioSessionId", audioSessionId);
 
 		if (eventSink != null) {
 			eventSink.success(event);

@@ -96,6 +96,8 @@ abstract class JustAudioPlayer {
           return await concatenatingMove(args[0], args[1], args[2]);
         case "concatenating.clear":
           return await concatenatingClear(args[0]);
+        case "setAndroidAudioAttributes":
+          return null;
         default:
           throw PlatformException(code: 'Unimplemented');
       }
