@@ -172,7 +172,7 @@ If you wish to connect to non-HTTPS URLS, add the following attribute to the `ap
     <application ... android:usesCleartextTraffic="true">
 ```
 
-If you want to set the Android AudioAttributes, use (all parameter values just examples only):
+If you want to set the Android AudioAttributes, use the following method with the desired choice of parameters:
 
 ```dart
 player.setAndroidAudioAttributes(AndroidAudioAttributes(
