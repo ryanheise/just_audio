@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
@@ -53,15 +54,16 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    AudioPlayer.setIosCategory(IosCategory.playback);
-    _player = AudioPlayer();
+    _player = AudioPlayer(handleInterruptions: true);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
-    _loadAudio();
+    _init();
   }
 
-  _loadAudio() async {
+  _init() async {
+    final session = await AudioSession.instance;
+    await session.configure(AudioSessionConfiguration.speech());
     try {
       await _player.load(_playlist);
     } catch (e) {

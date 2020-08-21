@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -38,26 +39,6 @@ class AudioPlayer {
     return MethodChannel('com.ryanheise.just_audio.methods.$id');
   }
 
-  /// Configure the audio session category on iOS. This method should be called
-  /// before playing any audio. It has no effect on Android or Flutter for Web.
-  ///
-  /// Note that the default category on iOS is [IosCategory.soloAmbient], but
-  /// for a typical media app, Apple recommends setting this to
-  /// [IosCategory.playback]. If you don't call this method, `just_audio` will
-  /// respect any prior category that was already set on your app's audio
-  /// session and will leave it alone. If it hasn't been previously set, this
-  /// will be [IosCategory.soloAmbient]. But if another audio plugin in your
-  /// app has configured a particular category, that will also be left alone.
-  ///
-  /// Note: If you use other audio plugins in conjunction with this one, it is
-  /// possible that each of those audio plugins may override the setting you
-  /// choose here. (You may consider asking the developers of the other plugins
-  /// to provide similar configurability so that you have complete control over
-  /// setting the overall category that you want for your app.)
-  static Future<void> setIosCategory(IosCategory category) async {
-    await _mainChannel.invokeMethod('setIosCategory', category.index);
-  }
-
   final Future<MethodChannel> _channel;
   final String _id;
   _ProxyHttpServer _proxy;
@@ -85,11 +66,14 @@ class AudioPlayer {
   final _androidAudioSessionIdSubject = BehaviorSubject<int>();
   BehaviorSubject<Duration> _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
+  bool _playInterrupted = false;
 
   /// Creates an [AudioPlayer].
-  factory AudioPlayer() => AudioPlayer._internal(_uuid.v4());
+  factory AudioPlayer({bool handleInterruptions = false}) =>
+      AudioPlayer._internal(_uuid.v4(), handleInterruptions);
 
-  AudioPlayer._internal(this._id) : _channel = _init(_id) {
+  AudioPlayer._internal(this._id, bool handleInterruptions)
+      : _channel = _init(_id) {
     _playbackEvent = PlaybackEvent(
       processingState: ProcessingState.none,
       updatePosition: Duration.zero,
@@ -126,6 +110,43 @@ class AudioPlayer {
           androidAudioSessionId: data['androidAudioSessionId'],
         );
         //print("created event object with state: ${_playbackEvent.state}");
+        if (handleInterruptions) {
+          AudioSession.instance.then((session) {
+            session.interruptionEventStream.listen((event) {
+              switch (event) {
+                case AudioInterruptionEvent.pauseIndefinitely:
+                case AudioInterruptionEvent.pauseTemporarily:
+                  if (playing) {
+                    pause();
+                    // Although pause is asyncand sets _playInterrupted = false,
+                    // this is done in the sync portion.
+                    _playInterrupted = true;
+                  }
+                  break;
+                case AudioInterruptionEvent.duck:
+                  if (session.androidAudioAttributes.usage ==
+                      AndroidAudioUsage.game) {
+                    setVolume(volume / 2);
+                  }
+                  _playInterrupted = false;
+                  break;
+                case AudioInterruptionEvent.end:
+                  _playInterrupted = false;
+                  break;
+                case AudioInterruptionEvent.resume:
+                  if (_playInterrupted) play();
+                  _playInterrupted = false;
+                  break;
+                case AudioInterruptionEvent.unduck:
+                  setVolume(min(1.0, volume * 2));
+                  _playInterrupted = false;
+                  break;
+                default:
+                  break;
+              }
+            });
+          });
+        }
         return _playbackEvent;
       } catch (e, stacktrace) {
         print("Error parsing event: $e");
@@ -502,7 +523,9 @@ class AudioPlayer {
   /// [processingStateStream].
   Future<void> play() async {
     if (playing) return;
+    _playInterrupted = false;
     _playingSubject.add(true);
+    await AudioSession.ensurePrepared(ensureActive: true);
     await _invokeMethod('play');
   }
 
@@ -510,6 +533,7 @@ class AudioPlayer {
   /// ![playing].
   Future<void> pause() async {
     if (!playing) return;
+    _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
     _playbackEvent = _playbackEvent.copyWith(
       updatePosition: position,
@@ -870,67 +894,6 @@ class SequenceState {
   /// The current source in the sequence.
   IndexedAudioSource get currentSource => sequence[currentIndex];
 }
-
-/// The audio session categories on iOS, to be used with
-/// [AudioPlayer.setIosCategory].
-enum IosCategory {
-  ambient,
-  soloAmbient,
-  playback,
-  record,
-  playAndRecord,
-  multiRoute,
-}
-
-/// The Android AudioAttributes to use with a player.
-class AndroidAudioAttributes {
-  static const FLAG_AUDIBILITY_ENFORCED = 0x1 << 0;
-  final AndroidAudioContentType contentType;
-  final int flags;
-  final AndroidAudioUsage usage;
-  final AndroidAudioAllowedCapturePolicy allowedCapturePolicy;
-
-  AndroidAudioAttributes({
-    this.contentType = AndroidAudioContentType.unknown,
-    this.flags = 0,
-    this.usage = AndroidAudioUsage.unknown,
-    this.allowedCapturePolicy = AndroidAudioAllowedCapturePolicy.all,
-  });
-
-  Map toJson() => {
-        'contentType': contentType.index,
-        'flags': flags,
-        'usage': usage.index,
-        // The Android constant values for this enum are 1-indexed
-        'allowedCapturePolicy': allowedCapturePolicy.index + 1,
-      };
-}
-
-/// The content type options for [AndroidAudioAttributes].
-enum AndroidAudioContentType { unknown, speech, music, movie, sonification }
-
-/// The usage options for [AndroidAudioAttributes].
-enum AndroidAudioUsage {
-  unknown,
-  media,
-  voiceCommunication,
-  voiceCommunicationSignalling,
-  alarm,
-  notification,
-  notificationRingtone,
-  notificationCommunicationRequest,
-  notificationCommunicationInstant,
-  notificationCommunicationDelayed,
-  notificationEvent,
-  assistanceAccessibility,
-  assistanceNavigationGuidance,
-  assistanceSonification,
-  unused_1,
-  assistant,
-}
-
-/// The allowed capture policy options for [AndroidAudioAttributes].
-enum AndroidAudioAllowedCapturePolicy { all, system, none }
 
 /// A local proxy HTTP server for making remote GET requests with headers.
 ///
