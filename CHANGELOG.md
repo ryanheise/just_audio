@@ -1,3 +1,9 @@
+## 0.3.4
+
+* Fix bug in icy metadata
+* Allow Android AudioAttributes to be set
+* Provide access to Android audio session ID
+
 ## 0.3.3
 
 * Remove dependency on Java streams API
