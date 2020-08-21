@@ -844,7 +844,12 @@ class IcyMetadata {
   IcyMetadata({@required this.info, @required this.headers});
 
   IcyMetadata.fromJson(Map json)
-      : this(info: json['info'], headers: json['headers']);
+      : this(
+          info: json['info'] == null ? null : IcyInfo.fromJson(json['info']),
+          headers: json['headers'] == null
+              ? null
+              : IcyHeaders.fromJson(json['headers']),
+        );
 
   @override
   int get hashCode => info.hashCode ^ headers.hashCode;
