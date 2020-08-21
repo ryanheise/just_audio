@@ -113,36 +113,39 @@ class AudioPlayer {
         if (handleInterruptions) {
           AudioSession.instance.then((session) {
             session.interruptionEventStream.listen((event) {
-              switch (event) {
-                case AudioInterruptionEvent.pauseIndefinitely:
-                case AudioInterruptionEvent.pauseTemporarily:
-                  if (playing) {
-                    pause();
-                    // Although pause is asyncand sets _playInterrupted = false,
-                    // this is done in the sync portion.
-                    _playInterrupted = true;
-                  }
-                  break;
-                case AudioInterruptionEvent.duck:
-                  if (session.androidAudioAttributes.usage ==
-                      AndroidAudioUsage.game) {
-                    setVolume(volume / 2);
-                  }
-                  _playInterrupted = false;
-                  break;
-                case AudioInterruptionEvent.end:
-                  _playInterrupted = false;
-                  break;
-                case AudioInterruptionEvent.resume:
-                  if (_playInterrupted) play();
-                  _playInterrupted = false;
-                  break;
-                case AudioInterruptionEvent.unduck:
-                  setVolume(min(1.0, volume * 2));
-                  _playInterrupted = false;
-                  break;
-                default:
-                  break;
+              if (event.begin) {
+                switch (event.type) {
+                  case AudioInterruptionType.duck:
+                    if (session.androidAudioAttributes.usage ==
+                        AndroidAudioUsage.game) {
+                      setVolume(volume / 2);
+                    }
+                    _playInterrupted = false;
+                    break;
+                  case AudioInterruptionType.pause:
+                  case AudioInterruptionType.unknown:
+                    if (playing) {
+                      pause();
+                      // Although pause is asyncand sets _playInterrupted = false,
+                      // this is done in the sync portion.
+                      _playInterrupted = true;
+                    }
+                    break;
+                }
+              } else {
+                switch (event.type) {
+                  case AudioInterruptionType.duck:
+                    setVolume(min(1.0, volume * 2));
+                    _playInterrupted = false;
+                    break;
+                  case AudioInterruptionType.pause:
+                    if (_playInterrupted) play();
+                    _playInterrupted = false;
+                    break;
+                  case AudioInterruptionType.unknown:
+                    _playInterrupted = false;
+                    break;
+                }
               }
             });
           });
