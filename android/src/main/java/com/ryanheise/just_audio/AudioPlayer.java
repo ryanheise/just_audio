@@ -553,11 +553,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	}
 
 	private void setAudioAttributes(Map<?, ?> json) {
+		ensurePlayerInitialized();
 		AudioAttributes.Builder builder = new AudioAttributes.Builder();
 		builder.setContentType((Integer)json.get("contentType"));
 		builder.setFlags((Integer)json.get("flags"));
 		builder.setUsage((Integer)json.get("usage"));
-		builder.setAllowedCapturePolicy((Integer)json.get("allowedCapturePolicy"));
+		//builder.setAllowedCapturePolicy((Integer)json.get("allowedCapturePolicy"));
 		player.setAudioAttributes(builder.build());
 	}
 

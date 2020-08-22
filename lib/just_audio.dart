@@ -200,6 +200,14 @@ class AudioPlayer {
       onError: _playbackEventSubject.addError,
     );
     _sequenceSubject.add(null);
+    // Respond to changes to AndroidAudioAttributes configuration.
+    AudioSession.instance.then((audioSession) {
+      audioSession.configurationStream
+          .map((conf) => conf?.androidAudioAttributes)
+          .where((attributes) => attributes != null)
+          .distinct()
+          .listen(setAndroidAudioAttributes);
+    });
   }
 
   /// The latest [PlaybackEvent].
@@ -636,6 +644,7 @@ class AudioPlayer {
   /// platforms. This will cause a new Android AudioSession ID to be generated.
   Future<void> setAndroidAudioAttributes(
       AndroidAudioAttributes audioAttributes) async {
+    if (audioAttributes == null) return;
     await _invokeMethod(
         'setAndroidAudioAttributes', [audioAttributes.toJson()]);
   }
