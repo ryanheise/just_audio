@@ -469,7 +469,6 @@ class AudioPlayer {
       return duration;
     } catch (e) {
       _audioSource = null;
-      _audioSources.clear();
       rethrow;
     }
   }
