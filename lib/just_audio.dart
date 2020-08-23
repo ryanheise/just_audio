@@ -126,7 +126,7 @@ class AudioPlayer {
                   case AudioInterruptionType.unknown:
                     if (playing) {
                       pause();
-                      // Although pause is asyncand sets _playInterrupted = false,
+                      // Although pause is async and sets _playInterrupted = false,
                       // this is done in the sync portion.
                       _playInterrupted = true;
                     }
@@ -532,12 +532,17 @@ class AudioPlayer {
   /// [stop] playback on completion, you can call either method as soon as
   /// [processingState] becomes [ProcessingState.completed] by listening to
   /// [processingStateStream].
+  ///
+  /// This method activates the audio session before playback, and will do
+  /// nothing if activation of the audio session fails for any reason.
   Future<void> play() async {
     if (playing) return;
     _playInterrupted = false;
-    _playingSubject.add(true);
-    await AudioSession.ensurePrepared(ensureActive: true);
-    await _invokeMethod('play');
+    final audioSession = await AudioSession.instance;
+    if (await audioSession.setActive(true)) {
+      _playingSubject.add(true);
+      await _invokeMethod('play');
+    }
   }
 
   /// Pauses the currently playing media. This method does nothing if

@@ -11,9 +11,9 @@ packages:
   audio_session:
     dependency: "direct main"
     description:
-      path: "../audio_session"
-      relative: true
-    source: path
+      name: audio_session
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "0.0.1"
   boolean_selector:
     dependency: transitive
