@@ -488,6 +488,8 @@
         }
         [self updatePosition];
     }
+
+    [self updateEndAction];
 }
 
 - (void)updatePosition {
@@ -629,13 +631,14 @@
     } else {
         IndexedPlayerItem *endedPlayerItem = (IndexedPlayerItem *)notification.object;
         IndexedAudioSource *endedSource = endedPlayerItem.audioSource;
-        // When an item ends, seek back to its beginning.
-        [endedSource seek:kCMTimeZero];
 
         if ([_orderInv[_index] intValue] + 1 < [_order count]) {
+            // When an item ends, seek back to its beginning.
+            [endedSource seek:kCMTimeZero];
             // account for automatic move to next item
             _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
             NSLog(@"advance to next: index = %d", _index);
+            [self updateEndAction];
             [self broadcastPlaybackEvent];
         } else {
             // reached end of playlist
@@ -650,11 +653,13 @@
                 // sources.
                 // For now we just do a seek back to the start.
                 if ([_order count] == 1) {
-                    [self seek:kCMTimeZero index:[NSNull null] completionHandler:^(BOOL finished) {
+                    [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
                         // XXX: Necessary?
                         [self play];
                     }];
                 } else {
+                    // When an item ends, seek back to its beginning.
+                    [endedSource seek:kCMTimeZero];
                     [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
                         // XXX: Necessary?
                         [self play];
@@ -796,6 +801,7 @@
                 // account for automatic move to next item
                 _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
                 NSLog(@"advance to next on error: index = %d", _index);
+                [self updateEndAction];
                 [self broadcastPlaybackEvent];
             } else {
                 NSLog(@"error on last item");
@@ -808,6 +814,7 @@
                 // notifying this observer.
                 NSLog(@"Queue change detected. Adjusting index from %d -> %d", _index, expectedIndex);
                 _index = expectedIndex;
+                [self updateEndAction];
                 [self broadcastPlaybackEvent];
             }
         }
@@ -961,14 +968,16 @@
 
 - (void)setLoopMode:(int)loopMode {
     _loopMode = loopMode;
-    if (_player) {
-        switch (_loopMode) {
-            case loopOne:
-                _player.actionAtItemEnd = AVPlayerActionAtItemEndPause; // AVPlayerActionAtItemEndNone
-                break;
-            default:
-                _player.actionAtItemEnd = AVPlayerActionAtItemEndAdvance;
-        }
+    [self updateEndAction];
+}
+
+- (void)updateEndAction {
+    // Should update this whenever the audio source changes and whenever _index changes.
+    if (!_player) return;
+    if (_audioSource && [_orderInv[_index] intValue] + 1 < [_order count] && _loopMode != loopOne) {
+        _player.actionAtItemEnd = AVPlayerActionAtItemEndAdvance;
+    } else {
+        _player.actionAtItemEnd = AVPlayerActionAtItemEndPause; // AVPlayerActionAtItemEndNone
     }
 }
 
