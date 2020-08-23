@@ -69,6 +69,11 @@ class AudioPlayer {
   bool _playInterrupted = false;
 
   /// Creates an [AudioPlayer].
+  ///
+  /// Set [handleInterruptions] to `true` if you would like audio to be
+  /// automatically paused/ducked and resumed/unducked when audio interruptions
+  /// occur or when headphones are unplugged. You may may instead choose to
+  /// implement this behaviour yourself using the audio_session package.
   factory AudioPlayer({bool handleInterruptions = false}) =>
       AudioPlayer._internal(_uuid.v4(), handleInterruptions);
 
@@ -112,6 +117,9 @@ class AudioPlayer {
         //print("created event object with state: ${_playbackEvent.state}");
         if (handleInterruptions) {
           AudioSession.instance.then((session) {
+            session.becomingNoisyEventStream.listen((_) {
+              pause();
+            });
             session.interruptionEventStream.listen((event) {
               if (event.begin) {
                 switch (event.type) {
