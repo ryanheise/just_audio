@@ -1419,6 +1419,12 @@ class LoopingAudioSource extends AudioSource {
   }) : super();
 
   @override
+  Future<void> _setup(AudioPlayer player) async {
+    await super._setup(player);
+    await child._setup(player);
+  }
+
+  @override
   List<IndexedAudioSource> get sequence =>
       List.generate(count, (i) => child).expand((s) => s.sequence).toList();
 
