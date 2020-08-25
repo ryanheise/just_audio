@@ -68,13 +68,13 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
 
-  /// Creates an [AudioPlayer].
-  ///
-  /// Set [handleInterruptions] to `true` if you would like audio to be
-  /// automatically paused/ducked and resumed/unducked when audio interruptions
-  /// occur or when headphones are unplugged. You may may instead choose to
-  /// implement this behaviour yourself using the audio_session package.
-  factory AudioPlayer({bool handleInterruptions = false}) =>
+  /// Creates an [AudioPlayer]. The player will automatically pause/duck and
+  /// resume/unduck when audio interruptions occur (e.g. a phone call) or when
+  /// headphones are unplugged. If you wish to handle audio interruptions
+  /// manually, set [handleInterruptions] to `false` and interface directly
+  /// with the audio session via the
+  /// [audio_session](https://pub.dev/packages/audio_session) package.
+  factory AudioPlayer({bool handleInterruptions = true}) =>
       AudioPlayer._internal(_uuid.v4(), handleInterruptions);
 
   AudioPlayer._internal(this._id, bool handleInterruptions)

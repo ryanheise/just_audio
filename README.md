@@ -227,3 +227,8 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
     <true/>
 </dict>
 ```
+
+## Related plugins
+
+* [audio_service](https://pub.dev/packages/audio_service): play any audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
+* [audio_session](https://pub.dev/packages/audio_session): configure your app's audio category (e.g. music vs speech) and configure how your app interacts with other audio apps (e.g. audio focus, ducking, mixing).
