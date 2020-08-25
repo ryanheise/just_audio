@@ -3,8 +3,7 @@ description: Demonstrates how to use the just_audio plugin.
 publish_to: 'none'
 
 environment:
-  sdk: '>=2.6.0 <3.0.0'
-  flutter: ">=1.12.8 <2.0.0"
+  sdk: ">=2.7.0 <3.0.0"
 
 dependencies:
   audio_session: ^0.0.1

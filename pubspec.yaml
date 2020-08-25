@@ -4,8 +4,8 @@ version: 0.3.4
 homepage: https://github.com/ryanheise/just_audio
 
 environment:
-  sdk: '>=2.6.0 <3.0.0'
-  flutter: ">=1.12.8 <2.0.0"
+  sdk: ">=2.7.0 <3.0.0"
+  flutter: ">=1.20.0 <2.0.0"
 
 dependencies:
   audio_session: ^0.0.1
