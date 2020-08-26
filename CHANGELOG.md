@@ -1,3 +1,8 @@
+## 0.4.0
+
+* Handles audio focus/interruptions via audio_session
+* Bug fixes
+
 ## 0.3.4
 
 * Fix bug in icy metadata
