@@ -1,3 +1,7 @@
+## 0.4.1
+
+* Fix setSpeed bug on iOS.
+
 ## 0.4.0
 
 * Handles audio focus/interruptions via audio_session
