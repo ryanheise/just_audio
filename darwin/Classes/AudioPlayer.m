@@ -39,6 +39,7 @@
     BOOL _automaticallyWaitsToMinimizeStalling;
     BOOL _configuredSession;
     BOOL _playing;
+    float _speed;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam configuredSession:(BOOL)configuredSession {
@@ -74,6 +75,7 @@
     _loadResult = nil;
     _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
+    _speed = 1.0f;
     __weak __typeof__(self) weakSelf = self;
     [_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
         [weakSelf handleMethodCall:call result:result];
@@ -919,7 +921,7 @@
         [[AVAudioSession sharedInstance] setActive:YES error:nil];
     }
 #endif
-    [_player play];
+    _player.rate = _speed;
     [self updatePosition];
     if (@available(macOS 10.12, iOS 10.0, *)) {}
     else {
@@ -961,7 +963,10 @@
     if (speed == 1.0
             || (speed < 1.0 && _player.currentItem.canPlaySlowForward)
             || (speed > 1.0 && _player.currentItem.canPlayFastForward)) {
-        _player.rate = speed;
+        _speed = speed;
+        if (_playing) {
+            _player.rate = speed;
+        }
     }
     [self updatePosition];
 }
