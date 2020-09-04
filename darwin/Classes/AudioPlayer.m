@@ -1109,6 +1109,7 @@
                     [_player playImmediatelyAtRate:_speed];
                 } else {
                     [_player play];
+                    _player.rate = _speed;
                 }
             } else {
                 // If not playing, there is no reliable way to detect
