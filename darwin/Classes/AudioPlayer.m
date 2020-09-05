@@ -1108,7 +1108,6 @@
                 if (@available(iOS 10.0, *)) {
                     [_player playImmediatelyAtRate:_speed];
                 } else {
-                    [_player play];
                     _player.rate = _speed;
                 }
             } else {
