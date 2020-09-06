@@ -6,7 +6,7 @@ environment:
   sdk: ">=2.7.0 <3.0.0"
 
 dependencies:
-  audio_session: ^0.0.3
+  audio_session: ^0.0.5
   flutter:
     sdk: flutter
 
