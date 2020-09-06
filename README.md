@@ -4,25 +4,26 @@ This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and p
 
 ## Features
 
-| Feature                | Android   | iOS     | MacOS   | Web     |
-| -------                | :-------: | :-----: | :-----: | :-----: |
-| read from URL          | ✅        | ✅      | ✅      | ✅      |
-| read from file         | ✅        | ✅      | ✅      |         |
-| read from asset        | ✅        | ✅      | ✅      |         |
-| request headers        | ✅        | ✅      | ✅      |         |
-| DASH                   | ✅        |         |         |         |
-| HLS                    | ✅        | ✅      | ✅      |         |
-| buffer status/position | ✅        | ✅      | ✅      | ✅      |
-| play/pause/seek        | ✅        | ✅      | ✅      | ✅      |
-| set volume             | ✅        | ✅      | ✅      | ✅      |
-| set speed              | ✅        | ✅      | ✅      | ✅      |
-| clip audio             | ✅        | ✅      | ✅      | ✅      |
-| playlists              | ✅        | ✅      | ✅      | ✅      |
-| looping                | ✅        | ✅      | ✅      | ✅      |
-| shuffle                | ✅        | ✅      | ✅      | ✅      |
-| compose audio          | ✅        | ✅      | ✅      | ✅      |
-| gapless playback       | ✅        | ✅      | ✅      |         |
-| report player errors   | ✅        | ✅      | ✅      | ✅      |
+| Feature                        | Android   | iOS     | MacOS   | Web     |
+| -------                        | :-------: | :-----: | :-----: | :-----: |
+| read from URL                  | ✅        | ✅      | ✅      | ✅      |
+| read from file                 | ✅        | ✅      | ✅      |         |
+| read from asset                | ✅        | ✅      | ✅      |         |
+| request headers                | ✅        | ✅      | ✅      |         |
+| DASH                           | ✅        |         |         |         |
+| HLS                            | ✅        | ✅      | ✅      |         |
+| buffer status/position         | ✅        | ✅      | ✅      | ✅      |
+| play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
+| set volume                     | ✅        | ✅      | ✅      | ✅      |
+| set speed                      | ✅        | ✅      | ✅      | ✅      |
+| clip audio                     | ✅        | ✅      | ✅      | ✅      |
+| playlists                      | ✅        | ✅      | ✅      | ✅      |
+| looping                        | ✅        | ✅      | ✅      | ✅      |
+| shuffle                        | ✅        | ✅      | ✅      | ✅      |
+| compose audio                  | ✅        | ✅      | ✅      | ✅      |
+| gapless playback               | ✅        | ✅      | ✅      |         |
+| report player errors           | ✅        | ✅      | ✅      | ✅      |
+| Handle phonecall interruptions | ✅        | ✅      |         |         |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
