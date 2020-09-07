@@ -50,19 +50,36 @@
 
 - (void)seek:(CMTime)position completionHandler:(void (^)(BOOL))completionHandler {
     if (!completionHandler || (_playerItem.status == AVPlayerItemStatusReadyToPlay)) {
-        [_playerItem seekToTime:position toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
+        CMTimeRange seekableRange = [_playerItem.seekableTimeRanges.lastObject CMTimeRangeValue];
+        CMTime relativePosition = CMTimeAdd(position, seekableRange.start);
+        [_playerItem seekToTime:relativePosition toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
     }
 }
 
 - (CMTime)duration {
-    return _playerItem.duration;
+    NSValue *seekableRange = _playerItem.seekableTimeRanges.lastObject;
+    if (seekableRange) {
+        CMTimeRange seekableDuration = [seekableRange CMTimeRangeValue];;
+        return seekableDuration.duration;
+    }
+    else {
+        return _playerItem.duration;
+    }
+    return kCMTimeInvalid;
 }
 
 - (void)setDuration:(CMTime)duration {
 }
 
 - (CMTime)position {
-    return _playerItem.currentTime;
+    NSValue *seekableRange = _playerItem.seekableTimeRanges.lastObject;
+    if (seekableRange) {
+        CMTimeRange range = [seekableRange CMTimeRangeValue];
+        return CMTimeSubtract(_playerItem.currentTime, range.start);
+    } else {
+        return _playerItem.currentTime;
+    }
+    
 }
 
 - (CMTime)bufferedPosition {
