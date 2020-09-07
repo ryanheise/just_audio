@@ -1,3 +1,8 @@
+## 0.4.2
+
+* Make default audio session settings compatible with iOS control center.
+* Update README to mention NSMicrophoneUsageDescription key in Info.plist.
+
 ## 0.4.1
 
 * Fix setSpeed bug on iOS.
