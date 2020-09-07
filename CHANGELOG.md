@@ -1,3 +1,7 @@
+## 0.4.3
+
+* Add section to README on configuring the audio session.
+
 ## 0.4.2
 
 * Make default audio session settings compatible with iOS control center.
