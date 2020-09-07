@@ -188,6 +188,13 @@ If you need access to the player's AudioSession ID, you can listen to `AudioPlay
 
 ### iOS
 
+Regardless of whether your app uses the microphone, Apple will require you to add the following key to your `Info.plist` file. The message will simply be ignored if your app doesn't use the microphone:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>... explain why you use (or don't use) the microphone ...</string>
+```
+
 If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
 
 ```xml
