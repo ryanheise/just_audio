@@ -65,6 +65,7 @@ class AudioPlayer {
   final _shuffleModeEnabledSubject = BehaviorSubject<bool>();
   final _androidAudioSessionIdSubject = BehaviorSubject<int>();
   BehaviorSubject<Duration> _positionSubject;
+  StreamController<Duration> _positionStreamController;
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
 
@@ -391,12 +392,12 @@ class AudioPlayer {
       return s;
     }
 
-    StreamController<Duration> controller = StreamController.broadcast();
+    _positionStreamController = StreamController.broadcast();
     Timer currentTimer;
     StreamSubscription durationSubscription;
     StreamSubscription playbackEventSubscription;
     void yieldPosition(Timer timer) {
-      if (controller.isClosed) {
+      if (_positionStreamController.isClosed) {
         timer.cancel();
         durationSubscription?.cancel();
         playbackEventSubscription?.cancel();
@@ -406,10 +407,10 @@ class AudioPlayer {
         timer.cancel();
         durationSubscription?.cancel();
         playbackEventSubscription?.cancel();
-        controller.close();
+        _positionStreamController.close();
         return;
       }
-      controller.add(position);
+      _positionStreamController.add(position);
     }
 
     currentTimer = Timer.periodic(step(), yieldPosition);
@@ -418,9 +419,9 @@ class AudioPlayer {
       currentTimer = Timer.periodic(step(), yieldPosition);
     });
     playbackEventSubscription = playbackEventStream.listen((event) {
-      controller.add(position);
+      _positionStreamController.add(position);
     });
-    return controller.stream.distinct();
+    return _positionStreamController.stream.distinct();
   }
 
   /// Convenience method to load audio from a URL with optional headers,
@@ -677,6 +678,7 @@ class AudioPlayer {
     await _volumeSubject.close();
     await _speedSubject.close();
     await _sequenceSubject.close();
+    await _positionStreamController?.close();
     await _positionSubject?.close();
   }
 
