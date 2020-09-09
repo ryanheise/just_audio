@@ -678,6 +678,7 @@ class AudioPlayer {
     await _speedSubject.close();
     await _sequenceSubject.close();
     if (_positionSubject != null) {
+      await _positionSubject.drain();
       await _positionSubject.close();
     }
   }
