@@ -677,10 +677,7 @@ class AudioPlayer {
     await _volumeSubject.close();
     await _speedSubject.close();
     await _sequenceSubject.close();
-    if (_positionSubject != null) {
-      await _positionSubject.drain();
-      await _positionSubject.close();
-    }
+    await _positionSubject?.close();
   }
 
   Future<dynamic> _invokeMethod(String method, [dynamic args]) async =>
