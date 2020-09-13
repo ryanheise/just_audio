@@ -406,6 +406,7 @@ class AudioPlayer {
         timer.cancel();
         durationSubscription?.cancel();
         playbackEventSubscription?.cancel();
+        // This will in turn close _positionSubject.
         controller.close();
         return;
       }
@@ -677,9 +678,6 @@ class AudioPlayer {
     await _volumeSubject.close();
     await _speedSubject.close();
     await _sequenceSubject.close();
-    if (_positionSubject != null) {
-      await _positionSubject.close();
-    }
   }
 
   Future<dynamic> _invokeMethod(String method, [dynamic args]) async =>
