@@ -1105,7 +1105,11 @@
                 // If playing, buffering will be detected either by:
                 // 1. checkForDiscontinuity
                 // 2. timeControlStatus
-                [_player play];
+                if (@available(iOS 10.0, *)) {
+                    [_player playImmediatelyAtRate:_speed];
+                } else {
+                    _player.rate = _speed;
+                }
             } else {
                 // If not playing, there is no reliable way to detect
                 // when buffering has completed, so we use
