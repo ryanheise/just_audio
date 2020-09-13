@@ -850,7 +850,7 @@
                     if (shouldResumePlayback) {
                         _player.actionAtItemEnd = originalEndAction;
                         // TODO: This logic is almost duplicated in seek. See if we can reuse this code.
-                        [_player play];
+                        _player.rate = _speed;
                     }
                 }];
             } else {
@@ -1072,7 +1072,7 @@
                         }
                     }
                     if (_playing) {
-                        [_player play];
+                        _player.rate = _speed;
                     }
                     _seekPos = kCMTimeInvalid;
                     [self broadcastPlaybackEvent];
@@ -1083,7 +1083,15 @@
             } else {
                 _seekPos = kCMTimeInvalid;
                 if (_playing) {
-                    [_player play];
+                    if (@available(iOS 10.0, *)) {
+                        // NOTE: Re-enable this line only after figuring out
+                        // how to detect buffering when buffered audio is not
+                        // immediately available.
+                        //[_player playImmediatelyAtRate:_speed];
+                        _player.rate = _speed;
+                    } else {
+                        _player.rate = _speed;
+                    }
                 }
             }
         }
@@ -1106,7 +1114,11 @@
                 // 1. checkForDiscontinuity
                 // 2. timeControlStatus
                 if (@available(iOS 10.0, *)) {
-                    [_player playImmediatelyAtRate:_speed];
+                    // NOTE: Re-enable this line only after figuring out how to
+                    // detect buffering when buffered audio is not immediately
+                    // available.
+                    //[_player playImmediatelyAtRate:_speed];
+                    _player.rate = _speed;
                 } else {
                     _player.rate = _speed;
                 }
