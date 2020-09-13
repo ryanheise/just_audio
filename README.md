@@ -4,7 +4,7 @@ This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and p
 
 ## Features
 
-| Feature                        | Android   | iOS     | MacOS   | Web     |
+| Feature                        | Android   | iOS     | macOS   | Web     |
 | -------                        | :-------: | :-----: | :-----: | :-----: |
 | read from URL                  | ✅        | ✅      | ✅      | ✅      |
 | read from file                 | ✅        | ✅      | ✅      |         |
@@ -211,9 +211,9 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 </dict>
 ```
 
-### MacOS
+### macOS
 
-To allow your MacOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
+To allow your macOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
 
 ```xml
     <key>com.apple.security.network.client</key>

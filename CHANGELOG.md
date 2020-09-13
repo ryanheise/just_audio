@@ -1,3 +1,10 @@
+## 0.4.4
+
+* Fix crash when disposing of positionStream controller.
+* Handle interruptions correctly when willPauseWhenDucked is set.
+* Correct seek/position/duration in HLS streams (@snaeji).
+* Resume at correct speed after seek on iOS (@subhash279).
+
 ## 0.4.3
 
 * Add section to README on configuring the audio session.
