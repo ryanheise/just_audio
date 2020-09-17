@@ -115,49 +115,6 @@ class AudioPlayer {
           androidAudioSessionId: data['androidAudioSessionId'],
         );
         //print("created event object with state: ${_playbackEvent.state}");
-        if (handleInterruptions) {
-          AudioSession.instance.then((session) {
-            session.becomingNoisyEventStream.listen((_) {
-              pause();
-            });
-            session.interruptionEventStream.listen((event) {
-              if (event.begin) {
-                switch (event.type) {
-                  case AudioInterruptionType.duck:
-                    if (session.androidAudioAttributes.usage ==
-                        AndroidAudioUsage.game) {
-                      setVolume(volume / 2);
-                    }
-                    _playInterrupted = false;
-                    break;
-                  case AudioInterruptionType.pause:
-                  case AudioInterruptionType.unknown:
-                    if (playing) {
-                      pause();
-                      // Although pause is async and sets _playInterrupted = false,
-                      // this is done in the sync portion.
-                      _playInterrupted = true;
-                    }
-                    break;
-                }
-              } else {
-                switch (event.type) {
-                  case AudioInterruptionType.duck:
-                    setVolume(min(1.0, volume * 2));
-                    _playInterrupted = false;
-                    break;
-                  case AudioInterruptionType.pause:
-                    if (_playInterrupted) play();
-                    _playInterrupted = false;
-                    break;
-                  case AudioInterruptionType.unknown:
-                    _playInterrupted = false;
-                    break;
-                }
-              }
-            });
-          });
-        }
         return _playbackEvent;
       } catch (e, stacktrace) {
         print("Error parsing event: $e");
@@ -216,6 +173,49 @@ class AudioPlayer {
           .distinct()
           .listen(setAndroidAudioAttributes);
     });
+    if (handleInterruptions) {
+      AudioSession.instance.then((session) {
+        session.becomingNoisyEventStream.listen((_) {
+          pause();
+        });
+        session.interruptionEventStream.listen((event) {
+          if (event.begin) {
+            switch (event.type) {
+              case AudioInterruptionType.duck:
+                if (session.androidAudioAttributes.usage ==
+                    AndroidAudioUsage.game) {
+                  setVolume(volume / 2);
+                }
+                _playInterrupted = false;
+                break;
+              case AudioInterruptionType.pause:
+              case AudioInterruptionType.unknown:
+                if (playing) {
+                  pause();
+                  // Although pause is async and sets _playInterrupted = false,
+                  // this is done in the sync portion.
+                  _playInterrupted = true;
+                }
+                break;
+            }
+          } else {
+            switch (event.type) {
+              case AudioInterruptionType.duck:
+                setVolume(min(1.0, volume * 2));
+                _playInterrupted = false;
+                break;
+              case AudioInterruptionType.pause:
+                if (_playInterrupted) play();
+                _playInterrupted = false;
+                break;
+              case AudioInterruptionType.unknown:
+                _playInterrupted = false;
+                break;
+            }
+          }
+        });
+      });
+    }
   }
 
   /// The latest [PlaybackEvent].
@@ -406,6 +406,7 @@ class AudioPlayer {
         timer.cancel();
         durationSubscription?.cancel();
         playbackEventSubscription?.cancel();
+        // This will in turn close _positionSubject.
         controller.close();
         return;
       }
@@ -677,9 +678,6 @@ class AudioPlayer {
     await _volumeSubject.close();
     await _speedSubject.close();
     await _sequenceSubject.close();
-    if (_positionSubject != null) {
-      await _positionSubject.close();
-    }
   }
 
   Future<dynamic> _invokeMethod(String method, [dynamic args]) async =>

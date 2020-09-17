@@ -4,25 +4,26 @@ This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and p
 
 ## Features
 
-| Feature                | Android   | iOS     | MacOS   | Web     |
-| -------                | :-------: | :-----: | :-----: | :-----: |
-| read from URL          | ✅        | ✅      | ✅      | ✅      |
-| read from file         | ✅        | ✅      | ✅      |         |
-| read from asset        | ✅        | ✅      | ✅      |         |
-| request headers        | ✅        | ✅      | ✅      |         |
-| DASH                   | ✅        |         |         |         |
-| HLS                    | ✅        | ✅      | ✅      |         |
-| buffer status/position | ✅        | ✅      | ✅      | ✅      |
-| play/pause/seek        | ✅        | ✅      | ✅      | ✅      |
-| set volume             | ✅        | ✅      | ✅      | ✅      |
-| set speed              | ✅        | ✅      | ✅      | ✅      |
-| clip audio             | ✅        | ✅      | ✅      | ✅      |
-| playlists              | ✅        | ✅      | ✅      | ✅      |
-| looping                | ✅        | ✅      | ✅      | ✅      |
-| shuffle                | ✅        | ✅      | ✅      | ✅      |
-| compose audio          | ✅        | ✅      | ✅      | ✅      |
-| gapless playback       | ✅        | ✅      | ✅      |         |
-| report player errors   | ✅        | ✅      | ✅      | ✅      |
+| Feature                        | Android   | iOS     | macOS   | Web     |
+| -------                        | :-------: | :-----: | :-----: | :-----: |
+| read from URL                  | ✅        | ✅      | ✅      | ✅      |
+| read from file                 | ✅        | ✅      | ✅      |         |
+| read from asset                | ✅        | ✅      | ✅      |         |
+| request headers                | ✅        | ✅      | ✅      |         |
+| DASH                           | ✅        |         |         |         |
+| HLS                            | ✅        | ✅      | ✅      |         |
+| buffer status/position         | ✅        | ✅      | ✅      | ✅      |
+| play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
+| set volume                     | ✅        | ✅      | ✅      | ✅      |
+| set speed                      | ✅        | ✅      | ✅      | ✅      |
+| clip audio                     | ✅        | ✅      | ✅      | ✅      |
+| playlists                      | ✅        | ✅      | ✅      | ✅      |
+| looping                        | ✅        | ✅      | ✅      | ✅      |
+| shuffle                        | ✅        | ✅      | ✅      | ✅      |
+| compose audio                  | ✅        | ✅      | ✅      | ✅      |
+| gapless playback               | ✅        | ✅      | ✅      |         |
+| report player errors           | ✅        | ✅      | ✅      | ✅      |
+| Handle phonecall interruptions | ✅        | ✅      |         |         |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -162,6 +163,21 @@ player.playerStateStream.listen((state) {
 // - playbackEventStream
 ```
 
+## Configuring the audio session
+
+If your app uses audio, you should tell the operating system what kind of usage scenario your app has and how your app will interact with other audio apps on the device. Different audio apps often have unique requirements. For example, when a navigator app speaks driving instructions, a music player should duck its audio while a podcast player should pause its audio. Depending on which one of these three apps you are building, you will need to configure your app's audio settings and callbacks to appropriately handle these interactions.
+
+just_audio will by default choose settings that are appropriate for a music player app which means that it will automatically duck audio when a navigator starts speaking, but should pause when a phone call or another music player starts. If you are building a podcast player or audio book reader, this behaviour would not be appropriate. While the user may be able to comprehend the navigator instructions while ducked music is playing in the background, it would be much more difficult to understand the navigator instructions while simultaneously listening to an audio book or podcast.
+
+You can use the [audio_session](https://pub.dev/packages/audio_session) package to change the default audio session configuration for your app. E.g. for a podcast player, you may use:
+
+```dart
+final session = await AudioSession.instance;
+await session.configure(AudioSessionConfiguration.speech());
+```
+
+Note: If your app uses a number of different audio plugins, e.g. for audio recording, or text to speech, or background audio, it is possible that those plugins may internally override each other's audio session settings, so it is recommended that you apply your own preferred configuration using audio_session after all other audio plugins have loaded. You may consider asking the developer of each audio plugin you use to provide an option to not overwrite these global settings and allow them be managed externally.
+
 ## Platform specific configuration
 
 ### Android
@@ -172,20 +188,16 @@ If you wish to connect to non-HTTPS URLS, add the following attribute to the `ap
     <application ... android:usesCleartextTraffic="true">
 ```
 
-If you want to set the Android AudioAttributes, use the following method with the desired choice of parameters:
-
-```dart
-player.setAndroidAudioAttributes(AndroidAudioAttributes(
-  contentType: AndroidAudioContentType.music,
-  flags: AndroidAudioAttributes.FLAG_AUDIBILITY_ENFORCED,
-  usage: AndroidAudioUsage.media,
-  allowedCapturePolicy: AndroidAudioAllowedCapturePolicy.all,
-));
-```
-
 If you need access to the player's AudioSession ID, you can listen to `AudioPlayer.androidAudioSessionIdStream`. Note that the AudioSession ID will change whenever you set new AudioAttributes.
 
 ### iOS
+
+Regardless of whether your app uses the microphone, Apple will require you to add the following key to your `Info.plist` file. The message will simply be ignored if your app doesn't use the microphone:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>... explain why you use (or don't use) the microphone ...</string>
+```
 
 If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
 
@@ -199,17 +211,9 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 </dict>
 ```
 
-By default, iOS will mute your app's audio when your phone is switched to silent mode. Depending on the requirements of your app, you can change the default audio session category using `AudioPlayer.setIosCategory`. For example, if you are writing a media app, Apple recommends that you set the category to `AVAudioSessionCategoryPlayback`, which you can achieve by adding the following code to your app's initialisation:
+### macOS
 
-```dart
-AudioPlayer.setIosCategory(IosCategory.playback);
-```
-
-Note: If your app uses a number of different audio plugins in combination, e.g. for audio recording, or text to speech, or background audio, it is possible that those plugins may internally override the setting you choose here. You may consider asking the developer of each other plugin you use to provide a similar method so that you can configure the same audio session category universally across all plugins you use.
-
-### MacOS
-
-To allow your MacOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
+To allow your macOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
 
 ```xml
     <key>com.apple.security.network.client</key>
