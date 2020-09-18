@@ -282,7 +282,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     if (_shuffleModeEnabled) {
       _audioSourcePlayer?.shuffle(0, _index);
     }
-    return (await _currentAudioSourcePlayer.load()).inMilliseconds;
+    return (await _currentAudioSourcePlayer.load())?.inMilliseconds;
   }
 
   Future<Duration> loadUri(final Uri uri) async {
