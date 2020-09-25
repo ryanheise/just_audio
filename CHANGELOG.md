@@ -1,3 +1,8 @@
+## 0.4.5
+
+* Fix iOS bug in seek/position/duration in HLS streams (@snaeji).
+* Fix web bug for audio sources with unknown durations.
+
 ## 0.4.4
 
 * Fix crash when disposing of positionStream controller.
