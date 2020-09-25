@@ -367,13 +367,17 @@
 }
 
 - (void)removeItemObservers:(AVPlayerItem *)playerItem {
-    [playerItem removeObserver:self forKeyPath:@"status"];
-    [playerItem removeObserver:self forKeyPath:@"playbackBufferEmpty"];
-    [playerItem removeObserver:self forKeyPath:@"playbackBufferFull"];
-    //[playerItem removeObserver:self forKeyPath:@"playbackLikelyToKeepUp"];
-    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemDidPlayToEndTimeNotification object:playerItem];
-    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemFailedToPlayToEndTimeNotification object:playerItem];
-    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemPlaybackStalledNotification object:playerItem];
+    @try {
+        [playerItem removeObserver:self forKeyPath:@"status"];
+        [playerItem removeObserver:self forKeyPath:@"playbackBufferEmpty"];
+        [playerItem removeObserver:self forKeyPath:@"playbackBufferFull"];
+        //[playerItem removeObserver:self forKeyPath:@"playbackLikelyToKeepUp"];
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemDidPlayToEndTimeNotification object:playerItem];
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemFailedToPlayToEndTimeNotification object:playerItem];
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemPlaybackStalledNotification object:playerItem];
+    } @catch (id exception) {
+        NSLog(@"Tried to remove an observer for a key that did not have one");
+    }
 }
 
 - (void)addItemObservers:(AVPlayerItem *)playerItem {
