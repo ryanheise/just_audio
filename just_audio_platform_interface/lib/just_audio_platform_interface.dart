@@ -244,15 +244,18 @@ class DisposeResponse {
 }
 
 class ConcatenatingInsertAllRequest {
+  final String id;
   final int index;
   final List<AudioSourceMessage> children;
 
   ConcatenatingInsertAllRequest({
+    @required this.id,
     @required this.index,
     @required this.children,
   });
 
   Map<dynamic, dynamic> toMap() => {
+        'id': id,
         'index': index,
         'children': children.map((child) => child.toMap()).toList(),
       };
@@ -264,15 +267,18 @@ class ConcatenatingInsertAllResponse {
 }
 
 class ConcatenatingRemoveRangeRequest {
+  final String id;
   final int startIndex;
   final int endIndex;
 
   ConcatenatingRemoveRangeRequest({
+    @required this.id,
     @required this.startIndex,
     @required this.endIndex,
   });
 
   Map<dynamic, dynamic> toMap() => {
+        'id': id,
         'startIndex': startIndex,
         'endIndex': endIndex,
       };
@@ -284,12 +290,18 @@ class ConcatenatingRemoveRangeResponse {
 }
 
 class ConcatenatingMoveRequest {
+  final String id;
   final int currentIndex;
   final int newIndex;
 
-  ConcatenatingMoveRequest({this.currentIndex, this.newIndex});
+  ConcatenatingMoveRequest({
+    @required this.id,
+    @required this.currentIndex,
+    @required this.newIndex,
+  });
 
   Map<dynamic, dynamic> toMap() => {
+        'id': id,
         'currentIndex': currentIndex,
         'newIndex': newIndex,
       };
