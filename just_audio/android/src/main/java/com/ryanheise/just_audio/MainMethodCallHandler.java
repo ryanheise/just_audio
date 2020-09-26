@@ -28,14 +28,11 @@ public class MainMethodCallHandler implements MethodCallHandler {
 	public void onMethodCall(MethodCall call, @NonNull Result result) {
 		switch (call.method) {
 		case "init":
-			final List<String> ids = call.arguments();
-			String id = ids.get(0);
+			final Map<?, ?> request = call.arguments();
+			String id = (String)request.get("id");
 			players.put(id, new AudioPlayer(applicationContext, messenger, id,
 					() -> players.remove(id)
 			));
-			result.success(null);
-			break;
-		case "setIosCategory":
 			result.success(null);
 			break;
 		default:

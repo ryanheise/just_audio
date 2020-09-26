@@ -60,10 +60,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	private EventSink eventSink;
 
 	private ProcessingState processingState;
-	private long updateTime;
-	private long updatePosition;
 	private long bufferedPosition;
-	private long duration;
 	private Long start;
 	private Long end;
 	private Long seekPos;
@@ -210,9 +207,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 		switch (playbackState) {
 		case Player.STATE_READY:
 			if (prepareResult != null) {
-				duration = getDuration();
+				long duration = getDuration();
 				transition(ProcessingState.ready);
-				prepareResult.success(duration);
+				Map<String, Object> response = new HashMap<>();
+				response.put("duration", 1000 * duration);
+				prepareResult.success(response);
 				prepareResult = null;
 			} else {
 				transition(ProcessingState.ready);
@@ -232,7 +231,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 				transition(ProcessingState.completed);
 			}
 			if (playResult != null) {
-				playResult.success(null);
+				playResult.success(new HashMap<String, Object>());
 				playResult = null;
 			}
 			break;
@@ -279,7 +278,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	private void completeSeek() {
 		seekProcessed = false;
 		seekPos = null;
-		seekResult.success(null);
+		seekResult.success(new HashMap<String, Object>());
 		seekResult = null;
 	}
 
@@ -287,81 +286,62 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	public void onMethodCall(final MethodCall call, final Result result) {
 		ensurePlayerInitialized();
 
-		final List<?> args = (List<?>) call.arguments;
+		final Map<?, ?> request = (Map<?, ?>) call.arguments;
 		try {
 			switch (call.method) {
 			case "load":
-				load(getAudioSource(args.get(0)), result);
+				load(getAudioSource(request.get("audioSource")), result);
 				break;
 			case "play":
 				play(result);
 				break;
 			case "pause":
 				pause();
-				result.success(null);
+				result.success(new HashMap<String, Object>());
 				break;
 			case "setVolume":
-				setVolume((float) ((double) ((Double) args.get(0))));
-				result.success(null);
+				setVolume((float) ((double) ((Double) request.get("volume"))));
+				result.success(new HashMap<String, Object>());
 				break;
 			case "setSpeed":
-				setSpeed((float) ((double) ((Double) args.get(0))));
-				result.success(null);
+				setSpeed((float) ((double) ((Double) request.get("speed"))));
+				result.success(new HashMap<String, Object>());
 				break;
 			case "setLoopMode":
-				setLoopMode((Integer) args.get(0));
-				result.success(null);
+				setLoopMode((Integer) request.get("loopMode"));
+				result.success(new HashMap<String, Object>());
 				break;
 			case "setShuffleModeEnabled":
-				setShuffleModeEnabled((Boolean) args.get(0));
-				result.success(null);
+				setShuffleModeEnabled((Integer) request.get("shuffleMode") == 1);
+				result.success(new HashMap<String, Object>());
 				break;
 			case "setAutomaticallyWaitsToMinimizeStalling":
-				result.success(null);
+				result.success(new HashMap<String, Object>());
 				break;
 			case "seek":
-				Long position = getLong(args.get(0));
-				Integer index = (Integer)args.get(1);
-				seek(position == null ? C.TIME_UNSET : position, result, index);
+				Long position = getLong(request.get("position"));
+				Integer index = (Integer)request.get("index");
+				seek(position == null ? C.TIME_UNSET : position / 1000, result, index);
 				break;
 			case "dispose":
 				dispose();
-				result.success(null);
+				result.success(new HashMap<String, Object>());
 				break;
-			case "concatenating.add":
-				concatenating(args.get(0))
-						.addMediaSource(getAudioSource(args.get(1)), handler, () -> result.success(null));
+			case "concatenatingInsertAll":
+				concatenating(request.get("id"))
+						.addMediaSources((Integer)request.get("index"), getAudioSources(request.get("children")), handler, () -> result.success(new HashMap<String, Object>()));
 				break;
-			case "concatenating.insert":
-				concatenating(args.get(0))
-						.addMediaSource((Integer)args.get(1), getAudioSource(args.get(2)), handler, () -> result.success(null));
+			case "concatenatingRemoveRange":
+				concatenating(request.get("id"))
+						.removeMediaSourceRange((Integer)request.get("startIndex"), (Integer)request.get("endIndex"), handler, () -> result.success(new HashMap<String, Object>()));
 				break;
-			case "concatenating.addAll":
-				concatenating(args.get(0))
-						.addMediaSources(getAudioSources(args.get(1)), handler, () -> result.success(null));
-				break;
-			case "concatenating.insertAll":
-				concatenating(args.get(0))
-						.addMediaSources((Integer)args.get(1), getAudioSources(args.get(2)), handler, () -> result.success(null));
-				break;
-			case "concatenating.removeAt":
-				concatenating(args.get(0))
-						.removeMediaSource((Integer)args.get(1), handler, () -> result.success(null));
-				break;
-			case "concatenating.removeRange":
-				concatenating(args.get(0))
-						.removeMediaSourceRange((Integer)args.get(1), (Integer)args.get(2), handler, () -> result.success(null));
-				break;
-			case "concatenating.move":
-				concatenating(args.get(0))
-						.moveMediaSource((Integer)args.get(1), (Integer)args.get(2), handler, () -> result.success(null));
-				break;
-			case "concatenating.clear":
-				concatenating(args.get(0)).clear(handler, () -> result.success(null));
+			case "concatenatingMove":
+				concatenating(request.get("id"))
+						.moveMediaSource((Integer)request.get("currentIndex"), (Integer)request.get("newIndex"), handler, () -> result.success(new HashMap<String, Object>()));
 				break;
 			case "setAndroidAudioAttributes":
-				setAudioAttributes((Map<?, ?>)args.get(0));
-				result.success(null);
+				setAudioAttributes((Integer)request.get("contentType"), (Integer)request.get("flags"), (Integer)request.get("usage"));
+				result.success(new HashMap<String, Object>());
 				break;
 			default:
 				result.notImplemented();
@@ -469,7 +449,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 					.setTag(id)
 					.createMediaSource(Uri.parse((String)map.get("uri")));
 		case "concatenating":
-			MediaSource[] mediaSources = getAudioSourcesArray(map.get("audioSources"));
+			MediaSource[] mediaSources = getAudioSourcesArray(map.get("children"));
 			return new ConcatenatingMediaSource(
 					false, // isAtomic
 					(Boolean)map.get("useLazyPreparation"),
@@ -478,12 +458,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 		case "clipping":
 			Long start = getLong(map.get("start"));
 			Long end = getLong(map.get("end"));
-			return new ClippingMediaSource(getAudioSource(map.get("audioSource")),
-					(start != null ? start : 0) * 1000L,
-					(end != null ? end : C.TIME_END_OF_SOURCE) * 1000L);
+			return new ClippingMediaSource(getAudioSource(map.get("child")),
+					start != null ? start : 0,
+					end != null ? end : C.TIME_END_OF_SOURCE);
 		case "looping":
 			Integer count = (Integer)map.get("count");
-			MediaSource looperChild = getAudioSource(map.get("audioSource"));
+			MediaSource looperChild = getAudioSource(map.get("child"));
 			LoopingMediaSource looper = new LoopingMediaSource(looperChild, count);
 			// TODO: store both in a single map
 			loopingChildren.put(looper, looperChild);
@@ -552,24 +532,26 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 		}
 	}
 
-	private void setAudioAttributes(Map<?, ?> json) {
+	private void setAudioAttributes(int contentType, int flags, int usage) {
 		ensurePlayerInitialized();
 		AudioAttributes.Builder builder = new AudioAttributes.Builder();
-		builder.setContentType((Integer)json.get("contentType"));
-		builder.setFlags((Integer)json.get("flags"));
-		builder.setUsage((Integer)json.get("usage"));
+		builder.setContentType(contentType);
+		builder.setFlags(flags);
+		builder.setUsage(usage);
 		//builder.setAllowedCapturePolicy((Integer)json.get("allowedCapturePolicy"));
 		player.setAudioAttributes(builder.build());
 	}
 
 	private void broadcastPlaybackEvent() {
 		final Map<String, Object> event = new HashMap<String, Object>();
+		long updatePosition = getCurrentPosition();
+		long duration = getDuration();
 		event.put("processingState", processingState.ordinal());
-		event.put("updatePosition", updatePosition = getCurrentPosition());
-		event.put("updateTime", updateTime = System.currentTimeMillis());
-		event.put("bufferedPosition", Math.max(updatePosition, bufferedPosition));
+		event.put("updatePosition", 1000 * updatePosition);
+		event.put("updateTime", System.currentTimeMillis());
+		event.put("bufferedPosition", 1000 * Math.max(updatePosition, bufferedPosition));
 		event.put("icyMetadata", collectIcyMetadata());
-		event.put("duration", duration = getDuration());
+		event.put("duration", 1000 * getDuration());
 		event.put("currentIndex", currentIndex);
 		event.put("androidAudioSessionId", audioSessionId);
 
@@ -646,13 +628,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	public void play(Result result) {
 		if (player.getPlayWhenReady()) return;
 		if (playResult != null) {
-			playResult.success(null);
+			playResult.success(new HashMap<String, Object>());
 		}
 		playResult = result;
 		startWatchingBuffer();
 		player.setPlayWhenReady(true);
 		if (processingState == ProcessingState.completed && playResult != null) {
-			playResult.success(null);
+			playResult.success(new HashMap<String, Object>());
 			playResult = null;
 		}
 	}
@@ -661,7 +643,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 		if (!player.getPlayWhenReady()) return;
 		player.setPlayWhenReady(false);
 		if (playResult != null) {
-			playResult.success(null);
+			playResult.success(new HashMap<String, Object>());
 			playResult = null;
 		}
 	}
@@ -715,7 +697,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
 	private void abortSeek() {
 		if (seekResult != null) {
-			seekResult.success(null);
+			seekResult.success(new HashMap<String, Object>());
 			seekResult = null;
 			seekPos = null;
 			seekProcessed = false;
