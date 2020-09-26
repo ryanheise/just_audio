@@ -258,7 +258,7 @@ class SetLoopModeRequest {
   SetLoopModeRequest({@required this.loopMode});
 
   Map<dynamic, dynamic> toMap() => {
-        'loopMode': describeEnum(loopMode),
+        'loopMode': loopMode.index,
       };
 }
 
@@ -275,7 +275,7 @@ class SetShuffleModeRequest {
   SetShuffleModeRequest({@required this.shuffleMode});
 
   Map<dynamic, dynamic> toMap() => {
-        'shuffleMode': describeEnum(shuffleMode),
+        'shuffleMode': shuffleMode.index,
       };
 }
 
