@@ -46,6 +46,7 @@ abstract class JustAudioPlatform extends PlatformInterface {
 /// A nested platform interface for communicating with a particular player
 /// instance.
 abstract class AudioPlayerPlatform {
+  Stream<PlaybackEventMessage> get playbackEventMessageStream;
   Future<LoadResponse> load(LoadRequest request);
   Future<PlayResponse> play(PlayRequest request);
   Future<PauseResponse> pause(PauseRequest request);
@@ -66,6 +67,112 @@ abstract class AudioPlayerPlatform {
       ConcatenatingRemoveRangeRequest request);
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request);
+}
+
+class PlaybackEventMessage {
+  final ProcessingStateMessage processingState;
+  final DateTime updateTime;
+  final Duration updatePosition;
+  final Duration bufferedPosition;
+  final Duration duration;
+  final IcyMetadataMessage icyMetadata;
+  final int currentIndex;
+  final int androidAudioSessionId;
+
+  PlaybackEventMessage({
+    @required this.processingState,
+    @required this.updateTime,
+    @required this.updatePosition,
+    @required this.bufferedPosition,
+    @required this.duration,
+    @required this.icyMetadata,
+    @required this.currentIndex,
+    @required this.androidAudioSessionId,
+  });
+
+  static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
+      PlaybackEventMessage(
+        processingState: ProcessingStateMessage.values[map['processingState']],
+        updateTime: DateTime.fromMillisecondsSinceEpoch(map['updateTime']),
+        // TODO: Ensure all platforms pass a microsecond value.
+        updatePosition: Duration(microseconds: map['updatePosition']),
+        // TODO: Ensure all platforms pass a microsecond value.
+        bufferedPosition: Duration(microseconds: map['bufferedPosition']),
+        // TODO: Ensure all platforms pass a microsecond value.
+        duration: map['duration'] == null || map['duration'] < 0
+            ? null
+            : Duration(microseconds: map['duration']),
+        icyMetadata: map['icyMetadata'] == null
+            ? null
+            : IcyMetadataMessage.fromMap(map['icyMetadata']),
+        currentIndex: map['currentIndex'],
+        androidAudioSessionId: map['androidAudioSessionId'],
+      );
+}
+
+enum ProcessingStateMessage {
+  none,
+  loading,
+  buffering,
+  ready,
+  completed,
+}
+
+class IcyMetadataMessage {
+  final IcyInfoMessage info;
+  final IcyHeadersMessage headers;
+
+  IcyMetadataMessage({
+    @required this.info,
+    @required this.headers,
+  });
+
+  static IcyMetadataMessage fromMap(Map<dynamic, dynamic> json) =>
+      IcyMetadataMessage(
+        info:
+            json['info'] == null ? null : IcyInfoMessage.fromMap(json['info']),
+        headers: json['headers'] == null
+            ? null
+            : IcyHeadersMessage.fromMap(json['headers']),
+      );
+}
+
+class IcyInfoMessage {
+  final String title;
+  final String url;
+
+  IcyInfoMessage({@required this.title, @required this.url});
+
+  static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) =>
+      IcyInfoMessage(title: json['title'], url: json['url']);
+}
+
+class IcyHeadersMessage {
+  final int bitrate;
+  final String genre;
+  final String name;
+  final int metadataInterval;
+  final String url;
+  final bool isPublic;
+
+  IcyHeadersMessage({
+    @required this.bitrate,
+    @required this.genre,
+    @required this.name,
+    @required this.metadataInterval,
+    @required this.url,
+    @required this.isPublic,
+  });
+
+  static IcyHeadersMessage fromMap(Map<dynamic, dynamic> json) =>
+      IcyHeadersMessage(
+        bitrate: json['bitrate'],
+        genre: json['genre'],
+        name: json['name'],
+        metadataInterval: json['metadataInterval'],
+        url: json['url'],
+        isPublic: json['isPublic'],
+      );
 }
 
 class InitRequest {
@@ -344,6 +451,7 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => {
+        'type': 'progressive',
         'id': id,
         'uri': uri,
         'headers': headers,
@@ -359,6 +467,7 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => {
+        'type': 'dash',
         'id': id,
         'uri': uri,
         'headers': headers,
@@ -374,6 +483,7 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => {
+        'type': 'hls',
         'id': id,
         'uri': uri,
         'headers': headers,
@@ -392,7 +502,9 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => {
+        'type': 'concatenating',
         'id': id,
+        // TODO: ensure platform implementation uses this key
         'children': children.map((child) => child.toMap()).toList(),
         'useLazyPreparation': useLazyPreparation,
       };
@@ -412,9 +524,13 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => {
+        'type': 'clipping',
         'id': id,
+        // TODO: ensure platform implementation uses this key
         'child': child.toMap(),
+        // TODO: ensure platform implementation interprets in Us.
         'start': start.inMicroseconds,
+        // TODO: ensure platform implementation interprets in Us.
         'end': end.inMicroseconds,
       };
 }
@@ -431,7 +547,9 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => {
+        'type': 'looping',
         'id': id,
+        // TODO: ensure platform implementation uses this key
         'child': child.toMap(),
         'count': count,
       };
