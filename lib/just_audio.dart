@@ -582,6 +582,23 @@ class AudioPlayer {
     await _invokeMethod('setVolume', [volume]);
   }
 
+    /// Sets skipSilence option on exoPlayer to true/false. Works only on Android for now.
+  Future<void> setSkipSilence(bool enabled) async {
+    enabled ??= false;
+    if (Platform.isAndroid) {
+      await _invokeMethod('setSkipSilence', [enabled]);
+    }
+  }
+
+  /// Sets volume boost option on exoPlayer to true/false. Works only on Android for now.
+  /// gainmB is the value in millibels you want to amplify the volume by.
+  Future<void> setVolumeBoost(bool enabled, {int gainmB = 2000}) async {
+    enabled ??= false;
+    if (Platform.isAndroid) {
+      await _invokeMethod('setVolumeBoost', [enabled, gainmB]);
+    }
+  }
+
   /// Sets the playback speed of this player, where 1.0 is normal speed.
   Future<void> setSpeed(final double speed) async {
     _playbackEvent = _playbackEvent.copyWith(
