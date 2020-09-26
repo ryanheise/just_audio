@@ -84,64 +84,48 @@
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-    NSArray* args = (NSArray*)call.arguments;
+    NSDictionary *request = (NSDictionary *)call.arguments;
     if ([@"load" isEqualToString:call.method]) {
-        [self load:args[0] result:result];
+        [self load:request[@"audioSource"] result:result];
     } else if ([@"play" isEqualToString:call.method]) {
         [self play:result];
     } else if ([@"pause" isEqualToString:call.method]) {
         [self pause];
-        result(nil);
+        result(@{});
     } else if ([@"setVolume" isEqualToString:call.method]) {
-        [self setVolume:(float)[args[0] doubleValue]];
-        result(nil);
+        [self setVolume:(float)[request[@"volume"] doubleValue]];
+        result(@{});
     } else if ([@"setSpeed" isEqualToString:call.method]) {
-        [self setSpeed:(float)[args[0] doubleValue]];
-        result(nil);
+        [self setSpeed:(float)[request[@"speed"] doubleValue]];
+        result(@{});
     } else if ([@"setLoopMode" isEqualToString:call.method]) {
-        [self setLoopMode:[args[0] intValue]];
-        result(nil);
-    } else if ([@"setShuffleModeEnabled" isEqualToString:call.method]) {
-        [self setShuffleModeEnabled:(BOOL)[args[0] boolValue]];
-        result(nil);
+        [self setLoopMode:[request[@"loopMode"] intValue]];
+        result(@{});
+    } else if ([@"setShuffleMode" isEqualToString:call.method]) {
+        [self setShuffleModeEnabled:(BOOL)([request[@"shuffleMode"] intValue] == 1)];
+        result(@{});
     } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
-        [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[args[0] boolValue]];
-        result(nil);
+        [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];
+        result(@{});
     } else if ([@"seek" isEqualToString:call.method]) {
-        CMTime position = args[0] == [NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([args[0] intValue], 1000);
-        [self seek:position index:args[1] completionHandler:^(BOOL finished) {
-            result(nil);
+        CMTime position = request[@"position"] == [NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
+        [self seek:position index:request[@"index"] completionHandler:^(BOOL finished) {
+            result(@{});
         }];
-        result(nil);
     } else if ([@"dispose" isEqualToString:call.method]) {
         [self dispose];
-        result(nil);
-    } else if ([@"concatenating.add" isEqualToString:call.method]) {
-        [self concatenatingAdd:(NSString*)args[0] source:(NSDictionary*)args[1]];
-        result(nil);
-    } else if ([@"concatenating.insert" isEqualToString:call.method]) {
-        [self concatenatingInsert:(NSString*)args[0] index:[args[1] intValue] source:(NSDictionary*)args[2]];
-        result(nil);
-    } else if ([@"concatenating.addAll" isEqualToString:call.method]) {
-        [self concatenatingAddAll:(NSString*)args[0] sources:(NSArray*)args[1]];
-        result(nil);
-    } else if ([@"concatenating.insertAll" isEqualToString:call.method]) {
-        [self concatenatingInsertAll:(NSString*)args[0] index:[args[1] intValue] sources:(NSArray*)args[2]];
-        result(nil);
-    } else if ([@"concatenating.removeAt" isEqualToString:call.method]) {
-        [self concatenatingRemoveAt:(NSString*)args[0] index:[args[1] intValue]];
-        result(nil);
-    } else if ([@"concatenating.removeRange" isEqualToString:call.method]) {
-        [self concatenatingRemoveRange:(NSString*)args[0] start:[args[1] intValue] end:[args[2] intValue]];
-        result(nil);
-    } else if ([@"concatenating.move" isEqualToString:call.method]) {
-        [self concatenatingMove:(NSString*)args[0] currentIndex:[args[1] intValue] newIndex:[args[2] intValue]];
-        result(nil);
-    } else if ([@"concatenating.clear" isEqualToString:call.method]) {
-        [self concatenatingClear:(NSString*)args[0]];
-        result(nil);
+        result(@{});
+    } else if ([@"concatenatingInsertAll" isEqualToString:call.method]) {
+        [self concatenatingInsertAll:(NSString *)request[@"id"] index:[request[@"index"] intValue] sources:(NSArray *)request[@"children"]];
+        result(@{});
+    } else if ([@"concatenatingRemoveRange" isEqualToString:call.method]) {
+        [self concatenatingRemoveRange:(NSString *)request[@"id"] start:[request[@"startIndex"] intValue] end:[request[@"endIndex"] intValue]];
+        result(@{});
+    } else if ([@"concatenatingMove" isEqualToString:call.method]) {
+        [self concatenatingMove:(NSString *)request[@"id"] currentIndex:[request[@"currentIndex"] intValue] newIndex:[request[@"newIndex"] intValue]];
+        result(@{});
     } else if ([@"setAndroidAudioAttributes" isEqualToString:call.method]) {
-        result(nil);
+        result(@{});
     } else {
         result(FlutterMethodNotImplemented);
     }
@@ -318,13 +302,13 @@
     if (!_eventSink) return;
     _eventSink(@{
             @"processingState": @(_processingState),
-            @"updatePosition": @(_updatePosition),
+            @"updatePosition": @((long long)1000 * _updatePosition),
             @"updateTime": @(_updateTime),
             // TODO: buffer position
-            @"bufferedPosition": @(_updatePosition),
+            @"bufferedPosition": @((long long)1000 * _updatePosition),
             // TODO: Icy Metadata
             @"icyMetadata": [NSNull null],
-            @"duration": @([self getDuration]),
+            @"duration": @((long long)1000 * [self getDuration]),
             @"currentIndex": @(_index),
     });
 }
@@ -411,17 +395,17 @@
         return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
     } else if ([@"concatenating" isEqualToString:type]) {
         return [[ConcatenatingAudioSource alloc] initWithId:data[@"id"]
-                                               audioSources:[self decodeAudioSources:data[@"audioSources"]]];
+                                               audioSources:[self decodeAudioSources:data[@"children"]]];
     } else if ([@"clipping" isEqualToString:type]) {
         return [[ClippingAudioSource alloc] initWithId:data[@"id"]
-                                           audioSource:[self decodeAudioSource:data[@"audioSource"]]
+                                           audioSource:[self decodeAudioSource:data[@"child"]]
                                                  start:data[@"start"]
                                                    end:data[@"end"]];
     } else if ([@"looping" isEqualToString:type]) {
         NSMutableArray *childSources = [NSMutableArray new];
         int count = [data[@"count"] intValue];
         for (int i = 0; i < count; i++) {
-            [childSources addObject:[self decodeAudioSource:data[@"audioSource"]]];
+            [childSources addObject:[self decodeAudioSource:data[@"child"]]];
         }
         return [[LoopingAudioSource alloc] initWithId:data[@"id"] audioSources:childSources];
     } else {
@@ -583,7 +567,7 @@
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
-        _loadResult(@([self getDuration]));
+        _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
         _loadResult = nil;
     } else {
         // We send result after the playerItem is ready in observeValueForKeyPath.
@@ -724,7 +708,7 @@
                 }
                 [self broadcastPlaybackEvent];
                 if (_loadResult) {
-                    _loadResult(@([self getDuration]));
+                    _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
                     _loadResult = nil;
                 }
                 break;
@@ -911,7 +895,7 @@
     if (result) {
         if (_playResult) {
             NSLog(@"INTERRUPTING PLAY");
-            _playResult(nil);
+            _playResult(@{});
         }
         _playResult = result;
     }
@@ -939,7 +923,7 @@
     [self broadcastPlaybackEvent];
     if (_playResult) {
         NSLog(@"PLAY FINISHED DUE TO PAUSE");
-        _playResult(nil);
+        _playResult(@{});
         _playResult = nil;
     }
 }
@@ -950,7 +934,7 @@
     [self broadcastPlaybackEvent];
     if (_playResult) {
         NSLog(@"PLAY FINISHED DUE TO COMPLETE");
-        _playResult(nil);
+        _playResult(@{});
         _playResult = nil;
     }
 }
