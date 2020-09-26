@@ -311,7 +311,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 				setLoopMode((Integer) request.get("loopMode"));
 				result.success(new HashMap<String, Object>());
 				break;
-			case "setShuffleModeEnabled":
+			case "setShuffleMode":
 				setShuffleModeEnabled((Integer) request.get("shuffleMode") == 1);
 				result.success(new HashMap<String, Object>());
 				break;
