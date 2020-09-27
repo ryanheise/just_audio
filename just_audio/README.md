@@ -232,6 +232,19 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 </dict>
 ```
 
+### Web
+
+Add the package [just_audio_web](https://github.com/ryanheise/just_audio/tree/master/just_audio_web) to the `dependencies` of your `pubspec.yaml` in addition to just_audio:
+
+```yaml
+...
+dependencies:
+  ...
+  just_audio: ...
+  just_audio_web: ...
+  ...
+```
+
 ## Related plugins
 
 * [audio_service](https://pub.dev/packages/audio_service): play any audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.

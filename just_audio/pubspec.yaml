@@ -8,8 +8,7 @@ environment:
   flutter: ">=1.12.13+hotfix.5"
 
 dependencies:
-  just_audio_platform_interface:
-    path: ../just_audio_platform_interface
+  just_audio_platform_interface: ^1.0.0
   audio_session: ^0.0.7
   rxdart: ^0.24.1
   path: ^1.6.4
@@ -17,8 +16,6 @@ dependencies:
   async: ^2.4.1
   uuid: ^2.2.0
   flutter:
-    sdk: flutter
-  flutter_web_plugins:
     sdk: flutter
 
 dev_dependencies:
@@ -35,8 +32,5 @@ flutter:
         pluginClass: JustAudioPlugin
       macos:
         pluginClass: JustAudioPlugin
-      # web:
-      #   default_package: just_audio_web
-      # web:
-      #   pluginClass: JustAudioPlugin
-      #   fileName: just_audio_web.dart
+      web:
+        default_package: just_audio_web
