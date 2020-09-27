@@ -354,6 +354,7 @@
     [playerItem removeObserver:self forKeyPath:@"status"];
     [playerItem removeObserver:self forKeyPath:@"playbackBufferEmpty"];
     [playerItem removeObserver:self forKeyPath:@"playbackBufferFull"];
+    [playerItem removeObserver:self forKeyPath:@"loadedTimeRanges"];
     //[playerItem removeObserver:self forKeyPath:@"playbackLikelyToKeepUp"];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemDidPlayToEndTimeNotification object:playerItem];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemFailedToPlayToEndTimeNotification object:playerItem];
@@ -484,7 +485,7 @@
 }
 
 - (void)load:(NSDictionary *)source result:(FlutterResult)result {
-    if (!_playing) {
+    if (_playing) {
         [_player pause];
     }
     if (_processingState == loading) {
@@ -892,6 +893,7 @@
 }
 
 - (void)play:(FlutterResult)result {
+    if (_playing) return;
     if (result) {
         if (_playResult) {
             NSLog(@"INTERRUPTING PLAY");
@@ -917,6 +919,7 @@
 }
 
 - (void)pause {
+    if (!_playing) return;
     _playing = NO;
     [_player pause];
     [self updatePosition];
@@ -1003,6 +1006,9 @@
 }
 
 - (void)seek:(CMTime)position index:(NSNumber *)newIndex completionHandler:(void (^)(BOOL))completionHandler {
+    if (_processingState == none || _processingState == loading) {
+        return;
+    }
     int index = _index;
     if (newIndex != [NSNull null]) {
         index = [newIndex intValue];
@@ -1131,6 +1137,7 @@
 }
 
 - (void)dispose {
+    if (!_player) return;
     if (_processingState != none) {
         [_player pause];
         _processingState = none;
@@ -1145,6 +1152,7 @@
             [self removeItemObservers:_indexedAudioSources[i].playerItem];
         }
     }
+    _audioSource = nil;
     if (_player) {
         [_player removeObserver:self forKeyPath:@"currentItem"];
         if (@available(macOS 10.12, iOS 10.0, *)) {
