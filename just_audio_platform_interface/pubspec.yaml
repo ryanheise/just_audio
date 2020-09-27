@@ -1,6 +1,6 @@
 name: just_audio_platform_interface
 description: A common platform interface for the just_audio plugin.
-homepage: https://github.com/ryanheise/just_audio/just_audio_platform_interface
+homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_platform_interface
 # NOTE: We strongly prefer non-breaking changes, even at the expense of a
 # less-clean API. See https://flutter.dev/go/platform-interface-breaking-changes
 version: 0.0.1

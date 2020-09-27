@@ -121,6 +121,13 @@ packages:
       relative: true
     source: path
     version: "0.0.1"
+  just_audio_web:
+    dependency: "direct dev"
+    description:
+      path: "../../just_audio_web"
+      relative: true
+    source: path
+    version: "0.0.1"
   matcher:
     dependency: transitive
     description:

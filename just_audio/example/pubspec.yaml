@@ -18,6 +18,8 @@ dev_dependencies:
 
   just_audio:
     path: ../
+  just_audio_web:
+    path: ../../just_audio_web
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
