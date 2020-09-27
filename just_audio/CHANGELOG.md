@@ -1,3 +1,7 @@
+## 0.5.0
+
+* Convert to federated plugin.
+
 ## 0.4.5
 
 * Fix iOS bug in seek/position/duration in HLS streams (@snaeji).

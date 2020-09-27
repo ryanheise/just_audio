@@ -113,7 +113,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.4.5"
+    version: "0.5.0"
   just_audio_platform_interface:
     dependency: transitive
     description:
