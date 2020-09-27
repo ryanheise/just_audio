@@ -681,6 +681,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	}
 
 	public void dispose() {
+		if (player == null) return;
 		mediaSources.clear();
 		mediaSource = null;
 		loopingChildren.clear();

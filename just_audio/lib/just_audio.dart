@@ -42,6 +42,7 @@ class AudioPlayer {
   _ProxyHttpServer _proxy;
   AudioSource _audioSource;
   Map<String, AudioSource> _audioSources = {};
+  bool _disposed = false;
 
   PlaybackEvent _playbackEvent;
   final _playbackEventSubject = BehaviorSubject<PlaybackEvent>();
@@ -323,6 +324,7 @@ class AudioPlayer {
 
   /// The current position of the player.
   Duration get position {
+    if (_disposed) return null;
     if (playing && processingState == ProcessingState.ready) {
       final result = _playbackEvent.updatePosition +
           (DateTime.now().difference(_playbackEvent.updateTime)) * speed;
@@ -344,6 +346,7 @@ class AudioPlayer {
   ///
   /// See [createPositionStream] for more control over the stream parameters.
   Stream<Duration> get positionStream {
+    if (_disposed) return null;
     if (_positionSubject == null) {
       _positionSubject = BehaviorSubject<Duration>();
       _positionSubject.addStream(createPositionStream(
@@ -371,6 +374,7 @@ class AudioPlayer {
   }) {
     assert(minPeriod <= maxPeriod);
     assert(minPeriod > Duration.zero);
+    if (_disposed) return null;
     Duration duration() => this.duration ?? Duration.zero;
     Duration step() {
       var s = duration() ~/ steps;
@@ -448,6 +452,7 @@ class AudioPlayer {
   /// * [PlayerInterruptedException] if another call to [load] happened before
   /// this call completed.
   Future<Duration> load(AudioSource source) async {
+    if (_disposed) return null;
     try {
       _audioSource = source;
       _broadcastSequence();
@@ -504,6 +509,7 @@ class AudioPlayer {
   /// the original [AudioSource]. This method cannot be called from the
   /// [AudioPlaybackState.none] state.
   Future<Duration> setClip({Duration start, Duration end}) async {
+    if (_disposed) return null;
     final duration = await _load(start == null && end == null
         ? _audioSource
         : ClippingAudioSource(
@@ -533,6 +539,7 @@ class AudioPlayer {
   /// This method activates the audio session before playback, and will do
   /// nothing if activation of the audio session fails for any reason.
   Future<void> play() async {
+    if (_disposed) return;
     if (playing) return;
     _playInterrupted = false;
     final audioSession = await AudioSession.instance;
@@ -545,6 +552,7 @@ class AudioPlayer {
   /// Pauses the currently playing media. This method does nothing if
   /// ![playing].
   Future<void> pause() async {
+    if (_disposed) return;
     if (!playing) return;
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
@@ -561,18 +569,21 @@ class AudioPlayer {
 
   /// Convenience method to pause and seek to zero.
   Future<void> stop() async {
+    if (_disposed) return;
     await pause();
     await seek(Duration.zero);
   }
 
   /// Sets the volume of this player, where 1.0 is normal volume.
   Future<void> setVolume(final double volume) async {
+    if (_disposed) return;
     _volumeSubject.add(volume);
     await (await _platform).setVolume(SetVolumeRequest(volume: volume));
   }
 
   /// Sets the playback speed of this player, where 1.0 is normal speed.
   Future<void> setSpeed(final double speed) async {
+    if (_disposed) return;
     _playbackEvent = _playbackEvent.copyWith(
       updatePosition: position,
       updateTime: DateTime.now(),
@@ -589,6 +600,7 @@ class AudioPlayer {
   /// using [LoopingAudioSource].
   /// * Web: not supported
   Future<void> setLoopMode(LoopMode mode) async {
+    if (_disposed) return;
     _loopModeSubject.add(mode);
     await (await _platform).setLoopMode(
         SetLoopModeRequest(loopMode: LoopModeMessage.values[mode.index]));
@@ -596,6 +608,7 @@ class AudioPlayer {
 
   /// Sets whether shuffle mode is enabled.
   Future<void> setShuffleModeEnabled(bool enabled) async {
+    if (_disposed) return;
     _shuffleModeEnabledSubject.add(enabled);
     await (await _platform).setShuffleMode(SetShuffleModeRequest(
         shuffleMode:
@@ -606,6 +619,7 @@ class AudioPlayer {
   /// Has no effect on Android clients
   Future<void> setAutomaticallyWaitsToMinimizeStalling(
       final bool automaticallyWaitsToMinimizeStalling) async {
+    if (_disposed) return;
     _automaticallyWaitsToMinimizeStalling =
         automaticallyWaitsToMinimizeStalling;
     await (await _platform).setAutomaticallyWaitsToMinimizeStalling(
@@ -618,6 +632,7 @@ class AudioPlayer {
   /// particular item within that sequence. This method has no effect unless
   /// an audio source has been loaded.
   Future<void> seek(final Duration position, {int index}) async {
+    if (_disposed) return;
     switch (processingState) {
       case ProcessingState.none:
       case ProcessingState.loading:
@@ -635,6 +650,7 @@ class AudioPlayer {
 
   /// Seek to the next item.
   Future<void> seekToNext() async {
+    if (_disposed) return;
     if (hasNext) {
       await seek(Duration.zero, index: currentIndex + 1);
     }
@@ -642,6 +658,7 @@ class AudioPlayer {
 
   /// Seek to the previous item.
   Future<void> seekToPrevious() async {
+    if (_disposed) return;
     if (hasPrevious) {
       await seek(Duration.zero, index: currentIndex - 1);
     }
@@ -651,6 +668,7 @@ class AudioPlayer {
   /// platforms. This will cause a new Android AudioSession ID to be generated.
   Future<void> setAndroidAudioAttributes(
       AndroidAudioAttributes audioAttributes) async {
+    if (_disposed) return;
     if (audioAttributes == null) return;
     await (await _platform).setAndroidAudioAttributes(
         SetAndroidAudioAttributesRequest(
@@ -662,6 +680,8 @@ class AudioPlayer {
   /// Release all resources associated with this player. You must invoke this
   /// after you are done with the player.
   Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
     await (await _platform).dispose(DisposeRequest());
     _audioSource = null;
     _audioSources.values.forEach((s) => s._dispose());
