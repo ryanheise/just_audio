@@ -15,6 +15,7 @@ class MethodChannelJustAudio extends JustAudioPlatform {
   }
 }
 
+/// An implementation of [AudioPlayerPlatform] that uses method channels.
 class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   final String id;
   final MethodChannel _channel;

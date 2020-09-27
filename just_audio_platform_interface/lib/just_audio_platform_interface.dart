@@ -36,7 +36,7 @@ abstract class JustAudioPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  /// Creates a new player and returns a nested platform interface for
+  /// Creates a new platform player and returns a nested platform interface for
   /// communicating with that player.
   Future<AudioPlayerPlatform> init(InitRequest request) {
     throw UnimplementedError('init() has not been implemented.');
@@ -45,30 +45,88 @@ abstract class JustAudioPlatform extends PlatformInterface {
 
 /// A nested platform interface for communicating with a particular player
 /// instance.
+///
+/// Platform implementations should extend this class rather than implement it
+/// as `just_audio` does not consider newly added methods to be breaking
+/// changes. Extending this class (using `extends`) ensures that the subclass
+/// will get the default implementation, while platform implementations that
+/// `implements` this interface will be broken by newly added
+/// [AudioPlayerPlatform] methods.
 abstract class AudioPlayerPlatform {
-  Stream<PlaybackEventMessage> get playbackEventMessageStream;
-  Future<LoadResponse> load(LoadRequest request);
-  Future<PlayResponse> play(PlayRequest request);
-  Future<PauseResponse> pause(PauseRequest request);
-  Future<SetVolumeResponse> setVolume(SetVolumeRequest request);
-  Future<SetSpeedResponse> setSpeed(SetSpeedRequest request);
-  Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request);
-  Future<SetShuffleModeResponse> setShuffleMode(SetShuffleModeRequest request);
+  Stream<PlaybackEventMessage> get playbackEventMessageStream {
+    throw UnimplementedError(
+        'playbackEventMessageStream has not been implemented.');
+  }
+
+  Future<LoadResponse> load(LoadRequest request) {
+    throw UnimplementedError("load() has not been implemented.");
+  }
+
+  Future<PlayResponse> play(PlayRequest request) {
+    throw UnimplementedError("play() has not been implemented.");
+  }
+
+  Future<PauseResponse> pause(PauseRequest request) {
+    throw UnimplementedError("pause() has not been implemented.");
+  }
+
+  Future<SetVolumeResponse> setVolume(SetVolumeRequest request) {
+    throw UnimplementedError("setVolume() has not been implemented.");
+  }
+
+  Future<SetSpeedResponse> setSpeed(SetSpeedRequest request) {
+    throw UnimplementedError("setSpeed() has not been implemented.");
+  }
+
+  Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) {
+    throw UnimplementedError("setLoopMode() has not been implemented.");
+  }
+
+  Future<SetShuffleModeResponse> setShuffleMode(SetShuffleModeRequest request) {
+    throw UnimplementedError("setShuffleMode() has not been implemented.");
+  }
+
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
       setAutomaticallyWaitsToMinimizeStalling(
-          SetAutomaticallyWaitsToMinimizeStallingRequest request);
-  Future<SeekResponse> seek(SeekRequest request);
+          SetAutomaticallyWaitsToMinimizeStallingRequest request) {
+    throw UnimplementedError(
+        "setAutomaticallyWaitsToMinimizeStalling() has not been implemented.");
+  }
+
+  Future<SeekResponse> seek(SeekRequest request) {
+    throw UnimplementedError("seek() has not been implemented.");
+  }
+
   Future<SetAndroidAudioAttributesResponse> setAndroidAudioAttributes(
-      SetAndroidAudioAttributesRequest request);
-  Future<DisposeResponse> dispose(DisposeRequest request);
+      SetAndroidAudioAttributesRequest request) {
+    throw UnimplementedError(
+        "setAndroidAudioAttributes() has not been implemented.");
+  }
+
+  Future<DisposeResponse> dispose(DisposeRequest request) {
+    throw UnimplementedError("dispose() has not been implemented.");
+  }
+
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
-      ConcatenatingInsertAllRequest request);
+      ConcatenatingInsertAllRequest request) {
+    throw UnimplementedError(
+        "concatenatingInsertAll() has not been implemented.");
+  }
+
   Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(
-      ConcatenatingRemoveRangeRequest request);
+      ConcatenatingRemoveRangeRequest request) {
+    throw UnimplementedError(
+        "concatenatingRemoveRange() has not been implemented.");
+  }
+
   Future<ConcatenatingMoveResponse> concatenatingMove(
-      ConcatenatingMoveRequest request);
+      ConcatenatingMoveRequest request) {
+    throw UnimplementedError("concatenatingMove() has not been implemented.");
+  }
 }
 
+/// A playback event communicated from the platform implementation to the
+/// Flutter plugin.
 class PlaybackEventMessage {
   final ProcessingStateMessage processingState;
   final DateTime updateTime;
@@ -94,11 +152,8 @@ class PlaybackEventMessage {
       PlaybackEventMessage(
         processingState: ProcessingStateMessage.values[map['processingState']],
         updateTime: DateTime.fromMillisecondsSinceEpoch(map['updateTime']),
-        // TODO: Ensure all platforms pass a microsecond value.
         updatePosition: Duration(microseconds: map['updatePosition']),
-        // TODO: Ensure all platforms pass a microsecond value.
         bufferedPosition: Duration(microseconds: map['bufferedPosition']),
-        // TODO: Ensure all platforms pass a microsecond value.
         duration: map['duration'] == null || map['duration'] < 0
             ? null
             : Duration(microseconds: map['duration']),
@@ -110,6 +165,7 @@ class PlaybackEventMessage {
       );
 }
 
+/// A processing state communicated from the platform implementation.
 enum ProcessingStateMessage {
   none,
   loading,
@@ -118,6 +174,7 @@ enum ProcessingStateMessage {
   completed,
 }
 
+/// Icy metadata communicated from the platform implementation.
 class IcyMetadataMessage {
   final IcyInfoMessage info;
   final IcyHeadersMessage headers;
@@ -137,6 +194,7 @@ class IcyMetadataMessage {
       );
 }
 
+/// Icy info communicated from the platform implementation.
 class IcyInfoMessage {
   final String title;
   final String url;
@@ -147,6 +205,7 @@ class IcyInfoMessage {
       IcyInfoMessage(title: json['title'], url: json['url']);
 }
 
+/// Icy headers communicated from the platform implementation.
 class IcyHeadersMessage {
   final int bitrate;
   final String genre;
@@ -419,6 +478,8 @@ class ConcatenatingMoveResponse {
       ConcatenatingMoveResponse();
 }
 
+/// Information about an audio source to be communicated with the platform
+/// implementation.
 abstract class AudioSourceMessage {
   final String id;
 
@@ -504,7 +565,6 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
   Map<dynamic, dynamic> toMap() => {
         'type': 'concatenating',
         'id': id,
-        // TODO: ensure platform implementation uses this key
         'children': children.map((child) => child.toMap()).toList(),
         'useLazyPreparation': useLazyPreparation,
       };
@@ -526,11 +586,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
   Map<dynamic, dynamic> toMap() => {
         'type': 'clipping',
         'id': id,
-        // TODO: ensure platform implementation uses this key
         'child': child.toMap(),
-        // TODO: ensure platform implementation interprets in Us.
         'start': start.inMicroseconds,
-        // TODO: ensure platform implementation interprets in Us.
         'end': end.inMicroseconds,
       };
 }
@@ -549,7 +606,6 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
   Map<dynamic, dynamic> toMap() => {
         'type': 'looping',
         'id': id,
-        // TODO: ensure platform implementation uses this key
         'child': child.toMap(),
         'count': count,
       };
