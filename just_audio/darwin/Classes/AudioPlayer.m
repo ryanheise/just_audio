@@ -84,50 +84,56 @@
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-    NSDictionary *request = (NSDictionary *)call.arguments;
-    if ([@"load" isEqualToString:call.method]) {
-        [self load:request[@"audioSource"] result:result];
-    } else if ([@"play" isEqualToString:call.method]) {
-        [self play:result];
-    } else if ([@"pause" isEqualToString:call.method]) {
-        [self pause];
-        result(@{});
-    } else if ([@"setVolume" isEqualToString:call.method]) {
-        [self setVolume:(float)[request[@"volume"] doubleValue]];
-        result(@{});
-    } else if ([@"setSpeed" isEqualToString:call.method]) {
-        [self setSpeed:(float)[request[@"speed"] doubleValue]];
-        result(@{});
-    } else if ([@"setLoopMode" isEqualToString:call.method]) {
-        [self setLoopMode:[request[@"loopMode"] intValue]];
-        result(@{});
-    } else if ([@"setShuffleMode" isEqualToString:call.method]) {
-        [self setShuffleModeEnabled:(BOOL)([request[@"shuffleMode"] intValue] == 1)];
-        result(@{});
-    } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
-        [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];
-        result(@{});
-    } else if ([@"seek" isEqualToString:call.method]) {
-        CMTime position = request[@"position"] == [NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
-        [self seek:position index:request[@"index"] completionHandler:^(BOOL finished) {
+    @try {
+        NSDictionary *request = (NSDictionary *)call.arguments;
+        if ([@"load" isEqualToString:call.method]) {
+            [self load:request[@"audioSource"] result:result];
+        } else if ([@"play" isEqualToString:call.method]) {
+            [self play:result];
+        } else if ([@"pause" isEqualToString:call.method]) {
+            [self pause];
             result(@{});
-        }];
-    } else if ([@"dispose" isEqualToString:call.method]) {
-        [self dispose];
-        result(@{});
-    } else if ([@"concatenatingInsertAll" isEqualToString:call.method]) {
-        [self concatenatingInsertAll:(NSString *)request[@"id"] index:[request[@"index"] intValue] sources:(NSArray *)request[@"children"]];
-        result(@{});
-    } else if ([@"concatenatingRemoveRange" isEqualToString:call.method]) {
-        [self concatenatingRemoveRange:(NSString *)request[@"id"] start:[request[@"startIndex"] intValue] end:[request[@"endIndex"] intValue]];
-        result(@{});
-    } else if ([@"concatenatingMove" isEqualToString:call.method]) {
-        [self concatenatingMove:(NSString *)request[@"id"] currentIndex:[request[@"currentIndex"] intValue] newIndex:[request[@"newIndex"] intValue]];
-        result(@{});
-    } else if ([@"setAndroidAudioAttributes" isEqualToString:call.method]) {
-        result(@{});
-    } else {
-        result(FlutterMethodNotImplemented);
+        } else if ([@"setVolume" isEqualToString:call.method]) {
+            [self setVolume:(float)[request[@"volume"] doubleValue]];
+            result(@{});
+        } else if ([@"setSpeed" isEqualToString:call.method]) {
+            [self setSpeed:(float)[request[@"speed"] doubleValue]];
+            result(@{});
+        } else if ([@"setLoopMode" isEqualToString:call.method]) {
+            [self setLoopMode:[request[@"loopMode"] intValue]];
+            result(@{});
+        } else if ([@"setShuffleMode" isEqualToString:call.method]) {
+            [self setShuffleModeEnabled:(BOOL)([request[@"shuffleMode"] intValue] == 1)];
+            result(@{});
+        } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
+            [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];
+            result(@{});
+        } else if ([@"seek" isEqualToString:call.method]) {
+            CMTime position = request[@"position"] == [NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
+            [self seek:position index:request[@"index"] completionHandler:^(BOOL finished) {
+                result(@{});
+            }];
+        } else if ([@"dispose" isEqualToString:call.method]) {
+            [self dispose];
+            result(@{});
+        } else if ([@"concatenatingInsertAll" isEqualToString:call.method]) {
+            [self concatenatingInsertAll:(NSString *)request[@"id"] index:[request[@"index"] intValue] sources:(NSArray *)request[@"children"]];
+            result(@{});
+        } else if ([@"concatenatingRemoveRange" isEqualToString:call.method]) {
+            [self concatenatingRemoveRange:(NSString *)request[@"id"] start:[request[@"startIndex"] intValue] end:[request[@"endIndex"] intValue]];
+            result(@{});
+        } else if ([@"concatenatingMove" isEqualToString:call.method]) {
+            [self concatenatingMove:(NSString *)request[@"id"] currentIndex:[request[@"currentIndex"] intValue] newIndex:[request[@"newIndex"] intValue]];
+            result(@{});
+        } else if ([@"setAndroidAudioAttributes" isEqualToString:call.method]) {
+            result(@{});
+        } else {
+            result(FlutterMethodNotImplemented);
+        }
+    } @catch (id exception) {
+        NSLog(@"Error in handleMethodCall");
+        FlutterError *flutterError = [FlutterError errorWithCode:@"error" message:@"Error in handleMethodCall" details:nil];
+        result(flutterError);
     }
 }
 
