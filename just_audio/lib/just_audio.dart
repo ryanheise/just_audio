@@ -1244,7 +1244,7 @@ class ProgressiveAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: uri.toString(), headers: headers);
+      id: _id, uri: (_overrideUri ?? uri).toString(), headers: headers);
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
