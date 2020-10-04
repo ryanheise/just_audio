@@ -1317,14 +1317,13 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Appends an [AudioSource].
   Future<void> add(AudioSource audioSource) async {
+    final index = children.length;
     children.add(audioSource);
     _player._broadcastSequence();
     if (_player != null) {
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
-              id: _id,
-              index: children.length,
-              children: [audioSource._toMessage()]));
+              id: _id, index: index, children: [audioSource._toMessage()]));
     }
   }
 
@@ -1341,13 +1340,14 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Appends multiple [AudioSource]s.
   Future<void> addAll(List<AudioSource> children) async {
+    int index = this.children.length;
     this.children.addAll(children);
     _player._broadcastSequence();
     if (_player != null) {
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id,
-              index: this.children.length,
+              index: index,
               children: children.map((child) => child._toMessage()).toList()));
     }
   }
