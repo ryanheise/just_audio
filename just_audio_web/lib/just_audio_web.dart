@@ -10,28 +10,37 @@ import 'package:just_audio_platform_interface/just_audio_platform_interface.dart
 final Random _random = Random();
 
 class JustAudioPlugin extends JustAudioPlatform {
+  final Map<String, JustAudioPlayer> players = {};
+
   static void registerWith(Registrar registrar) {
+    print("registerWith setting instance");
     JustAudioPlatform.instance = JustAudioPlugin();
   }
 
   Future<AudioPlayerPlatform> init(InitRequest request) async {
-    return Html5AudioPlayer(id: request.id);
+    final player = Html5AudioPlayer(id: request.id);
+    players[request.id] = player;
+    return player;
+  }
+
+  Future<DisposePlayerResponse> disposePlayer(
+      DisposePlayerRequest request) async {
+    await players[request.id]?.release();
+    return DisposePlayerResponse();
   }
 }
 
 abstract class JustAudioPlayer extends AudioPlayerPlatform {
-  final String id;
   final eventController = StreamController<PlaybackEventMessage>();
   ProcessingStateMessage _processingState = ProcessingStateMessage.none;
   bool _playing = false;
   int _index;
 
-  JustAudioPlayer({@required this.id});
+  JustAudioPlayer({@required String id}) : super(id);
 
   @mustCallSuper
-  Future<DisposeResponse> dispose(DisposeRequest request) async {
+  Future<void> release() async {
     eventController.close();
-    return DisposeResponse();
   }
 
   Duration getCurrentPosition();
@@ -170,6 +179,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
+    print("web load");
     _currentAudioSourcePlayer?.pause();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = 0;
@@ -180,6 +190,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   Future<Duration> loadUri(final Uri uri) async {
+    print("loadUri $uri");
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
     if (src != _audioElement.src) {
@@ -198,6 +209,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     }
     transition(ProcessingStateMessage.ready);
     final seconds = _audioElement.duration;
+    print("loadUri returning");
     return seconds.isFinite
         ? Duration(milliseconds: (seconds * 1000).toInt())
         : null;
@@ -349,12 +361,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
   Duration getDuration() => _currentAudioSourcePlayer?.duration;
 
   @override
-  Future<DisposeResponse> dispose(DisposeRequest request) async {
+  Future<void> release() async {
+    print("web release");
     _currentAudioSourcePlayer?.pause();
     _audioElement.removeAttribute('src');
     _audioElement.load();
     transition(ProcessingStateMessage.none);
-    return await super.dispose(request);
+    return await super.release();
   }
 
   List<AudioSourcePlayer> getAudioSources(List messages) =>
