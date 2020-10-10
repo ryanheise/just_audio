@@ -41,6 +41,11 @@ abstract class JustAudioPlatform extends PlatformInterface {
   Future<AudioPlayerPlatform> init(InitRequest request) {
     throw UnimplementedError('init() has not been implemented.');
   }
+
+  /// Disposes of a platform player.
+  Future<DisposePlayerResponse> disposePlayer(DisposePlayerRequest request) {
+    throw UnimplementedError('disposePlayer() has not been implemented.');
+  }
 }
 
 /// A nested platform interface for communicating with a particular player
@@ -53,6 +58,10 @@ abstract class JustAudioPlatform extends PlatformInterface {
 /// `implements` this interface will be broken by newly added
 /// [AudioPlayerPlatform] methods.
 abstract class AudioPlayerPlatform {
+  final String id;
+
+  AudioPlayerPlatform(this.id);
+
   Stream<PlaybackEventMessage> get playbackEventMessageStream {
     throw UnimplementedError(
         'playbackEventMessageStream has not been implemented.');
@@ -103,6 +112,9 @@ abstract class AudioPlayerPlatform {
         "setAndroidAudioAttributes() has not been implemented.");
   }
 
+  /// This method has been superceded by [JustAudioPlatform.disposePlayer].
+  /// For backward compatibility, this method will still be called as a
+  /// fallback if [JustAudioPlatform.disposePlayer] is not implemented.
   Future<DisposeResponse> dispose(DisposeRequest request) {
     throw UnimplementedError("dispose() has not been implemented.");
   }
@@ -242,6 +254,21 @@ class InitRequest {
   Map<dynamic, dynamic> toMap() => {
         'id': id,
       };
+}
+
+class DisposePlayerRequest {
+  final String id;
+
+  DisposePlayerRequest({@required this.id});
+
+  Map<dynamic, dynamic> toMap() => {
+        'id': id,
+      };
+}
+
+class DisposePlayerResponse {
+  static DisposePlayerResponse fromMap(Map<dynamic, dynamic> map) =>
+      DisposePlayerResponse();
 }
 
 class LoadRequest {

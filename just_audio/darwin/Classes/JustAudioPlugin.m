@@ -5,7 +5,7 @@
 
 @implementation JustAudioPlugin {
     NSObject<FlutterPluginRegistrar>* _registrar;
-    BOOL _configuredSession;
+    NSMutableDictionary<NSString *, AudioPlayer *> *_players;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -20,6 +20,7 @@
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _registrar = registrar;
+    _players = [[NSMutableDictionary alloc] init];
     return self;
 }
 
@@ -27,11 +28,25 @@
     if ([@"init" isEqualToString:call.method]) {
         NSDictionary *request = (NSDictionary *)call.arguments;
         NSString *playerId = request[@"id"];
-        /*AudioPlayer* player =*/ [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId configuredSession:_configuredSession];
+        AudioPlayer* player = [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId];
+        [_players setValue:player forKey:playerId];
         result(nil);
+    } else if ([@"disposePlayer" isEqualToString:call.method]) {
+        NSDictionary *request = (NSDictionary *)call.arguments;
+        NSString *playerId = request[@"id"];
+        [_players[playerId] dispose];
+        [_players setValue:nil forKey:playerId];
+        result(@{});
     } else {
         result(FlutterMethodNotImplemented);
     }
+}
+
+- (void)dealloc {
+    for (NSString *playerId in _players) {
+        [_players[playerId] dispose];
+    }
+    [_players removeAllObjects];
 }
 
 @end

@@ -324,7 +324,6 @@ class AudioPlayer {
 
   /// The current position of the player.
   Duration get position {
-    if (_disposed) return null;
     if (playing && processingState == ProcessingState.ready) {
       final result = _playbackEvent.updatePosition +
           (DateTime.now().difference(_playbackEvent.updateTime)) * speed;
@@ -682,7 +681,13 @@ class AudioPlayer {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    await (await _platform).dispose(DisposeRequest());
+    try {
+      await JustAudioPlatform.instance
+          .disposePlayer(DisposePlayerRequest(id: _id));
+    } catch (e) {
+      print("disposePlayer() not implemented. Falling back to dispose()");
+      await (await _platform).dispose(DisposeRequest());
+    }
     _audioSource = null;
     _audioSources.values.forEach((s) => s._dispose());
     _audioSources.clear();

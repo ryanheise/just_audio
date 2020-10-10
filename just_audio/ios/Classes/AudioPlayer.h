@@ -2,7 +2,8 @@
 
 @interface AudioPlayer : NSObject<FlutterStreamHandler>
 
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam configuredSession:(BOOL)configuredSession;
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam;
+- (void)dispose;
 
 @end
 

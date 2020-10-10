@@ -37,17 +37,15 @@
     FlutterResult _playResult;
     id _timeObserver;
     BOOL _automaticallyWaitsToMinimizeStalling;
-    BOOL _configuredSession;
     BOOL _playing;
     float _speed;
 }
 
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam configuredSession:(BOOL)configuredSession {
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _registrar = registrar;
     _playerId = idParam;
-    _configuredSession = configuredSession;
     _methodChannel =
         [FlutterMethodChannel methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
                                     binaryMessenger:[registrar messenger]];
@@ -113,9 +111,6 @@
             [self seek:position index:request[@"index"] completionHandler:^(BOOL finished) {
                 result(@{});
             }];
-        } else if ([@"dispose" isEqualToString:call.method]) {
-            [self dispose];
-            result(@{});
         } else if ([@"concatenatingInsertAll" isEqualToString:call.method]) {
             [self concatenatingInsertAll:(NSString *)request[@"id"] index:[request[@"index"] intValue] sources:(NSArray *)request[@"children"]];
             result(@{});
@@ -908,11 +903,6 @@
         _playResult = result;
     }
     _playing = YES;
-#if TARGET_OS_IPHONE
-    if (_configuredSession) {
-        [[AVAudioSession sharedInstance] setActive:YES error:nil];
-    }
-#endif
     _player.rate = _speed;
     [self updatePosition];
     if (@available(macOS 10.12, iOS 10.0, *)) {}

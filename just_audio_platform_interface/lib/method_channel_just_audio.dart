@@ -13,15 +13,22 @@ class MethodChannelJustAudio extends JustAudioPlatform {
     await _mainChannel.invokeMethod('init', request.toMap());
     return MethodChannelAudioPlayer(request.id);
   }
+
+  @override
+  Future<DisposePlayerResponse> disposePlayer(
+      DisposePlayerRequest request) async {
+    return DisposePlayerResponse.fromMap(
+        await _mainChannel.invokeMethod('disposePlayer', request.toMap()));
+  }
 }
 
 /// An implementation of [AudioPlayerPlatform] that uses method channels.
 class MethodChannelAudioPlayer extends AudioPlayerPlatform {
-  final String id;
   final MethodChannel _channel;
 
-  MethodChannelAudioPlayer(this.id)
-      : _channel = MethodChannel('com.ryanheise.just_audio.methods.$id');
+  MethodChannelAudioPlayer(String id)
+      : _channel = MethodChannel('com.ryanheise.just_audio.methods.$id'),
+        super(id);
 
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
