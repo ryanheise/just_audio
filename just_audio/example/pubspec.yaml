@@ -6,20 +6,24 @@ environment:
   sdk: ">=2.7.0 <3.0.0"
 
 dependencies:
-  audio_session: ^0.0.7
   flutter:
     sdk: flutter
-
-  cupertino_icons: ^0.1.2
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-
+  audio_session: ^0.0.8
   just_audio:
     path: ../
   just_audio_web:
     path: ../../just_audio_web
+
+  cupertino_icons: ^0.1.2
+
+# Temporary (for testing)
+dependency_overrides:
+  just_audio_platform_interface:
+    path: ../../just_audio_platform_interface
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

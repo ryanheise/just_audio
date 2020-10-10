@@ -1,3 +1,9 @@
+## 0.5.3
+
+* ARC fixes on iOS.
+* Update to use platform interface 1.1.0.
+* Retain player.position after dispose.
+
 ## 0.5.2
 
 * Fix bug in concatenating add/addAll.
