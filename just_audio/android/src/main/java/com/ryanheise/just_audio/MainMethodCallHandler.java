@@ -26,15 +26,24 @@ public class MainMethodCallHandler implements MethodCallHandler {
 
 	@Override
 	public void onMethodCall(MethodCall call, @NonNull Result result) {
+		final Map<?, ?> request = call.arguments();
 		switch (call.method) {
-		case "init":
-			final Map<?, ?> request = call.arguments();
+		case "init": {
 			String id = (String)request.get("id");
-			players.put(id, new AudioPlayer(applicationContext, messenger, id,
-					() -> players.remove(id)
-			));
+			players.put(id, new AudioPlayer(applicationContext, messenger, id));
 			result.success(null);
 			break;
+		}
+		case "disposePlayer": {
+			String id = (String)request.get("id");
+			AudioPlayer player = players.get(id);
+			if (player != null) {
+				player.dispose();
+				players.remove(id);
+			}
+			result.success(new HashMap<String, Object>());
+			break;
+		}
 		default:
 			result.notImplemented();
 			break;

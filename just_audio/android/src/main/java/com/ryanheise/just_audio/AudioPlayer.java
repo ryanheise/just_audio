@@ -108,12 +108,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 		}
 	};
 
-	private final Runnable onDispose;
-
-	public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger,
-			final String id, final Runnable onDispose) {
+	public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id) {
 		this.context = applicationContext;
-		this.onDispose = onDispose;
 		methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
 		methodChannel.setMethodCallHandler(this);
 		eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
@@ -322,10 +318,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 				Long position = getLong(request.get("position"));
 				Integer index = (Integer)request.get("index");
 				seek(position == null ? C.TIME_UNSET : position / 1000, result, index);
-				break;
-			case "dispose":
-				dispose();
-				result.success(new HashMap<String, Object>());
 				break;
 			case "concatenatingInsertAll":
 				concatenating(request.get("id"))
@@ -681,7 +673,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	}
 
 	public void dispose() {
-		if (player == null) return;
 		mediaSources.clear();
 		mediaSource = null;
 		loopingChildren.clear();
@@ -693,7 +684,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 		if (eventSink != null) {
 			eventSink.endOfStream();
 		}
-		onDispose.run();
 	}
 
 	private void abortSeek() {
