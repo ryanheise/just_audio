@@ -1185,6 +1185,11 @@ abstract class UriAudioSource extends IndexedAudioSource {
       : _type = type,
         super(tag);
 
+  /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
+  /// of the copied asset on the filesystem, otherwise it gives us the original
+  /// [uri].
+  Uri get _effectiveUri => _overrideUri ?? uri;
+
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
@@ -1249,7 +1254,7 @@ class ProgressiveAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: uri.toString(), headers: headers);
+      id: _id, uri: _effectiveUri.toString(), headers: headers);
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
@@ -1268,8 +1273,8 @@ class DashAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, type: 'dash');
 
   @override
-  AudioSourceMessage _toMessage() =>
-      DashAudioSourceMessage(id: _id, uri: uri.toString(), headers: headers);
+  AudioSourceMessage _toMessage() => DashAudioSourceMessage(
+      id: _id, uri: _effectiveUri.toString(), headers: headers);
 }
 
 /// An [AudioSource] representing an HLS stream. The following URI schemes are
@@ -1287,8 +1292,8 @@ class HlsAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, type: 'hls');
 
   @override
-  AudioSourceMessage _toMessage() =>
-      HlsAudioSourceMessage(id: _id, uri: uri.toString(), headers: headers);
+  AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
+      id: _id, uri: _effectiveUri.toString(), headers: headers);
 }
 
 /// An [AudioSource] representing a concatenation of multiple audio sources to
@@ -1317,14 +1322,13 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Appends an [AudioSource].
   Future<void> add(AudioSource audioSource) async {
+    final index = children.length;
     children.add(audioSource);
     _player._broadcastSequence();
     if (_player != null) {
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
-              id: _id,
-              index: children.length,
-              children: [audioSource._toMessage()]));
+              id: _id, index: index, children: [audioSource._toMessage()]));
     }
   }
 
@@ -1341,13 +1345,14 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Appends multiple [AudioSource]s.
   Future<void> addAll(List<AudioSource> children) async {
+    int index = this.children.length;
     this.children.addAll(children);
     _player._broadcastSequence();
     if (_player != null) {
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id,
-              index: this.children.length,
+              index: index,
               children: children.map((child) => child._toMessage()).toList()));
     }
   }

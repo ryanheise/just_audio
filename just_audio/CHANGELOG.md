@@ -1,3 +1,13 @@
+## 0.5.2
+
+* Fix bug in concatenating add/addAll.
+
+## 0.5.1
+
+* Fix bug in loading from assets.
+* Ignore method calls from invalid states.
+* Forward exceptions from iOS platform implementation.
+
 ## 0.5.0
 
 * Convert to federated plugin.
