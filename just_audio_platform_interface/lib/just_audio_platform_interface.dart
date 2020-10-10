@@ -62,39 +62,49 @@ abstract class AudioPlayerPlatform {
 
   AudioPlayerPlatform(this.id);
 
+  /// A stream of playback events.
   Stream<PlaybackEventMessage> get playbackEventMessageStream {
     throw UnimplementedError(
         'playbackEventMessageStream has not been implemented.');
   }
 
+  /// Loads an audio source.
   Future<LoadResponse> load(LoadRequest request) {
     throw UnimplementedError("load() has not been implemented.");
   }
 
+  /// Plays the current audio source at the current index and position.
   Future<PlayResponse> play(PlayRequest request) {
     throw UnimplementedError("play() has not been implemented.");
   }
 
+  /// Pauses playback.
   Future<PauseResponse> pause(PauseRequest request) {
     throw UnimplementedError("pause() has not been implemented.");
   }
 
+  /// Changes the volume.
   Future<SetVolumeResponse> setVolume(SetVolumeRequest request) {
     throw UnimplementedError("setVolume() has not been implemented.");
   }
 
+  /// Changes the playback speed.
   Future<SetSpeedResponse> setSpeed(SetSpeedRequest request) {
     throw UnimplementedError("setSpeed() has not been implemented.");
   }
 
+  /// Sets the loop mode.
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) {
     throw UnimplementedError("setLoopMode() has not been implemented.");
   }
 
+  /// Sets the shuffle mode.
   Future<SetShuffleModeResponse> setShuffleMode(SetShuffleModeRequest request) {
     throw UnimplementedError("setShuffleMode() has not been implemented.");
   }
 
+  /// On iOS and macOS, sets the automaticallyWaitsToMinimizeStalling option,
+  /// and does nothing on other platforms.
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
       setAutomaticallyWaitsToMinimizeStalling(
           SetAutomaticallyWaitsToMinimizeStallingRequest request) {
@@ -102,10 +112,13 @@ abstract class AudioPlayerPlatform {
         "setAutomaticallyWaitsToMinimizeStalling() has not been implemented.");
   }
 
+  /// Seeks to the given index and position.
   Future<SeekResponse> seek(SeekRequest request) {
     throw UnimplementedError("seek() has not been implemented.");
   }
 
+  /// On Android, sets the audio attributes, and does nothing on other
+  /// platforms.
   Future<SetAndroidAudioAttributesResponse> setAndroidAudioAttributes(
       SetAndroidAudioAttributesRequest request) {
     throw UnimplementedError(
@@ -119,18 +132,21 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError("dispose() has not been implemented.");
   }
 
+  /// Inserts audio sources into the given concatenating audio source.
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
       ConcatenatingInsertAllRequest request) {
     throw UnimplementedError(
         "concatenatingInsertAll() has not been implemented.");
   }
 
+  /// Removes audio sources from the given concatenating audio source.
   Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(
       ConcatenatingRemoveRangeRequest request) {
     throw UnimplementedError(
         "concatenatingRemoveRange() has not been implemented.");
   }
 
+  /// Moves an audio source within a concatenating audio source.
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request) {
     throw UnimplementedError("concatenatingMove() has not been implemented.");
@@ -246,6 +262,8 @@ class IcyHeadersMessage {
       );
 }
 
+/// Information communicated to the platform implementation when creating a new
+/// player instance.
 class InitRequest {
   final String id;
 
@@ -256,6 +274,8 @@ class InitRequest {
       };
 }
 
+/// Information communicated to the platform implementation when disposing of a
+/// player instance.
 class DisposePlayerRequest {
   final String id;
 
@@ -266,11 +286,15 @@ class DisposePlayerRequest {
       };
 }
 
+/// Information returned by the platform implementation after disposing of a
+/// player instance.
 class DisposePlayerResponse {
   static DisposePlayerResponse fromMap(Map<dynamic, dynamic> map) =>
       DisposePlayerResponse();
 }
 
+/// Information communicated to the platform implementation when loading an
+/// audio source.
 class LoadRequest {
   final AudioSourceMessage audioSourceMessage;
 
@@ -281,6 +305,8 @@ class LoadRequest {
       };
 }
 
+/// Information returned by the platform implementation after loading an audio
+/// source.
 class LoadResponse {
   final Duration duration;
 
@@ -292,22 +318,31 @@ class LoadResponse {
           : null);
 }
 
+/// Information communicated to the platform implementation when playing an
+/// audio source.
 class PlayRequest {
   Map<dynamic, dynamic> toMap() => {};
 }
 
+/// Information returned by the platform implementation after playing an audio
+/// source.
 class PlayResponse {
   static PlayResponse fromMap(Map<dynamic, dynamic> map) => PlayResponse();
 }
 
+/// Information communicated to the platform implementation when pausing
+/// playback.
 class PauseRequest {
   Map<dynamic, dynamic> toMap() => {};
 }
 
+/// Information returned by the platform implementation after pausing playback.
 class PauseResponse {
   static PauseResponse fromMap(Map<dynamic, dynamic> map) => PauseResponse();
 }
 
+/// Information communicated to the platform implementation when setting the
+/// volume.
 class SetVolumeRequest {
   final double volume;
 
@@ -318,11 +353,15 @@ class SetVolumeRequest {
       };
 }
 
+/// Information returned by the platform implementation after setting the
+/// volume.
 class SetVolumeResponse {
   static SetVolumeResponse fromMap(Map<dynamic, dynamic> map) =>
       SetVolumeResponse();
 }
 
+/// Information communicated to the platform implementation when setting the
+/// speed.
 class SetSpeedRequest {
   final double speed;
 
@@ -333,11 +372,15 @@ class SetSpeedRequest {
       };
 }
 
+/// Information returned by the platform implementation after setting the
+/// speed.
 class SetSpeedResponse {
   static SetSpeedResponse fromMap(Map<dynamic, dynamic> map) =>
       SetSpeedResponse();
 }
 
+/// Information communicated to the platform implementation when setting the
+/// loop mode.
 class SetLoopModeRequest {
   final LoopModeMessage loopMode;
 
@@ -348,13 +391,18 @@ class SetLoopModeRequest {
       };
 }
 
+/// Information returned by the platform implementation after setting the
+/// loop mode.
 class SetLoopModeResponse {
   static SetLoopModeResponse fromMap(Map<dynamic, dynamic> map) =>
       SetLoopModeResponse();
 }
 
+/// The loop mode communicated to the platform implementation.
 enum LoopModeMessage { off, one, all }
 
+/// Information communicated to the platform implementation when setting the
+/// shuffle mode.
 class SetShuffleModeRequest {
   final ShuffleModeMessage shuffleMode;
 
@@ -365,13 +413,18 @@ class SetShuffleModeRequest {
       };
 }
 
+/// Information returned by the platform implementation after setting the
+/// shuffle mode.
 class SetShuffleModeResponse {
   static SetShuffleModeResponse fromMap(Map<dynamic, dynamic> map) =>
       SetShuffleModeResponse();
 }
 
+/// The shuffle mode communicated to the platform implementation.
 enum ShuffleModeMessage { none, all }
 
+/// Information communicated to the platform implementation when setting the
+/// automaticallyWaitsToMinimizeStalling option.
 class SetAutomaticallyWaitsToMinimizeStallingRequest {
   final bool enabled;
 
@@ -382,12 +435,16 @@ class SetAutomaticallyWaitsToMinimizeStallingRequest {
       };
 }
 
+/// Information returned by the platform implementation after setting the
+/// automaticallyWaitsToMinimizeStalling option.
 class SetAutomaticallyWaitsToMinimizeStallingResponse {
   static SetAutomaticallyWaitsToMinimizeStallingResponse fromMap(
           Map<dynamic, dynamic> map) =>
       SetAutomaticallyWaitsToMinimizeStallingResponse();
 }
 
+/// Information communicated to the platform implementation when seeking to a
+/// position and index.
 class SeekRequest {
   final Duration position;
   final int index;
@@ -400,10 +457,14 @@ class SeekRequest {
       };
 }
 
+/// Information returned by the platform implementation after seeking to a
+/// position and index.
 class SeekResponse {
   static SeekResponse fromMap(Map<dynamic, dynamic> map) => SeekResponse();
 }
 
+/// Information communicated to the platform implementation when setting the
+/// Android audio attributes.
 class SetAndroidAudioAttributesRequest {
   final int contentType;
   final int flags;
@@ -422,20 +483,26 @@ class SetAndroidAudioAttributesRequest {
       };
 }
 
+/// Information returned by the platform implementation after setting the
+/// Android audio attributes.
 class SetAndroidAudioAttributesResponse {
   static SetAndroidAudioAttributesResponse fromMap(Map<dynamic, dynamic> map) =>
       SetAndroidAudioAttributesResponse();
 }
 
+/// The parameter of [AudioPlayerPlatform.dispose] which is deprecated.
 class DisposeRequest {
   Map<dynamic, dynamic> toMap() => {};
 }
 
+/// The result of [AudioPlayerPlatform.dispose] which is deprecated.
 class DisposeResponse {
   static DisposeResponse fromMap(Map<dynamic, dynamic> map) =>
       DisposeResponse();
 }
 
+/// Information communicated to the platform implementation when inserting audio
+/// sources into a concatenating audio source.
 class ConcatenatingInsertAllRequest {
   final String id;
   final int index;
@@ -454,11 +521,15 @@ class ConcatenatingInsertAllRequest {
       };
 }
 
+/// Information returned by the platform implementation after inserting audio
+/// sources into a concatenating audio source.
 class ConcatenatingInsertAllResponse {
   static ConcatenatingInsertAllResponse fromMap(Map<dynamic, dynamic> map) =>
       ConcatenatingInsertAllResponse();
 }
 
+/// Information communicated to the platform implementation when removing audio
+/// sources from a concatenating audio source.
 class ConcatenatingRemoveRangeRequest {
   final String id;
   final int startIndex;
@@ -477,11 +548,15 @@ class ConcatenatingRemoveRangeRequest {
       };
 }
 
+/// Information returned by the platform implementation after removing audio
+/// sources from a concatenating audio source.
 class ConcatenatingRemoveRangeResponse {
   static ConcatenatingRemoveRangeResponse fromMap(Map<dynamic, dynamic> map) =>
       ConcatenatingRemoveRangeResponse();
 }
 
+/// Information communicated to the platform implementation when moving an audio
+/// source within a concatenating audio source.
 class ConcatenatingMoveRequest {
   final String id;
   final int currentIndex;
@@ -500,6 +575,8 @@ class ConcatenatingMoveRequest {
       };
 }
 
+/// Information returned by the platform implementation after moving an audio
+/// source within a concatenating audio source.
 class ConcatenatingMoveResponse {
   static ConcatenatingMoveResponse fromMap(Map<dynamic, dynamic> map) =>
       ConcatenatingMoveResponse();
@@ -515,10 +592,14 @@ abstract class AudioSourceMessage {
   Map<dynamic, dynamic> toMap();
 }
 
+/// Information about an indexed audio source to be communicated with the
+/// platform implementation.
 abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
   IndexedAudioSourceMessage({@required String id}) : super(id: id);
 }
 
+/// Information about a URI audio source to be communicated with the platform
+/// implementation.
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
   final Map<dynamic, dynamic> headers;
@@ -530,6 +611,8 @@ abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   }) : super(id: id);
 }
 
+/// Information about a progressive audio source to be communicated with the
+/// platform implementation.
 class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
   ProgressiveAudioSourceMessage({
     @required String id,
@@ -546,6 +629,8 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
       };
 }
 
+/// Information about a DASH audio source to be communicated with the platform
+/// implementation.
 class DashAudioSourceMessage extends UriAudioSourceMessage {
   DashAudioSourceMessage({
     @required String id,
@@ -562,6 +647,8 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
       };
 }
 
+/// Information about a HLS audio source to be communicated with the platform
+/// implementation.
 class HlsAudioSourceMessage extends UriAudioSourceMessage {
   HlsAudioSourceMessage({
     @required String id,
@@ -578,6 +665,8 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
       };
 }
 
+/// Information about a concatenating audio source to be communicated with the
+/// platform implementation.
 class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
   final List<AudioSourceMessage> children;
   final bool useLazyPreparation;
@@ -597,6 +686,8 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
       };
 }
 
+/// Information about a clipping audio source to be communicated with the
+/// platform implementation.
 class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
   final UriAudioSourceMessage child;
   final Duration start;
@@ -619,6 +710,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
       };
 }
 
+/// Information about a looping audio source to be communicated with the
+/// platform implementation.
 class LoopingAudioSourceMessage extends AudioSourceMessage {
   final AudioSourceMessage child;
   final int count;
