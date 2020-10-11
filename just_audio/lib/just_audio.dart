@@ -1324,8 +1324,8 @@ class ConcatenatingAudioSource extends AudioSource {
   Future<void> add(AudioSource audioSource) async {
     final index = children.length;
     children.add(audioSource);
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id, index: index, children: [audioSource._toMessage()]));
@@ -1335,8 +1335,8 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Inserts an [AudioSource] at [index].
   Future<void> insert(int index, AudioSource audioSource) async {
     children.insert(index, audioSource);
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id, index: index, children: [audioSource._toMessage()]));
@@ -1347,8 +1347,8 @@ class ConcatenatingAudioSource extends AudioSource {
   Future<void> addAll(List<AudioSource> children) async {
     int index = this.children.length;
     this.children.addAll(children);
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id,
@@ -1360,8 +1360,8 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Insert multiple [AudioSource]s at [index].
   Future<void> insertAll(int index, List<AudioSource> children) async {
     this.children.insertAll(index, children);
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id,
@@ -1374,8 +1374,8 @@ class ConcatenatingAudioSource extends AudioSource {
   /// [ConcatenatingAudioSource] has already been loaded.
   Future<void> removeAt(int index) async {
     children.removeAt(index);
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingRemoveRange(
           ConcatenatingRemoveRangeRequest(
               id: _id, startIndex: index, endIndex: index + 1));
@@ -1386,8 +1386,8 @@ class ConcatenatingAudioSource extends AudioSource {
   /// to [end] exclusive.
   Future<void> removeRange(int start, int end) async {
     children.removeRange(start, end);
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingRemoveRange(
           ConcatenatingRemoveRangeRequest(
               id: _id, startIndex: start, endIndex: end));
@@ -1397,8 +1397,8 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Moves an [AudioSource] from [currentIndex] to [newIndex].
   Future<void> move(int currentIndex, int newIndex) async {
     children.insert(newIndex, children.removeAt(currentIndex));
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingMove(
           ConcatenatingMoveRequest(
               id: _id, currentIndex: currentIndex, newIndex: newIndex));
@@ -1408,8 +1408,8 @@ class ConcatenatingAudioSource extends AudioSource {
   /// (Untested) Removes all [AudioSources].
   Future<void> clear() async {
     children.clear();
-    _player._broadcastSequence();
     if (_player != null) {
+      _player._broadcastSequence();
       await (await _player._platform).concatenatingRemoveRange(
           ConcatenatingRemoveRangeRequest(
               id: _id, startIndex: 0, endIndex: children.length));
