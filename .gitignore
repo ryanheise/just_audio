@@ -1,0 +1,15 @@
+flutter_export_environment.sh
+
+**/Flutter/App.framework/
+**/Flutter/ephemeral/
+**/Flutter/Flutter.framework/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_assets/
+
+generated_plugin_registrant.dart
+GeneratedPluginRegistrant.h
+GeneratedPluginRegistrant.m
+GeneratedPluginRegistrant.java
+GeneratedPluginRegistrant.swift
+build/
+.flutter-plugins
