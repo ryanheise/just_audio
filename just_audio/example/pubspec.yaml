@@ -16,11 +16,6 @@ dependencies:
 
   cupertino_icons: ^0.1.2
 
-# Temporary (for testing)
-dependency_overrides:
-  just_audio_platform_interface:
-    path: ../../just_audio_platform_interface
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

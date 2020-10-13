@@ -3,6 +3,7 @@
 * ARC fixes on iOS.
 * Update to use platform interface 1.1.0.
 * Retain player.position after dispose.
+* Fix unnattached player bug in ConcatenatingAudioSource (@nuc134r).
 
 ## 0.5.2
 
