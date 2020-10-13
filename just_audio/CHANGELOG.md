@@ -1,3 +1,7 @@
+## 0.5.4+1
+
+* Add web dependency.
+
 ## 0.5.4
 
 * Use audio_session 0.0.9.
