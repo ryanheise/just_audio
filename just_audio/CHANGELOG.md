@@ -1,3 +1,7 @@
+## 0.5.4
+
+* Use audio_session 0.0.9.
+
 ## 0.5.3
 
 * ARC fixes on iOS.
