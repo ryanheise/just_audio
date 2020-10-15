@@ -217,7 +217,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 			}
 			break;
 		case Player.STATE_BUFFERING:
-			if (processingState != ProcessingState.buffering) {
+			if (processingState != ProcessingState.buffering && processingState != ProcessingState.loading) {
 				transition(ProcessingState.buffering);
 				startWatchingBuffer();
 			}
@@ -673,6 +673,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 	}
 
 	public void dispose() {
+		if (processingState == ProcessingState.loading) {
+			abortExistingConnection();
+		}
 		mediaSources.clear();
 		mediaSource = null;
 		loopingChildren.clear();
