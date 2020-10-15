@@ -4,13 +4,29 @@
 
 @implementation IndexedAudioSource {
     BOOL _isAttached;
+    CMTime _queuedSeekPos;
+    void (^_queuedSeekCompletionHandler)(BOOL);
 }
 
 - (instancetype)initWithId:(NSString *)sid {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _isAttached = NO;
+    _queuedSeekPos = kCMTimeInvalid;
+    _queuedSeekCompletionHandler = nil;
     return self;
+}
+
+- (void)onStatusChanged:(AVPlayerItemStatus)status {
+    if (status == AVPlayerItemStatusReadyToPlay) {
+        // This handles a pending seek during a load.
+        // TODO: Test seeking during a seek.
+        if (_queuedSeekCompletionHandler) {
+            [self seek:_queuedSeekPos completionHandler:_queuedSeekCompletionHandler];
+            _queuedSeekPos = kCMTimeInvalid;
+            _queuedSeekCompletionHandler = nil;
+        }
+    }
 }
 
 - (IndexedPlayerItem *)playerItem {
@@ -48,6 +64,10 @@
 }
 
 - (void)seek:(CMTime)position completionHandler:(void (^)(BOOL))completionHandler {
+    if (completionHandler && (self.playerItem.status != AVPlayerItemStatusReadyToPlay)) {
+        _queuedSeekPos = position;
+        _queuedSeekCompletionHandler = completionHandler;
+    }
 }
 
 - (CMTime)duration {

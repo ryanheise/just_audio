@@ -56,6 +56,8 @@
     if (!completionHandler || (self.playerItem.status == AVPlayerItemStatusReadyToPlay)) {
         CMTime absPosition = CMTimeAdd(_start, position);
         [_audioSource.playerItem seekToTime:absPosition toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
+    } else {
+        [super seek:position completionHandler:completionHandler];
     }
 }
 

@@ -672,6 +672,7 @@
         if ([statusNumber isKindOfClass:[NSNumber class]]) {
             status = statusNumber.intValue;
         }
+        [playerItem.audioSource onStatusChanged:status];
         switch (status) {
             case AVPlayerItemStatusReadyToPlay: {
                 if (playerItem != _player.currentItem) return;

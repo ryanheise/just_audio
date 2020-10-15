@@ -56,6 +56,8 @@
             position = CMTimeAdd(position, range.start);
         }
         [_playerItem seekToTime:position toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
+    } else {
+        [super seek:position completionHandler:completionHandler];
     }
 }
 

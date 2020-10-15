@@ -11,6 +11,7 @@
 @property (readonly, nonatomic) CMTime bufferedPosition;
 @property (readonly, nonatomic) BOOL isAttached;
 
+- (void)onStatusChanged:(AVPlayerItemStatus)status;
 - (void)attach:(AVQueuePlayer *)player;
 - (void)play:(AVQueuePlayer *)player;
 - (void)pause:(AVQueuePlayer *)player;
