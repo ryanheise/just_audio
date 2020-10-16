@@ -33,6 +33,7 @@
     // Set when the current item hasn't been played yet so we aren't sure whether sufficient audio has been buffered.
     BOOL _bufferUnconfirmed;
     CMTime _seekPos;
+    CMTime _initialPos;
     FlutterResult _loadResult;
     FlutterResult _playResult;
     id _timeObserver;
@@ -63,6 +64,7 @@
     _order = nil;
     _orderInv = nil;
     _seekPos = kCMTimeInvalid;
+    _initialPos = kCMTimeZero;
     _timeObserver = 0;
     _updatePosition = 0;
     _updateTime = 0;
@@ -85,7 +87,8 @@
     @try {
         NSDictionary *request = (NSDictionary *)call.arguments;
         if ([@"load" isEqualToString:call.method]) {
-            [self load:request[@"audioSource"] result:result];
+            CMTime initialPosition = request[@"initialPosition"] == [NSNull null] ? kCMTimeZero : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
+            [self load:request[@"audioSource"] initialPosition:initialPosition initialIndex:request[@"initialIndex"] result:result];
         } else if ([@"play" isEqualToString:call.method]) {
             [self play:result];
         } else if ([@"pause" isEqualToString:call.method]) {
@@ -316,7 +319,7 @@
 
 - (int)getCurrentPosition {
     if (_processingState == none || _processingState == loading) {
-        return 0;
+        return (int)(1000 * CMTimeGetSeconds(_initialPos));
     } else if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
     } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
@@ -485,17 +488,18 @@
     _updateTime = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 }
 
-- (void)load:(NSDictionary *)source result:(FlutterResult)result {
+- (void)load:(NSDictionary *)source initialPosition:(CMTime)initialPosition initialIndex:(NSNumber *)initialIndex result:(FlutterResult)result {
     if (_playing) {
         [_player pause];
     }
     if (_processingState == loading) {
         [self abortExistingConnection];
     }
+    _initialPos = initialPosition;
     _loadResult = result;
-    _index = 0;
-    [self updatePosition];
+    _index = (initialIndex != [NSNull null]) ? [initialIndex intValue] : 0;
     _processingState = loading;
+    [self updatePosition];
     [self broadcastPlaybackEvent];
     // Remove previous observers
     if (_indexedAudioSources) {
@@ -562,7 +566,7 @@
         }
     }
     // Initialise the AVQueuePlayer with items.
-    [self enqueueFrom:0];
+    [self enqueueFrom:_index];
     // Notify each IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         [_indexedAudioSources[i] attach:_player];
@@ -713,6 +717,13 @@
                 if (_loadResult) {
                     _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
                     _loadResult = nil;
+                }
+                if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {
+                    [playerItem.audioSource seek:_initialPos completionHandler:^(BOOL finished) {
+                        [self updatePosition];
+                        [self broadcastPlaybackEvent];
+                    }];
+                    _initialPos = kCMTimeZero;
                 }
                 break;
             }
@@ -895,7 +906,12 @@
 }
 
 - (void)play:(FlutterResult)result {
-    if (_playing) return;
+    if (_playing) {
+        if (result) {
+            result(@{});
+        }
+        return;
+    }
     if (result) {
         if (_playResult) {
             NSLog(@"INTERRUPTING PLAY");
@@ -1004,6 +1020,9 @@
 
 - (void)seek:(CMTime)position index:(NSNumber *)newIndex completionHandler:(void (^)(BOOL))completionHandler {
     if (_processingState == none || _processingState == loading) {
+        if (completionHandler) {
+            completionHandler(NO);
+        }
         return;
     }
     int index = _index;
