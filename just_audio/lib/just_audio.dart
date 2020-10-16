@@ -442,20 +442,25 @@ class AudioPlayer {
   Future<Duration> setAsset(String assetPath) =>
       load(AudioSource.uri(Uri.parse('asset:///$assetPath')));
 
-  /// Loads audio from an [AudioSource] and completes when the audio is ready
-  /// to play with the duration of that audio, or null if the duration is unknown.
+  /// Loads audio from an [AudioSource] and completes when the audio is ready to
+  /// play with the duration of that audio, or null if the duration is unknown.
+  /// Optionally specify [initialPosition] and [initialIndex] to seek to an
+  /// initial position within a particular item (defaulting to position zero of
+  /// the first item).
   ///
   /// This method throws:
   ///
   /// * [PlayerException] if the audio source was unable to be loaded.
   /// * [PlayerInterruptedException] if another call to [load] happened before
   /// this call completed.
-  Future<Duration> load(AudioSource source) async {
+  Future<Duration> load(AudioSource source,
+      {Duration initialPosition, int initialIndex}) async {
     if (_disposed) return null;
     try {
       _audioSource = source;
       _broadcastSequence();
-      final duration = await _load(source);
+      final duration = await _load(source,
+          initialPosition: initialPosition, initialIndex: initialIndex);
       // Wait for loading state to pass.
       await processingStateStream
           .firstWhere((state) => state != ProcessingState.loading);
@@ -474,7 +479,8 @@ class AudioPlayer {
     _audioSources[source._id] = source;
   }
 
-  Future<Duration> _load(AudioSource source) async {
+  Future<Duration> _load(AudioSource source,
+      {Duration initialPosition, int initialIndex}) async {
     try {
       if (!kIsWeb && source._requiresHeaders) {
         if (_proxy == null) {
@@ -484,7 +490,11 @@ class AudioPlayer {
       }
       await source._setup(this);
       _durationFuture = (await _platform)
-          .load(LoadRequest(audioSourceMessage: source._toMessage()))
+          .load(LoadRequest(
+            audioSourceMessage: source._toMessage(),
+            initialPosition: initialPosition,
+            initialIndex: initialIndex,
+          ))
           .then((response) => response.duration);
       final duration = await _durationFuture;
       _durationSubject.add(duration);

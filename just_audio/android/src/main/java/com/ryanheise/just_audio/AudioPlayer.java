@@ -64,6 +64,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private Long start;
     private Long end;
     private Long seekPos;
+    private long initialPos;
+    private Integer initialIndex;
     private Result prepareResult;
     private Result playResult;
     private Result seekResult;
@@ -185,6 +187,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     @Override
     public void onTimelineChanged(Timeline timeline, int reason) {
+        if (initialPos != C.TIME_UNSET || initialIndex != null) {
+            player.seekTo(initialIndex, initialPos);
+            initialIndex = null;
+            initialPos = C.TIME_UNSET;
+        }
         if (reason == Player.TIMELINE_CHANGE_REASON_DYNAMIC) {
             onItemMayHaveChanged();
         }
@@ -285,7 +292,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         try {
             switch (call.method) {
             case "load":
-                load(getAudioSource(request.get("audioSource")), result);
+                Long initialPosition = getLong(request.get("initialPosition"));
+                Integer initialIndex = (Integer)request.get("initialIndex");
+                load(getAudioSource(request.get("audioSource")),
+                        initialPosition == null ? C.TIME_UNSET : initialPosition / 1000,
+                        initialIndex, result);
                 break;
             case "play":
                 play(result);
@@ -316,7 +327,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             case "seek":
                 Long position = getLong(request.get("position"));
                 Integer index = (Integer)request.get("index");
-                seek(position == null ? C.TIME_UNSET : position / 1000, result, index);
+                seek(position == null ? C.TIME_UNSET : position / 1000, index, result);
                 break;
             case "concatenatingInsertAll":
                 concatenating(request.get("id"))
@@ -492,7 +503,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         return new DefaultDataSourceFactory(context, httpDataSourceFactory);
     }
 
-    private void load(final MediaSource mediaSource, final Result result) {
+    private void load(final MediaSource mediaSource, final long initialPosition, final Integer initialIndex, final Result result) {
+        this.initialPos = initialPosition;
+        this.initialIndex = initialIndex;
         switch (processingState) {
         case none:
             break;
@@ -662,7 +675,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         player.setShuffleModeEnabled(enabled);
     }
 
-    public void seek(final long position, final Result result, final Integer index) {
+    public void seek(final long position, final Integer index, final Result result) {
         if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
             result.success(new HashMap<String, Object>());
             return;

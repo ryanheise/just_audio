@@ -1,3 +1,7 @@
+## 1.2.0
+
+- Add initialPosition and initialIndex to LoadRequest.
+
 ## 1.1.0
 
 - Player is now disposed via JustAudioPlatform.disposePlayer().

@@ -297,11 +297,19 @@ class DisposePlayerResponse {
 /// audio source.
 class LoadRequest {
   final AudioSourceMessage audioSourceMessage;
+  final Duration initialPosition;
+  final int initialIndex;
 
-  LoadRequest({@required this.audioSourceMessage});
+  LoadRequest({
+    @required this.audioSourceMessage,
+    this.initialPosition,
+    this.initialIndex,
+  });
 
   Map<dynamic, dynamic> toMap() => {
         'audioSource': audioSourceMessage.toMap(),
+        'initialPosition': initialPosition?.inMicroseconds,
+        'initialIndex': initialIndex,
       };
 }
 

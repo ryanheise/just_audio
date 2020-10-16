@@ -110,10 +110,17 @@ packages:
   just_audio_platform_interface:
     dependency: "direct main"
     description:
-      name: just_audio_platform_interface
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "../just_audio_platform_interface"
+      relative: true
+    source: path
     version: "1.1.0"
+  just_audio_web:
+    dependency: "direct main"
+    description:
+      path: "../just_audio_web"
+      relative: true
+    source: path
+    version: "0.1.0"
   matcher:
     dependency: transitive
     description:
