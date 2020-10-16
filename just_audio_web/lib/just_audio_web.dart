@@ -182,11 +182,19 @@ class Html5AudioPlayer extends JustAudioPlayer {
     print("web load");
     _currentAudioSourcePlayer?.pause();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
-    _index = 0;
+    _index = request.initialIndex ?? 0;
     if (_shuffleModeEnabled) {
       _audioSourcePlayer?.shuffle(0, _index);
     }
-    return LoadResponse(duration: await _currentAudioSourcePlayer.load());
+    final duration = await _currentAudioSourcePlayer.load();
+    if (request.initialPosition != null) {
+      await _currentAudioSourcePlayer
+          .seek(request.initialPosition.inMilliseconds);
+    }
+    if (_playing) {
+      _currentAudioSourcePlayer.play();
+    }
+    return LoadResponse(duration: duration);
   }
 
   Future<Duration> loadUri(final Uri uri) async {
