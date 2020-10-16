@@ -618,7 +618,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void play(Result result) {
-        if (player.getPlayWhenReady()) return;
+        if (player.getPlayWhenReady()) {
+            result.success(new HashMap<String, Object>());
+            return;
+        }
         if (playResult != null) {
             playResult.success(new HashMap<String, Object>());
         }
@@ -662,6 +665,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     public void seek(final long position, final Result result, final Integer index) {
         if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
+            result.success(new HashMap<String, Object>());
             return;
         }
         abortSeek();
