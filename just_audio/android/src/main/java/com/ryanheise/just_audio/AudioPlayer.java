@@ -203,10 +203,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         switch (playbackState) {
         case Player.STATE_READY:
             if (prepareResult != null) {
-                long duration = getDuration();
                 transition(ProcessingState.ready);
                 Map<String, Object> response = new HashMap<>();
-                response.put("duration", 1000 * duration);
+                response.put("duration", 1000 * getDuration());
                 prepareResult.success(response);
                 prepareResult = null;
             } else {
