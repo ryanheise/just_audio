@@ -11,8 +11,6 @@ dependencies:
   audio_session: ^0.0.9
   just_audio:
     path: ../
-  just_audio_web:
-    path: ../../just_audio_web
 
   cupertino_icons: ^0.1.2
 
