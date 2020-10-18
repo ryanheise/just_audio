@@ -1035,6 +1035,7 @@ class _ProxyHttpServer {
           originResponse.headers.forEach((name, value) {
             request.response.headers.set(name, value);
           });
+          request.response.statusCode = originResponse.statusCode;
 
           // Pipe response
           await originResponse.pipe(request.response);
