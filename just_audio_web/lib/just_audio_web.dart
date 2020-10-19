@@ -13,7 +13,6 @@ class JustAudioPlugin extends JustAudioPlatform {
   final Map<String, JustAudioPlayer> players = {};
 
   static void registerWith(Registrar registrar) {
-    print("registerWith setting instance");
     JustAudioPlatform.instance = JustAudioPlugin();
   }
 
@@ -179,7 +178,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
-    print("web load");
     _currentAudioSourcePlayer?.pause();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = request.initialIndex ?? 0;
@@ -198,7 +196,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   Future<Duration> loadUri(final Uri uri) async {
-    print("loadUri $uri");
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
     if (src != _audioElement.src) {
@@ -217,7 +214,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
     }
     transition(ProcessingStateMessage.ready);
     final seconds = _audioElement.duration;
-    print("loadUri returning");
     return seconds.isFinite
         ? Duration(milliseconds: (seconds * 1000).toInt())
         : null;
@@ -370,7 +366,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<void> release() async {
-    print("web release");
     _currentAudioSourcePlayer?.pause();
     _audioElement.removeAttribute('src');
     _audioElement.load();
@@ -392,38 +387,33 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   AudioSourcePlayer decodeAudioSource(AudioSourceMessage audioSourceMessage) {
-    try {
-      if (audioSourceMessage is ProgressiveAudioSourceMessage) {
-        return ProgressiveAudioSourcePlayer(this, audioSourceMessage.id,
-            Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
-      } else if (audioSourceMessage is DashAudioSourceMessage) {
-        return DashAudioSourcePlayer(this, audioSourceMessage.id,
-            Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
-      } else if (audioSourceMessage is HlsAudioSourceMessage) {
-        return HlsAudioSourcePlayer(this, audioSourceMessage.id,
-            Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
-      } else if (audioSourceMessage is ConcatenatingAudioSourceMessage) {
-        return ConcatenatingAudioSourcePlayer(
-            this,
-            audioSourceMessage.id,
-            getAudioSources(audioSourceMessage.children),
-            audioSourceMessage.useLazyPreparation);
-      } else if (audioSourceMessage is ClippingAudioSourceMessage) {
-        return ClippingAudioSourcePlayer(
-            this,
-            audioSourceMessage.id,
-            getAudioSource(audioSourceMessage.child),
-            audioSourceMessage.start,
-            audioSourceMessage.end);
-      } else if (audioSourceMessage is LoopingAudioSourceMessage) {
-        return LoopingAudioSourcePlayer(this, audioSourceMessage.id,
-            getAudioSource(audioSourceMessage.child), audioSourceMessage.count);
-      } else {
-        throw Exception("Unknown AudioSource type: $audioSourceMessage");
-      }
-    } catch (e, stacktrace) {
-      print("$stacktrace");
-      rethrow;
+    if (audioSourceMessage is ProgressiveAudioSourceMessage) {
+      return ProgressiveAudioSourcePlayer(this, audioSourceMessage.id,
+          Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
+    } else if (audioSourceMessage is DashAudioSourceMessage) {
+      return DashAudioSourcePlayer(this, audioSourceMessage.id,
+          Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
+    } else if (audioSourceMessage is HlsAudioSourceMessage) {
+      return HlsAudioSourcePlayer(this, audioSourceMessage.id,
+          Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
+    } else if (audioSourceMessage is ConcatenatingAudioSourceMessage) {
+      return ConcatenatingAudioSourcePlayer(
+          this,
+          audioSourceMessage.id,
+          getAudioSources(audioSourceMessage.children),
+          audioSourceMessage.useLazyPreparation);
+    } else if (audioSourceMessage is ClippingAudioSourceMessage) {
+      return ClippingAudioSourcePlayer(
+          this,
+          audioSourceMessage.id,
+          getAudioSource(audioSourceMessage.child),
+          audioSourceMessage.start,
+          audioSourceMessage.end);
+    } else if (audioSourceMessage is LoopingAudioSourceMessage) {
+      return LoopingAudioSourcePlayer(this, audioSourceMessage.id,
+          getAudioSource(audioSourceMessage.child), audioSourceMessage.count);
+    } else {
+      throw Exception("Unknown AudioSource type: $audioSourceMessage");
     }
   }
 }
