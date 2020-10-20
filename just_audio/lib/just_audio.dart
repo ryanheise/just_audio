@@ -127,30 +127,24 @@ class AudioPlayer {
             .handleError((err, stack) {/* noop */}));
     _platform.then((platform) {
       platform.playbackEventMessageStream.listen((message) {
-        try {
-          final playbackEvent = PlaybackEvent(
-            processingState:
-                ProcessingState.values[message.processingState.index],
-            updateTime: message.updateTime,
-            updatePosition: message.updatePosition,
-            bufferedPosition: message.bufferedPosition,
-            duration: message.duration,
-            icyMetadata: message.icyMetadata == null
-                ? null
-                : IcyMetadata._fromMessage(message.icyMetadata),
-            currentIndex: message.currentIndex,
-            androidAudioSessionId: message.androidAudioSessionId,
-          );
-          _durationFuture = Future.value(playbackEvent.duration);
-          if (playbackEvent.duration != _playbackEvent.duration) {
-            _durationSubject.add(playbackEvent.duration);
-          }
-          _playbackEventSubject.add(_playbackEvent = playbackEvent);
-        } catch (e, stacktrace) {
-          print("Error parsing event: $e");
-          print("$stacktrace");
-          rethrow;
+        final playbackEvent = PlaybackEvent(
+          processingState:
+              ProcessingState.values[message.processingState.index],
+          updateTime: message.updateTime,
+          updatePosition: message.updatePosition,
+          bufferedPosition: message.bufferedPosition,
+          duration: message.duration,
+          icyMetadata: message.icyMetadata == null
+              ? null
+              : IcyMetadata._fromMessage(message.icyMetadata),
+          currentIndex: message.currentIndex,
+          androidAudioSessionId: message.androidAudioSessionId,
+        );
+        _durationFuture = Future.value(playbackEvent.duration);
+        if (playbackEvent.duration != _playbackEvent.duration) {
+          _durationSubject.add(playbackEvent.duration);
         }
+        _playbackEventSubject.add(_playbackEvent = playbackEvent);
       }, onError: _playbackEventSubject.addError);
     });
     _sequenceSubject.add(null);
@@ -700,7 +694,6 @@ class AudioPlayer {
       await JustAudioPlatform.instance
           .disposePlayer(DisposePlayerRequest(id: _id));
     } catch (e) {
-      print("disposePlayer() not implemented. Falling back to dispose()");
       await (await _platform).dispose(DisposeRequest());
     }
     _audioSource = null;

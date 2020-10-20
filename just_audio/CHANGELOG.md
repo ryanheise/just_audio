@@ -1,3 +1,7 @@
+## 0.5.4+2
+
+* Removed `print` statements from plugin code.
+
 ## 0.5.4+1
 
 * Add web dependency.
