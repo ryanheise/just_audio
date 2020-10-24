@@ -1157,7 +1157,9 @@
     if (_processingState != none) {
         [_player pause];
         _processingState = none;
-        [self broadcastPlaybackEvent];
+        // If used just before destroying the current FlutterEngine, this will result in:
+        // NSInternalInconsistencyException: 'Sending a message before the FlutterEngine has been run.'
+        //[self broadcastPlaybackEvent];
     }
     if (_timeObserver) {
         [_player removeTimeObserver:_timeObserver];
