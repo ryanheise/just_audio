@@ -585,11 +585,8 @@ class AudioPlayer {
   }
 
   /// Sets the playback speed of this player, where 1.0 is normal speed. Note
-  /// that on iOS, calls to [setSpeed] may ignored if the underlying media
-  /// doesn't support speed changes (e.g. live streams). On Android, values in
-  /// excess of 1.0 may result in stalls if the playback speed is faster than
-  /// the player is able to downloaded the audio (this should not happen with
-  /// locally-stored audio files).
+  /// that values in excess of 1.0 may result in stalls if the playback speed is
+  /// faster than the player is able to downloaded the audio.
   Future<void> setSpeed(final double speed) async {
     if (_disposed) return;
     _playbackEvent = _playbackEvent.copyWith(
