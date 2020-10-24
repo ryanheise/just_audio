@@ -960,13 +960,35 @@
 }
 
 - (void)setSpeed:(float)speed {
-    if (speed == 1.0
-            || (speed < 1.0 && _player.currentItem.canPlaySlowForward)
-            || (speed > 1.0 && _player.currentItem.canPlayFastForward)) {
-        _speed = speed;
-        if (_playing) {
-            _player.rate = speed;
-        }
+    // NOTE: We ideally should check _player.currentItem.canPlaySlowForward and
+    // canPlayFastForward, but these properties are unreliable and the official
+    // documentation is unclear and contradictory.
+    //
+    // Source #1:
+    // https://developer.apple.com/documentation/avfoundation/avplayer/1388846-rate?language=objc
+    //
+    //     Rates other than 0.0 and 1.0 can be used if the associated player
+    //     item returns YES for the AVPlayerItem properties canPlaySlowForward
+    //     or canPlayFastForward.
+    //
+    // Source #2:
+    // https://developer.apple.com/library/archive/qa/qa1772/_index.html
+    //
+    //     An AVPlayerItem whose status property equals
+    //     AVPlayerItemStatusReadyToPlay can be played at rates between 1.0 and
+    //     2.0, inclusive, even if AVPlayerItem.canPlayFastForward is NO.
+    //     AVPlayerItem.canPlayFastForward indicates whether the item can be
+    //     played at rates greater than 2.0.
+    //
+    // But in practice, it appears that even if AVPlayerItem.canPlayFastForward
+    // is NO, rates greater than 2.0 still work sometimes.
+    //
+    // So for now, we just let the app pass in any speed and hope for the best.
+    // There is no way to reliably query whether the requested speed is
+    // supported.
+    _speed = speed;
+    if (_playing) {
+        _player.rate = speed;
     }
     [self updatePosition];
 }
