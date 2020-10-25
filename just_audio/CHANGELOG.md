@@ -1,10 +1,14 @@
-## 0.5.4+2
+## 0.5.5
 
-* Removed `print` statements from plugin code.
-
-## 0.5.4+1
-
-* Add web dependency.
+* Add initialPosition/initialIndex parameters to load.
+* Fix iOS crash when disposing just before FlutterEngine is destroyed.
+* Fix bug with simultaneous seek requests on iOS.
+* Fix seeking when using headers (@nuc134r).
+* Fix loading state transition on Android.
+* Pass through all setSpeeds requests on iOS, ignoring canPlayFast/Slow.
+* Fix bug loading file paths containing spaces (@hsangtini).
+* Remove noisy logs from web console (@creativecreatorormaybenot).
+* Add web dependency (@creativecreatorormaybenot).
 
 ## 0.5.4
 
