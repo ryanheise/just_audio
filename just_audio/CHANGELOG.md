@@ -7,8 +7,7 @@
 * Fix loading state transition on Android.
 * Pass through all setSpeeds requests on iOS, ignoring canPlayFast/Slow.
 * Fix bug loading file paths containing spaces (@hsangtini).
-* Remove noisy logs from web console (@creativecreatorormaybenot).
-* Add web dependency (@creativecreatorormaybenot).
+* Add web endorsement (@creativecreatorormaybenot).
 
 ## 0.5.4
 

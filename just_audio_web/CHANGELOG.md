@@ -1,6 +1,7 @@
-## 0.1.0+1
+## 0.1.1
 
-* Removed `print` statements from plugin code.
+* Support initialPosition/initialIndex parameters to load.
+* Remove `print` statements (@creativecreatorormaybenot).
 
 ## 0.1.0
 
