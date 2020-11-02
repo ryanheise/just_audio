@@ -67,6 +67,12 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
+  Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) async {
+    return SetSkipSilenceResponse.fromMap(
+        await _channel.invokeMethod('setSkipSilence', request?.toMap()));
+  }
+
+  @override
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async {
     return SetLoopModeResponse.fromMap(
         await _channel.invokeMethod('setLoopMode', request?.toMap()));
@@ -92,6 +98,12 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   Future<SeekResponse> seek(SeekRequest request) async {
     return SeekResponse.fromMap(
         await _channel.invokeMethod('seek', request?.toMap()));
+  }
+  
+  @override
+  Future<SetVolumeBoostResponse> setVolumeBoost(SetVolumeBoostRequest request) async {
+    return SetVolumeBoostResponse.fromMap(
+        await _channel.invokeMethod('setVolumeBoost', request?.toMap()));
   }
 
   @override

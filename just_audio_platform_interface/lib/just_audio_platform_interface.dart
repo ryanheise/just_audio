@@ -93,6 +93,16 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError("setSpeed() has not been implemented.");
   }
 
+  /// sets skipSilence to true/false.
+  Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) {
+    throw UnimplementedError("setSkipSilence() has not been implemented.");
+  }
+
+  /// sets skipSilence to true/false.
+  Future<SetVolumeBoostResponse> setVolumeBoost(SetVolumeBoostRequest request) {
+    throw UnimplementedError("setVolumeBoost() has not been implemented.");
+  }
+
   /// Sets the loop mode.
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) {
     throw UnimplementedError("setLoopMode() has not been implemented.");
@@ -388,6 +398,25 @@ class SetSpeedResponse {
 }
 
 /// Information communicated to the platform implementation when setting the
+/// skipSilence.
+class SetSkipSilenceRequest {
+  final bool enabled;
+
+  SetSkipSilenceRequest({@required this.enabled});
+
+  Map<dynamic, dynamic> toMap() => {
+        'enabled': enabled,
+      };
+}
+
+/// Information returned by the platform implementation after setting the
+/// speed.
+class SetSkipSilenceResponse {
+  static SetSkipSilenceResponse fromMap(Map<dynamic, dynamic> map) =>
+      SetSkipSilenceResponse();
+}
+
+/// Information communicated to the platform implementation when setting the
 /// loop mode.
 class SetLoopModeRequest {
   final LoopModeMessage loopMode;
@@ -449,6 +478,26 @@ class SetAutomaticallyWaitsToMinimizeStallingResponse {
   static SetAutomaticallyWaitsToMinimizeStallingResponse fromMap(
           Map<dynamic, dynamic> map) =>
       SetAutomaticallyWaitsToMinimizeStallingResponse();
+}
+
+/// Information communicated to the platform implementation when setting 
+/// volume boost
+class SetVolumeBoostRequest {
+  final bool enabled;
+  final int gainmB;
+
+  SetVolumeBoostRequest({@required this.enabled, this.gainmB});
+
+  Map<dynamic, dynamic> toMap() => {
+        'enabled': enabled,
+        'gainmB': gainmB,
+      };
+}
+
+/// Information returned by the platform implementation after setting 
+/// volume boost
+class SetVolumeBoostResponse {
+  static SetVolumeBoostResponse fromMap(Map<dynamic, dynamic> map) => SetVolumeBoostResponse();
 }
 
 /// Information communicated to the platform implementation when seeking to a
