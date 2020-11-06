@@ -149,8 +149,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             this.audioSessionId = audioSessionId;
         }
         if (_volumeBoostEnabled) {
-						setVolumeBoost(true, _volumeBoostGainMB);
-				} 
+            setVolumeBoost(true, _volumeBoostGainMB);
+        }
     }
 
     @Override
