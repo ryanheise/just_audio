@@ -588,7 +588,7 @@ class AudioPlayer {
   Future<void> setSkipSilence(bool enabled) async {
     if (_disposed) return;
     enabled ??= false;
-    await (await _platform).setSkipSilence(SetSkipSilenceRequest(enabled: enabled)); //test _invokeMethod('setSkipSilence', [enabled]);
+    await (await _platform).setSkipSilence(SetSkipSilenceRequest(enabled: enabled));
   }
 
   /// Sets volume boost option on exoPlayer to true/false. Works only on Android for now.
