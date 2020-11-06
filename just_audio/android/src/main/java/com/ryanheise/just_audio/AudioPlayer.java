@@ -328,7 +328,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 result.success(null);
                 break;
             case "setVolumeBoost":
-                setVolumeBoost((Boolean) request.get("enabled"), (Integer) request.get("gainmB"));
+                setVolumeBoost((Boolean) request.get("enabled"), (Integer) request.get("gainMillibels"));
                 result.success(null);
                 break;
             case "setLoopMode":

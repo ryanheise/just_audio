@@ -592,12 +592,12 @@ class AudioPlayer {
   }
 
   /// Sets volume boost option on exoPlayer to true/false. Works only on Android for now.
-  /// gainmB is the value in millibels you want to amplify the volume by.
-  Future<void> setVolumeBoost(bool enabled, {int gainmB = 2000}) async {
+  /// gainMillibels is the value in millibels you want to amplify the volume by.
+  Future<void> setVolumeBoost(bool enabled, {int gainMillibels = 2000}) async {
     if (_disposed) return;
     enabled ??= false;
     if (Platform.isAndroid) {
-      await (await _platform).setVolumeBoost(SetVolumeBoostRequest(enabled: enabled, gainmB: gainmB)); //_invokeMethod('setVolumeBoost', [enabled, gainmB]);
+      await (await _platform).setVolumeBoost(SetVolumeBoostRequest(enabled: enabled, gainMillibels: gainMillibels));
     }
   }
 

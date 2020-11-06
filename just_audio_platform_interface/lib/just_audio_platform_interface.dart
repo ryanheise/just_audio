@@ -484,13 +484,13 @@ class SetAutomaticallyWaitsToMinimizeStallingResponse {
 /// volume boost
 class SetVolumeBoostRequest {
   final bool enabled;
-  final int gainmB;
+  final int gainMillibels;
 
-  SetVolumeBoostRequest({@required this.enabled, this.gainmB});
+  SetVolumeBoostRequest({@required this.enabled, this.gainMillibels});
 
   Map<dynamic, dynamic> toMap() => {
         'enabled': enabled,
-        'gainmB': gainmB,
+        'gainMillibels': gainMillibels,
       };
 }
 
