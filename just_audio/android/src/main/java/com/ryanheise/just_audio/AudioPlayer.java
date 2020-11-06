@@ -150,7 +150,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
         if (_volumeBoostEnabled) {
 						setVolumeBoost(true, _volumeBoostGainMB);
-				}
+				} 
     }
 
     @Override
