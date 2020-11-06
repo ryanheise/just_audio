@@ -324,13 +324,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 result.success(new HashMap<String, Object>());
                 break;
             case "setSkipSilence":
-				        setSkipSilence((Boolean) request.get("enabled"));
-				        result.success(null);
-				        break;
-						case "setVolumeBoost":
-							setVolumeBoost((Boolean) request.get("enabled"), (Integer) request.get("gainmB"));
-							result.success(null);
-							break;
+                setSkipSilence((Boolean) request.get("enabled"));
+                result.success(null);
+                break;
+            case "setVolumeBoost":
+                setVolumeBoost((Boolean) request.get("enabled"), (Integer) request.get("gainmB"));
+                result.success(null);
+                break;
             case "setLoopMode":
                 setLoopMode((Integer) request.get("loopMode"));
                 result.success(new HashMap<String, Object>());
@@ -679,29 +679,29 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     public void setSpeed(final float speed) {
         _speed = speed;
-				if (_skipSilence) {
-						player.setPlaybackParameters(new PlaybackParameters(_speed, 1, _skipSilence));
-				} else {
-						player.setPlaybackParameters(new PlaybackParameters(speed));
-				}
-				broadcastPlaybackEvent();
-		}
+        if (_skipSilence) {
+            player.setPlaybackParameters(new PlaybackParameters(_speed, 1, _skipSilence));
+        } else {
+            player.setPlaybackParameters(new PlaybackParameters(speed));
+        }
+        broadcastPlaybackEvent();
+    }
 
-		public void setSkipSilence(final boolean skipSilence) {
-				_skipSilence = skipSilence;
-				player.setPlaybackParameters(new PlaybackParameters(_speed, 1, skipSilence));
-		}
+    public void setSkipSilence(final boolean skipSilence) {
+        _skipSilence = skipSilence;
+        player.setPlaybackParameters(new PlaybackParameters(_speed, 1, skipSilence));
+    }
 
-		public void setVolumeBoost(final boolean enabled, final int gainmB) {
-				if (android.os.Build.VERSION.SDK_INT >= 19 && audioSessionId != null) {
-						_volumeBoostEnabled = enabled;
-						_volumeBoostGainMB = gainmB;
-						Log.e(TAG, "setVolumeBoost in android 2 : " + enabled);
-						loudness = new LoudnessEnhancer(audioSessionId);
-						loudness.setEnabled(enabled);
-						loudness.setTargetGain(gainmB);
-				}
-		}
+    public void setVolumeBoost(final boolean enabled, final int gainmB) {
+        if (android.os.Build.VERSION.SDK_INT >= 19 && audioSessionId != null) {
+            _volumeBoostEnabled = enabled;
+            _volumeBoostGainMB = gainmB;
+            Log.e(TAG, "setVolumeBoost in android 2 : " + enabled);
+            loudness = new LoudnessEnhancer(audioSessionId);
+            loudness.setEnabled(enabled);
+            loudness.setTargetGain(gainmB);
+        }
+    }
 
     public void setLoopMode(final int mode) {
         player.setRepeatMode(mode);
@@ -740,8 +740,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             transition(ProcessingState.none);
         }
         if (loudness != null) {
-					loudness.release();
-				}
+            loudness.release();
+        }
         if (eventSink != null) {
             eventSink.endOfStream();
         }
