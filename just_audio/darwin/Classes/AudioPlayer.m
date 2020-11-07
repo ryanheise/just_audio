@@ -616,9 +616,10 @@
 - (void)onComplete:(NSNotification *)notification {
     NSLog(@"onComplete");
     if (_loopMode == loopOne) {
+        __weak __typeof__(self) weakSelf = self;
         [self seek:kCMTimeZero index:@(_index) completionHandler:^(BOOL finished) {
             // XXX: Not necessary?
-            [self play];
+            [weakSelf play];
         }];
     } else {
         IndexedPlayerItem *endedPlayerItem = (IndexedPlayerItem *)notification.object;
@@ -645,16 +646,18 @@
                 // sources.
                 // For now we just do a seek back to the start.
                 if ([_order count] == 1) {
+                    __weak __typeof__(self) weakSelf = self;
                     [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
                         // XXX: Necessary?
-                        [self play];
+                        [weakSelf play];
                     }];
                 } else {
                     // When an item ends, seek back to its beginning.
                     [endedSource seek:kCMTimeZero];
+                    __weak __typeof__(self) weakSelf = self;
                     [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
                         // XXX: Necessary?
-                        [self play];
+                        [weakSelf play];
                     }];
                 }
             } else {
@@ -719,9 +722,10 @@
                     _loadResult = nil;
                 }
                 if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {
+                    __weak __typeof__(self) weakSelf = self;
                     [playerItem.audioSource seek:_initialPos completionHandler:^(BOOL finished) {
-                        [self updatePosition];
-                        [self broadcastPlaybackEvent];
+                        [weakSelf updatePosition];
+                        [weakSelf broadcastPlaybackEvent];
                     }];
                     _initialPos = kCMTimeZero;
                 }
@@ -841,10 +845,11 @@
                 [self enterBuffering:@"currentItem changed, seeking"];
                 [self updatePosition];
                 [self broadcastPlaybackEvent];
+                __weak __typeof__(self) weakSelf = self;
                 [source seek:kCMTimeZero completionHandler:^(BOOL finished) {
-                    [self leaveBuffering:@"currentItem changed, finished seek"];
-                    [self updatePosition];
-                    [self broadcastPlaybackEvent];
+                    [weakSelf leaveBuffering:@"currentItem changed, finished seek"];
+                    [weakSelf updatePosition];
+                    [weakSelf broadcastPlaybackEvent];
                     if (shouldResumePlayback) {
                         _player.actionAtItemEnd = originalEndAction;
                         // TODO: This logic is almost duplicated in seek. See if we can reuse this code.
@@ -1135,8 +1140,9 @@
         [self enterBuffering:@"seek"];
         [self updatePosition];
         [self broadcastPlaybackEvent];
+        __weak __typeof__(self) weakSelf = self;
         [_indexedAudioSources[_index] seek:position completionHandler:^(BOOL finished) {
-            [self updatePosition];
+            [weakSelf updatePosition];
             if (_playing) {
                 // If playing, buffering will be detected either by:
                 // 1. checkForDiscontinuity
@@ -1156,17 +1162,17 @@
                 // !playbackBufferEmpty. Although this always seems to
                 // be full even right after a seek.
                 if (_player.currentItem.playbackBufferEmpty) {
-                    [self enterBuffering:@"seek finished, playbackBufferEmpty"];
+                    [weakSelf enterBuffering:@"seek finished, playbackBufferEmpty"];
                 } else {
-                    [self leaveBuffering:@"seek finished, !playbackBufferEmpty"];
+                    [weakSelf leaveBuffering:@"seek finished, !playbackBufferEmpty"];
                 }
-                [self updatePosition];
+                [weakSelf updatePosition];
                 if (_processingState != buffering) {
-                    [self broadcastPlaybackEvent];
+                    [weakSelf broadcastPlaybackEvent];
                 }
             }
             _seekPos = kCMTimeInvalid;
-            [self broadcastPlaybackEvent];
+            [weakSelf broadcastPlaybackEvent];
             if (completionHandler) {
                 completionHandler(finished);
             }
@@ -1191,6 +1197,7 @@
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
             [self removeItemObservers:_indexedAudioSources[i].playerItem];
         }
+        _indexedAudioSources = nil;
     }
     _audioSource = nil;
     if (_player) {
@@ -1201,8 +1208,8 @@
         _player = nil;
     }
     // Untested:
-    // [_eventChannel setStreamHandler:nil];
-    // [_methodChannel setMethodHandler:nil];
+    [_eventChannel setStreamHandler:nil];
+    [_methodChannel setMethodCallHandler:nil];
 }
 
 @end

@@ -4,6 +4,6 @@
 
 @interface IndexedPlayerItem : AVPlayerItem
 
-@property (readwrite, nonatomic) IndexedAudioSource *audioSource;
+@property (readwrite, nonatomic, weak) IndexedAudioSource *audioSource;
 
 @end
