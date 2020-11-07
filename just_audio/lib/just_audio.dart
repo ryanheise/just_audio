@@ -1315,7 +1315,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   ConcatenatingAudioSource({
     @required this.children,
-    this.useLazyPreparation = false,
+    this.useLazyPreparation = true,
   });
 
   @override
