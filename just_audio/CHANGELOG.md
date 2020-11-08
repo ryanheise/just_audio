@@ -1,3 +1,8 @@
+## 0.5.6
+
+* Fix iOS memory leak.
+* Enable useLazyPreparation by default.
+
 ## 0.5.5
 
 * Add initialPosition/initialIndex parameters to load.
