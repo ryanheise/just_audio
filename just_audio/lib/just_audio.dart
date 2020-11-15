@@ -1029,6 +1029,7 @@ class _ProxyHttpServer {
 
           // Pipe response
           await originResponse.pipe(request.response);
+          await request.response.close();
         } on HttpException {
           // We likely are dealing with a streaming protocol
           if (proxyRequest.uri.scheme == 'http') {
