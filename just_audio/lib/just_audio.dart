@@ -859,8 +859,6 @@ class IcyInfo {
 
   IcyInfo({@required this.title, @required this.url});
 
-  IcyInfo.fromJson(Map json) : this(title: json['title'], url: json['url']);
-
   @override
   String toString() => 'title=$title,url=$url';
 
@@ -898,16 +896,6 @@ class IcyHeaders {
     @required this.isPublic,
   });
 
-  IcyHeaders.fromJson(Map json)
-      : this(
-          bitrate: json['bitrate'],
-          genre: json['genre'],
-          name: json['name'],
-          metadataInterval: json['metadataInterval'],
-          url: json['url'],
-          isPublic: json['isPublic'],
-        );
-
   @override
   String toString() =>
       'bitrate=$bitrate,genre=$genre,name=$name,metadataInterval=$metadataInterval,url=$url,isPublic=$isPublic';
@@ -932,14 +920,6 @@ class IcyMetadata {
       );
 
   IcyMetadata({@required this.info, @required this.headers});
-
-  IcyMetadata.fromJson(Map json)
-      : this(
-          info: json['info'] == null ? null : IcyInfo.fromJson(json['info']),
-          headers: json['headers'] == null
-              ? null
-              : IcyHeaders.fromJson(json['headers']),
-        );
 
   @override
   int get hashCode => info.hashCode ^ headers.hashCode;
@@ -1117,31 +1097,6 @@ abstract class AudioSource {
     }
   }
 
-  static AudioSource fromJson(Map json) {
-    switch (json['type']) {
-      case 'progressive':
-        return ProgressiveAudioSource(Uri.parse(json['uri']),
-            headers: json['headers']);
-      case "dash":
-        return DashAudioSource(Uri.parse(json['uri']),
-            headers: json['headers']);
-      case "hls":
-        return HlsAudioSource(Uri.parse(json['uri']), headers: json['headers']);
-      case "concatenating":
-        return ConcatenatingAudioSource(
-            children: (json['audioSources'] as List)
-                .map((s) => AudioSource.fromJson(s))
-                .toList());
-      case "clipping":
-        return ClippingAudioSource(
-            child: AudioSource.fromJson(json['audioSource']),
-            start: Duration(milliseconds: json['start']),
-            end: Duration(milliseconds: json['end']));
-      default:
-        throw Exception("Unknown AudioSource type: " + json['type']);
-    }
-  }
-
   AudioSource() : _id = _uuid.v4();
 
   @mustCallSuper
@@ -1160,8 +1115,6 @@ abstract class AudioSource {
   bool get _requiresHeaders;
 
   List<IndexedAudioSource> get sequence;
-
-  Map toJson();
 
   @override
   int get hashCode => _id.hashCode;
@@ -1204,7 +1157,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       _overrideUri = Uri.file(
           (await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''))).path);
     } else if (headers != null) {
-      _overrideUri = player._proxy.addUrl(uri, headers);
+      _overrideUri = player._proxy.addUrl(uri, headers.cast<String, String>());
     }
   }
 
@@ -1235,14 +1188,6 @@ abstract class UriAudioSource extends IndexedAudioSource {
 
   @override
   bool get _requiresHeaders => headers != null;
-
-  @override
-  Map toJson() => {
-        'id': _id,
-        'type': _type,
-        'uri': (_overrideUri ?? uri).toString(),
-        'headers': headers,
-      };
 }
 
 /// An [AudioSource] representing a regular media file such as an MP3 or M4A
@@ -1437,14 +1382,6 @@ class ConcatenatingAudioSource extends AudioSource {
       children.any((source) => source._requiresHeaders);
 
   @override
-  Map toJson() => {
-        'id': _id,
-        'type': 'concatenating',
-        'audioSources': children.map((source) => source.toJson()).toList(),
-        'useLazyPreparation': useLazyPreparation,
-      };
-
-  @override
   AudioSourceMessage _toMessage() => ConcatenatingAudioSourceMessage(
       id: _id,
       children: children.map((child) => child._toMessage()).toList(),
@@ -1476,15 +1413,6 @@ class ClippingAudioSource extends IndexedAudioSource {
 
   @override
   bool get _requiresHeaders => child._requiresHeaders;
-
-  @override
-  Map toJson() => {
-        'id': _id,
-        'type': 'clipping',
-        'audioSource': child.toJson(),
-        'start': start?.inMilliseconds,
-        'end': end?.inMilliseconds,
-      };
 
   @override
   AudioSourceMessage _toMessage() => ClippingAudioSourceMessage(
@@ -1519,14 +1447,6 @@ class LoopingAudioSource extends AudioSource {
 
   @override
   bool get _requiresHeaders => child._requiresHeaders;
-
-  @override
-  Map toJson() => {
-        'id': _id,
-        'type': 'looping',
-        'audioSource': child.toJson(),
-        'count': count,
-      };
 
   @override
   AudioSourceMessage _toMessage() => LoopingAudioSourceMessage(
