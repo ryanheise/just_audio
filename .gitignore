@@ -13,3 +13,4 @@ GeneratedPluginRegistrant.java
 GeneratedPluginRegistrant.swift
 build/
 .flutter-plugins
+coverage
