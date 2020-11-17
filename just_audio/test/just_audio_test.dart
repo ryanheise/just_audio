@@ -211,7 +211,7 @@ void runTests() {
     final period = Duration(seconds: 3);
     final position1 = period;
     final position2 = position1 + period;
-    double speed1 = 0.75;
+    final speed1 = 0.75;
     final speed2 = 1.5;
     final stepDuration = period ~/ 5;
     var target = stepDuration;
@@ -219,25 +219,34 @@ void runTests() {
     player.play();
     final stopwatch = Stopwatch();
     stopwatch.start();
-    await for (var position in player.positionStream) {
+
+    var completer = Completer();
+    StreamSubscription subscription;
+    subscription = player.positionStream.listen((position) {
       if (position >= position1) {
-        break;
+        subscription.cancel();
+        completer.complete();
       } else if (position >= target) {
         expectDuration(position, stopwatch.elapsed * speed1);
         target += stepDuration;
       }
-    }
+    });
+    await completer.future;
     player.setSpeed(speed2);
     stopwatch.reset();
+
     target = position1 + target;
-    await for (var position in player.positionStream) {
+    completer = Completer();
+    subscription = player.positionStream.listen((position) {
       if (position >= position2) {
-        break;
+        subscription.cancel();
+        completer.complete();
       } else if (position >= target) {
         expectDuration(position, position1 + stopwatch.elapsed * speed2);
         target += stepDuration;
       }
-    }
+    });
+    await completer.future;
     player.dispose();
   });
 
