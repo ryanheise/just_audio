@@ -35,7 +35,7 @@
     return _playerItem;
 }
 
-- (NSArray *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleOrder {
     return @[@(0)];
 }
 

@@ -26,7 +26,7 @@
     }
 }
 
-- (NSArray *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleOrder {
     return @[];
 }
 

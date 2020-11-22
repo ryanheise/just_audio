@@ -28,12 +28,12 @@
     }
 }
 
-- (NSArray *)getShuffleOrder {
-    NSMutableArray *order = [NSMutableArray new];
+- (NSArray<NSNumber *> *)getShuffleOrder {
+    NSMutableArray<NSNumber *> *order = [NSMutableArray new];
     int offset = (int)[order count];
     for (int i = 0; i < [_audioSources count]; i++) {
         AudioSource *audioSource = _audioSources[i];
-        NSArray *childShuffleOrder = [audioSource getShuffleOrder];
+        NSArray<NSNumber *> *childShuffleOrder = [audioSource getShuffleOrder];
         for (int j = 0; j < [childShuffleOrder count]; j++) {
             [order addObject:@([childShuffleOrder[j] integerValue] + offset)];
         }

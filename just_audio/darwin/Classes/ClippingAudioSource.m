@@ -14,8 +14,8 @@
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _audioSource = audioSource;
-    _start = start == [NSNull null] ? kCMTimeZero : CMTimeMake([start longLongValue], 1000000);
-    _end = end == [NSNull null] ? kCMTimeInvalid : CMTimeMake([end longLongValue], 1000000);
+    _start = start == (id)[NSNull null] ? kCMTimeZero : CMTimeMake([start longLongValue], 1000000);
+    _end = end == (id)[NSNull null] ? kCMTimeInvalid : CMTimeMake([end longLongValue], 1000000);
     return self;
 }
 
@@ -39,7 +39,7 @@
     return _audioSource.playerItem;
 }
 
-- (NSArray *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleOrder {
     return @[@(0)];
 }
 

@@ -16,7 +16,7 @@
 }
 
 - (int)count {
-    return _audioSources.count;
+    return (int)_audioSources.count;
 }
 
 - (void)insertSource:(AudioSource *)audioSource atIndex:(int)index {
@@ -24,7 +24,7 @@
 }
 
 - (void)removeSourcesFromIndex:(int)start toIndex:(int)end {
-    if (end == -1) end = _audioSources.count;
+    if (end == -1) end = (int)_audioSources.count;
     for (int i = start; i < end; i++) {
         [_audioSources removeObjectAtIndex:start];
     }
@@ -50,14 +50,14 @@
     }
 }
 
-- (NSArray *)getShuffleOrder {
-    NSMutableArray *order = [NSMutableArray new];
-    int offset = [order count];
-    NSMutableArray *childOrders = [NSMutableArray new]; // array of array of ints
+- (NSArray<NSNumber *> *)getShuffleOrder {
+    NSMutableArray<NSNumber *> *order = [NSMutableArray new];
+    int offset = (int)[order count];
+    NSMutableArray<NSArray<NSNumber *> *> *childOrders = [NSMutableArray new]; // array of array of ints
     for (int i = 0; i < [_audioSources count]; i++) {
         AudioSource *audioSource = _audioSources[i];
-        NSArray *childShuffleOrder = [audioSource getShuffleOrder];
-        NSMutableArray *offsetChildShuffleOrder = [NSMutableArray new];
+        NSArray<NSNumber *> *childShuffleOrder = [audioSource getShuffleOrder];
+        NSMutableArray<NSNumber *> *offsetChildShuffleOrder = [NSMutableArray new];
         for (int j = 0; j < [childShuffleOrder count]; j++) {
             [offsetChildShuffleOrder addObject:@([childShuffleOrder[j] integerValue] + offset)];
         }
@@ -85,7 +85,7 @@
     for (int i = 0; i < [_audioSources count]; i++) {
         [_shuffleOrder addObject:@(0)];
     }
-    NSLog(@"shuffle: audioSources.count=%d and shuffleOrder.count=%d", [_audioSources count], [_shuffleOrder count]);
+    NSLog(@"shuffle: audioSources.count=%d and shuffleOrder.count=%d", (int)[_audioSources count], (int)[_shuffleOrder count]);
     // First generate a random shuffle
     for (int i = 0; i < [_audioSources count]; i++) {
         int j = arc4random_uniform(i + 1);

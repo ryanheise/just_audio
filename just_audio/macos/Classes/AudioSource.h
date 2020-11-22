@@ -7,7 +7,7 @@
 - (instancetype)initWithId:(NSString *)sid;
 - (int)buildSequence:(NSMutableArray *)sequence treeIndex:(int)treeIndex;
 - (void)findById:(NSString *)sourceId matches:(NSMutableArray<AudioSource *> *)matches;
-- (NSArray *)getShuffleOrder;
+- (NSArray<NSNumber *> *)getShuffleOrder;
 - (int)shuffle:(int)treeIndex currentIndex:(int)currentIndex;
 
 @end
