@@ -151,6 +151,28 @@ abstract class AudioPlayerPlatform {
       ConcatenatingMoveRequest request) {
     throw UnimplementedError("concatenatingMove() has not been implemented.");
   }
+
+  Future<List<MediaRouteInfo>> getAvailableCastDevices() {
+    throw UnimplementedError("getAvailableCastDevices() has not been implemented");
+  }
+
+  Future connectCast(String id) {
+    throw UnimplementedError("connectCast() has not been implemented");
+  }
+}
+
+class MediaRouteInfo {
+  String id;
+  String name;
+  String description;
+
+  MediaRouteInfo({this.id, this.name, this.description});
+
+  factory MediaRouteInfo.fromJson(Map json) => MediaRouteInfo(
+    id: json['id'],
+    name: json['name'],
+    description: json['description']
+  );
 }
 
 /// A playback event communicated from the platform implementation to the

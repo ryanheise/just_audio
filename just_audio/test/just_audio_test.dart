@@ -629,6 +629,17 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _updatePosition = position;
     _updateTime = DateTime.now();
   }
+
+  //Empty sample
+  @override
+  Future<List<MediaRouteInfo>> getAvailableCastDevices() {
+    return null;
+  }
+
+  @override
+  Future connectCast(String id) {
+    return null;
+  }
 }
 
 class MockWebServer {

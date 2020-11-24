@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/just_audio/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio/build" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio_platform_interface/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio_platform_interface/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio_platform_interface/build" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio_web/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio_web/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/just_audio_web/build" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Dart SDK" level="project" />
+    <orderEntry type="library" name="Dart Packages" level="project" />
+  </component>
+</module>

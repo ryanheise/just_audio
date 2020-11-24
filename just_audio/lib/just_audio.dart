@@ -409,6 +409,14 @@ class AudioPlayer {
     return controller.stream.distinct();
   }
 
+  Future<List<MediaRouteInfo>> getAvailableCastDevices() async {
+    return await (await _platform).getAvailableCastDevices();
+  }
+
+  Future connectCast(String id) async {
+    await (await _platform).connectCast(id);
+  }
+
   /// Convenience method to load audio from a URL with optional headers,
   /// equivalent to:
   ///
