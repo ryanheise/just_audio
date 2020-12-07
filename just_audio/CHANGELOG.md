@@ -1,3 +1,10 @@
+## 0.5.7
+
+* Fix podspec error in web package (@timilehinjegede).
+* Fix iOS out-of-range bug.
+* Remove Objective C compiler warnings.
+* Unit tests.
+
 ## 0.5.6
 
 * Fix iOS memory leak.
