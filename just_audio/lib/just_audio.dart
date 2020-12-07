@@ -1278,6 +1278,7 @@ class ConcatenatingAudioSource extends AudioSource {
     children.add(audioSource);
     if (_player != null) {
       _player._broadcastSequence();
+      await audioSource._setup(_player);
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id, index: index, children: [audioSource._toMessage()]));
@@ -1289,6 +1290,7 @@ class ConcatenatingAudioSource extends AudioSource {
     children.insert(index, audioSource);
     if (_player != null) {
       _player._broadcastSequence();
+      await audioSource._setup(_player);
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id, index: index, children: [audioSource._toMessage()]));
@@ -1301,6 +1303,9 @@ class ConcatenatingAudioSource extends AudioSource {
     this.children.addAll(children);
     if (_player != null) {
       _player._broadcastSequence();
+      for (var child in children) {
+        await child._setup(_player);
+      }
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id,
@@ -1314,6 +1319,9 @@ class ConcatenatingAudioSource extends AudioSource {
     this.children.insertAll(index, children);
     if (_player != null) {
       _player._broadcastSequence();
+      for (var child in children) {
+        await child._setup(_player);
+      }
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
               id: _id,
