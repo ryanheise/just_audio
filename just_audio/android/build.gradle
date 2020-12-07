@@ -44,4 +44,5 @@ dependencies {
     implementation 'com.google.android.exoplayer:exoplayer-dash:2.11.7'
     implementation 'com.google.android.exoplayer:exoplayer-hls:2.11.7'
     implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.11.7'
+    implementation 'com.google.android.exoplayer:extension-cast:2.11.7'
 }

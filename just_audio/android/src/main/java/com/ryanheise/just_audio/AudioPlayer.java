@@ -1,8 +1,14 @@
 package com.ryanheise.just_audio;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Handler;
+
+import androidx.mediarouter.media.MediaControlIntent;
+import androidx.mediarouter.media.MediaRouteSelector;
+import androidx.mediarouter.media.MediaRouter;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -11,6 +17,9 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.audio.AudioListener;
+import com.google.android.exoplayer2.ext.cast.CastPlayer;
+import com.google.android.exoplayer2.ext.cast.MediaItem;
+import com.google.android.exoplayer2.ext.cast.SessionAvailabilityListener;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
@@ -31,7 +40,21 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
+import com.google.android.gms.cast.MediaInfo;
+import com.google.android.gms.cast.MediaMetadata;
+import com.google.android.gms.cast.MediaQueueItem;
+import com.google.android.gms.cast.framework.CastContext;
+import com.google.android.gms.cast.framework.CastOptions;
+import com.google.android.gms.cast.framework.CastStateListener;
+import com.google.android.gms.cast.framework.OptionsProvider;
+import com.google.android.gms.cast.framework.Session;
+import com.google.android.gms.cast.framework.SessionManager;
+import com.google.android.gms.cast.framework.SessionManagerListener;
+import com.google.android.gms.cast.framework.SessionProvider;
+import com.google.android.gms.common.images.WebImage;
+
 import io.flutter.Log;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.EventChannel;
@@ -82,6 +105,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private Integer currentIndex;
     private Map<LoopingMediaSource, MediaSource> loopingChildren = new HashMap<>();
     private Map<LoopingMediaSource, Integer> loopingCounts = new HashMap<>();
+
+    private CastContext castContext;
+    private CastPlayer castPlayer;
+    private MediaRouter mediaRouter;
+    private SessionManager sessionManager;
+    private MediaRouteSelector mediaRouteSelector;
+    private boolean castConnected = false;
+
     private final Handler handler = new Handler();
     private final Runnable bufferWatcher = new Runnable() {
         @Override
@@ -91,6 +122,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             }
 
             long newBufferedPosition = player.getBufferedPosition();
+
+            //Cast
+            if (castConnected)
+                newBufferedPosition = castPlayer.getBufferedPosition();
+
             if (newBufferedPosition != bufferedPosition) {
                 bufferedPosition = newBufferedPosition;
                 broadcastPlaybackEvent();
@@ -127,6 +163,53 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             }
         });
         processingState = ProcessingState.none;
+
+        castContext = CastContext.getSharedInstance(context);
+        mediaRouter = MediaRouter.getInstance(context);
+        castPlayer = new CastPlayer(castContext);
+        sessionManager = castContext.getSessionManager();
+
+        //MediaRouteSelector for discovering cast devices
+        mediaRouteSelector = new MediaRouteSelector.Builder()
+                .addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
+                .build();
+        //Request scan
+        mediaRouter.addCallback(mediaRouteSelector, new MediaRouter.Callback() {}, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY);
+
+        castPlayer.setSessionAvailabilityListener(new SessionAvailabilityListener() {
+            @Override
+            public void onCastSessionAvailable() {
+                castConnected = true;
+                //Stop normal player
+                player.stop();
+
+                //Items already in queue
+                if (castPlayer.getItem(0) != null)
+                    return;
+
+                //Session started, load music
+                String audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+                MediaMetadata mediaMetadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK);
+                mediaMetadata.putString(MediaMetadata.KEY_TITLE, "Test title");
+                mediaMetadata.putString(MediaMetadata.KEY_ALBUM_ARTIST, "Test artist");
+                mediaMetadata.addImage(new WebImage(Uri.parse("https://picsum.photos/200")));
+                MediaInfo mediaInfo = new MediaInfo.Builder(audioUrl)
+                        .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                        .setContentType(MimeTypes.AUDIO_UNKNOWN)
+                        .setMetadata(mediaMetadata).build();
+
+                castPlayer.loadItem(new MediaQueueItem.Builder(mediaInfo).build(), 0);
+                broadcastPlaybackEvent();
+            }
+
+            @Override
+            public void onCastSessionUnavailable() {
+                Log.d("DDD", "Exo Cast session unavailable");
+                castPlayer.stop();
+                castConnected = false;
+                broadcastPlaybackEvent();
+            }
+        });
     }
 
     private void startWatchingBuffer() {
@@ -345,6 +428,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 setAudioAttributes((Integer)request.get("contentType"), (Integer)request.get("flags"), (Integer)request.get("usage"));
                 result.success(new HashMap<String, Object>());
                 break;
+            case "getAvailableCastDevices":
+                getAvailableCastDevices(result);
+                break;
+            case "connectCast":
+                connectRoute(call.argument("id").toString());
+                result.success(null);
+                break;
             default:
                 result.notImplemented();
                 break;
@@ -356,6 +446,25 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             e.printStackTrace();
             result.error("Error: " + e, null, null);
         }
+    }
+
+    //All available routes to a list with JSON
+    private void getAvailableCastDevices(Result result) {
+        ArrayList<HashMap<String, String>> out = new ArrayList<>();
+        for (MediaRouter.RouteInfo routeInfo : mediaRouter.getRoutes()) {
+            HashMap route = new HashMap();
+            route.put("id", routeInfo.getId());
+            route.put("name", routeInfo.getName());
+            route.put("description", routeInfo.getDescription());
+            out.add(route);
+        }
+        result.success(out);
+    }
+
+    private void connectRoute(String id) {
+        Intent castIntent = new Intent();
+        castIntent.putExtra("CAST_INTENT_TO_CAST_ROUTE_ID_KEY", id);
+        sessionManager.startSession(castIntent);
     }
 
     // Set the shuffle order for mediaSource, with currentIndex at
@@ -586,6 +695,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private long getCurrentPosition() {
+        //Cast
+        if (castConnected)
+            return castPlayer.getCurrentPosition();
+
         if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
             return 0;
         } else if (seekPos != null && seekPos != C.TIME_UNSET) {
@@ -596,6 +709,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private long getDuration() {
+        //Cast
+        if (castConnected)
+            return castPlayer.getDuration();
+
         if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
             return C.TIME_UNSET;
         } else {
@@ -630,6 +747,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void play(Result result) {
+        //Cast
+        if (castConnected) {
+            castPlayer.setPlayWhenReady(true);
+            result.success(new HashMap<String, Object>());
+            return;
+        }
+
         if (player.getPlayWhenReady()) {
             result.success(new HashMap<String, Object>());
             return;
@@ -647,8 +771,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void pause() {
-        if (!player.getPlayWhenReady()) return;
-        player.setPlayWhenReady(false);
+        //Cast
+        if (castConnected) {
+            if (!castPlayer.getPlayWhenReady()) return;
+            castPlayer.setPlayWhenReady(false);
+        } else {
+            if (!player.getPlayWhenReady()) return;
+            player.setPlayWhenReady(false);
+        }
+
         if (playResult != null) {
             playResult.success(new HashMap<String, Object>());
             playResult = null;
@@ -676,6 +807,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void seek(final long position, final Integer index, final Result result) {
+        if (castConnected)
+            castPlayer.seekTo(index != null ? index : castPlayer.getCurrentWindowIndex(), position);
+
         if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
             result.success(new HashMap<String, Object>());
             return;

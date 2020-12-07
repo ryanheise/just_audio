@@ -4,6 +4,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 
 void main() => runApp(MyApp());
 
@@ -310,6 +311,31 @@ class ControlButtons extends StatelessWidget {
             },
           ),
         ),
+        IconButton(
+          icon: Icon(Icons.cast),
+          onPressed: () async {
+            List<MediaRouteInfo> routes = await player.getAvailableCastDevices();
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('Select device'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(routes.length, (i) => ListTile(
+                    title: Text(routes[i].name??'Invalid device name'),
+                    subtitle: Text(routes[i].description??''),
+                    leading: Icon(Icons.devices),
+                    onTap: () async {
+                      await player.connectCast(routes[i].id);
+                      Navigator.of(context).pop();
+                    },
+                  ))
+                ),
+              )
+            );
+            routes.forEach((r) => print('Route: ${r.id}, ${r.name}'));
+          },
+        )
       ],
     );
   }

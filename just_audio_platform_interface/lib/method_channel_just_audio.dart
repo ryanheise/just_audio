@@ -127,4 +127,16 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
     return ConcatenatingMoveResponse.fromMap(
         await _channel.invokeMethod('concatenatingMove', request?.toMap()));
   }
+
+  @override
+  Future<List<MediaRouteInfo>> getAvailableCastDevices() async {
+    List data = await _channel.invokeMethod('getAvailableCastDevices');
+    return data.map<MediaRouteInfo>((r) => MediaRouteInfo.fromJson(r)).toList();
+  }
+
+  @override
+  Future connectCast(String id) async {
+    await _channel.invokeMethod('connectCast', {"id": id});
+  }
+
 }
