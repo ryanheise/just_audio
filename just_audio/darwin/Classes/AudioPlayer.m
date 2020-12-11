@@ -106,6 +106,9 @@
         } else if ([@"setShuffleMode" isEqualToString:call.method]) {
             [self setShuffleModeEnabled:(BOOL)([request[@"shuffleMode"] intValue] == 1)];
             result(@{});
+        } else if ([@"setShuffleOrder" isEqualToString:call.method]) {
+            [self setShuffleOrder:(NSDictionary *)request[@"audioSources"]];
+            result(@{});
         } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
             [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];
             result(@{});
@@ -115,13 +118,13 @@
                 result(@{});
             }];
         } else if ([@"concatenatingInsertAll" isEqualToString:call.method]) {
-            [self concatenatingInsertAll:(NSString *)request[@"id"] index:[request[@"index"] intValue] sources:(NSArray *)request[@"children"]];
+            [self concatenatingInsertAll:(NSString *)request[@"id"] index:[request[@"index"] intValue] sources:(NSArray *)request[@"children"] shuffleOrder:(NSArray<NSNumber *> *)request[@"shuffleOrder"]];
             result(@{});
         } else if ([@"concatenatingRemoveRange" isEqualToString:call.method]) {
-            [self concatenatingRemoveRange:(NSString *)request[@"id"] start:[request[@"startIndex"] intValue] end:[request[@"endIndex"] intValue]];
+            [self concatenatingRemoveRange:(NSString *)request[@"id"] start:[request[@"startIndex"] intValue] end:[request[@"endIndex"] intValue] shuffleOrder:(NSArray<NSNumber *> *)request[@"shuffleOrder"]];
             result(@{});
         } else if ([@"concatenatingMove" isEqualToString:call.method]) {
-            [self concatenatingMove:(NSString *)request[@"id"] currentIndex:[request[@"currentIndex"] intValue] newIndex:[request[@"newIndex"] intValue]];
+            [self concatenatingMove:(NSString *)request[@"id"] currentIndex:[request[@"currentIndex"] intValue] newIndex:[request[@"newIndex"] intValue] shuffleOrder:(NSArray<NSNumber *> *)request[@"shuffleOrder"]];
             result(@{});
         } else if ([@"setAndroidAudioAttributes" isEqualToString:call.method]) {
             result(@{});
@@ -144,22 +147,7 @@
 }
 
 // Untested
-- (void)concatenatingAdd:(NSString *)catId source:(NSDictionary *)source {
-    [self concatenatingInsertAll:catId index:-1 sources:@[source]];
-}
-
-// Untested
-- (void)concatenatingInsert:(NSString *)catId index:(int)index source:(NSDictionary *)source {
-    [self concatenatingInsertAll:catId index:index sources:@[source]];
-}
-
-// Untested
-- (void)concatenatingAddAll:(NSString *)catId sources:(NSArray *)sources {
-    [self concatenatingInsertAll:catId index:-1 sources:sources];
-}
-
-// Untested
-- (void)concatenatingInsertAll:(NSString *)catId index:(int)index sources:(NSArray *)sources {
+- (void)concatenatingInsertAll:(NSString *)catId index:(int)index sources:(NSArray *)sources shuffleOrder:(NSArray<NSNumber *> *)shuffleOrder {
     // Find all duplicates of the identified ConcatenatingAudioSource.
     NSMutableArray *matches = [[NSMutableArray alloc] init];
     [_audioSource findById:catId matches:matches];
@@ -172,6 +160,7 @@
             AudioSource *audioSource = audioSources[j];
             [catSource insertSource:audioSource atIndex:(idx + j)];
         }
+        [catSource setShuffleOrder:shuffleOrder];
     }
     // Index the new audio sources.
     _indexedAudioSources = [[NSMutableArray alloc] init];
@@ -200,12 +189,7 @@
 }
 
 // Untested
-- (void)concatenatingRemoveAt:(NSString *)catId index:(int)index {
-    [self concatenatingRemoveRange:catId start:index end:(index + 1)];
-}
-
-// Untested
-- (void)concatenatingRemoveRange:(NSString *)catId start:(int)start end:(int)end {
+- (void)concatenatingRemoveRange:(NSString *)catId start:(int)start end:(int)end shuffleOrder:(NSArray<NSNumber *> *)shuffleOrder {
     // Find all duplicates of the identified ConcatenatingAudioSource.
     NSMutableArray *matches = [[NSMutableArray alloc] init];
     [_audioSource findById:catId matches:matches];
@@ -214,6 +198,7 @@
         ConcatenatingAudioSource *catSource = (ConcatenatingAudioSource *)matches[i];
         int endIndex = end >= 0 ? end : catSource.count;
         [catSource removeSourcesFromIndex:start toIndex:endIndex];
+        [catSource setShuffleOrder:shuffleOrder];
     }
     // Re-index the remaining audio sources.
     NSArray<IndexedAudioSource *> *oldIndexedAudioSources = _indexedAudioSources;
@@ -239,7 +224,7 @@
 }
 
 // Untested
-- (void)concatenatingMove:(NSString *)catId currentIndex:(int)currentIndex newIndex:(int)newIndex {
+- (void)concatenatingMove:(NSString *)catId currentIndex:(int)currentIndex newIndex:(int)newIndex shuffleOrder:(NSArray<NSNumber *> *)shuffleOrder {
     // Find all duplicates of the identified ConcatenatingAudioSource.
     NSMutableArray *matches = [[NSMutableArray alloc] init];
     [_audioSource findById:catId matches:matches];
@@ -247,6 +232,7 @@
     for (int i = 0; i < matches.count; i++) {
         ConcatenatingAudioSource *catSource = (ConcatenatingAudioSource *)matches[i];
         [catSource moveSourceFromIndex:currentIndex toIndex:newIndex];
+        [catSource setShuffleOrder:shuffleOrder];
     }
     // Re-index the audio sources.
     _indexedAudioSources = [[NSMutableArray alloc] init];
@@ -254,11 +240,6 @@
     [self updateOrder];
     [self enqueueFrom:[self indexForItem:(IndexedPlayerItem *)_player.currentItem]];
     [self broadcastPlaybackEvent];
-}
-
-// Untested
-- (void)concatenatingClear:(NSString *)catId {
-    [self concatenatingRemoveRange:catId start:0 end:-1];
 }
 
 - (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
@@ -408,7 +389,8 @@
         return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
     } else if ([@"concatenating" isEqualToString:type]) {
         return [[ConcatenatingAudioSource alloc] initWithId:data[@"id"]
-                                               audioSources:[self decodeAudioSources:data[@"children"]]];
+                                               audioSources:[self decodeAudioSources:data[@"children"]]
+                                               shuffleOrder:(NSArray<NSNumber *> *)data[@"shuffleOrder"]];
     } else if ([@"clipping" isEqualToString:type]) {
         return [[ClippingAudioSource alloc] initWithId:data[@"id"]
                                            audioSource:(UriAudioSource *)[self decodeAudioSource:data[@"child"]]
@@ -590,15 +572,12 @@
 }
 
 - (void)updateOrder {
-    if (_shuffleModeEnabled) {
-        [_audioSource shuffle:0 currentIndex: _index];
-    }
     _orderInv = [NSMutableArray arrayWithCapacity:[_indexedAudioSources count]];
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         [_orderInv addObject:@(0)];
     }
     if (_shuffleModeEnabled) {
-        _order = [_audioSource getShuffleOrder];
+        _order = [_audioSource getShuffleIndices];
     } else {
         NSMutableArray *order = [[NSMutableArray alloc] init];
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -1029,6 +1008,10 @@
     [self updateOrder];
 
     [self enqueueFrom:_index];
+}
+
+- (void)setShuffleOrder:(NSDictionary *)dict {
+    [_audioSource decodeShuffleOrder:dict];
 }
 
 - (void)dumpQueue {

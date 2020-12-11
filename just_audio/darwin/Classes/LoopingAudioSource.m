@@ -28,12 +28,12 @@
     }
 }
 
-- (NSArray<NSNumber *> *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleIndices {
     NSMutableArray<NSNumber *> *order = [NSMutableArray new];
     int offset = (int)[order count];
     for (int i = 0; i < [_audioSources count]; i++) {
         AudioSource *audioSource = _audioSources[i];
-        NSArray<NSNumber *> *childShuffleOrder = [audioSource getShuffleOrder];
+        NSArray<NSNumber *> *childShuffleOrder = [audioSource getShuffleIndices];
         for (int j = 0; j < [childShuffleOrder count]; j++) {
             [order addObject:@([childShuffleOrder[j] integerValue] + offset)];
         }
@@ -42,12 +42,12 @@
     return order;
 }
 
-- (int)shuffle:(int)treeIndex currentIndex:(int)currentIndex {
-    // TODO: This should probably shuffle the same way on all duplicates.
+- (void)decodeShuffleOrder:(NSDictionary *)dict {
+    NSDictionary *dictChild = (NSDictionary *)dict[@"child"];
     for (int i = 0; i < [_audioSources count]; i++) {
-        treeIndex = [_audioSources[i] shuffle:treeIndex currentIndex:currentIndex];
+        AudioSource *child = _audioSources[i];
+        [child decodeShuffleOrder:dictChild];
     }
-    return treeIndex;
 }
 
 @end

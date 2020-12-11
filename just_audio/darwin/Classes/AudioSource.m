@@ -26,12 +26,11 @@
     }
 }
 
-- (NSArray<NSNumber *> *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleIndices {
     return @[];
 }
 
-- (int)shuffle:(int)treeIndex currentIndex:(int)currentIndex {
-    return 0;
+- (void)decodeShuffleOrder:(NSDictionary *)dict {
 }
 
 @end

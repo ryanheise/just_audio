@@ -45,7 +45,7 @@ class AudioPlayer {
   bool _disposed = false;
 
   PlaybackEvent _playbackEvent;
-  final _playbackEventSubject = BehaviorSubject<PlaybackEvent>();
+  final _playbackEventSubject = BehaviorSubject<PlaybackEvent>(sync: true);
   Future<Duration> _durationFuture;
   final _durationSubject = BehaviorSubject<Duration>();
   final _processingStateSubject = BehaviorSubject<ProcessingState>();
@@ -56,7 +56,9 @@ class AudioPlayer {
   final _icyMetadataSubject = BehaviorSubject<IcyMetadata>();
   final _playerStateSubject = BehaviorSubject<PlayerState>();
   final _sequenceSubject = BehaviorSubject<List<IndexedAudioSource>>();
-  final _currentIndexSubject = BehaviorSubject<int>();
+  final _shuffleIndicesSubject = BehaviorSubject<List<int>>();
+  final _shuffleIndicesInv = <int>[];
+  final _currentIndexSubject = BehaviorSubject<int>(sync: true);
   final _sequenceStateSubject = BehaviorSubject<SequenceState>();
   final _loopModeSubject = BehaviorSubject<LoopMode>();
   final _shuffleModeEnabledSubject = BehaviorSubject<bool>();
@@ -103,19 +105,29 @@ class AudioPlayer {
         .map((event) => event.currentIndex)
         .distinct()
         .handleError((err, stack) {/* noop */}));
+    currentIndexStream.listen((index) => print('### index: $index'));
     _androidAudioSessionIdSubject.addStream(playbackEventStream
         .map((event) => event.androidAudioSessionId)
         .distinct()
         .handleError((err, stack) {/* noop */}));
-    _sequenceStateSubject.addStream(
-        Rx.combineLatest2<List<IndexedAudioSource>, int, SequenceState>(
+    _sequenceStateSubject.addStream(Rx.combineLatest5<List<IndexedAudioSource>,
+        List<int>, int, bool, LoopMode, SequenceState>(
       sequenceStream,
+      shuffleIndicesStream,
       currentIndexStream,
-      (sequence, currentIndex) {
+      shuffleModeEnabledStream,
+      loopModeStream,
+      (sequence, shuffleIndices, currentIndex, shuffleModeEnabled, loopMode) {
         if (sequence == null) return null;
         if (currentIndex == null) currentIndex = 0;
         currentIndex = min(sequence.length - 1, max(0, currentIndex));
-        return SequenceState(sequence, currentIndex);
+        return SequenceState(
+          sequence,
+          currentIndex,
+          shuffleIndices,
+          shuffleModeEnabled,
+          loopMode,
+        );
       },
     ).distinct().handleError((err, stack) {/* noop */}));
     _playerStateSubject.addStream(
@@ -125,6 +137,8 @@ class AudioPlayer {
                 (playing, event) => PlayerState(playing, event.processingState))
             .distinct()
             .handleError((err, stack) {/* noop */}));
+    _shuffleModeEnabledSubject.add(false);
+    _loopModeSubject.add(LoopMode.off);
     _platform.then((platform) {
       platform.playbackEventMessageStream.listen((message) {
         final playbackEvent = PlaybackEvent(
@@ -140,6 +154,8 @@ class AudioPlayer {
           currentIndex: message.currentIndex,
           androidAudioSessionId: message.androidAudioSessionId,
         );
+        print(
+            "### received event with currentIndex: ${playbackEvent.currentIndex}");
         _durationFuture = Future.value(playbackEvent.duration);
         if (playbackEvent.duration != _playbackEvent.duration) {
           _durationSubject.add(playbackEvent.duration);
@@ -268,6 +284,16 @@ class AudioPlayer {
   Stream<List<IndexedAudioSource>> get sequenceStream =>
       _sequenceSubject.stream;
 
+  /// The current shuffled sequence of indexed audio sources.
+  List<int> get shuffleIndices => _shuffleIndicesSubject.value;
+
+  /// A stream broadcasting the current shuffled sequence of indexed audio
+  /// sources.
+  Stream<List<int>> get shuffleIndicesStream => _shuffleIndicesSubject.stream;
+
+  //List<IndexedAudioSource> get _effectiveSequence =>
+  //    shuffleModeEnabled ? shuffleIndices : sequence;
+
   /// The index of the current item.
   int get currentIndex => _currentIndexSubject.value;
 
@@ -282,14 +308,71 @@ class AudioPlayer {
   Stream<SequenceState> get sequenceStateStream => _sequenceStateSubject.stream;
 
   /// Whether there is another item after the current index.
-  bool get hasNext =>
-      _audioSource != null &&
-      currentIndex != null &&
-      currentIndex + 1 < sequence.length;
+  bool get hasNext => _nextIndex != null;
 
   /// Whether there is another item before the current index.
-  bool get hasPrevious =>
-      _audioSource != null && currentIndex != null && currentIndex > 0;
+  bool get hasPrevious => _previousIndex != null;
+
+  int get _nextIndex => _getRelativeIndex(1);
+  int get _previousIndex => _getRelativeIndex(-1);
+
+  int _getRelativeIndex(int offset) {
+    print('### _getRelativeIndex');
+    print('audioSource = $_audioSource');
+    print('currentIndex = $currentIndex');
+    print('shuffleModeEnabled = $shuffleModeEnabled');
+    if (_audioSource == null ||
+        currentIndex == null ||
+        shuffleModeEnabled == null) return null;
+    if (loopMode == LoopMode.one) return currentIndex;
+    int result;
+    print('shuffleModeEnabled: $shuffleModeEnabled');
+    if (shuffleModeEnabled) {
+      print('shuffleIndices: $shuffleIndices');
+      print('shuffleIndicesInv: $_shuffleIndicesInv');
+      if (shuffleIndices == null) return null;
+      final shufflePos = _shuffleIndicesInv[currentIndex];
+      var newShufflePos = shufflePos + offset;
+      print(
+          'newshufflePos($newShufflePos) >= shuffleIndices.length(${shuffleIndices.length})');
+      if (newShufflePos >= shuffleIndices.length) {
+        if (loopMode == LoopMode.all) {
+          newShufflePos = 0;
+        } else {
+          return null;
+        }
+      }
+      if (newShufflePos < 0) {
+        if (loopMode == LoopMode.all) {
+          newShufflePos = shuffleIndices.length - 1;
+        } else {
+          return null;
+        }
+      }
+      result = shuffleIndices[newShufflePos];
+    } else {
+      print("sequence: $sequence");
+      if (sequence == null) return null;
+      result = currentIndex + offset;
+      print("result($result >= sequence.length(${sequence.length}))");
+      if (result >= sequence.length) {
+        if (loopMode == LoopMode.all) {
+          result = 0;
+        } else {
+          return null;
+        }
+      }
+      if (result < 0) {
+        if (loopMode == LoopMode.all) {
+          result = sequence.length - 1;
+        } else {
+          return null;
+        }
+      }
+    }
+    print("returning $result");
+    return result;
+  }
 
   /// The current loop mode.
   LoopMode get loopMode => _loopModeSubject.value;
@@ -452,6 +535,7 @@ class AudioPlayer {
     if (_disposed) return null;
     try {
       _audioSource = source;
+      print("### set _audioSource = $_audioSource");
       _broadcastSequence();
       final duration = await _load(source,
           initialPosition: initialPosition, initialIndex: initialIndex);
@@ -466,7 +550,30 @@ class AudioPlayer {
   }
 
   void _broadcastSequence() {
+    print("### _broadcastSequence");
     _sequenceSubject.add(_audioSource?.sequence);
+
+    print('sequence: ${_audioSource?.sequence?.length}');
+
+    _updateShuffleIndices();
+  }
+
+  _updateShuffleIndices() {
+    _shuffleIndicesSubject.add(_audioSource?.shuffleIndices);
+    print('shuffle indices: ${_audioSource?.shuffleIndices?.length}');
+    print('shuffleIndices: ${shuffleIndices?.length}');
+    final shuffleIndicesLength = shuffleIndices?.length ?? 0;
+    if (_shuffleIndicesInv.length > shuffleIndicesLength) {
+      _shuffleIndicesInv.removeRange(
+          shuffleIndicesLength, _shuffleIndicesInv.length);
+    } else if (_shuffleIndicesInv.length < shuffleIndicesLength) {
+      _shuffleIndicesInv.addAll(
+          List.filled(shuffleIndicesLength - _shuffleIndicesInv.length, 0));
+    }
+    for (var i = 0; i < shuffleIndicesLength; i++) {
+      _shuffleIndicesInv[shuffleIndices[i]] = i;
+    }
+    print('shuffleIndicesInv: ${_shuffleIndicesInv?.length}');
   }
 
   _registerAudioSource(AudioSource source) {
@@ -475,6 +582,7 @@ class AudioPlayer {
 
   Future<Duration> _load(AudioSource source,
       {Duration initialPosition, int initialIndex}) async {
+    print("### _load with initialIndex=$initialIndex");
     try {
       if (!kIsWeb && source._requiresHeaders) {
         if (_proxy == null) {
@@ -483,6 +591,8 @@ class AudioPlayer {
         }
       }
       await source._setup(this);
+      source._shuffle(initialIndex: initialIndex ?? 0);
+      _updateShuffleIndices();
       _durationFuture = (await _platform)
           .load(LoadRequest(
             audioSourceMessage: source._toMessage(),
@@ -620,6 +730,19 @@ class AudioPlayer {
             enabled ? ShuffleModeMessage.all : ShuffleModeMessage.none));
   }
 
+  /// Recursively shuffles the children of the currently loaded [AudioSource].
+  Future<void> shuffle() async {
+    print(
+        "shuffle. _disposed: $_disposed, currentIndex: $currentIndex, _audioSource: $_audioSource");
+    if (_disposed) return;
+    if (_audioSource == null) return;
+    _audioSource._shuffle(initialIndex: currentIndex);
+    _updateShuffleIndices();
+    print("Shuffle: $shuffleIndices");
+    await (await _platform).setShuffleOrder(
+        SetShuffleOrderRequest(audioSourceMessage: _audioSource._toMessage()));
+  }
+
   /// Sets automaticallyWaitsToMinimizeStalling for AVPlayer in iOS 10.0 or later, defaults to true.
   /// Has no effect on Android clients
   Future<void> setAutomaticallyWaitsToMinimizeStalling(
@@ -657,7 +780,7 @@ class AudioPlayer {
   Future<void> seekToNext() async {
     if (_disposed) return;
     if (hasNext) {
-      await seek(Duration.zero, index: currentIndex + 1);
+      await seek(Duration.zero, index: _nextIndex);
     }
   }
 
@@ -665,7 +788,7 @@ class AudioPlayer {
   Future<void> seekToPrevious() async {
     if (_disposed) return;
     if (hasPrevious) {
-      await seek(Duration.zero, index: currentIndex - 1);
+      await seek(Duration.zero, index: _previousIndex);
     }
   }
 
@@ -694,6 +817,7 @@ class AudioPlayer {
       await (await _platform).dispose(DisposeRequest());
     }
     _audioSource = null;
+    print("### set _audioSource = $_audioSource (dispose)");
     _audioSources.values.forEach((s) => s._dispose());
     _audioSources.clear();
     _proxy?.stop();
@@ -704,6 +828,7 @@ class AudioPlayer {
     await _volumeSubject.close();
     await _speedSubject.close();
     await _sequenceSubject.close();
+    await _shuffleIndicesSubject.close();
   }
 }
 
@@ -940,10 +1065,26 @@ class SequenceState {
   /// The index of the current source in the sequence.
   final int currentIndex;
 
-  SequenceState(this.sequence, this.currentIndex);
+  /// The current shuffle order
+  final List<int> shuffleIndices;
+
+  /// Whether shuffle mode is enabled.
+  final bool shuffleModeEnabled;
+
+  /// The current loop mode.
+  final LoopMode loopMode;
+
+  SequenceState(this.sequence, this.currentIndex, this.shuffleIndices,
+      this.shuffleModeEnabled, this.loopMode);
 
   /// The current source in the sequence.
   IndexedAudioSource get currentSource => sequence[currentIndex];
+
+  /// The effective sequence. This is equivalent to [sequence]. If
+  /// [shuffleModeEnabled] is true, this is modulated by [shuffleIndices].
+  List<IndexedAudioSource> get effectiveSequence => shuffleModeEnabled
+      ? shuffleIndices.map((i) => sequence[i]).toList()
+      : sequence;
 }
 
 /// A local proxy HTTP server for making remote GET requests with headers.
@@ -1105,6 +1246,8 @@ abstract class AudioSource {
     player._registerAudioSource(this);
   }
 
+  void _shuffle({int initialIndex});
+
   @mustCallSuper
   void _dispose() {
     _player = null;
@@ -1115,6 +1258,8 @@ abstract class AudioSource {
   bool get _requiresHeaders;
 
   List<IndexedAudioSource> get sequence;
+
+  List<int> get shuffleIndices;
 
   @override
   int get hashCode => _id.hashCode;
@@ -1130,7 +1275,13 @@ abstract class IndexedAudioSource extends AudioSource {
   IndexedAudioSource(this.tag);
 
   @override
+  void _shuffle({int initialIndex}) {}
+
+  @override
   List<IndexedAudioSource> get sequence => [this];
+
+  @override
+  List<int> get shuffleIndices => [0];
 }
 
 /// An abstract class representing audio sources that are loaded from a URI.
@@ -1258,11 +1409,14 @@ class HlsAudioSource extends UriAudioSource {
 class ConcatenatingAudioSource extends AudioSource {
   final List<AudioSource> children;
   final bool useLazyPreparation;
+  ShuffleOrder _shuffleOrder;
 
   ConcatenatingAudioSource({
     @required this.children,
     this.useLazyPreparation = true,
-  });
+    ShuffleOrder shuffleOrder,
+  }) : _shuffleOrder = shuffleOrder ?? DefaultShuffleOrder()
+          ..insert(0, children.length);
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -1272,28 +1426,60 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
+  @override
+  void _shuffle({int initialIndex}) {
+    int localInitialIndex;
+    // si = index in [sequence]
+    // ci = index in [children] array.
+    for (var ci = 0, si = 0; ci < children.length; ci++) {
+      final child = children[ci];
+      final childLength = child.sequence.length;
+      final initialIndexWithinThisChild = initialIndex != null &&
+          initialIndex >= si &&
+          initialIndex < si + childLength;
+      if (initialIndexWithinThisChild) {
+        localInitialIndex = ci;
+      }
+      final childInitialIndex =
+          initialIndexWithinThisChild ? (initialIndex - si) : null;
+      child._shuffle(initialIndex: childInitialIndex);
+      si += childLength;
+    }
+    print(
+        "cat _shuffle (initialIndex=$initialIndex, localInitialIndex=$localInitialIndex)");
+    _shuffleOrder.shuffle(initialIndex: localInitialIndex);
+  }
+
   /// (Untested) Appends an [AudioSource].
   Future<void> add(AudioSource audioSource) async {
     final index = children.length;
     children.add(audioSource);
+    _shuffleOrder.insert(index, 1);
     if (_player != null) {
       _player._broadcastSequence();
       await audioSource._setup(_player);
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
-              id: _id, index: index, children: [audioSource._toMessage()]));
+              id: _id,
+              index: index,
+              children: [audioSource._toMessage()],
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
   /// (Untested) Inserts an [AudioSource] at [index].
   Future<void> insert(int index, AudioSource audioSource) async {
     children.insert(index, audioSource);
+    _shuffleOrder.insert(index, 1);
     if (_player != null) {
       _player._broadcastSequence();
       await audioSource._setup(_player);
       await (await _player._platform).concatenatingInsertAll(
           ConcatenatingInsertAllRequest(
-              id: _id, index: index, children: [audioSource._toMessage()]));
+              id: _id,
+              index: index,
+              children: [audioSource._toMessage()],
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
@@ -1301,6 +1487,7 @@ class ConcatenatingAudioSource extends AudioSource {
   Future<void> addAll(List<AudioSource> children) async {
     int index = this.children.length;
     this.children.addAll(children);
+    _shuffleOrder.insert(index, children.length);
     if (_player != null) {
       _player._broadcastSequence();
       for (var child in children) {
@@ -1310,13 +1497,15 @@ class ConcatenatingAudioSource extends AudioSource {
           ConcatenatingInsertAllRequest(
               id: _id,
               index: index,
-              children: children.map((child) => child._toMessage()).toList()));
+              children: children.map((child) => child._toMessage()).toList(),
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
   /// (Untested) Insert multiple [AudioSource]s at [index].
   Future<void> insertAll(int index, List<AudioSource> children) async {
     this.children.insertAll(index, children);
+    _shuffleOrder.insert(index, children.length);
     if (_player != null) {
       _player._broadcastSequence();
       for (var child in children) {
@@ -1326,7 +1515,8 @@ class ConcatenatingAudioSource extends AudioSource {
           ConcatenatingInsertAllRequest(
               id: _id,
               index: index,
-              children: children.map((child) => child._toMessage()).toList()));
+              children: children.map((child) => child._toMessage()).toList(),
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
@@ -1334,11 +1524,15 @@ class ConcatenatingAudioSource extends AudioSource {
   /// [ConcatenatingAudioSource] has already been loaded.
   Future<void> removeAt(int index) async {
     children.removeAt(index);
+    _shuffleOrder.removeRange(index, index + 1);
     if (_player != null) {
       _player._broadcastSequence();
       await (await _player._platform).concatenatingRemoveRange(
           ConcatenatingRemoveRangeRequest(
-              id: _id, startIndex: index, endIndex: index + 1));
+              id: _id,
+              startIndex: index,
+              endIndex: index + 1,
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
@@ -1346,33 +1540,46 @@ class ConcatenatingAudioSource extends AudioSource {
   /// to [end] exclusive.
   Future<void> removeRange(int start, int end) async {
     children.removeRange(start, end);
+    _shuffleOrder.removeRange(start, end);
     if (_player != null) {
       _player._broadcastSequence();
       await (await _player._platform).concatenatingRemoveRange(
           ConcatenatingRemoveRangeRequest(
-              id: _id, startIndex: start, endIndex: end));
+              id: _id,
+              startIndex: start,
+              endIndex: end,
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
   /// (Untested) Moves an [AudioSource] from [currentIndex] to [newIndex].
   Future<void> move(int currentIndex, int newIndex) async {
     children.insert(newIndex, children.removeAt(currentIndex));
+    _shuffleOrder.removeRange(currentIndex, currentIndex + 1);
+    _shuffleOrder.insert(newIndex, 1);
     if (_player != null) {
       _player._broadcastSequence();
       await (await _player._platform).concatenatingMove(
           ConcatenatingMoveRequest(
-              id: _id, currentIndex: currentIndex, newIndex: newIndex));
+              id: _id,
+              currentIndex: currentIndex,
+              newIndex: newIndex,
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
   /// (Untested) Removes all [AudioSources].
   Future<void> clear() async {
     children.clear();
+    _shuffleOrder.clear();
     if (_player != null) {
       _player._broadcastSequence();
       await (await _player._platform).concatenatingRemoveRange(
           ConcatenatingRemoveRangeRequest(
-              id: _id, startIndex: 0, endIndex: children.length));
+              id: _id,
+              startIndex: 0,
+              endIndex: children.length,
+              shuffleOrder: _shuffleOrder.indices));
     }
   }
 
@@ -1386,6 +1593,25 @@ class ConcatenatingAudioSource extends AudioSource {
       children.expand((s) => s.sequence).toList();
 
   @override
+  List<int> get shuffleIndices {
+    var offset = 0;
+    final childIndicesList = <List<int>>[];
+    for (var child in children) {
+      final childIndices = child.shuffleIndices.map((i) => i + offset).toList();
+      childIndicesList.add(childIndices);
+      offset += childIndices.length;
+    }
+    final indices = <int>[];
+    for (var index in _shuffleOrder.indices) {
+      final childIndices = childIndicesList[index];
+      //print("child indices: $childIndices");
+      indices.addAll(childIndices);
+    }
+    print("### returning: $indices");
+    return indices;
+  }
+
+  @override
   bool get _requiresHeaders =>
       children.any((source) => source._requiresHeaders);
 
@@ -1393,7 +1619,8 @@ class ConcatenatingAudioSource extends AudioSource {
   AudioSourceMessage _toMessage() => ConcatenatingAudioSourceMessage(
       id: _id,
       children: children.map((child) => child._toMessage()).toList(),
-      useLazyPreparation: useLazyPreparation);
+      useLazyPreparation: useLazyPreparation,
+      shuffleOrder: _shuffleOrder.indices);
 }
 
 /// An [AudioSource] that clips the audio of a [UriAudioSource] between a
@@ -1450,8 +1677,14 @@ class LoopingAudioSource extends AudioSource {
   }
 
   @override
+  void _shuffle({int initialIndex}) {}
+
+  @override
   List<IndexedAudioSource> get sequence =>
       List.generate(count, (i) => child).expand((s) => s.sequence).toList();
+
+  @override
+  List<int> get shuffleIndices => List.generate(count, (i) => i);
 
   @override
   bool get _requiresHeaders => child._requiresHeaders;
@@ -1459,6 +1692,92 @@ class LoopingAudioSource extends AudioSource {
   @override
   AudioSourceMessage _toMessage() => LoopingAudioSourceMessage(
       id: _id, child: child._toMessage(), count: count);
+}
+
+/// Defines the algorithm for shuffling the order of a
+/// [ConcatenatingAudioSource]. See [DefaultShuffleOrder] for a default
+/// implementation.
+abstract class ShuffleOrder {
+  /// The shuffled list of indices of [AudioSource]s to play. For example,
+  /// [2,0,1] specifies to play the 3rd, then the 1st, then the 2nd item.
+  List<int> get indices;
+
+  /// Shuffles the [indices]. If [initialIndex] is provided, the [indices]
+  /// should be shuffled so that [initialIndex] appears in `indices[0]`.
+  void shuffle({int initialIndex});
+
+  /// Inserts [count] new consecutive indices starting from [index] into
+  /// [indices], at random positions.
+  void insert(int index, int count);
+
+  /// Removes the indices that are `>= start` and `< end`.
+  void removeRange(int start, int end);
+
+  /// Removes all indices.
+  void clear();
+}
+
+/// A default implementation of [ShuffleOrder].
+class DefaultShuffleOrder extends ShuffleOrder {
+  final _random;
+  @override
+  final indices = <int>[];
+
+  DefaultShuffleOrder({Random random}) : _random = random ?? Random();
+
+  @override
+  void shuffle({int initialIndex}) {
+    assert(initialIndex == null || indices.contains(initialIndex));
+    print(
+        "### order shuffle, initialIndex: $initialIndex (existing: $indices)");
+    if (indices.length <= 1) return;
+    indices.shuffle(_random);
+    print("now $indices");
+    if (initialIndex == null) return;
+
+    final initialPos = 0;
+    final swapPos = indices.indexOf(initialIndex);
+    // Swap the indices at initialPos and swapPos.
+    final swapIndex = indices[initialPos];
+    indices[initialPos] = initialIndex;
+    indices[swapPos] = swapIndex;
+    print("final $indices");
+  }
+
+  @override
+  void insert(int index, int count) {
+    // Offset indices after insertion point.
+    for (var i = 0; i < indices.length; i++) {
+      if (indices[i] >= index) {
+        indices[i] += count;
+      }
+    }
+    // Insert new indices at random positions after currentIndex.
+    final newIndices = List.generate(count, (i) => index + i);
+    for (var newIndex in newIndices) {
+      final insertionIndex = _random.nextInt(indices.length + 1);
+      indices.insert(insertionIndex, newIndex);
+    }
+  }
+
+  @override
+  void removeRange(int start, int end) {
+    final count = end - start;
+    // Remove old indices.
+    final oldIndices = List.generate(count, (i) => start + i).toSet();
+    indices.removeWhere(oldIndices.contains);
+    // Offset indices after deletion point.
+    for (var i = 0; i < indices.length; i++) {
+      if (indices[i] >= end) {
+        indices[i] -= count;
+      }
+    }
+  }
+
+  @override
+  void clear() {
+    indices.clear();
+  }
 }
 
 enum LoopMode { off, one, all }

@@ -103,6 +103,12 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError("setShuffleMode() has not been implemented.");
   }
 
+  /// Sets the shuffle order.
+  Future<SetShuffleOrderResponse> setShuffleOrder(
+      SetShuffleOrderRequest request) {
+    throw UnimplementedError("setShuffleOrder() has not been implemented.");
+  }
+
   /// On iOS and macOS, sets the automaticallyWaitsToMinimizeStalling option,
   /// and does nothing on other platforms.
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
@@ -432,6 +438,25 @@ class SetShuffleModeResponse {
 enum ShuffleModeMessage { none, all }
 
 /// Information communicated to the platform implementation when setting the
+/// shuffle order.
+class SetShuffleOrderRequest {
+  final AudioSourceMessage audioSourceMessage;
+
+  SetShuffleOrderRequest({@required this.audioSourceMessage});
+
+  Map<dynamic, dynamic> toMap() => {
+        'audioSource': audioSourceMessage.toMap(),
+      };
+}
+
+/// Information returned by the platform implementation after setting the
+/// shuffle order.
+class SetShuffleOrderResponse {
+  static SetShuffleOrderResponse fromMap(Map<dynamic, dynamic> map) =>
+      SetShuffleOrderResponse();
+}
+
+/// Information communicated to the platform implementation when setting the
 /// automaticallyWaitsToMinimizeStalling option.
 class SetAutomaticallyWaitsToMinimizeStallingRequest {
   final bool enabled;
@@ -515,17 +540,20 @@ class ConcatenatingInsertAllRequest {
   final String id;
   final int index;
   final List<AudioSourceMessage> children;
+  final List<int> shuffleOrder;
 
   ConcatenatingInsertAllRequest({
     @required this.id,
     @required this.index,
     @required this.children,
+    @required this.shuffleOrder,
   });
 
   Map<dynamic, dynamic> toMap() => {
         'id': id,
         'index': index,
         'children': children.map((child) => child.toMap()).toList(),
+        'shuffleOrder': shuffleOrder,
       };
 }
 
@@ -542,17 +570,20 @@ class ConcatenatingRemoveRangeRequest {
   final String id;
   final int startIndex;
   final int endIndex;
+  final List<int> shuffleOrder;
 
   ConcatenatingRemoveRangeRequest({
     @required this.id,
     @required this.startIndex,
     @required this.endIndex,
+    @required this.shuffleOrder,
   });
 
   Map<dynamic, dynamic> toMap() => {
         'id': id,
         'startIndex': startIndex,
         'endIndex': endIndex,
+        'shuffleOrder': shuffleOrder,
       };
 }
 
@@ -569,17 +600,20 @@ class ConcatenatingMoveRequest {
   final String id;
   final int currentIndex;
   final int newIndex;
+  final List<int> shuffleOrder;
 
   ConcatenatingMoveRequest({
     @required this.id,
     @required this.currentIndex,
     @required this.newIndex,
+    @required this.shuffleOrder,
   });
 
   Map<dynamic, dynamic> toMap() => {
         'id': id,
         'currentIndex': currentIndex,
         'newIndex': newIndex,
+        'shuffleOrder': shuffleOrder,
       };
 }
 
@@ -678,11 +712,13 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
 class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
   final List<AudioSourceMessage> children;
   final bool useLazyPreparation;
+  final List<int> shuffleOrder;
 
   ConcatenatingAudioSourceMessage({
     @required String id,
     @required this.children,
     @required this.useLazyPreparation,
+    @required this.shuffleOrder,
   }) : super(id: id);
 
   @override
@@ -691,6 +727,7 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
         'id': id,
         'children': children.map((child) => child.toMap()).toList(),
         'useLazyPreparation': useLazyPreparation,
+        'shuffleOrder': shuffleOrder,
       };
 }
 

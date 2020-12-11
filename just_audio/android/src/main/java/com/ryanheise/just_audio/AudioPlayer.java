@@ -80,8 +80,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private Integer audioSessionId;
     private MediaSource mediaSource;
     private Integer currentIndex;
-    private Map<LoopingMediaSource, MediaSource> loopingChildren = new HashMap<>();
-    private Map<LoopingMediaSource, Integer> loopingCounts = new HashMap<>();
     private final Handler handler = new Handler();
     private final Runnable bufferWatcher = new Runnable() {
         @Override
@@ -321,6 +319,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 setShuffleModeEnabled((Integer) request.get("shuffleMode") == 1);
                 result.success(new HashMap<String, Object>());
                 break;
+            case "setShuffleOrder":
+                setShuffleOrder(request.get("audioSource"));
+                result.success(new HashMap<String, Object>());
+                break;
             case "setAutomaticallyWaitsToMinimizeStalling":
                 result.success(new HashMap<String, Object>());
                 break;
@@ -332,14 +334,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             case "concatenatingInsertAll":
                 concatenating(request.get("id"))
                         .addMediaSources((Integer)request.get("index"), getAudioSources(request.get("children")), handler, () -> result.success(new HashMap<String, Object>()));
+                concatenating(request.get("id"))
+                        .setShuffleOrder(decodeShuffleOrder((List<Integer>)request.get("shuffleOrder")));
                 break;
             case "concatenatingRemoveRange":
                 concatenating(request.get("id"))
                         .removeMediaSourceRange((Integer)request.get("startIndex"), (Integer)request.get("endIndex"), handler, () -> result.success(new HashMap<String, Object>()));
+                concatenating(request.get("id"))
+                        .setShuffleOrder(decodeShuffleOrder((List<Integer>)request.get("shuffleOrder")));
                 break;
             case "concatenatingMove":
                 concatenating(request.get("id"))
                         .moveMediaSource((Integer)request.get("currentIndex"), (Integer)request.get("newIndex"), handler, () -> result.success(new HashMap<String, Object>()));
+                concatenating(request.get("id"))
+                        .setShuffleOrder(decodeShuffleOrder((List<Integer>)request.get("shuffleOrder")));
                 break;
             case "setAndroidAudioAttributes":
                 setAudioAttributes((Integer)request.get("contentType"), (Integer)request.get("flags"), (Integer)request.get("usage"));
@@ -358,39 +366,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
     }
 
-    // Set the shuffle order for mediaSource, with currentIndex at
-    // the first position. Traverse the tree incrementing index at each
-    // node.
-    private int setShuffleOrder(MediaSource mediaSource, int index) {
-        if (mediaSource instanceof ConcatenatingMediaSource) {
-            final ConcatenatingMediaSource source = (ConcatenatingMediaSource)mediaSource;
-            // Find which child is current
-            Integer currentChildIndex = null;
-            for (int i = 0; i < source.getSize(); i++) {
-                final int indexBefore = index;
-                final MediaSource child = source.getMediaSource(i);
-                index = setShuffleOrder(child, index);
-                // If currentIndex falls within this child, make this child come first.
-                if (currentIndex >= indexBefore && currentIndex < index) {
-                    currentChildIndex = i;
-                }
-            }
-            // Shuffle so that the current child is first in the shuffle order
-            source.setShuffleOrder(createShuffleOrder(source.getSize(), currentChildIndex));
-        } else if (mediaSource instanceof LoopingMediaSource) {
-            final LoopingMediaSource source = (LoopingMediaSource)mediaSource;
-            // The ExoPlayer API doesn't provide accessors for these so we have
-            // to index them ourselves.
-            MediaSource child = loopingChildren.get(source);
-            int count = loopingCounts.get(source);
-            for (int i = 0; i < count; i++) {
-                index = setShuffleOrder(child, index);
-            }
-        } else {
-            // An actual media item takes up one spot in the playlist.
-            index++;
+    private ShuffleOrder decodeShuffleOrder(List<Integer> indexList) {
+        int[] shuffleIndices = new int[indexList.size()];
+        for (int i = 0; i < shuffleIndices.length; i++) {
+            shuffleIndices[i] = indexList.get(i);
         }
-        return index;
+        return new DefaultShuffleOrder(shuffleIndices, random.nextLong());
     }
 
     private static int[] shuffle(int length, Integer firstIndex) {
@@ -421,6 +402,26 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private ConcatenatingMediaSource concatenating(final Object index) {
         return (ConcatenatingMediaSource)mediaSources.get((String)index);
+    }
+
+    private void setShuffleOrder(final Object json) {
+        Map<?, ?> map = (Map<?, ?>)json;
+        String id = (String)map.get("id");
+        MediaSource mediaSource = mediaSources.get(id);
+        if (mediaSource == null) return;
+        switch ((String)map.get("type")) {
+        case "concatenating":
+            ConcatenatingMediaSource concatenatingMediaSource = (ConcatenatingMediaSource)mediaSource;
+            concatenatingMediaSource.setShuffleOrder(decodeShuffleOrder((List<Integer>)map.get("shuffleOrder")));
+            List<Object> children = (List<Object>)map.get("children");
+            for (Object child : children) {
+                setShuffleOrder(child);
+            }
+            break;
+        case "looping":
+            setShuffleOrder(map.get("child"));
+            break;
+        }
     }
 
     private MediaSource getAudioSource(final Object json) {
@@ -455,7 +456,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             return new ConcatenatingMediaSource(
                     false, // isAtomic
                     (Boolean)map.get("useLazyPreparation"),
-                    new DefaultShuffleOrder(mediaSources.length),
+                    decodeShuffleOrder((List<Integer>)map.get("shuffleOrder")),
                     mediaSources);
         case "clipping":
             Long start = getLong(map.get("start"));
@@ -466,11 +467,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         case "looping":
             Integer count = (Integer)map.get("count");
             MediaSource looperChild = getAudioSource(map.get("child"));
-            LoopingMediaSource looper = new LoopingMediaSource(looperChild, count);
-            // TODO: store both in a single map
-            loopingChildren.put(looper, looperChild);
-            loopingCounts.put(looper, count);
-            return looper;
+            return new LoopingMediaSource(looperChild, count);
         default:
             throw new IllegalArgumentException("Unknown AudioSource type: " + map.get("type"));
         }
@@ -520,9 +517,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         errorCount = 0;
         prepareResult = result;
         transition(ProcessingState.loading);
-        if (player.getShuffleModeEnabled()) {
-            setShuffleOrder(mediaSource, 0);
-        }
         this.mediaSource = mediaSource;
         player.prepare(mediaSource);
     }
@@ -669,9 +663,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void setShuffleModeEnabled(final boolean enabled) {
-        if (enabled) {
-            setShuffleOrder(mediaSource, 0);
-        }
         player.setShuffleModeEnabled(enabled);
     }
 
@@ -694,7 +685,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
         mediaSources.clear();
         mediaSource = null;
-        loopingChildren.clear();
         if (player != null) {
             player.release();
             player = null;

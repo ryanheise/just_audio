@@ -179,8 +179,12 @@ class _MyAppState extends State<MyApp> {
                         icon: shuffleModeEnabled
                             ? Icon(Icons.shuffle, color: Colors.orange)
                             : Icon(Icons.shuffle, color: Colors.grey),
-                        onPressed: () {
-                          _player.setShuffleModeEnabled(!shuffleModeEnabled);
+                        onPressed: () async {
+                          final enable = !shuffleModeEnabled;
+                          if (enable) {
+                            await _player.shuffle();
+                          }
+                          await _player.setShuffleModeEnabled(enable);
                         },
                       );
                     },

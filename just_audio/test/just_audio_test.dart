@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
@@ -42,6 +43,12 @@ void runTests() {
     if (playing != null) {
       expect(player.playing, equals(playing));
     }
+  }
+
+  void checkIndices(List<int> indices, int length) {
+    expect(indices.length, length);
+    final sorted = List.of(indices)..sort();
+    expect(sorted, equals(List.generate(indices.length, (i) => i)));
   }
 
   setUp(() {
@@ -381,6 +388,95 @@ void runTests() {
     expect(AudioSource.uri(Uri.parse('https://a.a/a#.mpd')) is DashAudioSource,
         equals(true));
   });
+
+  test('shuffle order', () async {
+    final shuffleOrder1 = DefaultShuffleOrder(random: Random(1001));
+    checkIndices(shuffleOrder1.indices, 0);
+    //expect(shuffleOrder1.indices, equals([]));
+    shuffleOrder1.insert(0, 5);
+    //expect(shuffleOrder1.indices, equals([3, 0, 2, 4, 1]));
+    checkIndices(shuffleOrder1.indices, 5);
+    shuffleOrder1.insert(3, 2);
+    checkIndices(shuffleOrder1.indices, 7);
+    shuffleOrder1.insert(0, 2);
+    checkIndices(shuffleOrder1.indices, 9);
+    shuffleOrder1.insert(9, 2);
+    checkIndices(shuffleOrder1.indices, 11);
+
+    final indices1 = List.of(shuffleOrder1.indices);
+    shuffleOrder1.shuffle();
+    expect(shuffleOrder1.indices, isNot(indices1));
+    checkIndices(shuffleOrder1.indices, 11);
+    final indices2 = List.of(shuffleOrder1.indices);
+    shuffleOrder1.shuffle(initialIndex: 5);
+    expect(shuffleOrder1.indices[0], equals(5));
+    expect(shuffleOrder1.indices, isNot(indices2));
+    checkIndices(shuffleOrder1.indices, 11);
+
+    shuffleOrder1.removeRange(4, 6);
+    checkIndices(shuffleOrder1.indices, 9);
+    shuffleOrder1.removeRange(0, 2);
+    checkIndices(shuffleOrder1.indices, 7);
+    shuffleOrder1.removeRange(5, 7);
+    checkIndices(shuffleOrder1.indices, 5);
+    shuffleOrder1.removeRange(0, 5);
+    checkIndices(shuffleOrder1.indices, 0);
+
+    shuffleOrder1.insert(0, 5);
+    checkIndices(shuffleOrder1.indices, 5);
+    shuffleOrder1.clear();
+    checkIndices(shuffleOrder1.indices, 0);
+  });
+
+  test('shuffle', () async {
+    AudioSource createSource() => ConcatenatingAudioSource(
+          shuffleOrder: DefaultShuffleOrder(random: Random(1001)),
+          children: [
+            LoopingAudioSource(
+              count: 2,
+              child: ClippingAudioSource(
+                start: Duration(seconds: 60),
+                end: Duration(seconds: 65),
+                child: AudioSource.uri(Uri.parse("https://foo.foo/foo.mp3")),
+                tag: 'a',
+              ),
+            ),
+            AudioSource.uri(
+              Uri.parse("https://bar.bar/bar.mp3"),
+              tag: 'b',
+            ),
+            AudioSource.uri(
+              Uri.parse("https://baz.baz/baz.mp3"),
+              tag: 'c',
+            ),
+            ClippingAudioSource(
+              child: AudioSource.uri(
+                Uri.parse("https://baz.baz/baz.mp3"),
+                tag: 'd',
+              ),
+            ),
+          ],
+        );
+    final source1 = createSource();
+    //expect(source1.shuffleIndices, [4, 0, 1, 3, 2]);
+    checkIndices(source1.shuffleIndices, 5);
+    expect(source1.shuffleIndices.skipWhile((i) => i != 0).skip(1).first,
+        equals(1));
+    final player1 = AudioPlayer();
+    await player1.load(source1);
+    checkIndices(player1.shuffleIndices, 5);
+    expect(player1.shuffleIndices.first, equals(0));
+    await player1.seek(Duration.zero, index: 3);
+    await player1.shuffle();
+    checkIndices(player1.shuffleIndices, 5);
+    expect(player1.shuffleIndices.first, equals(3));
+
+    final source2 = createSource();
+    final player2 = AudioPlayer();
+    await player2.load(source2, initialIndex: 3);
+    checkIndices(player2.shuffleIndices, 5);
+    expect(player2.shuffleIndices.first, equals(3));
+  });
 }
 
 class MockJustAudio extends Mock
@@ -541,6 +637,12 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       SetShuffleModeRequest request) async {
     _shuffleModeEnabled = request.shuffleMode == ShuffleModeMessage.all;
     return SetShuffleModeResponse();
+  }
+
+  @override
+  Future<SetShuffleOrderResponse> setShuffleOrder(
+      SetShuffleOrderRequest request) async {
+    return SetShuffleOrderResponse();
   }
 
   @override

@@ -39,7 +39,7 @@
     return _audioSource.playerItem;
 }
 
-- (NSArray<NSNumber *> *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleIndices {
     return @[@(0)];
 }
 

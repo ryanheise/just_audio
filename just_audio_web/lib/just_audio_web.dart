@@ -112,7 +112,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     final sequence = _audioSourcePlayer.sequence;
     List<int> order = List<int>(sequence.length);
     if (_shuffleModeEnabled) {
-      order = _audioSourcePlayer.shuffleOrder;
+      order = _audioSourcePlayer.shuffleIndices;
     } else {
       for (var i = 0; i < order.length; i++) {
         order[i] = i;
@@ -181,9 +181,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _currentAudioSourcePlayer?.pause();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = request.initialIndex ?? 0;
-    if (_shuffleModeEnabled) {
-      _audioSourcePlayer?.shuffle(0, _index);
-    }
     final duration = await _currentAudioSourcePlayer.load();
     if (request.initialPosition != null) {
       await _currentAudioSourcePlayer
@@ -259,10 +256,28 @@ class Html5AudioPlayer extends JustAudioPlayer {
   Future<SetShuffleModeResponse> setShuffleMode(
       SetShuffleModeRequest request) async {
     _shuffleModeEnabled = request.shuffleMode == ShuffleModeMessage.all;
-    if (_shuffleModeEnabled) {
-      _audioSourcePlayer?.shuffle(0, _index);
-    }
     return SetShuffleModeResponse();
+  }
+
+  @override
+  Future<SetShuffleOrderResponse> setShuffleOrder(
+      SetShuffleOrderRequest request) async {
+    void internalSetShuffleOrder(AudioSourceMessage sourceMessage) {
+      final audioSourcePlayer = _audioSourcePlayers[sourceMessage.id];
+      if (audioSourcePlayer == null) return;
+      if (sourceMessage is ConcatenatingAudioSourceMessage &&
+          audioSourcePlayer is ConcatenatingAudioSourcePlayer) {
+        audioSourcePlayer.setShuffleOrder(sourceMessage.shuffleOrder);
+        for (var childMessage in sourceMessage.children) {
+          internalSetShuffleOrder(childMessage);
+        }
+      } else if (sourceMessage is LoopingAudioSourceMessage) {
+        internalSetShuffleOrder(sourceMessage.child);
+      }
+    }
+
+    internalSetShuffleOrder(request.audioSourceMessage);
+    return SetShuffleOrderResponse();
   }
 
   @override
@@ -294,6 +309,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
       ConcatenatingInsertAllRequest request) async {
     _concatenating(request.id)
         .insertAll(request.index, getAudioSources(request.children));
+    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     if (request.index <= _index) {
       _index += request.children.length;
     }
@@ -309,6 +325,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     }
     _concatenating(request.id)
         .removeRange(request.startIndex, request.endIndex);
+    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     if (_index >= request.startIndex && _index < request.endIndex) {
       // Skip backward if there's nothing after this
       if (request.startIndex >= _audioSourcePlayer.sequence.length) {
@@ -332,6 +349,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request) async {
     _concatenating(request.id).move(request.currentIndex, request.newIndex);
+    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     if (request.currentIndex == _index) {
       _index = request.newIndex;
     } else if (request.currentIndex < _index && request.newIndex >= _index) {
@@ -401,7 +419,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
           this,
           audioSourceMessage.id,
           getAudioSources(audioSourceMessage.children),
-          audioSourceMessage.useLazyPreparation);
+          audioSourceMessage.useLazyPreparation,
+          audioSourceMessage.shuffleOrder);
     } else if (audioSourceMessage is ClippingAudioSourceMessage) {
       return ClippingAudioSourcePlayer(
           this,
@@ -426,9 +445,7 @@ abstract class AudioSourcePlayer {
 
   List<IndexedAudioSourcePlayer> get sequence;
 
-  List<int> get shuffleOrder;
-
-  int shuffle(int treeIndex, int currentIndex);
+  List<int> get shuffleIndices;
 }
 
 abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
@@ -456,9 +473,6 @@ abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
   AudioElement get _audioElement => html5AudioPlayer._audioElement;
 
   @override
-  int shuffle(int treeIndex, int currentIndex) => treeIndex + 1;
-
-  @override
   String toString() => "${this.runtimeType}";
 }
 
@@ -477,7 +491,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   List<IndexedAudioSourcePlayer> get sequence => [this];
 
   @override
-  List<int> get shuffleOrder => [0];
+  List<int> get shuffleIndices => [0];
 
   @override
   Future<Duration> load() async {
@@ -566,33 +580,13 @@ class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
 }
 
 class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
-  static List<int> generateShuffleOrder(int length, [int firstIndex]) {
-    final shuffleOrder = List<int>(length);
-    for (var i = 0; i < length; i++) {
-      final j = _random.nextInt(i + 1);
-      shuffleOrder[i] = shuffleOrder[j];
-      shuffleOrder[j] = i;
-    }
-    if (firstIndex != null) {
-      for (var i = 1; i < length; i++) {
-        if (shuffleOrder[i] == firstIndex) {
-          final v = shuffleOrder[0];
-          shuffleOrder[0] = shuffleOrder[i];
-          shuffleOrder[i] = v;
-          break;
-        }
-      }
-    }
-    return shuffleOrder;
-  }
-
   final List<AudioSourcePlayer> audioSourcePlayers;
   final bool useLazyPreparation;
   List<int> _shuffleOrder;
 
   ConcatenatingAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id,
-      this.audioSourcePlayers, this.useLazyPreparation)
-      : _shuffleOrder = generateShuffleOrder(audioSourcePlayers.length),
+      this.audioSourcePlayers, this.useLazyPreparation, List<int> shuffleOrder)
+      : _shuffleOrder = shuffleOrder,
         super(html5AudioPlayer, id);
 
   @override
@@ -600,14 +594,14 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
       audioSourcePlayers.expand((p) => p.sequence).toList();
 
   @override
-  List<int> get shuffleOrder {
+  List<int> get shuffleIndices {
     final order = <int>[];
     var offset = order.length;
     final childOrders = <List<int>>[];
     for (var audioSourcePlayer in audioSourcePlayers) {
-      final childShuffleOrder = audioSourcePlayer.shuffleOrder;
-      childOrders.add(childShuffleOrder.map((i) => i + offset).toList());
-      offset += childShuffleOrder.length;
+      final childShuffleIndices = audioSourcePlayer.shuffleIndices;
+      childOrders.add(childShuffleIndices.map((i) => i + offset).toList());
+      offset += childShuffleIndices.length;
     }
     for (var i = 0; i < childOrders.length; i++) {
       order.addAll(childOrders[_shuffleOrder[i]]);
@@ -615,21 +609,8 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
     return order;
   }
 
-  @override
-  int shuffle(int treeIndex, int currentIndex) {
-    int currentChildIndex;
-    for (var i = 0; i < audioSourcePlayers.length; i++) {
-      final indexBefore = treeIndex;
-      final child = audioSourcePlayers[i];
-      treeIndex = child.shuffle(treeIndex, currentIndex);
-      if (currentIndex >= indexBefore && currentIndex < treeIndex) {
-        currentChildIndex = i;
-      } else {}
-    }
-    // Shuffle so that the current child is first in the shuffle order
-    _shuffleOrder =
-        generateShuffleOrder(audioSourcePlayers.length, currentChildIndex);
-    return treeIndex;
+  void setShuffleOrder(List<int> shuffleOrder) {
+    _shuffleOrder = shuffleOrder;
   }
 
   insertAll(int index, List<AudioSourcePlayer> players) {
@@ -639,8 +620,6 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
         _shuffleOrder[i] += players.length;
       }
     }
-    _shuffleOrder.addAll(
-        List.generate(players.length, (i) => index + i).toList()..shuffle());
   }
 
   removeRange(int start, int end) {
@@ -650,7 +629,6 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
         _shuffleOrder[i] -= (end - start);
       }
     }
-    _shuffleOrder.removeWhere((i) => i >= start && i < end);
   }
 
   move(int currentIndex, int newIndex) {
@@ -675,7 +653,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   List<IndexedAudioSourcePlayer> get sequence => [this];
 
   @override
-  List<int> get shuffleOrder => [0];
+  List<int> get shuffleIndices => [0];
 
   @override
   Future<Duration> load() async {
@@ -799,22 +777,14 @@ class LoopingAudioSourcePlayer extends AudioSourcePlayer {
           .toList();
 
   @override
-  List<int> get shuffleOrder {
+  List<int> get shuffleIndices {
     final order = <int>[];
     var offset = order.length;
     for (var i = 0; i < count; i++) {
-      final childShuffleOrder = audioSourcePlayer.shuffleOrder;
+      final childShuffleOrder = audioSourcePlayer.shuffleIndices;
       order.addAll(childShuffleOrder.map((i) => i + offset).toList());
       offset += childShuffleOrder.length;
     }
     return order;
-  }
-
-  @override
-  int shuffle(int treeIndex, int currentIndex) {
-    for (var i = 0; i < count; i++) {
-      treeIndex = audioSourcePlayer.shuffle(treeIndex, currentIndex);
-    }
-    return treeIndex;
   }
 }

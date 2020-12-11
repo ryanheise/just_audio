@@ -42,10 +42,6 @@
     return treeIndex + 1;
 }
 
-- (int)shuffle:(int)treeIndex currentIndex:(int)currentIndex {
-    return treeIndex + 1;
-}
-
 - (void)attach:(AVQueuePlayer *)player {
     _isAttached = YES;
 }

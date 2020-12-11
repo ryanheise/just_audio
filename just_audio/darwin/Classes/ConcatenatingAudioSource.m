@@ -5,13 +5,14 @@
 
 @implementation ConcatenatingAudioSource {
     NSMutableArray<AudioSource *> *_audioSources;
-    NSMutableArray<NSNumber *> *_shuffleOrder;
+    NSArray<NSNumber *> *_shuffleOrder;
 }
 
-- (instancetype)initWithId:(NSString *)sid audioSources:(NSMutableArray<AudioSource *> *)audioSources {
+- (instancetype)initWithId:(NSString *)sid audioSources:(NSMutableArray<AudioSource *> *)audioSources shuffleOrder:(NSArray<NSNumber *> *)shuffleOrder {
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _audioSources = audioSources;
+    _shuffleOrder = shuffleOrder;
     return self;
 }
 
@@ -50,19 +51,19 @@
     }
 }
 
-- (NSArray<NSNumber *> *)getShuffleOrder {
+- (NSArray<NSNumber *> *)getShuffleIndices {
     NSMutableArray<NSNumber *> *order = [NSMutableArray new];
     int offset = (int)[order count];
     NSMutableArray<NSArray<NSNumber *> *> *childOrders = [NSMutableArray new]; // array of array of ints
     for (int i = 0; i < [_audioSources count]; i++) {
         AudioSource *audioSource = _audioSources[i];
-        NSArray<NSNumber *> *childShuffleOrder = [audioSource getShuffleOrder];
+        NSArray<NSNumber *> *childShuffleIndices = [audioSource getShuffleIndices];
         NSMutableArray<NSNumber *> *offsetChildShuffleOrder = [NSMutableArray new];
-        for (int j = 0; j < [childShuffleOrder count]; j++) {
-            [offsetChildShuffleOrder addObject:@([childShuffleOrder[j] integerValue] + offset)];
+        for (int j = 0; j < [childShuffleIndices count]; j++) {
+            [offsetChildShuffleOrder addObject:@([childShuffleIndices[j] integerValue] + offset)];
         }
         [childOrders addObject:offsetChildShuffleOrder];
-        offset += [childShuffleOrder count];
+        offset += [childShuffleIndices count];
     }
     for (int i = 0; i < [_audioSources count]; i++) {
         [order addObjectsFromArray:childOrders[[_shuffleOrder[i] integerValue]]];
@@ -70,40 +71,22 @@
     return order;
 }
 
-- (int)shuffle:(int)treeIndex currentIndex:(int)currentIndex {
-    int currentChildIndex = -1;
+- (void)setShuffleOrder:(NSArray<NSNumber *> *)shuffleOrder {
+    _shuffleOrder = shuffleOrder;
+}
+
+- (void)decodeShuffleOrder:(NSDictionary *)dict {
+    _shuffleOrder = (NSArray<NSNumber *> *)dict[@"shuffleOrder"];
+    NSArray *dictChildren = (NSArray *)dict[@"children"];
+    if (_audioSources.count != dictChildren.count) {
+        NSLog(@"decodeShuffleOrder Concatenating children don't match");
+        return;
+    }
     for (int i = 0; i < [_audioSources count]; i++) {
-        int indexBefore = treeIndex;
         AudioSource *child = _audioSources[i];
-        treeIndex = [child shuffle:treeIndex currentIndex:currentIndex];
-        if (currentIndex >= indexBefore && currentIndex < treeIndex) {
-            currentChildIndex = i;
-        } else {}
+        NSDictionary *dictChild = (NSDictionary *)dictChildren[i];
+        [child decodesetShuffleOrder:dictChild];
     }
-    // Shuffle so that the current child is first in the shuffle order
-    _shuffleOrder = [NSMutableArray arrayWithCapacity:[_audioSources count]];
-    for (int i = 0; i < [_audioSources count]; i++) {
-        [_shuffleOrder addObject:@(0)];
-    }
-    NSLog(@"shuffle: audioSources.count=%d and shuffleOrder.count=%d", (int)[_audioSources count], (int)[_shuffleOrder count]);
-    // First generate a random shuffle
-    for (int i = 0; i < [_audioSources count]; i++) {
-        int j = arc4random_uniform(i + 1);
-        _shuffleOrder[i] = _shuffleOrder[j];
-        _shuffleOrder[j] = @(i);
-    }
-    // Then bring currentIndex to the front
-    if (currentChildIndex != -1) {
-      for (int i = 1; i < [_audioSources count]; i++) {
-        if ([_shuffleOrder[i] integerValue] == currentChildIndex) {
-          NSNumber *v = _shuffleOrder[0];
-          _shuffleOrder[0] = _shuffleOrder[i];
-          _shuffleOrder[i] = v;
-          break;
-        }
-      }
-    }
-    return treeIndex;
 }
 
 @end
