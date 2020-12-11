@@ -78,17 +78,7 @@ class AudioPlayer {
 
   AudioPlayer._internal(this._id, bool handleInterruptions)
       : _platform = _init(_id) {
-    _playbackEvent = PlaybackEvent(
-      processingState: ProcessingState.none,
-      updatePosition: Duration.zero,
-      updateTime: DateTime.now(),
-      bufferedPosition: Duration.zero,
-      duration: null,
-      icyMetadata: null,
-      currentIndex: null,
-      androidAudioSessionId: null,
-    );
-    _playbackEventSubject.add(_playbackEvent);
+    _playbackEventSubject.add(_playbackEvent = PlaybackEvent());
     _processingStateSubject.addStream(playbackEventStream
         .map((event) => event.processingState)
         .distinct()
@@ -851,15 +841,15 @@ class PlaybackEvent {
   final int androidAudioSessionId;
 
   PlaybackEvent({
-    @required this.processingState,
-    @required this.updateTime,
-    @required this.updatePosition,
-    @required this.bufferedPosition,
-    @required this.duration,
-    @required this.icyMetadata,
-    @required this.currentIndex,
-    @required this.androidAudioSessionId,
-  });
+    this.processingState = ProcessingState.none,
+    DateTime updateTime,
+    this.updatePosition = Duration.zero,
+    this.bufferedPosition = Duration.zero,
+    this.duration,
+    this.icyMetadata,
+    this.currentIndex,
+    this.androidAudioSessionId,
+  }) : this.updateTime = updateTime ?? DateTime.now();
 
   PlaybackEvent copyWith({
     ProcessingState processingState,
