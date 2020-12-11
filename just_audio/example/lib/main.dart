@@ -284,7 +284,8 @@ class ControlButtons extends StatelessWidget {
               return IconButton(
                 icon: Icon(Icons.replay),
                 iconSize: 64.0,
-                onPressed: () => player.seek(Duration.zero, index: 0),
+                onPressed: () => player.seek(Duration.zero,
+                    index: player.effectiveIndices.first),
               );
             }
           },

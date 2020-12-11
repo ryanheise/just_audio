@@ -105,7 +105,6 @@ class AudioPlayer {
         .map((event) => event.currentIndex)
         .distinct()
         .handleError((err, stack) {/* noop */}));
-    currentIndexStream.listen((index) => print('### index: $index'));
     _androidAudioSessionIdSubject.addStream(playbackEventStream
         .map((event) => event.androidAudioSessionId)
         .distinct()
@@ -154,8 +153,6 @@ class AudioPlayer {
           currentIndex: message.currentIndex,
           androidAudioSessionId: message.androidAudioSessionId,
         );
-        print(
-            "### received event with currentIndex: ${playbackEvent.currentIndex}");
         _durationFuture = Future.value(playbackEvent.duration);
         if (playbackEvent.duration != _playbackEvent.duration) {
           _durationSubject.add(playbackEvent.duration);
@@ -308,69 +305,48 @@ class AudioPlayer {
   Stream<SequenceState> get sequenceStateStream => _sequenceStateSubject.stream;
 
   /// Whether there is another item after the current index.
-  bool get hasNext => _nextIndex != null;
+  bool get hasNext => nextIndex != null;
 
   /// Whether there is another item before the current index.
-  bool get hasPrevious => _previousIndex != null;
+  bool get hasPrevious => previousIndex != null;
 
-  int get _nextIndex => _getRelativeIndex(1);
-  int get _previousIndex => _getRelativeIndex(-1);
+  /// Returns [shuffleIndices] if [shuffleModeEnabled] is `true`, otherwise
+  /// returns the unshuffled indices.
+  List<int> get effectiveIndices {
+    if (shuffleIndices == null || sequence == null) return null;
+    return shuffleModeEnabled
+        ? shuffleIndices
+        : List.generate(sequence.length, (i) => i);
+  }
+
+  List<int> get _effectiveIndicesInv {
+    if (shuffleIndices == null || sequence == null) return null;
+    return shuffleModeEnabled
+        ? _shuffleIndicesInv
+        : List.generate(sequence.length, (i) => i);
+  }
+
+  int get nextIndex => _getRelativeIndex(1);
+  int get previousIndex => _getRelativeIndex(-1);
 
   int _getRelativeIndex(int offset) {
-    print('### _getRelativeIndex');
-    print('audioSource = $_audioSource');
-    print('currentIndex = $currentIndex');
-    print('shuffleModeEnabled = $shuffleModeEnabled');
     if (_audioSource == null ||
         currentIndex == null ||
         shuffleModeEnabled == null) return null;
     if (loopMode == LoopMode.one) return currentIndex;
-    int result;
-    print('shuffleModeEnabled: $shuffleModeEnabled');
-    if (shuffleModeEnabled) {
-      print('shuffleIndices: $shuffleIndices');
-      print('shuffleIndicesInv: $_shuffleIndicesInv');
-      if (shuffleIndices == null) return null;
-      final shufflePos = _shuffleIndicesInv[currentIndex];
-      var newShufflePos = shufflePos + offset;
-      print(
-          'newshufflePos($newShufflePos) >= shuffleIndices.length(${shuffleIndices.length})');
-      if (newShufflePos >= shuffleIndices.length) {
-        if (loopMode == LoopMode.all) {
-          newShufflePos = 0;
-        } else {
-          return null;
-        }
-      }
-      if (newShufflePos < 0) {
-        if (loopMode == LoopMode.all) {
-          newShufflePos = shuffleIndices.length - 1;
-        } else {
-          return null;
-        }
-      }
-      result = shuffleIndices[newShufflePos];
-    } else {
-      print("sequence: $sequence");
-      if (sequence == null) return null;
-      result = currentIndex + offset;
-      print("result($result >= sequence.length(${sequence.length}))");
-      if (result >= sequence.length) {
-        if (loopMode == LoopMode.all) {
-          result = 0;
-        } else {
-          return null;
-        }
-      }
-      if (result < 0) {
-        if (loopMode == LoopMode.all) {
-          result = sequence.length - 1;
-        } else {
-          return null;
-        }
+    final effectiveIndices = this.effectiveIndices;
+    if (effectiveIndices == null) return null;
+    final effectiveIndicesInv = _effectiveIndicesInv;
+    final invPos = effectiveIndicesInv[currentIndex];
+    var newInvPos = invPos + offset;
+    if (newInvPos >= effectiveIndices.length || newInvPos < 0) {
+      if (loopMode == LoopMode.all) {
+        newInvPos %= effectiveIndices.length;
+      } else {
+        return null;
       }
     }
-    print("returning $result");
+    final result = effectiveIndices[newInvPos];
     return result;
   }
 
@@ -535,7 +511,6 @@ class AudioPlayer {
     if (_disposed) return null;
     try {
       _audioSource = source;
-      print("### set _audioSource = $_audioSource");
       _broadcastSequence();
       final duration = await _load(source,
           initialPosition: initialPosition, initialIndex: initialIndex);
@@ -550,18 +525,12 @@ class AudioPlayer {
   }
 
   void _broadcastSequence() {
-    print("### _broadcastSequence");
     _sequenceSubject.add(_audioSource?.sequence);
-
-    print('sequence: ${_audioSource?.sequence?.length}');
-
     _updateShuffleIndices();
   }
 
   _updateShuffleIndices() {
     _shuffleIndicesSubject.add(_audioSource?.shuffleIndices);
-    print('shuffle indices: ${_audioSource?.shuffleIndices?.length}');
-    print('shuffleIndices: ${shuffleIndices?.length}');
     final shuffleIndicesLength = shuffleIndices?.length ?? 0;
     if (_shuffleIndicesInv.length > shuffleIndicesLength) {
       _shuffleIndicesInv.removeRange(
@@ -573,7 +542,6 @@ class AudioPlayer {
     for (var i = 0; i < shuffleIndicesLength; i++) {
       _shuffleIndicesInv[shuffleIndices[i]] = i;
     }
-    print('shuffleIndicesInv: ${_shuffleIndicesInv?.length}');
   }
 
   _registerAudioSource(AudioSource source) {
@@ -582,7 +550,6 @@ class AudioPlayer {
 
   Future<Duration> _load(AudioSource source,
       {Duration initialPosition, int initialIndex}) async {
-    print("### _load with initialIndex=$initialIndex");
     try {
       if (!kIsWeb && source._requiresHeaders) {
         if (_proxy == null) {
@@ -732,13 +699,10 @@ class AudioPlayer {
 
   /// Recursively shuffles the children of the currently loaded [AudioSource].
   Future<void> shuffle() async {
-    print(
-        "shuffle. _disposed: $_disposed, currentIndex: $currentIndex, _audioSource: $_audioSource");
     if (_disposed) return;
     if (_audioSource == null) return;
     _audioSource._shuffle(initialIndex: currentIndex);
     _updateShuffleIndices();
-    print("Shuffle: $shuffleIndices");
     await (await _platform).setShuffleOrder(
         SetShuffleOrderRequest(audioSourceMessage: _audioSource._toMessage()));
   }
@@ -776,19 +740,17 @@ class AudioPlayer {
     }
   }
 
-  /// Seek to the next item.
+  /// Seek to the next item, or does nothing if there is no next item.
   Future<void> seekToNext() async {
-    if (_disposed) return;
     if (hasNext) {
-      await seek(Duration.zero, index: _nextIndex);
+      await seek(Duration.zero, index: nextIndex);
     }
   }
 
-  /// Seek to the previous item.
+  /// Seek to the previous item, or does nothing if there is no previous item.
   Future<void> seekToPrevious() async {
-    if (_disposed) return;
     if (hasPrevious) {
-      await seek(Duration.zero, index: _previousIndex);
+      await seek(Duration.zero, index: previousIndex);
     }
   }
 
@@ -817,7 +779,6 @@ class AudioPlayer {
       await (await _platform).dispose(DisposeRequest());
     }
     _audioSource = null;
-    print("### set _audioSource = $_audioSource (dispose)");
     _audioSources.values.forEach((s) => s._dispose());
     _audioSources.clear();
     _proxy?.stop();
@@ -1445,8 +1406,6 @@ class ConcatenatingAudioSource extends AudioSource {
       child._shuffle(initialIndex: childInitialIndex);
       si += childLength;
     }
-    print(
-        "cat _shuffle (initialIndex=$initialIndex, localInitialIndex=$localInitialIndex)");
     _shuffleOrder.shuffle(initialIndex: localInitialIndex);
   }
 
@@ -1603,11 +1562,8 @@ class ConcatenatingAudioSource extends AudioSource {
     }
     final indices = <int>[];
     for (var index in _shuffleOrder.indices) {
-      final childIndices = childIndicesList[index];
-      //print("child indices: $childIndices");
-      indices.addAll(childIndices);
+      indices.addAll(childIndicesList[index]);
     }
-    print("### returning: $indices");
     return indices;
   }
 
@@ -1728,11 +1684,8 @@ class DefaultShuffleOrder extends ShuffleOrder {
   @override
   void shuffle({int initialIndex}) {
     assert(initialIndex == null || indices.contains(initialIndex));
-    print(
-        "### order shuffle, initialIndex: $initialIndex (existing: $indices)");
     if (indices.length <= 1) return;
     indices.shuffle(_random);
-    print("now $indices");
     if (initialIndex == null) return;
 
     final initialPos = 0;
@@ -1741,7 +1694,6 @@ class DefaultShuffleOrder extends ShuffleOrder {
     final swapIndex = indices[initialPos];
     indices[initialPos] = initialIndex;
     indices[swapPos] = swapIndex;
-    print("final $indices");
   }
 
   @override
