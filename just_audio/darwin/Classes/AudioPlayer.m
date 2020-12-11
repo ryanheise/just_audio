@@ -107,7 +107,7 @@
             [self setShuffleModeEnabled:(BOOL)([request[@"shuffleMode"] intValue] == 1)];
             result(@{});
         } else if ([@"setShuffleOrder" isEqualToString:call.method]) {
-            [self setShuffleOrder:(NSDictionary *)request[@"audioSources"]];
+            [self setShuffleOrder:(NSDictionary *)request[@"audioSource"]];
             result(@{});
         } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
             [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];

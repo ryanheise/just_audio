@@ -85,7 +85,7 @@
     for (int i = 0; i < [_audioSources count]; i++) {
         AudioSource *child = _audioSources[i];
         NSDictionary *dictChild = (NSDictionary *)dictChildren[i];
-        [child decodesetShuffleOrder:dictChild];
+        [child decodeShuffleOrder:dictChild];
     }
 }
 
