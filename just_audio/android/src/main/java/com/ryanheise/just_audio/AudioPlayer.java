@@ -190,9 +190,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             initialIndex = null;
             initialPos = C.TIME_UNSET;
         }
-        if (reason == Player.TIMELINE_CHANGE_REASON_DYNAMIC) {
-            onItemMayHaveChanged();
-        }
+        onItemMayHaveChanged();
     }
 
     private void onItemMayHaveChanged() {
