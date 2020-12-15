@@ -210,7 +210,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             if (prepareResult != null) {
                 transition(ProcessingState.ready);
                 Map<String, Object> response = new HashMap<>();
-                response.put("duration", 1000 * getDuration());
+                response.put("duration", getDuration() == C.TIME_UNSET ? null : (1000 * getDuration()));
                 prepareResult.success(response);
                 prepareResult = null;
             } else {
@@ -543,13 +543,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void broadcastPlaybackEvent() {
         final Map<String, Object> event = new HashMap<String, Object>();
         long updatePosition = getCurrentPosition();
-        long duration = getDuration();
+        Long duration = getDuration() == C.TIME_UNSET ? null : (1000 * getDuration());
         event.put("processingState", processingState.ordinal());
         event.put("updatePosition", 1000 * updatePosition);
         event.put("updateTime", System.currentTimeMillis());
         event.put("bufferedPosition", 1000 * Math.max(updatePosition, bufferedPosition));
         event.put("icyMetadata", collectIcyMetadata());
-        event.put("duration", 1000 * getDuration());
+        event.put("duration", duration);
         event.put("currentIndex", currentIndex);
         event.put("androidAudioSessionId", audioSessionId);
 
