@@ -18,6 +18,11 @@ class JustAudioPlugin extends JustAudioPlatform {
 
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     final player = Html5AudioPlayer(id: request.id);
+    if (players.containsKey(request.id)) {
+      throw PlatformException(
+          code: "error",
+          message: "Platform player ${request.id} already exists");
+    }
     players[request.id] = player;
     return player;
   }
@@ -25,6 +30,7 @@ class JustAudioPlugin extends JustAudioPlatform {
   Future<DisposePlayerResponse> disposePlayer(
       DisposePlayerRequest request) async {
     await players[request.id]?.release();
+    players.remove(request.id);
     return DisposePlayerResponse();
   }
 }

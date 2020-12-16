@@ -30,6 +30,10 @@ public class MainMethodCallHandler implements MethodCallHandler {
         switch (call.method) {
         case "init": {
             String id = (String)request.get("id");
+            if (players.containsKey(id)) {
+                result.error("Platform player " + id + " already exists", null, null);
+                break;
+            }
             players.put(id, new AudioPlayer(applicationContext, messenger, id));
             result.success(null);
             break;

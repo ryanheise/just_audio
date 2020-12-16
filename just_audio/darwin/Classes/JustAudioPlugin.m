@@ -28,9 +28,14 @@
     if ([@"init" isEqualToString:call.method]) {
         NSDictionary *request = (NSDictionary *)call.arguments;
         NSString *playerId = request[@"id"];
-        AudioPlayer* player = [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId];
-        [_players setValue:player forKey:playerId];
-        result(nil);
+        if ([_players objectForKey:playerId] != nil) {
+            FlutterError *flutterError = [FlutterError errorWithCode:@"error" message:@"Platform player already exists" details:nil];
+            result(flutterError);
+        } else {
+            AudioPlayer* player = [[AudioPlayer alloc] initWithRegistrar:_registrar playerId:playerId];
+            [_players setValue:player forKey:playerId];
+            result(nil);
+        }
     } else if ([@"disposePlayer" isEqualToString:call.method]) {
         NSDictionary *request = (NSDictionary *)call.arguments;
         NSString *playerId = request[@"id"];

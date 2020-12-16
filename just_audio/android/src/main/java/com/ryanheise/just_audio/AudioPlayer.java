@@ -500,7 +500,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void load(final MediaSource mediaSource, final long initialPosition, final Integer initialIndex, final Result result) {
         this.initialPos = initialPosition;
-        this.initialIndex = initialIndex;
+        this.initialIndex = currentIndex = initialIndex;
         switch (processingState) {
         case none:
             break;
