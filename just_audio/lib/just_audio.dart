@@ -711,11 +711,12 @@ class AudioPlayer {
   /// decoders alive so that the app can quickly resume audio playback.
   Future<void> stop() async {
     if (_disposed) return;
-    _setPlatformActive(false);
+    final future = _setPlatformActive(false);
 
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
     _playingSubject.add(false);
+    await future;
   }
 
   /// Sets the volume of this player, where 1.0 is normal volume.

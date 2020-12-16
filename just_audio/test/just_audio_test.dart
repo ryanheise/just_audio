@@ -63,7 +63,7 @@ void runTests() {
 
   test('init', () async {
     final player = AudioPlayer();
-    expect(player.processingState, equals(ProcessingState.none));
+    expect(player.processingState, equals(ProcessingState.idle));
     expect(player.position, equals(Duration.zero));
     //expect(player.bufferedPosition, equals(Duration.zero));
     expect(player.duration, equals(null));
@@ -337,7 +337,7 @@ void runTests() {
         equals(['a', 'a', 'b', 'c']));
     final source2 = ConcatenatingAudioSource(children: []);
     final player = AudioPlayer();
-    await player.load(source2);
+    await player.setAudioSource(source2);
     expect(source2.sequence.length, equals(0));
     await source2
         .add(AudioSource.uri(Uri.parse('https://b.b/b.mp3'), tag: 'b'));
@@ -463,7 +463,7 @@ void runTests() {
     expect(source1.shuffleIndices.skipWhile((i) => i != 0).skip(1).first,
         equals(1));
     final player1 = AudioPlayer();
-    await player1.load(source1);
+    await player1.setAudioSource(source1);
     checkIndices(player1.shuffleIndices, 5);
     expect(player1.shuffleIndices.first, equals(0));
     await player1.seek(Duration.zero, index: 3);
@@ -473,9 +473,50 @@ void runTests() {
 
     final source2 = createSource();
     final player2 = AudioPlayer();
-    await player2.load(source2, initialIndex: 3);
+    await player2.setAudioSource(source2, initialIndex: 3);
     checkIndices(player2.shuffleIndices, 5);
     expect(player2.shuffleIndices.first, equals(3));
+  });
+
+  test('stop', () async {
+    final source = ConcatenatingAudioSource(
+      shuffleOrder: DefaultShuffleOrder(random: Random(1001)),
+      children: [
+        AudioSource.uri(
+          Uri.parse("https://bar.bar/foo.mp3"),
+          tag: 'foo',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/bar.mp3"),
+          tag: 'bar',
+        ),
+      ],
+    );
+    final player = AudioPlayer();
+    expect(player.processingState, ProcessingState.idle);
+    await player.setAudioSource(source, preload: false);
+    expect(player.processingState, ProcessingState.idle);
+    await player.load();
+    expect(player.processingState, ProcessingState.ready);
+    await player.seek(Duration(seconds: 5), index: 1);
+    await player.setVolume(0.5);
+    await player.setSpeed(0.7);
+    await player.setShuffleModeEnabled(true);
+    await player.setLoopMode(LoopMode.one);
+    await player.stop();
+    expect(player.processingState, ProcessingState.idle);
+    expect(player.position, Duration(seconds: 5));
+    expect(player.volume, 0.5);
+    expect(player.speed, 0.7);
+    expect(player.shuffleModeEnabled, true);
+    expect(player.loopMode, LoopMode.one);
+    await player.load();
+    expect(player.processingState, ProcessingState.ready);
+    expect(player.position, Duration(seconds: 5));
+    expect(player.volume, 0.5);
+    expect(player.speed, 0.7);
+    expect(player.shuffleModeEnabled, true);
+    expect(player.loopMode, LoopMode.one);
   });
 }
 
@@ -660,6 +701,8 @@ class MockAudioPlayer implements AudioPlayerPlatform {
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
+    _processingState = ProcessingStateMessage.idle;
+    _broadcastPlaybackEvent();
     return DisposeResponse();
   }
 
