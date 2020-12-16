@@ -19,7 +19,7 @@ This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and p
 | clip audio                     | ✅        | ✅      | ✅      | ✅      |
 | playlists                      | ✅        | ✅      | ✅      | ✅      |
 | looping                        | ✅        | ✅      | ✅      | ✅      |
-| shuffle                        | ✅        | ✅      | ✅      | ✅      |
+| custom shuffle order           | ✅        | ✅      | ✅      | ✅      |
 | compose audio                  | ✅        | ✅      | ✅      | ✅      |
 | gapless playback               | ✅        | ✅      | ✅      |         |
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
@@ -38,6 +38,13 @@ final player = AudioPlayer();
 var duration = await player.setUrl('https://foo.com/bar.mp3');
 var duration = await player.setFilePath('/path/to/file.mp3');
 var duration = await player.setAsset('path/to/asset.mp3');
+```
+
+Headers:
+
+```dart
+var duration = await player.setUrl('https://foo.com/bar.mp3',
+    headers: {'header1': 'value1', 'header2': 'value2'});
 ```
 
 Standard controls:
@@ -64,34 +71,43 @@ await player.setVolume(0.5); // Halve volume
 Gapless playlists:
 
 ```dart
-await player.load(
+await player.setAudioSource(
   ConcatenatingAudioSource(
+    // Start loading next item just before reaching it.
+    useLazyPreparation: true, // default
+    // Customise the shuffle algorithm.
+    shuffleOrder: DefaultShuffleOrder(), // default
+    // Specify the items in the playlist.
     children: [
       AudioSource.uri(Uri.parse("https://example.com/track1.mp3")),
       AudioSource.uri(Uri.parse("https://example.com/track2.mp3")),
       AudioSource.uri(Uri.parse("https://example.com/track3.mp3")),
     ],
   ),
+  // Playback will be prepared to start from track1.mp3
+  initialIndex: 0, // default
+  // Playback will be prepared to start from position zero.
+  initialPosition: Duration.zero, // default
 );
-player.seekToNext();
-player.seekToPrevious();
+await player.seekToNext();
+await player.seekToPrevious();
 // Jump to the beginning of track3.mp3.
-player.seek(Duration(milliseconds: 0), index: 2);
+await player.seek(Duration(milliseconds: 0), index: 2);
 ```
 
 Looping and shuffling:
 
 ```dart
-player.setLoopMode(LoopMode.off); // no looping (default)
-player.setLoopMode(LoopMode.all); // loop playlist
-player.setLoopMode(LoopMode.one); // loop current item
-player.setShuffleModeEnabled(true); // shuffle except for current item
+await player.setLoopMode(LoopMode.off); // no looping (default)
+await player.setLoopMode(LoopMode.all); // loop playlist
+await player.setLoopMode(LoopMode.one); // loop current item
+await player.setShuffleModeEnabled(true); // shuffle playlist
 ```
 
 Composing audio sources:
 
 ```dart
-player.load(
+player.setAudioSource(
   // Loop child 4 times
   LoopingAudioSource(
     count: 4,
@@ -116,9 +132,16 @@ player.load(
 );
 ```
 
-Releasing resources:
+Managing resources:
 
 ```dart
+// Set the audio source but manually load audio at a later point.
+await player.setUrl('https://a.b/c.mp3', preload: false);
+// Acquire platform decoders and start loading audio.
+var duration = await player.load();
+// Unload audio and release decoders until needed again.
+await player.stop();
+// Permanently release decoders/resources used by th eplayer.
 await player.dispose();
 ```
 
@@ -127,8 +150,23 @@ Catching player errors:
 ```dart
 try {
   await player.setUrl("https://s3.amazonaws.com/404-file.mp3");
+} on PlayerException catch (e) {
+  // iOS/macOS: maps to NSError.code
+  // Android: maps to ExoPlayerException.type
+  // Web: maps to MediaError.code
+  print("Error code: ${e.code}");
+  // iOS/macOS: maps to NSError.localizedDescription
+  // Android: maps to ExoPlaybackException.getMessage()
+  // Web: a generic message
+  print("Essos message: ${e.message}");
+} on PlayerInterruptedException catch (e) {
+  // This call was interrupted since another audio source was loaded or the
+  // player was stopped or disposed before this audio source could complete
+  // loading.
+  print("Connection aborted: ${e.message}");
 } catch (e) {
-  print("Error: $e");
+  // Fallback for all errors
+  print(e);
 }
 ```
 
@@ -136,9 +174,9 @@ Listening to state changes:
 
 ```dart
 player.playerStateStream.listen((state) {
-  if (state.playing) ...  else ...
+  if (state.playing) ... else ...
   switch (state.processingState) {
-    case ProcessingState.none: ...
+    case ProcessingState.idle: ...
     case ProcessingState.loading: ...
     case ProcessingState.buffering: ...
     case ProcessingState.ready: ...
