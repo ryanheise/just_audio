@@ -37,7 +37,7 @@ class JustAudioPlugin extends JustAudioPlatform {
 
 abstract class JustAudioPlayer extends AudioPlayerPlatform {
   final eventController = StreamController<PlaybackEventMessage>();
-  ProcessingStateMessage _processingState = ProcessingStateMessage.none;
+  ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   bool _playing = false;
   int _index;
 
@@ -393,7 +393,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _currentAudioSourcePlayer?.pause();
     _audioElement.removeAttribute('src');
     _audioElement.load();
-    transition(ProcessingStateMessage.none);
+    transition(ProcessingStateMessage.idle);
     return await super.release();
   }
 

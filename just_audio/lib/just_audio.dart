@@ -636,7 +636,7 @@ class AudioPlayer {
   /// timestamps. If [start] is null, it will be reset to the start of the
   /// original [AudioSource]. If [end] is null, it will be reset to the end of
   /// the original [AudioSource]. This method cannot be called from the
-  /// [AudioPlaybackState.none] state.
+  /// [ProcessingState.idle] state.
   Future<Duration> setClip({Duration start, Duration end}) async {
     if (_disposed) return null;
     _setPlatformActive(true);
@@ -1037,7 +1037,7 @@ class PlaybackEvent {
   final int androidAudioSessionId;
 
   PlaybackEvent({
-    this.processingState = ProcessingState.none,
+    this.processingState = ProcessingState.idle,
     DateTime updateTime,
     this.updatePosition = Duration.zero,
     this.bufferedPosition = Duration.zero,
@@ -1078,7 +1078,7 @@ class PlaybackEvent {
 /// Enumerates the different processing states of a player.
 enum ProcessingState {
   /// The player has not loaded an [AudioSource].
-  none,
+  idle,
 
   /// The player is loading an [AudioSource].
   loading,
@@ -1949,7 +1949,7 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   _broadcastPlaybackEvent() {
     var updateTime = DateTime.now();
     _eventSubject.add(PlaybackEventMessage(
-      processingState: ProcessingStateMessage.none,
+      processingState: ProcessingStateMessage.idle,
       updatePosition: _position,
       updateTime: updateTime,
       bufferedPosition: Duration.zero,

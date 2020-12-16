@@ -201,7 +201,7 @@ class PlaybackEventMessage {
 
 /// A processing state communicated from the platform implementation.
 enum ProcessingStateMessage {
-  none,
+  idle,
   loading,
   buffering,
   ready,
