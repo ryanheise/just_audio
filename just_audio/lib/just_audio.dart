@@ -1437,14 +1437,11 @@ abstract class IndexedAudioSource extends AudioSource {
 abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
   final Map headers;
-  final String _type;
   Uri _overrideUri;
   File _cacheFile;
 
-  UriAudioSource(this.uri,
-      {this.headers, dynamic tag, @required String type, Duration duration})
-      : _type = type,
-        super(tag, duration: duration);
+  UriAudioSource(this.uri, {this.headers, dynamic tag, Duration duration})
+      : super(tag, duration: duration);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
   /// of the copied asset on the filesystem, otherwise it gives us the original
@@ -1503,11 +1500,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// the HTTP(S) request.
 class ProgressiveAudioSource extends UriAudioSource {
   ProgressiveAudioSource(Uri uri, {Map headers, dynamic tag, Duration duration})
-      : super(uri,
-            headers: headers,
-            tag: tag,
-            type: 'progressive',
-            duration: duration);
+      : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
@@ -1527,8 +1520,7 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// the HTTP(S) request. Currently headers are not applied recursively.
 class DashAudioSource extends UriAudioSource {
   DashAudioSource(Uri uri, {Map headers, dynamic tag, Duration duration})
-      : super(uri,
-            headers: headers, tag: tag, type: 'dash', duration: duration);
+      : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
@@ -1547,7 +1539,7 @@ class DashAudioSource extends UriAudioSource {
 /// the HTTP(S) request. Currently headers are not applied recursively.
 class HlsAudioSource extends UriAudioSource {
   HlsAudioSource(Uri uri, {Map headers, dynamic tag, Duration duration})
-      : super(uri, headers: headers, tag: tag, type: 'hls', duration: duration);
+      : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
