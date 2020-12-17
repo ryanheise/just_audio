@@ -1,3 +1,11 @@
+## 2.0.0
+
+- Breaking change: Implementations must not set the shuffle order except as
+  instructed by setShuffleOrder.
+- Breaking change: Implementations must be able to recreate a player instance
+  with the same ID as a disposed instance.
+- Breaking change: none state renamed to idle.
+
 ## 1.1.1
 
 - Add initialPosition and initialIndex to LoadRequest.

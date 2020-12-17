@@ -127,7 +127,7 @@ packages:
       path: "../../just_audio_platform_interface"
       relative: true
     source: path
-    version: "1.1.1"
+    version: "2.0.0"
   just_audio_web:
     dependency: transitive
     description:
