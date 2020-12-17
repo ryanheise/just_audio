@@ -1,3 +1,12 @@
+## 0.6.0
+
+* Breaking change: Replace load by setAudioSource.
+* Breaking change: Rename ProcessingState.none to idle.
+* Support custom shuffle order.
+* Fix bug dynamically adding to ConcatenatingAudioSource.
+* Correctly return null for unknown duration on Android.
+* Update dependency versions.
+
 ## 0.5.7
 
 * Fix podspec error in web package (@timilehinjegede).
