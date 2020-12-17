@@ -1,7 +1,7 @@
 name: just_audio_web
 description: Web platform implementation of just_audio
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_web
-version: 0.1.1
+version: 0.2.0
 
 flutter:
   plugin:
@@ -11,10 +11,7 @@ flutter:
         fileName: just_audio_web.dart
 
 dependencies:
-  # TODO: change this back when the new platform interface is published.
-  # just_audio_platform_interface: ^1.1.1
-  just_audio_platform_interface:
-    path: ../just_audio_platform_interface
+  just_audio_platform_interface: ^2.0.0
   flutter:
     sdk: flutter
   flutter_web_plugins:
