@@ -7,8 +7,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 
-final Random _random = Random();
-
 class JustAudioPlugin extends JustAudioPlatform {
   final Map<String, JustAudioPlayer> players = {};
 
