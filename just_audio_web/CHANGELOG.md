@@ -1,3 +1,7 @@
+## 0.2.0
+
+* Support setShuffleOrder.
+
 ## 0.1.1
 
 * Support initialPosition/initialIndex parameters to load.
