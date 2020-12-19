@@ -813,40 +813,40 @@
         _bufferUnconfirmed = YES;
         // If we've skipped or transitioned to a new item and we're not
         // currently in the middle of a seek
-        if (CMTIME_IS_INVALID(_seekPos) && _player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
-            [self updatePosition];
-            IndexedAudioSource *source = ((IndexedPlayerItem *)_player.currentItem).audioSource;
-            // We should already be at position zero but for
-            // ClippingAudioSource it might be off by some milliseconds so we
-            // consider anything <= 100 as close enough.
-            if ((int)(1000 * CMTimeGetSeconds(source.position)) > 100) {
-                NSLog(@"On currentItem change, seeking back to zero");
-                BOOL shouldResumePlayback = NO;
-                AVPlayerActionAtItemEnd originalEndAction = _player.actionAtItemEnd;
-                if (_playing && CMTimeGetSeconds(CMTimeSubtract(source.position, source.duration)) >= 0) {
-                    NSLog(@"Need to pause while rewinding because we're at the end");
-                    shouldResumePlayback = YES;
-                    _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
-                    [_player pause];
-                }
-                [self enterBuffering:@"currentItem changed, seeking"];
-                [self updatePosition];
-                [self broadcastPlaybackEvent];
-                __weak __typeof__(self) weakSelf = self;
-                [source seek:kCMTimeZero completionHandler:^(BOOL finished) {
-                    [weakSelf leaveBuffering:@"currentItem changed, finished seek"];
-                    [weakSelf updatePosition];
-                    [weakSelf broadcastPlaybackEvent];
-                    if (shouldResumePlayback) {
-                        weakSelf.player.actionAtItemEnd = originalEndAction;
-                        // TODO: This logic is almost duplicated in seek. See if we can reuse this code.
-                        weakSelf.player.rate = weakSelf.speed;
-                    }
-                }];
-            } else {
-                // Already at zero, no need to seek.
-            }
-        }
+        /* if (CMTIME_IS_INVALID(_seekPos) && _player.currentItem.status == AVPlayerItemStatusReadyToPlay) { */
+        /*     [self updatePosition]; */
+        /*     IndexedAudioSource *source = ((IndexedPlayerItem *)_player.currentItem).audioSource; */
+        /*     // We should already be at position zero but for */
+        /*     // ClippingAudioSource it might be off by some milliseconds so we */
+        /*     // consider anything <= 100 as close enough. */
+        /*     if ((int)(1000 * CMTimeGetSeconds(source.position)) > 100) { */
+        /*         NSLog(@"On currentItem change, seeking back to zero"); */
+        /*         BOOL shouldResumePlayback = NO; */
+        /*         AVPlayerActionAtItemEnd originalEndAction = _player.actionAtItemEnd; */
+        /*         if (_playing && CMTimeGetSeconds(CMTimeSubtract(source.position, source.duration)) >= 0) { */
+        /*             NSLog(@"Need to pause while rewinding because we're at the end"); */
+        /*             shouldResumePlayback = YES; */
+        /*             _player.actionAtItemEnd = AVPlayerActionAtItemEndPause; */
+        /*             [_player pause]; */
+        /*         } */
+        /*         [self enterBuffering:@"currentItem changed, seeking"]; */
+        /*         [self updatePosition]; */
+        /*         [self broadcastPlaybackEvent]; */
+        /*         __weak __typeof__(self) weakSelf = self; */
+        /*         [source seek:kCMTimeZero completionHandler:^(BOOL finished) { */
+        /*             [weakSelf leaveBuffering:@"currentItem changed, finished seek"]; */
+        /*             [weakSelf updatePosition]; */
+        /*             [weakSelf broadcastPlaybackEvent]; */
+        /*             if (shouldResumePlayback) { */
+        /*                 weakSelf.player.actionAtItemEnd = originalEndAction; */
+        /*                 // TODO: This logic is almost duplicated in seek. See if we can reuse this code. */
+        /*                 weakSelf.player.rate = weakSelf.speed; */
+        /*             } */
+        /*         }]; */
+        /*     } else { */
+        /*         // Already at zero, no need to seek. */
+        /*     } */
+        /* } */
     } else if ([keyPath isEqualToString:@"loadedTimeRanges"]) {
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)object;
         if (playerItem != _player.currentItem) return;
