@@ -75,6 +75,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private IcyInfo icyInfo;
     private IcyHeaders icyHeaders;
     private int errorCount;
+    private AudioAttributes pendingAudioAttributes;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
@@ -211,6 +212,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 response.put("duration", getDuration() == C.TIME_UNSET ? null : (1000 * getDuration()));
                 prepareResult.success(response);
                 prepareResult = null;
+                if (pendingAudioAttributes != null) {
+                    player.setAudioAttributes(pendingAudioAttributes);
+                    pendingAudioAttributes = null;
+                }
             } else {
                 transition(ProcessingState.ready);
             }
@@ -500,7 +505,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void load(final MediaSource mediaSource, final long initialPosition, final Integer initialIndex, final Result result) {
         this.initialPos = initialPosition;
-        this.initialIndex = currentIndex = initialIndex;
+        this.initialIndex = initialIndex;
+        currentIndex = initialIndex != null ? initialIndex : 0;
         switch (processingState) {
         case none:
             break;
@@ -535,7 +541,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         builder.setFlags(flags);
         builder.setUsage(usage);
         //builder.setAllowedCapturePolicy((Integer)json.get("allowedCapturePolicy"));
-        player.setAudioAttributes(builder.build());
+        AudioAttributes audioAttributes = builder.build();
+        if (processingState == ProcessingState.loading) {
+            // audio attributes should be set either before or after loading to
+            // avoid an ExoPlayer glitch.
+            pendingAudioAttributes = audioAttributes;
+        } else {
+            player.setAudioAttributes(audioAttributes);
+        }
     }
 
     private void broadcastPlaybackEvent() {
@@ -652,7 +665,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void setSpeed(final float speed) {
-        player.setPlaybackParameters(new PlaybackParameters(speed));
+        if (player.getPlaybackParameters().speed != speed)
+            player.setPlaybackParameters(new PlaybackParameters(speed));
         broadcastPlaybackEvent();
     }
 

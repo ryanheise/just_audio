@@ -61,6 +61,7 @@ class AudioPlayer {
   AudioSource _audioSource;
   Map<String, AudioSource> _audioSources = {};
   bool _disposed = false;
+  _InitialSeekValues _initialSeekValues;
 
   PlaybackEvent _playbackEvent;
   final _playbackEventSubject = BehaviorSubject<PlaybackEvent>(sync: true);
@@ -84,6 +85,7 @@ class AudioPlayer {
   BehaviorSubject<Duration> _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
+  AndroidAudioAttributes _androidAudioAttributes;
 
   /// Creates an [AudioPlayer]. The player will automatically pause/duck and
   /// resume/unduck when audio interruptions occur (e.g. a phone call) or when
@@ -466,7 +468,7 @@ class AudioPlayer {
   Future<Duration> setUrl(
     String url, {
     Map headers,
-    Duration initialPosition = Duration.zero,
+    Duration initialPosition,
     bool preload = true,
   }) =>
       setAudioSource(AudioSource.uri(Uri.parse(url), headers: headers),
@@ -483,7 +485,7 @@ class AudioPlayer {
   /// See [setAudioSource] for a detailed explanation of the options.
   Future<Duration> setFilePath(
     String filePath, {
-    Duration initialPosition = Duration.zero,
+    Duration initialPosition,
     bool preload = true,
   }) =>
       setAudioSource(AudioSource.uri(Uri.file(filePath)),
@@ -530,14 +532,16 @@ class AudioPlayer {
   Future<Duration> setAudioSource(
     AudioSource source, {
     bool preload = true,
-    int initialIndex = 0,
-    Duration initialPosition = Duration.zero,
+    int initialIndex,
+    Duration initialPosition,
   }) async {
     if (_disposed) return null;
     // Idea: always keep the idle player around and make it possible
     // to switch between idle and active players without disposing either
     // one.
     _audioSource = null;
+    _initialSeekValues =
+        _InitialSeekValues(position: initialPosition, index: initialIndex);
     _playbackEventSubject.add(_playbackEvent = PlaybackEvent(
         currentIndex: initialIndex, updatePosition: initialPosition));
     _broadcastSequence();
@@ -596,8 +600,6 @@ class AudioPlayer {
 
   Future<Duration> _load(AudioPlayerPlatform platform, AudioSource source,
       {Duration initialPosition, int initialIndex}) async {
-    initialIndex ??= 0;
-    initialPosition ??= Duration.zero;
     try {
       if (!kIsWeb && source._requiresHeaders) {
         if (_proxy == null) {
@@ -790,6 +792,7 @@ class AudioPlayer {
   /// an audio source has been loaded.
   Future<void> seek(final Duration position, {int index}) async {
     if (_disposed) return;
+    _initialSeekValues = null;
     switch (processingState) {
       case ProcessingState.loading:
         return;
@@ -824,11 +827,17 @@ class AudioPlayer {
       AndroidAudioAttributes audioAttributes) async {
     if (_disposed) return;
     if (audioAttributes == null) return;
-    await (await _platform).setAndroidAudioAttributes(
-        SetAndroidAudioAttributesRequest(
-            contentType: audioAttributes.contentType.index,
-            flags: audioAttributes.flags.value,
-            usage: audioAttributes.usage.value));
+    if (audioAttributes == _androidAudioAttributes) return;
+    _androidAudioAttributes = audioAttributes;
+    await _internalSetAndroidAudioAttributes(await _platform, audioAttributes);
+  }
+
+  Future<void> _internalSetAndroidAudioAttributes(AudioPlayerPlatform platform,
+      AndroidAudioAttributes audioAttributes) async {
+    await platform.setAndroidAudioAttributes(SetAndroidAudioAttributesRequest(
+        contentType: audioAttributes.contentType.index,
+        flags: audioAttributes.flags.value,
+        usage: audioAttributes.usage.value));
   }
 
   /// Release all resources associated with this player. You must invoke this
@@ -922,13 +931,16 @@ class AudioPlayer {
       if (active) {
         final automaticallyWaitsToMinimizeStalling =
             this.automaticallyWaitsToMinimizeStalling;
-        final setAndroidAudioAttributesRequest =
-            _idlePlatform.setAndroidAudioAttributesRequest;
-        if (setAndroidAudioAttributesRequest != null) {
-          // Only set if there was an unfulfilled pending request.
-          await platform
-              .setAndroidAudioAttributes(setAndroidAudioAttributesRequest);
-          _idlePlatform.setAndroidAudioAttributesRequest = null;
+        // To avoid a glitch in ExoPlayer, ensure that any requested audio
+        // attributes are set before loading the audio source.
+        final audioSession = await AudioSession.instance;
+        if (_androidAudioAttributes == null) {
+          _androidAudioAttributes =
+              audioSession.configuration?.androidAudioAttributes;
+        }
+        if (_androidAudioAttributes != null) {
+          await _internalSetAndroidAudioAttributes(
+              platform, _androidAudioAttributes);
         }
         if (!automaticallyWaitsToMinimizeStalling) {
           // Only set if different from default.
@@ -947,8 +959,17 @@ class AudioPlayer {
       }
       if (audioSource != null) {
         try {
+          Duration initialPosition;
+          int initialIndex;
+          if (_initialSeekValues != null) {
+            initialPosition = _initialSeekValues.position;
+            initialIndex = _initialSeekValues.index;
+          } else {
+            initialPosition = position;
+            initialIndex = currentIndex;
+          }
           final duration = await _load(platform, _audioSource,
-              initialPosition: position, initialIndex: currentIndex);
+              initialPosition: initialPosition, initialIndex: initialIndex);
           // Wait for loading state to pass.
           await processingStateStream
               .firstWhere((state) => state != ProcessingState.loading);
@@ -2053,4 +2074,13 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
       ConcatenatingMoveRequest request) async {
     return ConcatenatingMoveResponse();
   }
+}
+
+/// Holds the initial requested position and index for a newly loaded audio
+/// source.
+class _InitialSeekValues {
+  final Duration position;
+  final int index;
+
+  _InitialSeekValues({@required this.position, @required this.index});
 }
