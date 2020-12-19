@@ -1,3 +1,7 @@
+## 0.6.1
+
+* Fix bug with Android skipping start of audio.
+
 ## 0.6.0
 
 * Breaking change: Replace load by setAudioSource.
