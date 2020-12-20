@@ -546,7 +546,11 @@ class AudioPlayer {
         currentIndex: initialIndex, updatePosition: initialPosition));
     _broadcastSequence();
     // If the active platform existed, we should try to retain it.
-    _setPlatformActive(false);
+    try {
+      await _setPlatformActive(false);
+    } catch (e) {
+      print("Error deactivating previous platform: $e (ignoring)");
+    }
     _audioSource = source;
     _broadcastSequence();
     Duration duration;
@@ -885,15 +889,14 @@ class AudioPlayer {
         ? JustAudioPlatform.instance.init(InitRequest(id: _id))
         : Future.value(_idlePlatform);
     _playbackEventSubscription?.cancel();
-    if (oldPlatformFuture != null) {
-      oldPlatformFuture.then((platform) {
-        if (platform != _idlePlatform) {
-          _disposePlatform(platform);
-        }
-      });
-    }
     final durationCompleter = Completer<Duration>();
     _platform = Future<AudioPlayerPlatform>(() async {
+      if (oldPlatformFuture != null) {
+        final oldPlatform = await oldPlatformFuture;
+        if (oldPlatform != _idlePlatform) {
+          await _disposePlatform(oldPlatform);
+        }
+      }
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
       final platform = await newPlatform;
@@ -978,6 +981,8 @@ class AudioPlayer {
           _audioSource = null;
           durationCompleter.completeError(e, stackTrace);
         }
+      } else {
+        durationCompleter.complete(null);
       }
 
       return platform;
