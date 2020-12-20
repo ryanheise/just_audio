@@ -545,7 +545,7 @@ class AudioPlayer {
     _playbackEventSubject.add(_playbackEvent = PlaybackEvent(
         currentIndex: initialIndex, updatePosition: initialPosition));
     _broadcastSequence();
-    // If the active platform existed, we should try to retain it.
+    // TODO: If the active platform existed, we should try to retain it.
     try {
       await _setPlatformActive(false);
     } catch (e) {
@@ -679,7 +679,7 @@ class AudioPlayer {
   Future<void> play() async {
     if (_disposed) return;
     if (playing) return;
-    _setPlatformActive(true);
+    _setPlatformActive(_audioSource != null);
     _playInterrupted = false;
     final audioSession = await AudioSession.instance;
     if (await audioSession.setActive(true)) {
@@ -934,6 +934,7 @@ class AudioPlayer {
       if (active) {
         final automaticallyWaitsToMinimizeStalling =
             this.automaticallyWaitsToMinimizeStalling;
+        final playing = this.playing;
         // To avoid a glitch in ExoPlayer, ensure that any requested audio
         // attributes are set before loading the audio source.
         final audioSession = await AudioSession.instance;
@@ -959,6 +960,9 @@ class AudioPlayer {
             shuffleMode: shuffleModeEnabled
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
+        if (playing) {
+          platform.play(PlayRequest());
+        }
       }
       if (audioSource != null) {
         try {
@@ -1997,8 +2001,8 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<PlayResponse> play(PlayRequest request) {
-    throw UnimplementedError("play() has not been implemented.");
+  Future<PlayResponse> play(PlayRequest request) async {
+    return PlayResponse();
   }
 
   @override
