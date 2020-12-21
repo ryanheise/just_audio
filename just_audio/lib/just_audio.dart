@@ -514,7 +514,9 @@ class AudioPlayer {
   /// its duration as soon as it is known, or `null` if that information is
   /// unavailable. Set [preload] to `false` if you would prefer to delay loading
   /// until some later point, via an explicit call to [load]. If [preload] is
-  /// `false`, a `null` duration will be returned.
+  /// `false`, a `null` duration will be returned. Note that the [preload]
+  /// option will automatically be assumed as `true` if `playing` is currently
+  /// `true`.
   ///
   /// Optionally specify [initialPosition] and [initialIndex] to seek to an
   /// initial position within a particular item (defaulting to position zero of
@@ -534,9 +536,6 @@ class AudioPlayer {
     Duration initialPosition,
   }) async {
     if (_disposed) return null;
-    // Idea: always keep the idle player around and make it possible
-    // to switch between idle and active players without disposing either
-    // one.
     _audioSource = null;
     _initialSeekValues =
         _InitialSeekValues(position: initialPosition, index: initialIndex);
@@ -552,6 +551,7 @@ class AudioPlayer {
     _audioSource = source;
     _broadcastSequence();
     Duration duration;
+    if (playing) preload = true;
     if (preload) {
       duration = await load();
     }
@@ -660,9 +660,10 @@ class AudioPlayer {
   }
 
   /// Tells the player to play audio as soon as an audio source is loaded and
-  /// ready to play. The [Future] returned by this method completes when the
-  /// playback completes or is paused or stopped. If the player is already
-  /// playing, this method completes immediately.
+  /// ready to play. If an audio source has been set but not preloaded, this
+  /// method will also initiate the loading. The [Future] returned by this
+  /// method completes when the playback completes or is paused or stopped. If
+  /// the player is already playing, this method completes immediately.
   ///
   /// This method causes [playing] to become true, and it will remain true
   /// until [pause] or [stop] is called. This means that if playback completes,
@@ -677,12 +678,18 @@ class AudioPlayer {
   Future<void> play() async {
     if (_disposed) return;
     if (playing) return;
-    //_setPlatformActive(_audioSource != null);
+    _setPlatformActive(_audioSource != null);
     _playInterrupted = false;
+    // Broadcast to clients immediately, but revert to false if we fail to
+    // activate the audio session. This allows setAudioSource to be aware of a
+    // prior play request.
+    _playingSubject.add(true);
     final audioSession = await AudioSession.instance;
     if (await audioSession.setActive(true)) {
-      _playingSubject.add(true);
       await (await _platform).play(PlayRequest());
+    } else {
+      // Revert if we fail to activate the audio session.
+      _playingSubject.add(false);
     }
   }
 
