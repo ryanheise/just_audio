@@ -513,10 +513,10 @@ class AudioPlayer {
   /// By default, this method will immediately start loading audio and return
   /// its duration as soon as it is known, or `null` if that information is
   /// unavailable. Set [preload] to `false` if you would prefer to delay loading
-  /// until some later point, via an explicit call to [load]. If [preload] is
-  /// `false`, a `null` duration will be returned. Note that the [preload]
-  /// option will automatically be assumed as `true` if `playing` is currently
-  /// `true`.
+  /// until some later point, either via an explicit call to [load] or via a
+  /// call to [play] which implicitly loads the audio. If [preload] is `false`,
+  /// a `null` duration will be returned. Note that the [preload] option will
+  /// automatically be assumed as `true` if `playing` is currently `true`.
   ///
   /// Optionally specify [initialPosition] and [initialIndex] to seek to an
   /// initial position within a particular item (defaulting to position zero of
