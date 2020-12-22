@@ -86,7 +86,6 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
   AndroidAudioAttributes _androidAudioAttributes;
-  Completer<void> _playCompleter;
 
   /// Creates an [AudioPlayer]. The player will automatically pause/duck and
   /// resume/unduck when audio interruptions occur (e.g. a phone call) or when
@@ -684,7 +683,7 @@ class AudioPlayer {
     // activate the audio session. This allows setAudioSource to be aware of a
     // prior play request.
     _playingSubject.add(true);
-    _playCompleter = Completer();
+    final playCompleter = Completer();
     final audioSession = await AudioSession.instance;
     if (await audioSession.setActive(true)) {
       // TODO: rewrite this to more cleanly handle simultaneous load/play
@@ -696,19 +695,18 @@ class AudioPlayer {
           // NOTE: If a load() request happens simultaneously, this may result
           // in two play requests being sent. The platform implementation should
           // ignore the second play request since it is already playing.
-          _sendPlayRequest(await _platform);
+          _sendPlayRequest(await _platform, playCompleter);
         } else {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
-          _setPlatformActive(true);
+          _setPlatformActive(true, playCompleter);
         }
       }
     } else {
       // Revert if we fail to activate the audio session.
       _playingSubject.add(false);
     }
-    await _playCompleter?.future;
-    _playCompleter = null;
+    await playCompleter.future;
   }
 
   /// Pauses the currently playing media. This method does nothing if
@@ -730,11 +728,10 @@ class AudioPlayer {
     await (await _platform).pause(PauseRequest());
   }
 
-  Future<void> _sendPlayRequest(AudioPlayerPlatform platform) async {
+  Future<void> _sendPlayRequest(
+      AudioPlayerPlatform platform, Completer<void> playCompleter) async {
     await platform.play(PlayRequest());
-    if (_playCompleter?.isCompleted == false) {
-      _playCompleter.complete();
-    }
+    playCompleter?.complete();
   }
 
   /// Stops playing audio and releases decoders and other native platform
@@ -906,7 +903,8 @@ class AudioPlayer {
   /// idle platform when [active] is `false`. If an audio source has been set,
   /// the returned future completes with its duration if known, or `null`
   /// otherwise.
-  Future<Duration> _setPlatformActive(bool active) {
+  Future<Duration> _setPlatformActive(bool active,
+      [Completer<void> playCompleter]) {
     if (active == _active) return _durationFuture;
     // This method updates _active and _platform before yielding to the next
     // task in the event loop.
@@ -991,7 +989,7 @@ class AudioPlayer {
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
         if (playing) {
-          _sendPlayRequest(platform);
+          _sendPlayRequest(platform, playCompleter);
         }
       }
       if (audioSource != null) {
