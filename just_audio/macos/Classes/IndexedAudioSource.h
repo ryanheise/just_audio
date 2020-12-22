@@ -6,6 +6,7 @@
 @interface IndexedAudioSource : AudioSource
 
 @property (readonly, nonatomic) IndexedPlayerItem *playerItem;
+@property (readonly, nonatomic) IndexedPlayerItem *playerItem2;
 @property (readwrite, nonatomic) CMTime duration;
 @property (readonly, nonatomic) CMTime position;
 @property (readonly, nonatomic) CMTime bufferedPosition;
@@ -18,5 +19,7 @@
 - (void)stop:(AVQueuePlayer *)player;
 - (void)seek:(CMTime)position;
 - (void)seek:(CMTime)position completionHandler:(void (^)(BOOL))completionHandler;
+- (void)preparePlayerItem2;
+- (void)flip;
 
 @end
