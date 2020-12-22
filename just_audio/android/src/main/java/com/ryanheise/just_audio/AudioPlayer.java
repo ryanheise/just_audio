@@ -695,6 +695,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         if (processingState == ProcessingState.loading) {
             abortExistingConnection();
         }
+        if (playResult != null) {
+            playResult.success(new HashMap<String, Object>());
+            playResult = null;
+        }
         mediaSources.clear();
         mediaSource = null;
         if (player != null) {

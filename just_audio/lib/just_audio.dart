@@ -687,12 +687,16 @@ class AudioPlayer {
     _playCompleter = Completer();
     final audioSession = await AudioSession.instance;
     if (await audioSession.setActive(true)) {
-      final shouldActivate = _audioSource != null;
-      if (shouldActivate) {
+      // TODO: rewrite this to more cleanly handle simultaneous load/play
+      // requests which each may result in platform play requests.
+      final requireActive = _audioSource != null;
+      if (requireActive) {
         if (_active) {
           // If the native platform is already active, send it a play request.
-          await (await _platform).play(PlayRequest());
-          _playCompleter.complete();
+          // NOTE: If a load() request happens simultaneously, this may result
+          // in two play requests being sent. The platform implementation should
+          // ignore the second play request since it is already playing.
+          _sendPlayRequest(await _platform);
         } else {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
@@ -702,9 +706,8 @@ class AudioPlayer {
     } else {
       // Revert if we fail to activate the audio session.
       _playingSubject.add(false);
-      _playCompleter.complete();
     }
-    await _playCompleter.future;
+    await _playCompleter?.future;
     _playCompleter = null;
   }
 
@@ -725,6 +728,13 @@ class AudioPlayer {
     // TODO: perhaps modify platform side to ensure new state is broadcast
     // before this method returns.
     await (await _platform).pause(PauseRequest());
+  }
+
+  Future<void> _sendPlayRequest(AudioPlayerPlatform platform) async {
+    await platform.play(PlayRequest());
+    if (_playCompleter?.isCompleted == false) {
+      _playCompleter.complete();
+    }
   }
 
   /// Stops playing audio and releases decoders and other native platform
@@ -981,7 +991,7 @@ class AudioPlayer {
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
         if (playing) {
-          platform.play(PlayRequest()).then((_) => _playCompleter?.complete());
+          _sendPlayRequest(platform);
         }
       }
       if (audioSource != null) {
@@ -2081,8 +2091,6 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
-    await _sequenceSubscription.cancel();
-    await _eventSubject.close();
     return DisposeResponse();
   }
 
