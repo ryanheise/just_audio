@@ -1,3 +1,9 @@
+## 0.6.2
+
+* Fix bugs related to the new setAudioSource method:
+  * When calling setAudioSource more than once
+  * When calling setAudioSource/load/play simultaneously
+
 ## 0.6.1
 
 * Fix bug with Android skipping start of audio.

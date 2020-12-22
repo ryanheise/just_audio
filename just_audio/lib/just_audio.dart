@@ -1984,7 +1984,6 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   Duration _position;
   int _index;
   List<IndexedAudioSource> _sequence;
-  StreamSubscription<List<IndexedAudioSource>> _sequenceSubscription;
 
   /// Holds a pending request.
   SetAndroidAudioAttributesRequest setAndroidAudioAttributesRequest;
@@ -1993,8 +1992,7 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
     @required String id,
     @required Stream<List<IndexedAudioSource>> sequenceStream,
   }) : super(id) {
-    _sequenceSubscription =
-        sequenceStream.listen((sequence) => _sequence = sequence);
+    sequenceStream.listen((sequence) => _sequence = sequence);
   }
 
   _broadcastPlaybackEvent() {
