@@ -568,6 +568,9 @@
     } else {
         // We send result after the playerItem is ready in observeValueForKeyPath.
     }
+    if (_playing) {
+        _player.rate = _speed;
+    }
     [self broadcastPlaybackEvent];
 }
 

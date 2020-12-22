@@ -86,6 +86,7 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
   AndroidAudioAttributes _androidAudioAttributes;
+  Completer<void> _playCompleter;
 
   /// Creates an [AudioPlayer]. The player will automatically pause/duck and
   /// resume/unduck when audio interruptions occur (e.g. a phone call) or when
@@ -678,19 +679,33 @@ class AudioPlayer {
   Future<void> play() async {
     if (_disposed) return;
     if (playing) return;
-    _setPlatformActive(_audioSource != null);
     _playInterrupted = false;
     // Broadcast to clients immediately, but revert to false if we fail to
     // activate the audio session. This allows setAudioSource to be aware of a
     // prior play request.
     _playingSubject.add(true);
+    _playCompleter = Completer();
     final audioSession = await AudioSession.instance;
     if (await audioSession.setActive(true)) {
-      await (await _platform).play(PlayRequest());
+      final shouldActivate = _audioSource != null;
+      if (shouldActivate) {
+        if (_active) {
+          // If the native platform is already active, send it a play request.
+          await (await _platform).play(PlayRequest());
+          _playCompleter.complete();
+        } else {
+          // If the native platform wasn't already active, activating it will
+          // implicitly restore the playing state and send a play request.
+          _setPlatformActive(true);
+        }
+      }
     } else {
       // Revert if we fail to activate the audio session.
       _playingSubject.add(false);
+      _playCompleter.complete();
     }
+    await _playCompleter.future;
+    _playCompleter = null;
   }
 
   /// Pauses the currently playing media. This method does nothing if
@@ -966,7 +981,7 @@ class AudioPlayer {
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
         if (playing) {
-          platform.play(PlayRequest());
+          platform.play(PlayRequest()).then((_) => _playCompleter?.complete());
         }
       }
       if (audioSource != null) {
