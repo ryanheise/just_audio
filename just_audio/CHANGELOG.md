@@ -1,3 +1,10 @@
+## 0.6.3
+
+* Fix iOS compiler warnings.
+* Fix bug where native platform wasn't disposed.
+* Remove Java compiler warnings.
+* Process play/pause state transitions in a consistent order.
+
 ## 0.6.2
 
 * Fix bugs related to the new setAudioSource method:

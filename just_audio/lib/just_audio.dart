@@ -682,6 +682,10 @@ class AudioPlayer {
     // Broadcast to clients immediately, but revert to false if we fail to
     // activate the audio session. This allows setAudioSource to be aware of a
     // prior play request.
+    _playbackEvent = _playbackEvent.copyWith(
+      updatePosition: position,
+      updateTime: DateTime.now(),
+    );
     _playingSubject.add(true);
     final playCompleter = Completer();
     final audioSession = await AudioSession.instance;
@@ -721,8 +725,8 @@ class AudioPlayer {
       updatePosition: position,
       updateTime: DateTime.now(),
     );
-    _playbackEventSubject.add(_playbackEvent);
     _playingSubject.add(false);
+    _playbackEventSubject.add(_playbackEvent);
     // TODO: perhaps modify platform side to ensure new state is broadcast
     // before this method returns.
     await (await _platform).pause(PauseRequest());
@@ -914,7 +918,8 @@ class AudioPlayer {
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
     final newPlatform = active
-        ? JustAudioPlatform.instance.init(InitRequest(id: _id))
+        ? (_nativePlatform =
+            JustAudioPlatform.instance.init(InitRequest(id: _id)))
         : Future.value(_idlePlatform);
     _playbackEventSubscription?.cancel();
     final durationCompleter = Completer<Duration>();
@@ -1027,6 +1032,7 @@ class AudioPlayer {
     if (platform is _IdleAudioPlayer) {
       await platform.dispose(DisposeRequest());
     } else {
+      _nativePlatform = null;
       try {
         await JustAudioPlatform.instance
             .disposePlayer(DisposePlayerRequest(id: _id));
