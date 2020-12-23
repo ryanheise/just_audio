@@ -5,6 +5,7 @@ import android.net.Uri;
 import android.os.Handler;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -31,6 +32,7 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import io.flutter.Log;
 import io.flutter.plugin.common.BinaryMessenger;
@@ -69,7 +71,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private Result prepareResult;
     private Result playResult;
     private Result seekResult;
-    private boolean seekProcessed;
     private boolean playing;
     private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
     private IcyInfo icyInfo;
@@ -203,7 +204,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+    public void onPlaybackStateChanged(int playbackState) {
         switch (playbackState) {
         case Player.STATE_READY:
             if (prepareResult != null) {
@@ -219,7 +220,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             } else {
                 transition(ProcessingState.ready);
             }
-            if (seekProcessed) {
+            if (seekResult != null) {
                 completeSeek();
             }
             break;
@@ -263,23 +264,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         errorCount++;
         if (player.hasNext() && currentIndex != null && errorCount <= 5) {
             int nextIndex = currentIndex + 1;
-            player.prepare(mediaSource);
+            // TODO: pass in initial position here.
+            player.setMediaSource(mediaSource);
+            player.prepare();
             player.seekTo(nextIndex, 0);
         }
     }
 
-    @Override
-    public void onSeekProcessed() {
-        if (seekResult != null) {
-            seekProcessed = true;
-            if (player.getPlaybackState() == Player.STATE_READY) {
-                completeSeek();
-            }
-        }
-    }
-
     private void completeSeek() {
-        seekProcessed = false;
         seekPos = null;
         seekResult.success(new HashMap<String, Object>());
         seekResult = null;
@@ -289,13 +281,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     public void onMethodCall(final MethodCall call, final Result result) {
         ensurePlayerInitialized();
 
-        final Map<?, ?> request = (Map<?, ?>) call.arguments;
         try {
             switch (call.method) {
             case "load":
-                Long initialPosition = getLong(request.get("initialPosition"));
-                Integer initialIndex = (Integer)request.get("initialIndex");
-                load(getAudioSource(request.get("audioSource")),
+                Long initialPosition = getLong(call.argument("initialPosition"));
+                Integer initialIndex = call.argument("initialIndex");
+                load(getAudioSource(call.argument("audioSource")),
                         initialPosition == null ? C.TIME_UNSET : initialPosition / 1000,
                         initialIndex, result);
                 break;
@@ -307,53 +298,53 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 result.success(new HashMap<String, Object>());
                 break;
             case "setVolume":
-                setVolume((float) ((double) ((Double) request.get("volume"))));
+                setVolume((float) ((double) ((Double) call.argument("volume"))));
                 result.success(new HashMap<String, Object>());
                 break;
             case "setSpeed":
-                setSpeed((float) ((double) ((Double) request.get("speed"))));
+                setSpeed((float) ((double) ((Double) call.argument("speed"))));
                 result.success(new HashMap<String, Object>());
                 break;
             case "setLoopMode":
-                setLoopMode((Integer) request.get("loopMode"));
+                setLoopMode((Integer) call.argument("loopMode"));
                 result.success(new HashMap<String, Object>());
                 break;
             case "setShuffleMode":
-                setShuffleModeEnabled((Integer) request.get("shuffleMode") == 1);
+                setShuffleModeEnabled((Integer) call.argument("shuffleMode") == 1);
                 result.success(new HashMap<String, Object>());
                 break;
             case "setShuffleOrder":
-                setShuffleOrder(request.get("audioSource"));
+                setShuffleOrder(call.argument("audioSource"));
                 result.success(new HashMap<String, Object>());
                 break;
             case "setAutomaticallyWaitsToMinimizeStalling":
                 result.success(new HashMap<String, Object>());
                 break;
             case "seek":
-                Long position = getLong(request.get("position"));
-                Integer index = (Integer)request.get("index");
+                Long position = getLong(call.argument("position"));
+                Integer index = call.argument("index");
                 seek(position == null ? C.TIME_UNSET : position / 1000, index, result);
                 break;
             case "concatenatingInsertAll":
-                concatenating(request.get("id"))
-                        .addMediaSources((Integer)request.get("index"), getAudioSources(request.get("children")), handler, () -> result.success(new HashMap<String, Object>()));
-                concatenating(request.get("id"))
-                        .setShuffleOrder(decodeShuffleOrder((List<Integer>)request.get("shuffleOrder")));
+                concatenating(call.argument("id"))
+                        .addMediaSources(call.argument("index"), getAudioSources(call.argument("children")), handler, () -> result.success(new HashMap<String, Object>()));
+                concatenating(call.argument("id"))
+                        .setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                 break;
             case "concatenatingRemoveRange":
-                concatenating(request.get("id"))
-                        .removeMediaSourceRange((Integer)request.get("startIndex"), (Integer)request.get("endIndex"), handler, () -> result.success(new HashMap<String, Object>()));
-                concatenating(request.get("id"))
-                        .setShuffleOrder(decodeShuffleOrder((List<Integer>)request.get("shuffleOrder")));
+                concatenating(call.argument("id"))
+                        .removeMediaSourceRange(call.argument("startIndex"), call.argument("endIndex"), handler, () -> result.success(new HashMap<String, Object>()));
+                concatenating(call.argument("id"))
+                        .setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                 break;
             case "concatenatingMove":
-                concatenating(request.get("id"))
-                        .moveMediaSource((Integer)request.get("currentIndex"), (Integer)request.get("newIndex"), handler, () -> result.success(new HashMap<String, Object>()));
-                concatenating(request.get("id"))
-                        .setShuffleOrder(decodeShuffleOrder((List<Integer>)request.get("shuffleOrder")));
+                concatenating(call.argument("id"))
+                        .moveMediaSource(call.argument("currentIndex"), call.argument("newIndex"), handler, () -> result.success(new HashMap<String, Object>()));
+                concatenating(call.argument("id"))
+                        .setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                 break;
             case "setAndroidAudioAttributes":
-                setAudioAttributes((Integer)request.get("contentType"), (Integer)request.get("flags"), (Integer)request.get("usage"));
+                setAudioAttributes(call.argument("contentType"), call.argument("flags"), call.argument("usage"));
                 result.success(new HashMap<String, Object>());
                 break;
             default:
@@ -409,20 +400,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void setShuffleOrder(final Object json) {
         Map<?, ?> map = (Map<?, ?>)json;
-        String id = (String)map.get("id");
+        String id = mapGet(map, "id");
         MediaSource mediaSource = mediaSources.get(id);
         if (mediaSource == null) return;
-        switch ((String)map.get("type")) {
+        switch ((String)mapGet(map, "type")) {
         case "concatenating":
             ConcatenatingMediaSource concatenatingMediaSource = (ConcatenatingMediaSource)mediaSource;
-            concatenatingMediaSource.setShuffleOrder(decodeShuffleOrder((List<Integer>)map.get("shuffleOrder")));
-            List<Object> children = (List<Object>)map.get("children");
+            concatenatingMediaSource.setShuffleOrder(decodeShuffleOrder(mapGet(map, "shuffleOrder")));
+            List<Object> children = mapGet(map, "children");
             for (Object child : children) {
                 setShuffleOrder(child);
             }
             break;
         case "looping":
-            setShuffleOrder(map.get("child"));
+            setShuffleOrder(mapGet(map, "child"));
             break;
         }
     }
@@ -444,22 +435,29 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         switch ((String)map.get("type")) {
         case "progressive":
             return new ProgressiveMediaSource.Factory(buildDataSourceFactory())
-                    .setTag(id)
-                    .createMediaSource(Uri.parse((String)map.get("uri")));
+                    .createMediaSource(new MediaItem.Builder()
+                            .setUri(Uri.parse((String)map.get("uri")))
+                            .setTag(id)
+                            .build());
         case "dash":
             return new DashMediaSource.Factory(buildDataSourceFactory())
-                    .setTag(id)
-                    .createMediaSource(Uri.parse((String)map.get("uri")));
+                    .createMediaSource(new MediaItem.Builder()
+                            .setUri(Uri.parse((String)map.get("uri")))
+                            .setMimeType(MimeTypes.APPLICATION_MPD)
+                            .setTag(id)
+                            .build());
         case "hls":
             return new HlsMediaSource.Factory(buildDataSourceFactory())
-                    .setTag(id)
-                    .createMediaSource(Uri.parse((String)map.get("uri")));
+                    .createMediaSource(new MediaItem.Builder()
+                            .setUri(Uri.parse((String)map.get("uri")))
+                            .setMimeType(MimeTypes.APPLICATION_M3U8)
+                            .build());
         case "concatenating":
             MediaSource[] mediaSources = getAudioSourcesArray(map.get("children"));
             return new ConcatenatingMediaSource(
                     false, // isAtomic
                     (Boolean)map.get("useLazyPreparation"),
-                    decodeShuffleOrder((List<Integer>)map.get("shuffleOrder")),
+                    decodeShuffleOrder(mapGet(map, "shuffleOrder")),
                     mediaSources);
         case "clipping":
             Long start = getLong(map.get("start"));
@@ -484,7 +482,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private List<MediaSource> getAudioSources(final Object json) {
-        List<Object> audioSources = (List<Object>)json;
+        if (!(json instanceof List)) throw new RuntimeException("List expected: " + json);
+        List<?> audioSources = (List<?>)json;
         List<MediaSource> mediaSources = new ArrayList<MediaSource>();
         for (int i = 0 ; i < audioSources.size(); i++) {
             mediaSources.add(getAudioSource(audioSources.get(i)));
@@ -522,7 +521,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         prepareResult = result;
         transition(ProcessingState.loading);
         this.mediaSource = mediaSource;
-        player.prepare(mediaSource);
+        // TODO: pass in initial position here.
+        player.setMediaSource(mediaSource);
+        player.prepare();
     }
 
     private void ensurePlayerInitialized() {
@@ -686,7 +687,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         abortSeek();
         seekPos = position;
         seekResult = result;
-        seekProcessed = false;
         int windowIndex = index != null ? index : player.getCurrentWindowIndex();
         player.seekTo(windowIndex, position);
     }
@@ -716,7 +716,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             seekResult.success(new HashMap<String, Object>());
             seekResult = null;
             seekPos = null;
-            seekProcessed = false;
         }
     }
 
@@ -726,6 +725,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     public static Long getLong(Object o) {
         return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T> T mapGet(Object o, String key) {
+        if (o instanceof Map) {
+            return (T) ((Map<?, ?>)o).get(key);
+        } else {
+            return null;
+        }
     }
 
     enum ProcessingState {
