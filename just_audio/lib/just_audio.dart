@@ -918,7 +918,8 @@ class AudioPlayer {
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
     final newPlatform = active
-        ? JustAudioPlatform.instance.init(InitRequest(id: _id))
+        ? (_nativePlatform =
+            JustAudioPlatform.instance.init(InitRequest(id: _id)))
         : Future.value(_idlePlatform);
     _playbackEventSubscription?.cancel();
     final durationCompleter = Completer<Duration>();
@@ -1031,6 +1032,7 @@ class AudioPlayer {
     if (platform is _IdleAudioPlayer) {
       await platform.dispose(DisposeRequest());
     } else {
+      _nativePlatform = null;
       try {
         await JustAudioPlatform.instance
             .disposePlayer(DisposePlayerRequest(id: _id));
