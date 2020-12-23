@@ -682,6 +682,10 @@ class AudioPlayer {
     // Broadcast to clients immediately, but revert to false if we fail to
     // activate the audio session. This allows setAudioSource to be aware of a
     // prior play request.
+    _playbackEvent = _playbackEvent.copyWith(
+      updatePosition: position,
+      updateTime: DateTime.now(),
+    );
     _playingSubject.add(true);
     final playCompleter = Completer();
     final audioSession = await AudioSession.instance;
@@ -721,8 +725,8 @@ class AudioPlayer {
       updatePosition: position,
       updateTime: DateTime.now(),
     );
-    _playbackEventSubject.add(_playbackEvent);
     _playingSubject.add(false);
+    _playbackEventSubject.add(_playbackEvent);
     // TODO: perhaps modify platform side to ensure new state is broadcast
     // before this method returns.
     await (await _platform).pause(PauseRequest());
