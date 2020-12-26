@@ -27,6 +27,15 @@ This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and p
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
+## Migrating from 0.5.x to 0.6.x
+
+`load()` and `stop()` have new behaviours in 0.6.x documented [here](https://pub.dev/documentation/just_audio/latest/just_audio/AudioPlayer-class.html) that provide greater flexibility in how system resources are acquired and released. For a quick migration that maintains 0.5.x behaviour:
+
+* Replace `await player.load(source);` by `await player.setAudioSource(source);`
+* Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);
+
+Also beware that `playbackEventStream` will now emit events strictly when the fields in `PlaybackEvent` change. In 0.5.x this often (by chance) coincided with `playing` state changes. Apps that depended on this behaviour will break in 0.6.x and should explicitly listen for `playing` state changes via `playingStream` or `playerStateStream`.
+
 ## Example
 
 ![just_audio](https://user-images.githubusercontent.com/19899190/89558581-bf369080-d857-11ea-9376-3a5055284bab.png)
@@ -141,7 +150,7 @@ await player.setUrl('https://a.b/c.mp3', preload: false);
 var duration = await player.load();
 // Unload audio and release decoders until needed again.
 await player.stop();
-// Permanently release decoders/resources used by th eplayer.
+// Permanently release decoders/resources used by the player.
 await player.dispose();
 ```
 
@@ -158,7 +167,7 @@ try {
   // iOS/macOS: maps to NSError.localizedDescription
   // Android: maps to ExoPlaybackException.getMessage()
   // Web: a generic message
-  print("Essos message: ${e.message}");
+  print("Error message: ${e.message}");
 } on PlayerInterruptedException catch (e) {
   // This call was interrupted since another audio source was loaded or the
   // player was stopped or disposed before this audio source could complete
@@ -200,6 +209,18 @@ player.playerStateStream.listen((state) {
 // - speedStream
 // - playbackEventStream
 ```
+
+## The state model
+
+The state of the player consists of two orthogonal states: `playing` and `processingState`. The `playing` state typically maps to the app's play/pause button and only ever changes in response to direct method calls by the app. By contrast, `processingState` reflects the state of the underlying audio decoder and can change both in response to method calls by the app and also in response to events occurring asynchronously within the audio processing pipeline. The following diagram depicts the valid state transitions:
+
+![just_audio_states](https://user-images.githubusercontent.com/19899190/103147563-e6601100-47aa-11eb-8baf-dee00d8e2cd4.png)
+
+This state model provides a flexible way to capture different combinations of states such as playing+buffering vs paused+buffering, and this allows state to be more accurately represented in an app's UI. It is important to understand that even when `playing == true`, no sound will actually be audible unless `processingState == ready` which indicates that the buffers are filled and ready to play. This makes intuitive sense when imagining the `playing` state as mapping onto an app's play/pause button:
+
+* When the user presses "play" to start a new track, the button will immediately reflect the "playing" state change although there will be a few moments of silence while the audio is loading (while `processingState == loading`) but once the buffers are finally filled (i.e. `processingState == ready`), audio playback will begin.
+* When buffering occurs during playback (e.g. due to a slow network connection), the app's play/pause button remains in the `playing` state, although temporarily no sound will be audible while `processingState == buffering`. Sound will be audible again as soon as the buffers are filled again and `processingState == ready`.
+* When playback reaches the end of the audio stream, the player remains in the `playing` state with the seek bar positioned at the end of the track. No sound will be audible until the app seeks to an earlier point in the stream. Some apps may choose to display a "replay" button in place of the play/pause button at this point, which calls `seek(Duration.zero)`. When clicked, playback will automatically continue from the seek point (because it was never paused in the first place). Other apps may instead wish to listen for the `processingState == completed` event and programmatically pause and rewind the audio at that point.
 
 ## Configuring the audio session
 
