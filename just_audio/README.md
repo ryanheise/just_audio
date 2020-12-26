@@ -32,7 +32,7 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 `load()` and `stop()` have new behaviours in 0.6.x documented [here](https://pub.dev/documentation/just_audio/latest/just_audio/AudioPlayer-class.html) that provide greater flexibility in how system resources are acquired and released. For a quick migration that maintains 0.5.x behaviour:
 
 * Replace `await player.load(source);` by `await player.setAudioSource(source);`
-* Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);
+* Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);`
 
 Also beware that `playbackEventStream` will now emit events strictly when the fields in `PlaybackEvent` change. In 0.5.x this often (by chance) coincided with `playing` state changes. Apps that depended on this behaviour will break in 0.6.x and should explicitly listen for `playing` state changes via `playingStream` or `playerStateStream`.
 

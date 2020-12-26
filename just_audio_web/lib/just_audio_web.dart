@@ -15,12 +15,12 @@ class JustAudioPlugin extends JustAudioPlatform {
   }
 
   Future<AudioPlayerPlatform> init(InitRequest request) async {
-    final player = Html5AudioPlayer(id: request.id);
     if (players.containsKey(request.id)) {
       throw PlatformException(
           code: "error",
           message: "Platform player ${request.id} already exists");
     }
+    final player = Html5AudioPlayer(id: request.id);
     players[request.id] = player;
     return player;
   }

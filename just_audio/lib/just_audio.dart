@@ -542,18 +542,14 @@ class AudioPlayer {
     _playbackEventSubject.add(_playbackEvent = PlaybackEvent(
         currentIndex: initialIndex, updatePosition: initialPosition));
     _broadcastSequence();
-    // TODO: If the active platform existed, we should try to retain it.
-    try {
-      await _setPlatformActive(false);
-    } catch (e) {
-      print("Error deactivating previous platform: $e (ignoring)");
-    }
     _audioSource = source;
     _broadcastSequence();
     Duration duration;
     if (playing) preload = true;
     if (preload) {
       duration = await load();
+    } else {
+      await _setPlatformActive(false);
     }
     return duration;
   }
@@ -573,7 +569,13 @@ class AudioPlayer {
     if (_audioSource == null) {
       throw Exception('Must set AudioSource before loading');
     }
-    return await _setPlatformActive(true);
+    if (_active) {
+      return await _load(await _platform, _audioSource,
+          initialSeekValues: _initialSeekValues);
+    } else {
+      // This will implicitly load the current audio source.
+      return await _setPlatformActive(true);
+    }
   }
 
   void _broadcastSequence() {
@@ -601,7 +603,7 @@ class AudioPlayer {
   }
 
   Future<Duration> _load(AudioPlayerPlatform platform, AudioSource source,
-      {Duration initialPosition, int initialIndex}) async {
+      {_InitialSeekValues initialSeekValues}) async {
     try {
       if (!kIsWeb && source._requiresHeaders) {
         if (_proxy == null) {
@@ -610,18 +612,21 @@ class AudioPlayer {
         }
       }
       await source._setup(this);
-      source._shuffle(initialIndex: initialIndex ?? 0);
+      source._shuffle(initialIndex: initialSeekValues?.index ?? 0);
       _updateShuffleIndices();
       platform ??= await _platform;
       _durationFuture = platform
           .load(LoadRequest(
             audioSourceMessage: source._toMessage(),
-            initialPosition: initialPosition,
-            initialIndex: initialIndex,
+            initialPosition: initialSeekValues?.position,
+            initialIndex: initialSeekValues?.index,
           ))
           .then((response) => response.duration);
       final duration = await _durationFuture;
       _durationSubject.add(duration);
+      // Wait for loading state to pass.
+      await processingStateStream
+          .firstWhere((state) => state != ProcessingState.loading);
       return duration;
     } on PlatformException catch (e) {
       try {
@@ -653,9 +658,6 @@ class AudioPlayer {
                 start: start,
                 end: end,
               ));
-    // Wait for loading state to pass.
-    await processingStateStream
-        .firstWhere((state) => state != ProcessingState.loading);
     return duration;
   }
 
@@ -917,11 +919,6 @@ class AudioPlayer {
     final position = this.position;
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
-    final newPlatform = active
-        ? (_nativePlatform =
-            JustAudioPlatform.instance.init(InitRequest(id: _id)))
-        : Future.value(_idlePlatform);
-    _playbackEventSubscription?.cancel();
     final durationCompleter = Completer<Duration>();
     _platform = Future<AudioPlayerPlatform>(() async {
       if (oldPlatformFuture != null) {
@@ -932,7 +929,11 @@ class AudioPlayer {
       }
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
-      final platform = await newPlatform;
+      final platform = active
+          ? await (_nativePlatform =
+              JustAudioPlatform.instance.init(InitRequest(id: _id)))
+          : _idlePlatform;
+      _playbackEventSubscription?.cancel();
       _playbackEventSubscription =
           platform.playbackEventMessageStream.listen((message) {
         var duration = message.duration;
@@ -999,20 +1000,9 @@ class AudioPlayer {
       }
       if (audioSource != null) {
         try {
-          Duration initialPosition;
-          int initialIndex;
-          if (_initialSeekValues != null) {
-            initialPosition = _initialSeekValues.position;
-            initialIndex = _initialSeekValues.index;
-          } else {
-            initialPosition = position;
-            initialIndex = currentIndex;
-          }
           final duration = await _load(platform, _audioSource,
-              initialPosition: initialPosition, initialIndex: initialIndex);
-          // Wait for loading state to pass.
-          await processingStateStream
-              .firstWhere((state) => state != ProcessingState.loading);
+              initialSeekValues: _initialSeekValues ??
+                  _InitialSeekValues(position: position, index: currentIndex));
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
           _audioSource = null;
