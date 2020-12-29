@@ -541,7 +541,6 @@ class AudioPlayer {
         _InitialSeekValues(position: initialPosition, index: initialIndex);
     _playbackEventSubject.add(_playbackEvent = PlaybackEvent(
         currentIndex: initialIndex, updatePosition: initialPosition));
-    _broadcastSequence();
     _audioSource = source;
     _broadcastSequence();
     Duration duration;
@@ -689,6 +688,7 @@ class AudioPlayer {
       updateTime: DateTime.now(),
     );
     _playingSubject.add(true);
+    _playbackEventSubject.add(_playbackEvent);
     final playCompleter = Completer();
     final audioSession = await AudioSession.instance;
     if (await audioSession.setActive(true)) {
