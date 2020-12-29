@@ -1,3 +1,7 @@
+## 0.6.4
+
+* Emit PlaybackEvent when playing (compatibility with 0.5.x).
+
 ## 0.6.3
 
 * Fix iOS compiler warnings.
