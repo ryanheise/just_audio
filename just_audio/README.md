@@ -34,8 +34,6 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 * Replace `await player.load(source);` by `await player.setAudioSource(source);`
 * Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);`
 
-Also beware that `playbackEventStream` will now emit events strictly when the fields in `PlaybackEvent` change. In 0.5.x this often (by chance) coincided with `playing` state changes. Apps that depended on this behaviour will break in 0.6.x and should explicitly listen for `playing` state changes via `playingStream` or `playerStateStream`.
-
 ## Example
 
 ![just_audio](https://user-images.githubusercontent.com/19899190/89558581-bf369080-d857-11ea-9376-3a5055284bab.png)
