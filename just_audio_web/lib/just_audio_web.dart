@@ -15,12 +15,12 @@ class JustAudioPlugin extends JustAudioPlatform {
   }
 
   Future<AudioPlayerPlatform> init(InitRequest request) async {
-    final player = Html5AudioPlayer(id: request.id);
     if (players.containsKey(request.id)) {
       throw PlatformException(
           code: "error",
           message: "Platform player ${request.id} already exists");
     }
+    final player = Html5AudioPlayer(id: request.id);
     players[request.id] = player;
     return player;
   }
@@ -114,19 +114,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   List<int> get order {
     final sequence = _audioSourcePlayer.sequence;
-    List<int> order = List<int>(sequence.length);
-    if (_shuffleModeEnabled) {
-      order = _audioSourcePlayer.shuffleIndices;
-    } else {
-      for (var i = 0; i < order.length; i++) {
-        order[i] = i;
-      }
-    }
-    return order;
+    return _shuffleModeEnabled
+        ? _audioSourcePlayer.shuffleIndices
+        : List.generate(sequence.length, (i) => i);
   }
 
   List<int> getInv(List<int> order) {
-    List<int> orderInv = List<int>(order.length);
+    final orderInv = List<int>.filled(order.length, 0);
     for (var i = 0; i < order.length; i++) {
       orderInv[order[i]] = i;
     }
@@ -222,19 +216,21 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<PlayResponse> play(PlayRequest request) async {
+    if (_playing) return PlayResponse();
+    _playing = true;
     await _play();
     return PlayResponse();
   }
 
   Future<void> _play() async {
-    _playing = true;
-    await _currentAudioSourcePlayer.play();
+    await _currentAudioSourcePlayer?.play();
   }
 
   @override
   Future<PauseResponse> pause(PauseRequest request) async {
+    if (!_playing) return PauseResponse();
     _playing = false;
-    _currentAudioSourcePlayer.pause();
+    _currentAudioSourcePlayer?.pause();
     return PauseResponse();
   }
 
