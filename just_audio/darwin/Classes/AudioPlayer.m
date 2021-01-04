@@ -40,6 +40,7 @@
     BOOL _automaticallyWaitsToMinimizeStalling;
     BOOL _playing;
     float _speed;
+    BOOL _justAdvanced;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
@@ -76,6 +77,7 @@
     _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
     _speed = 1.0f;
+    _justAdvanced = NO;
     __weak __typeof__(self) weakSelf = self;
     [_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
         [weakSelf handleMethodCall:call result:result];
@@ -208,6 +210,9 @@
         IndexedAudioSource *audioSource = _indexedAudioSources[i];
         while (audioSource != oldIndexedAudioSources[j]) {
             [self removeItemObservers:oldIndexedAudioSources[j].playerItem];
+            if (oldIndexedAudioSources[j].playerItem2) {
+                [self removeItemObservers:oldIndexedAudioSources[j].playerItem2];
+            }
             if (j < _index) {
                 _index--;
             } else if (j == _index) {
@@ -370,8 +375,8 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onItemStalled:) name:AVPlayerItemPlaybackStalledNotification object:playerItem];
 }
 
-- (NSMutableArray *)decodeAudioSources:(NSArray *)data {
-    NSMutableArray *array = [[NSMutableArray alloc] init];
+- (NSMutableArray<AudioSource *> *)decodeAudioSources:(NSArray *)data {
+    NSMutableArray<AudioSource *> *array = (NSMutableArray<AudioSource *> *)[[NSMutableArray alloc] init];
     for (int i = 0; i < [data count]; i++) {
         AudioSource *source = [self decodeAudioSource:data[i]];
         [array addObject:source];
@@ -409,6 +414,7 @@
 }
 
 - (void)enqueueFrom:(int)index {
+    //NSLog(@"### enqueueFrom:%d", index);
     _index = index;
 
     // Update the queue while keeping the currently playing item untouched.
@@ -447,14 +453,38 @@
     /* [self dumpQueue]; */
 
     // Regenerate queue
-    BOOL include = NO;
-    for (int i = 0; i < [_order count]; i++) {
-        int si = [_order[i] intValue];
-        if (si == _index) include = YES;
-        if (include && _indexedAudioSources[si].playerItem != existingItem) {
-            //NSLog(@"inserting item %d", si);
-            [_player insertItem:_indexedAudioSources[si].playerItem afterItem:nil];
+    if (!existingItem || _loopMode != loopOne) {
+        BOOL include = NO;
+        for (int i = 0; i < [_order count]; i++) {
+            int si = [_order[i] intValue];
+            if (si == _index) include = YES;
+            if (include && _indexedAudioSources[si].playerItem != existingItem) {
+                //NSLog(@"inserting item %d", si);
+                [_player insertItem:_indexedAudioSources[si].playerItem afterItem:nil];
+                if (_loopMode == loopOne) {
+                    // We only want one item in the queue.
+                    break;
+                }
+            }
         }
+    }
+
+    // Add next loop item if we're looping
+    if (_loopMode == loopAll) {
+        int si = [_order[0] intValue];
+        //NSLog(@"### add loop item:%d", si);
+        if (!_indexedAudioSources[si].playerItem2) {
+            [_indexedAudioSources[si] preparePlayerItem2];
+            [self addItemObservers:_indexedAudioSources[si].playerItem2];
+        }
+        [_player insertItem:_indexedAudioSources[si].playerItem2 afterItem:nil];
+    } else if (_loopMode == loopOne) {
+        //NSLog(@"### add loop item:%d", _index);
+        if (!_indexedAudioSources[_index].playerItem2) {
+            [_indexedAudioSources[_index] preparePlayerItem2];
+            [self addItemObservers:_indexedAudioSources[_index].playerItem2];
+        }
+        [_player insertItem:_indexedAudioSources[_index].playerItem2 afterItem:nil];
     }
 
     /* NSLog(@"after reorder: _player.items.count: ", _player.items.count); */
@@ -495,6 +525,9 @@
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
             [self removeItemObservers:_indexedAudioSources[i].playerItem];
+            if (_indexedAudioSources[i].playerItem2) {
+                [self removeItemObservers:_indexedAudioSources[i].playerItem2];
+            }
         }
     }
     // Decode audio source
@@ -572,6 +605,10 @@
         _player.rate = _speed;
     }
     [self broadcastPlaybackEvent];
+    /* NSLog(@"load:"); */
+    /* for (int i = 0; i < [_indexedAudioSources count]; i++) { */
+    /*     NSLog(@"- %@", _indexedAudioSources[i].sourceId); */
+    /* } */
 }
 
 - (void)updateOrder {
@@ -605,55 +642,27 @@
 
 - (void)onComplete:(NSNotification *)notification {
     //NSLog(@"onComplete");
-    if (_loopMode == loopOne) {
-        __weak __typeof__(self) weakSelf = self;
-        [self seek:kCMTimeZero index:@(_index) completionHandler:^(BOOL finished) {
-            // XXX: Not necessary?
-            [weakSelf play];
-        }];
-    } else {
-        IndexedPlayerItem *endedPlayerItem = (IndexedPlayerItem *)notification.object;
-        IndexedAudioSource *endedSource = endedPlayerItem.audioSource;
 
-        if ([_orderInv[_index] intValue] + 1 < [_order count]) {
-            // When an item ends, seek back to its beginning.
-            [endedSource seek:kCMTimeZero];
-            // account for automatic move to next item
-            _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
-            //NSLog(@"advance to next: index = %d", _index);
-            [self updateEndAction];
-            [self broadcastPlaybackEvent];
-        } else {
-            // reached end of playlist
-            if (_loopMode == loopAll) {
-                //NSLog(@"Loop back to first item");
-                // Loop back to the beginning
-                // TODO: Currently there will be a gap at the loop point.
-                // Maybe we can do something clever by temporarily adding the
-                // first playlist item at the end of the queue, although this
-                // will affect any code that assumes the queue always
-                // corresponds to a contiguous region of the indexed audio
-                // sources.
-                // For now we just do a seek back to the start.
-                if ([_order count] == 1) {
-                    __weak __typeof__(self) weakSelf = self;
-                    [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
-                        // XXX: Necessary?
-                        [weakSelf play];
-                    }];
-                } else {
-                    // When an item ends, seek back to its beginning.
-                    [endedSource seek:kCMTimeZero];
-                    __weak __typeof__(self) weakSelf = self;
-                    [self seek:kCMTimeZero index:_order[0] completionHandler:^(BOOL finished) {
-                        // XXX: Necessary?
-                        [weakSelf play];
-                    }];
-                }
-            } else {
-                [self complete];
-            }
-        }
+    IndexedPlayerItem *endedPlayerItem = (IndexedPlayerItem *)notification.object;
+    IndexedAudioSource *endedSource = endedPlayerItem.audioSource;
+
+    if (_loopMode == loopOne) {
+        [endedSource seek:kCMTimeZero];
+        _justAdvanced = YES;
+    } else if (_loopMode == loopAll) {
+        [endedSource seek:kCMTimeZero];
+        _index = [_order[([_orderInv[_index] intValue] + 1) % _order.count] intValue];
+        [self broadcastPlaybackEvent];
+        _justAdvanced = YES;
+    } else if ([_orderInv[_index] intValue] + 1 < [_order count]) {
+        [endedSource seek:kCMTimeZero];
+        _index++;
+        [self updateEndAction];
+        [self broadcastPlaybackEvent];
+        _justAdvanced = YES;
+    } else {
+        // reached end of playlist
+        [self complete];
     }
 }
 
@@ -790,7 +799,9 @@
             }
         }
     } else if ([keyPath isEqualToString:@"currentItem"] && _player.currentItem) {
-        if (_player.currentItem.status == AVPlayerItemStatusFailed) {
+        IndexedPlayerItem *playerItem = (IndexedPlayerItem *)change[NSKeyValueChangeNewKey];
+        //IndexedPlayerItem *oldPlayerItem = (IndexedPlayerItem *)change[NSKeyValueChangeOldKey];
+        if (playerItem.status == AVPlayerItemStatusFailed) {
             if ([_orderInv[_index] intValue] + 1 < [_order count]) {
                 // account for automatic move to next item
                 _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
@@ -802,7 +813,7 @@
             }
             return;
         } else {
-            int expectedIndex = [self indexForItem:(IndexedPlayerItem *)_player.currentItem];
+            int expectedIndex = [self indexForItem:playerItem];
             if (_index != expectedIndex) {
                 // AVQueuePlayer will sometimes skip over error items without
                 // notifying this observer.
@@ -816,9 +827,9 @@
         _bufferUnconfirmed = YES;
         // If we've skipped or transitioned to a new item and we're not
         // currently in the middle of a seek
-        /* if (CMTIME_IS_INVALID(_seekPos) && _player.currentItem.status == AVPlayerItemStatusReadyToPlay) { */
+        /* if (CMTIME_IS_INVALID(_seekPos) && playerItem.status == AVPlayerItemStatusReadyToPlay) { */
         /*     [self updatePosition]; */
-        /*     IndexedAudioSource *source = ((IndexedPlayerItem *)_player.currentItem).audioSource; */
+        /*     IndexedAudioSource *source = playerItem.audioSource; */
         /*     // We should already be at position zero but for */
         /*     // ClippingAudioSource it might be off by some milliseconds so we */
         /*     // consider anything <= 100 as close enough. */
@@ -850,6 +861,22 @@
         /*         // Already at zero, no need to seek. */
         /*     } */
         /* } */
+
+        if (_justAdvanced) {
+            IndexedAudioSource *audioSource = playerItem.audioSource;
+            if (_loopMode == loopOne) {
+                [audioSource flip];
+                [self enqueueFrom:_index];
+            } else if (_loopMode == loopAll) {
+                if (_index == [_order[0] intValue] && playerItem == audioSource.playerItem2) {
+                    [audioSource flip];
+                    [self enqueueFrom:_index];
+                } else {
+                    [self updateEndAction];
+                }
+            }
+            _justAdvanced = NO;
+        }
     } else if ([keyPath isEqualToString:@"loadedTimeRanges"]) {
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)object;
         if (playerItem != _player.currentItem) return;
@@ -889,7 +916,7 @@
 
 - (int)indexForItem:(IndexedPlayerItem *)playerItem {
     for (int i = 0; i < _indexedAudioSources.count; i++) {
-        if (_indexedAudioSources[i].playerItem == playerItem) {
+        if (_indexedAudioSources[i].playerItem == playerItem || _indexedAudioSources[i].playerItem2 == playerItem) {
             return i;
         }
     }
@@ -989,14 +1016,20 @@
 }
 
 - (void)setLoopMode:(int)loopMode {
+    if (loopMode == _loopMode) return;
     _loopMode = loopMode;
-    [self updateEndAction];
+    [self enqueueFrom:_index];
 }
 
 - (void)updateEndAction {
-    // Should update this whenever the audio source changes and whenever _index changes.
+    // Should be called in the following situations:
+    // - when the audio source changes
+    // - when _index changes
+    // - when the loop mode changes.
+    // - when the shuffle order changes. (TODO)
+    // - when the shuffle mode changes.
     if (!_player) return;
-    if (_audioSource && [_orderInv[_index] intValue] + 1 < [_order count] && _loopMode != loopOne) {
+    if (_audioSource && (_loopMode != loopOff || [_orderInv[_index] intValue] + 1 < [_order count])) {
         _player.actionAtItemEnd = AVPlayerActionAtItemEndAdvance;
     } else {
         _player.actionAtItemEnd = AVPlayerActionAtItemEndPause; // AVPlayerActionAtItemEndNone
@@ -1014,19 +1047,15 @@
 }
 
 - (void)setShuffleOrder:(NSDictionary *)dict {
+    // TODO: update order and enqueue.
     [_audioSource decodeShuffleOrder:dict];
 }
 
 - (void)dumpQueue {
     for (int i = 0; i < _player.items.count; i++) {
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)_player.items[i];
-        for (int j = 0; j < _indexedAudioSources.count; j++) {
-            IndexedAudioSource *source = _indexedAudioSources[j];
-            if (source.playerItem == playerItem) {
-                NSLog(@"- %d", j);
-                break;
-            }
-        }
+        int j = [self indexForItem:playerItem];
+        NSLog(@"- %d", j);
     }
 }
 
@@ -1189,6 +1218,9 @@
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
             [self removeItemObservers:_indexedAudioSources[i].playerItem];
+            if (_indexedAudioSources[i].playerItem2) {
+                [self removeItemObservers:_indexedAudioSources[i].playerItem2];
+            }
         }
         _indexedAudioSources = nil;
     }

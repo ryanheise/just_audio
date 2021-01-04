@@ -6,6 +6,7 @@
 @implementation UriAudioSource {
     NSString *_uri;
     IndexedPlayerItem *_playerItem;
+    IndexedPlayerItem *_playerItem2;
     /* CMTime _duration; */
 }
 
@@ -13,26 +14,31 @@
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _uri = uri;
-    if ([_uri hasPrefix:@"file://"]) {
-        _playerItem = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[_uri stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding] substringFromIndex:7]]];
+    _playerItem = [self createPlayerItem:uri];
+    _playerItem2 = nil;
+    return self;
+}
+
+- (IndexedPlayerItem *)createPlayerItem:(NSString *)uri {
+    IndexedPlayerItem *item;
+    if ([uri hasPrefix:@"file://"]) {
+        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding] substringFromIndex:7]]];
     } else {
-        _playerItem = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:_uri]];
+        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:uri]];
     }
     if (@available(macOS 10.13, iOS 11.0, *)) {
         // This does the best at reducing distortion on voice with speeds below 1.0
-        _playerItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
+        item.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
     }
-    /* NSKeyValueObservingOptions options = */
-    /*     NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew; */
-    /* [_playerItem addObserver:self */
-    /*               forKeyPath:@"duration" */
-    /*                  options:options */
-    /*                  context:nil]; */
-    return self;
+    return item;
 }
 
 - (IndexedPlayerItem *)playerItem {
     return _playerItem;
+}
+
+- (IndexedPlayerItem *)playerItem2 {
+    return _playerItem2;
 }
 
 - (NSArray<NSNumber *> *)getShuffleIndices {
@@ -58,6 +64,19 @@
         [_playerItem seekToTime:position toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:completionHandler];
     } else {
         [super seek:position completionHandler:completionHandler];
+    }
+}
+
+- (void)flip {
+    IndexedPlayerItem *temp = _playerItem;
+    _playerItem = _playerItem2;
+    _playerItem2 = temp;
+}
+
+- (void)preparePlayerItem2 {
+    if (!_playerItem2) {
+        _playerItem2 = [self createPlayerItem:_uri];
+        _playerItem2.audioSource = _playerItem.audioSource;
     }
 }
 

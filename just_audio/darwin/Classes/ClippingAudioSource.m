@@ -30,13 +30,17 @@
 
 - (void)attach:(AVQueuePlayer *)player {
     [super attach:player];
+    // Prepare clip to start/end at the right timestamps.
     _audioSource.playerItem.forwardPlaybackEndTime = _end;
-    // XXX: Not needed since currentItem observer handles it?
     [self seek:kCMTimeZero];
 }
 
 - (IndexedPlayerItem *)playerItem {
     return _audioSource.playerItem;
+}
+
+- (IndexedPlayerItem *)playerItem2 {
+    return _audioSource.playerItem2;
 }
 
 - (NSArray<NSNumber *> *)getShuffleIndices {
@@ -59,6 +63,19 @@
     } else {
         [super seek:position completionHandler:completionHandler];
     }
+}
+
+- (void)flip {
+    [_audioSource flip];
+}
+
+- (void)preparePlayerItem2 {
+    if (self.playerItem2) return;
+    [_audioSource preparePlayerItem2];
+    IndexedPlayerItem *item = _audioSource.playerItem2;
+    // Prepare loop clip to start/end at the right timestamps.
+    item.forwardPlaybackEndTime = _end;
+    [item seekToTime:_start toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:nil];
 }
 
 - (CMTime)duration {

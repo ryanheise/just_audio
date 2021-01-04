@@ -9,7 +9,7 @@
 }
 
 - (instancetype)initWithId:(NSString *)sid {
-    self = [super init];
+    self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _isAttached = NO;
     _queuedSeekPos = kCMTimeInvalid;
@@ -30,6 +30,10 @@
 }
 
 - (IndexedPlayerItem *)playerItem {
+    return nil;
+}
+
+- (IndexedPlayerItem *)playerItem2 {
     return nil;
 }
 
@@ -64,6 +68,12 @@
         _queuedSeekPos = position;
         _queuedSeekCompletionHandler = completionHandler;
     }
+}
+
+- (void)flip {
+}
+
+- (void)preparePlayerItem2 {
 }
 
 - (CMTime)duration {
