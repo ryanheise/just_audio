@@ -1,3 +1,7 @@
+## 0.6.5
+
+* Rewrite setLoopMode on iOS to be gapless.
+
 ## 0.6.4
 
 * Emit PlaybackEvent when playing (compatibility with 0.5.x).
