@@ -921,6 +921,7 @@ class AudioPlayer {
     final audioSource = _audioSource;
     final durationCompleter = Completer<Duration>();
     _platform = Future<AudioPlayerPlatform>(() async {
+      _playbackEventSubscription?.cancel();
       if (oldPlatformFuture != null) {
         final oldPlatform = await oldPlatformFuture;
         if (oldPlatform != _idlePlatform) {
@@ -933,7 +934,6 @@ class AudioPlayer {
           ? await (_nativePlatform =
               JustAudioPlatform.instance.init(InitRequest(id: _id)))
           : _idlePlatform;
-      _playbackEventSubscription?.cancel();
       _playbackEventSubscription =
           platform.playbackEventMessageStream.listen((message) {
         var duration = message.duration;
