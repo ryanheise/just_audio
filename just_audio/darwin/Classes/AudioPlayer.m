@@ -134,7 +134,7 @@
             result(FlutterMethodNotImplemented);
         }
     } @catch (id exception) {
-        NSLog(@"Error in handleMethodCall");
+        //NSLog(@"Error in handleMethodCall");
         FlutterError *flutterError = [FlutterError errorWithCode:@"error" message:@"Error in handleMethodCall" details:nil];
         result(flutterError);
     }
@@ -278,7 +278,7 @@
             [self broadcastPlaybackEvent];
         } else if (drift < -100) {
             [self enterBuffering:@"stalling"];
-            NSLog(@"Drift: %lld", drift);
+            //NSLog(@"Drift: %lld", drift);
             [self updatePosition];
             [self broadcastPlaybackEvent];
         }
@@ -632,16 +632,16 @@
 
 - (void)onItemStalled:(NSNotification *)notification {
     //IndexedPlayerItem *playerItem = (IndexedPlayerItem *)notification.object;
-    NSLog(@"onItemStalled");
+    //NSLog(@"onItemStalled");
 }
 
 - (void)onFailToComplete:(NSNotification *)notification {
     //IndexedPlayerItem *playerItem = (IndexedPlayerItem *)notification.object;
-    NSLog(@"onFailToComplete");
+    //NSLog(@"onFailToComplete");
 }
 
 - (void)onComplete:(NSNotification *)notification {
-    NSLog(@"onComplete");
+    //NSLog(@"onComplete");
 
     IndexedPlayerItem *endedPlayerItem = (IndexedPlayerItem *)notification.object;
     IndexedAudioSource *endedSource = endedPlayerItem.audioSource;
@@ -731,7 +731,7 @@
                 break;
             }
             case AVPlayerItemStatusFailed: {
-                NSLog(@"AVPlayerItemStatusFailed");
+                //NSLog(@"AVPlayerItemStatusFailed");
                 [self sendErrorForItem:playerItem];
                 break;
             }
@@ -753,7 +753,7 @@
                     _bufferUnconfirmed = NO;
                     [self leaveBuffering:@"playing, _bufferUnconfirmed && playbackBufferFull"];
                     [self updatePosition];
-                    NSLog(@"Buffering confirmed! leaving buffering");
+                    //NSLog(@"Buffering confirmed! leaving buffering");
                     [self broadcastPlaybackEvent];
                 }
             }
@@ -788,7 +788,7 @@
                         [self updatePosition];
                         [self broadcastPlaybackEvent];
                     } else {
-                        NSLog(@"Ignoring wait signal because we reached the end");
+                        //NSLog(@"Ignoring wait signal because we reached the end");
                     }
                     break;
                 case AVPlayerTimeControlStatusPlaying:
@@ -805,11 +805,11 @@
             if ([_orderInv[_index] intValue] + 1 < [_order count]) {
                 // account for automatic move to next item
                 _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
-                NSLog(@"advance to next on error: index = %d", _index);
+                //NSLog(@"advance to next on error: index = %d", _index);
                 [self updateEndAction];
                 [self broadcastPlaybackEvent];
             } else {
-                NSLog(@"error on last item");
+                //NSLog(@"error on last item");
             }
             return;
         } else {
@@ -817,7 +817,7 @@
             if (_index != expectedIndex) {
                 // AVQueuePlayer will sometimes skip over error items without
                 // notifying this observer.
-                NSLog(@"Queue change detected. Adjusting index from %d -> %d", _index, expectedIndex);
+                //NSLog(@"Queue change detected. Adjusting index from %d -> %d", _index, expectedIndex);
                 _index = expectedIndex;
                 [self updateEndAction];
                 [self broadcastPlaybackEvent];
@@ -896,7 +896,7 @@
 }
 
 - (void)sendError:(FlutterError *)flutterError playerItem:(IndexedPlayerItem *)playerItem {
-    NSLog(@"sendError");
+    //NSLog(@"sendError");
     if (_loadResult && playerItem == _player.currentItem) {
         _loadResult(flutterError);
         _loadResult = nil;
@@ -936,7 +936,7 @@
     }
     if (result) {
         if (_playResult) {
-            NSLog(@"INTERRUPTING PLAY");
+            //NSLog(@"INTERRUPTING PLAY");
             _playResult(@{});
         }
         _playResult = result;
@@ -960,7 +960,7 @@
     [self updatePosition];
     [self broadcastPlaybackEvent];
     if (_playResult) {
-        NSLog(@"PLAY FINISHED DUE TO PAUSE");
+        //NSLog(@"PLAY FINISHED DUE TO PAUSE");
         _playResult(@{});
         _playResult = nil;
     }
@@ -971,7 +971,7 @@
     _processingState = completed;
     [self broadcastPlaybackEvent];
     if (_playResult) {
-        NSLog(@"PLAY FINISHED DUE TO COMPLETE");
+        //NSLog(@"PLAY FINISHED DUE TO COMPLETE");
         _playResult(@{});
         _playResult = nil;
     }
@@ -1037,7 +1037,7 @@
 }
 
 - (void)setShuffleModeEnabled:(BOOL)shuffleModeEnabled {
-    NSLog(@"setShuffleModeEnabled: %d", shuffleModeEnabled);
+    //NSLog(@"setShuffleModeEnabled: %d", shuffleModeEnabled);
     _shuffleModeEnabled = shuffleModeEnabled;
     if (!_audioSource) return;
 
