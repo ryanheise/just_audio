@@ -779,12 +779,8 @@ class AudioPlayer {
     await (await _platform).setSpeed(SetSpeedRequest(speed: speed));
   }
 
-  /// Sets the [LoopMode]. The gapless looping support is as follows:
-  ///
-  /// * Android: supported
-  /// * iOS/macOS: not supported, however, gapless looping can be achieved by
-  /// using [LoopingAudioSource].
-  /// * Web: not supported
+  /// Sets the [LoopMode]. Looping will be gapless on Android, iOS and macOS. On
+  /// web, there will be a slight gap at the loop point.
   Future<void> setLoopMode(LoopMode mode) async {
     if (_disposed) return;
     _loopModeSubject.add(mode);
@@ -1854,10 +1850,6 @@ class ClippingAudioSource extends IndexedAudioSource {
 // An [AudioSource] that loops a nested [AudioSource] a finite number of times.
 // NOTE: this can be inefficient when using a large loop count. If you wish to
 // loop an infinite number of times, use [AudioPlayer.setLoopMode].
-//
-// On iOS and macOS, note that [LoopingAudioSource] will provide gapless
-// playback while [AudioPlayer.setLoopMode] will not. (This will be supported
-// in a future release.)
 class LoopingAudioSource extends AudioSource {
   AudioSource child;
   final int count;
