@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 
@@ -195,6 +197,24 @@ class AudioPlayer {
           }
         });
       });
+    }
+    _removeOldAssetCacheDir();
+  }
+
+  /// Old versions of just_audio used an asset caching system that created a
+  /// separate cache file per asset per player instance, and was highly
+  /// dependent on the app calling [dispose] to clean up afterwards. If the app
+  /// is upgrading from an old version of just_audio, this will delete the old
+  /// cache directory.
+  Future<void> _removeOldAssetCacheDir() async {
+    final oldAssetCacheDir = Directory(
+        p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
+    if (oldAssetCacheDir.existsSync()) {
+      try {
+        oldAssetCacheDir.deleteSync(recursive: true);
+      } catch (e) {
+        print("Failed to delete old asset cache dir: $e");
+      }
     }
   }
 
@@ -1284,8 +1304,6 @@ class SequenceState {
 }
 
 /// A local proxy HTTP server for making remote GET requests with headers.
-///
-/// TODO: Recursively attach headers to items in playlists like m3u8.
 class _ProxyHttpServer {
   HttpServer _server;
 
@@ -1302,11 +1320,7 @@ class _ProxyHttpServer {
     final uri = source.uri;
     final headers = source.headers?.cast<String, String>();
     final path = _requestKey(uri);
-    if (uri.scheme == 'asset') {
-      _handlerMap[path] = _proxyHandlerForAsset(uri);
-    } else {
-      _handlerMap[path] = _proxyHandlerForUri(uri, headers);
-    }
+    _handlerMap[path] = _proxyHandlerForUri(uri, headers);
     return uri.replace(
       scheme: 'http',
       host: InternetAddress.loopbackIPv4.address,
@@ -1478,7 +1492,10 @@ abstract class UriAudioSource extends IndexedAudioSource {
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
-    if (uri.scheme == 'asset' || headers != null) {
+    if (uri.scheme == 'asset') {
+      _overrideUri = Uri.file(
+          (await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''))).path);
+    } else if (headers != null) {
       _overrideUri = player._proxy.addUriAudioSource(this);
     }
   }
@@ -1491,8 +1508,29 @@ abstract class UriAudioSource extends IndexedAudioSource {
     super._dispose();
   }
 
+  Future<File> _loadAsset(String assetPath) async {
+    final file = await _getCacheFile(assetPath);
+    this._cacheFile = file;
+    // Not technically inter-isolate-safe, although low risk. Could consider
+    // locking the file or creating a separate lock file.
+    if (!file.existsSync()) {
+      file.createSync(recursive: true);
+      await file.writeAsBytes(
+          (await rootBundle.load(assetPath)).buffer.asUint8List());
+    }
+    return file;
+  }
+
+  /// Get file for caching asset media with proper extension
+  Future<File> _getCacheFile(final String assetPath) async => File(p.joinAll([
+        (await getTemporaryDirectory()).path,
+        'just_audio_cache',
+        'assets',
+        ...Uri.parse(assetPath).pathSegments,
+      ]));
+
   @override
-  bool get _requiresProxy => headers != null || uri.scheme == 'asset';
+  bool get _requiresProxy => headers != null;
 }
 
 /// An [AudioSource] representing a regular media file such as an MP3 or M4A
@@ -1869,59 +1907,8 @@ abstract class StreamAudioSource extends IndexedAudioSource {
       id: _id, uri: _uri.toString(), headers: null);
 }
 
-/// An asset cache that holds loaded assets in memory for 10 seconds.
-class _AssetCache {
-  static final _assets = <String, Future<ByteData>>{};
-  static final _timers = <String, Timer>{};
-
-  static Future<ByteData> load(String path) async {
-    var asset = _assets[path];
-    if (asset == null) {
-      _assets[path] = asset = rootBundle.load(path);
-    } else {
-      _timers[path].cancel();
-    }
-    _timers[path] = Timer(Duration(seconds: 10), () {
-      _assets.remove(path);
-      _timers.remove(path);
-    });
-    return asset;
-  }
-}
-
 /// The type of functions that can handle HTTP requests sent to the proxy.
 typedef void _ProxyHandler(HttpRequest request);
-
-/// A proxy handler for serving assets.
-_ProxyHandler _proxyHandlerForAsset(Uri assetUri) {
-  Future<void> handler(HttpRequest request) async {
-    final assetPath = assetUri.path.replaceFirst(RegExp(r'^/'), '');
-    // This would be better if Flutter provided a stream-based API to load
-    // assets.
-    final byteData = await _AssetCache.load(assetPath);
-
-    final range = _HttpRange.parse(
-        request.headers[HttpHeaders.rangeHeader], byteData.lengthInBytes);
-
-    request.response.headers.clear();
-    request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
-    request.response.statusCode = range == null ? 200 : 206;
-    final length = range?.length ?? byteData.lengthInBytes;
-    request.response.contentLength = length;
-    if (range != null) {
-      request.response.headers
-          .set(HttpHeaders.contentRangeHeader, range.contentRangeHeader);
-    }
-
-    // Write response
-    final bytes = byteData.buffer.asUint8List(range?.start ?? 0, length);
-    request.response.add(bytes);
-    await request.response.flush();
-    await request.response.close();
-  }
-
-  return handler;
-}
 
 /// A proxy handler for serving audio from a [StreamAudioSource].
 _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
@@ -1948,6 +1935,8 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
+///
+/// TODO: Recursively attach headers to items in playlists like m3u8.
 _ProxyHandler _proxyHandlerForUri(Uri uri, Map headers) {
   Future<void> handler(HttpRequest request) async {
     final originRequest = await HttpClient().getUrl(uri);
