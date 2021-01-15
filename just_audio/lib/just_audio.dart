@@ -339,7 +339,7 @@ class AudioPlayer {
         shuffleModeEnabled == null) return null;
     if (loopMode == LoopMode.one) return currentIndex;
     final effectiveIndices = this.effectiveIndices;
-    if (effectiveIndices == null) return null;
+    if (effectiveIndices == null || effectiveIndices.isEmpty) return null;
     final effectiveIndicesInv = _effectiveIndicesInv;
     final invPos = effectiveIndicesInv[currentIndex];
     var newInvPos = invPos + offset;
