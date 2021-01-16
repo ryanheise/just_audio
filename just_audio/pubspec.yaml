@@ -16,6 +16,8 @@ dependencies:
   path_provider: ^1.6.10
   async: ^2.4.0
   uuid: ^2.2.0
+  crypto: ^2.1.5
+  meta: ^1.2.4
   flutter:
     sdk: flutter
 
