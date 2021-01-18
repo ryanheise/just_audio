@@ -3,6 +3,8 @@ package com.ryanheise.just_audio;
 import android.content.Context;
 import androidx.annotation.NonNull;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
@@ -10,7 +12,7 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 /**
  * JustAudioPlugin
  */
-public class JustAudioPlugin implements FlutterPlugin {
+public class JustAudioPlugin implements FlutterPlugin, ActivityAware {
 
     private MethodChannel channel;
     private MainMethodCallHandler methodCallHandler;
@@ -39,6 +41,25 @@ public class JustAudioPlugin implements FlutterPlugin {
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         stopListening();
+    }
+
+    @Override
+    public void onAttachedToActivity(ActivityPluginBinding binding) {
+        methodCallHandler.setActivityPluginBinding(binding);
+    }
+
+    @Override
+    public void onDetachedFromActivityForConfigChanges() {
+    }
+
+    @Override
+    public void onReattachedToActivityForConfigChanges(ActivityPluginBinding binding) {
+        methodCallHandler.setActivityPluginBinding(binding);
+    }
+
+    @Override
+    public void onDetachedFromActivity() {
+        methodCallHandler.setActivityPluginBinding(null);
     }
 
     private void startListening(Context applicationContext, BinaryMessenger messenger) {

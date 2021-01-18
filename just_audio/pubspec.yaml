@@ -8,8 +8,12 @@ environment:
   flutter: ">=1.12.13+hotfix.5"
 
 dependencies:
-  just_audio_platform_interface: ^2.0.0
-  just_audio_web: ^0.2.1
+  # just_audio_platform_interface: ^2.0.0
+  just_audio_platform_interface:
+    path: ../just_audio_platform_interface
+  # just_audio_web: ^0.2.1
+  just_audio_web:
+    path: ../just_audio_web
   audio_session: ^0.0.10
   rxdart: ">= 0.24.1 < 0.26.0"
   path: ^1.6.4

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 
@@ -35,6 +36,18 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       EventChannel('com.ryanheise.just_audio.events.$id')
           .receiveBroadcastStream()
           .map((map) => PlaybackEventMessage.fromMap(map));
+
+  @override
+  Stream<Uint8List> get visualizerWaveformStream =>
+      EventChannel('com.ryanheise.just_audio.waveform_events.$id')
+          .receiveBroadcastStream()
+          .cast<Uint8List>();
+
+  @override
+  Stream<Uint8List> get visualizerFftStream =>
+      EventChannel('com.ryanheise.just_audio.fft_events.$id')
+          .receiveBroadcastStream()
+          .cast<Uint8List>();
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
@@ -133,5 +146,19 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       ConcatenatingMoveRequest request) async {
     return ConcatenatingMoveResponse.fromMap(
         await _channel.invokeMethod('concatenatingMove', request?.toMap()));
+  }
+
+  @override
+  Future<StartVisualizerResponse> startVisualizer(
+      StartVisualizerRequest request) async {
+    return StartVisualizerResponse.fromMap(
+        await _channel.invokeMethod('startVisualizer', request?.toMap()));
+  }
+
+  @override
+  Future<StopVisualizerResponse> stopVisualizer(
+      StopVisualizerRequest request) async {
+    return StopVisualizerResponse.fromMap(
+        await _channel.invokeMethod('stopVisualizer', request?.toMap()));
   }
 }
