@@ -1,3 +1,8 @@
+## 0.2.2
+
+* Fix bug with empty playlist.
+* Fix bug when modifying playlists.
+
 ## 0.2.1
 
 * Fix bug with play before load.
