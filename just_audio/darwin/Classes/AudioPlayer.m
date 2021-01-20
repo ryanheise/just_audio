@@ -470,21 +470,23 @@
     }
 
     // Add next loop item if we're looping
-    if (_loopMode == loopAll) {
-        int si = [_order[0] intValue];
-        //NSLog(@"### add loop item:%d", si);
-        if (!_indexedAudioSources[si].playerItem2) {
-            [_indexedAudioSources[si] preparePlayerItem2];
-            [self addItemObservers:_indexedAudioSources[si].playerItem2];
+    if (_order.count > 0) {
+        if (_loopMode == loopAll) {
+            int si = [_order[0] intValue];
+            //NSLog(@"### add loop item:%d", si);
+            if (!_indexedAudioSources[si].playerItem2) {
+                [_indexedAudioSources[si] preparePlayerItem2];
+                [self addItemObservers:_indexedAudioSources[si].playerItem2];
+            }
+            [_player insertItem:_indexedAudioSources[si].playerItem2 afterItem:nil];
+        } else if (_loopMode == loopOne) {
+            //NSLog(@"### add loop item:%d", _index);
+            if (!_indexedAudioSources[_index].playerItem2) {
+                [_indexedAudioSources[_index] preparePlayerItem2];
+                [self addItemObservers:_indexedAudioSources[_index].playerItem2];
+            }
+            [_player insertItem:_indexedAudioSources[_index].playerItem2 afterItem:nil];
         }
-        [_player insertItem:_indexedAudioSources[si].playerItem2 afterItem:nil];
-    } else if (_loopMode == loopOne) {
-        //NSLog(@"### add loop item:%d", _index);
-        if (!_indexedAudioSources[_index].playerItem2) {
-            [_indexedAudioSources[_index] preparePlayerItem2];
-            [self addItemObservers:_indexedAudioSources[_index].playerItem2];
-        }
-        [_player insertItem:_indexedAudioSources[_index].playerItem2 afterItem:nil];
     }
 
     /* NSLog(@"after reorder: _player.items.count: ", _player.items.count); */
