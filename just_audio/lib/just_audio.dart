@@ -1051,6 +1051,15 @@ class AudioPlayer {
       }
     }
   }
+
+  /// Clears the plugin's internal asset cache directory. Call this when the
+  /// app's assets have changed to force assets to be re-fetched from the asset
+  /// bundle.
+  static Future<void> clearAssetCache() async {
+    await for (var file in (await _getCacheDir()).list()) {
+      await file.delete(recursive: true);
+    }
+  }
 }
 
 /// Captures the details of any error accessing, loading or playing an audio
