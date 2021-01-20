@@ -1,3 +1,13 @@
+## 0.6.6
+
+* Experimental cache support.
+* Experimental stream audio source.
+* Disable iOS/macOS logs (@pschuegr).
+* Fix bug with empty playlist (iOS/macOS/web).
+* Fix Android bug when initialIndex==null.
+* Avoid duplicates in asset cache.
+* Guard against unsupported assets on web.
+
 ## 0.6.5
 
 * Rewrite setLoopMode on iOS to be gapless.
