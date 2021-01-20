@@ -210,6 +210,7 @@ class AudioPlayer {
   /// is upgrading from an old version of just_audio, this will delete the old
   /// cache directory.
   Future<void> _removeOldAssetCacheDir() async {
+    if (kIsWeb) return;
     final oldAssetCacheDir = Directory(
         p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
     if (oldAssetCacheDir.existsSync()) {
@@ -1056,6 +1057,7 @@ class AudioPlayer {
   /// app's assets have changed to force assets to be re-fetched from the asset
   /// bundle.
   static Future<void> clearAssetCache() async {
+    if (kIsWeb) return;
     await for (var file in (await _getCacheDir()).list()) {
       await file.delete(recursive: true);
     }
@@ -1521,6 +1523,9 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
     if (uri.scheme == 'asset') {
+      if (kIsWeb) {
+        throw Exception("Assets not supported on web");
+      }
       _overrideUri = Uri.file(
           (await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''))).path);
     } else if (headers != null) {
