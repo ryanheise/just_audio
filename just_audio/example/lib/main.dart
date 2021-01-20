@@ -56,6 +56,7 @@ class _MyAppState extends State<MyApp> {
       ),
     ),
   ]);
+  int _addedCount = 0;
 
   @override
   void initState() {
@@ -251,7 +252,7 @@ class _MyAppState extends State<MyApp> {
               Uri.parse("asset:///audio/nature.mp3"),
               tag: AudioMetadata(
                 album: "Public Domain",
-                title: "Nature Sounds",
+                title: "Nature Sounds ${++_addedCount}",
                 artwork:
                     "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
               ),

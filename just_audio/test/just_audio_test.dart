@@ -79,7 +79,7 @@ void runTests() {
     //expect(player.loopMode, equals(LoopMode.off));
     //expect(player.shuffleModeEnabled, equals(false));
     expect(player.automaticallyWaitsToMinimizeStalling, equals(true));
-    player.dispose();
+    await player.dispose();
   });
 
   test('load', () async {
@@ -94,7 +94,7 @@ void runTests() {
     expect(player.hasPrevious, equals(false));
     expect(player.sequence.length, equals(1));
     expect(player.playing, equals(false));
-    player.dispose();
+    await player.dispose();
   });
 
   test('load error', () async {
@@ -121,7 +121,7 @@ void runTests() {
       exception = e;
     }
     expect(exception != null, equals(true));
-    player.dispose();
+    await player.dispose();
   });
 
   test('control', () async {
@@ -188,7 +188,7 @@ void runTests() {
       processingState: ProcessingState.completed,
       playing: true,
     );
-    player.dispose();
+    await player.dispose();
   });
 
   test('speed', () async {
@@ -208,7 +208,7 @@ void runTests() {
     await player.setSpeed(speed2);
     await Future.delayed(period2);
     expectState(player: player, position: position2);
-    player.dispose();
+    await player.dispose();
   });
 
   test('positionStream', () async {
@@ -253,7 +253,7 @@ void runTests() {
       }
     });
     await completer.future;
-    player.dispose();
+    await player.dispose();
   });
 
   test('icyMetadata', () async {
@@ -264,7 +264,7 @@ void runTests() {
     expect(player.icyMetadata.headers.genre, equals(icyMetadata.headers.genre));
     expect((await player.icyMetadataStream.first).headers.genre,
         equals(icyMetadata.headers.genre));
-    player.dispose();
+    await player.dispose();
   });
 
   test('proxy', () async {
@@ -286,6 +286,7 @@ void runTests() {
     expect(response.headers.value(HttpHeaders.contentTypeHeader),
         equals('audio/mock'));
     await server.stop();
+    await player.dispose();
   });
 
   test('proxy0.9', () async {
@@ -310,6 +311,7 @@ void runTests() {
     await socket.close();
     expect(responseText, equals('Hello'));
     await server.stop();
+    await player.dispose();
   });
 
   test('sequence', () async {
@@ -373,6 +375,7 @@ void runTests() {
     expect(source2.sequence.map((s) => s.tag as String), equals(['e']));
     await source2.clear();
     expect(source2.sequence.map((s) => s.tag as String), equals([]));
+    await player.dispose();
   });
 
   test('detect', () async {
@@ -469,12 +472,14 @@ void runTests() {
     await player1.shuffle();
     checkIndices(player1.shuffleIndices, 5);
     expect(player1.shuffleIndices.first, equals(3));
+    await player1.dispose();
 
     final source2 = createSource();
     final player2 = AudioPlayer();
     await player2.setAudioSource(source2, initialIndex: 3);
     checkIndices(player2.shuffleIndices, 5);
     expect(player2.shuffleIndices.first, equals(3));
+    await player2.dispose();
   });
 
   test('stop', () async {
@@ -516,6 +521,7 @@ void runTests() {
     expect(player.speed, 0.7);
     expect(player.shuffleModeEnabled, true);
     expect(player.loopMode, LoopMode.one);
+    await player.dispose();
   });
 
   test('play-load', () async {
@@ -715,6 +721,7 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     player.stop();
     await player.setUrl('https://bar.bar/foo.mp3');
+    await player.dispose();
   });
 }
 
