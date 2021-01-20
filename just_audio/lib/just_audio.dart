@@ -1685,7 +1685,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: [audioSource._toMessage()],
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1701,7 +1701,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: [audioSource._toMessage()],
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1720,7 +1720,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: children.map((child) => child._toMessage()).toList(),
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1738,7 +1738,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: children.map((child) => child._toMessage()).toList(),
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1754,7 +1754,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               startIndex: index,
               endIndex: index + 1,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1770,7 +1770,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               startIndex: start,
               endIndex: end,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1786,7 +1786,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               currentIndex: currentIndex,
               newIndex: newIndex,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1801,7 +1801,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               startIndex: 0,
               endIndex: children.length,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
