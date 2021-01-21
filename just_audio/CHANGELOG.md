@@ -1,3 +1,7 @@
+## 0.6.8
+
+* Fix pubspec description.
+
 ## 0.6.7
 
 * Fix bug with bufferedPositionStream on iOS/macOS.

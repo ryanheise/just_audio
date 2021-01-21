@@ -1,6 +1,6 @@
 name: just_audio
-description: Audio player for files, assets, URLs and DASH/HLS/custom streams supporting gapless looping, shuffling, concatenating and clipping of audio. Works with audio_service to play audio in the background.
-version: 0.6.7
+description: Audio player for files, assets, URLs and DASH/HLS streams supporting gapless looping, shuffling, concatenating, clipping. Works with audio_service to play audio in the background.
+version: 0.6.8
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio
 
 environment:
