@@ -1,3 +1,7 @@
+## 0.6.7
+
+* Fix bug with bufferedPositionStream on iOS/macOS.
+
 ## 0.6.6
 
 * Experimental cache support.
