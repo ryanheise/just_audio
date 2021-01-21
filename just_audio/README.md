@@ -5,7 +5,7 @@ A feature-rich audio player for Android, iOS, macOS and web.
 * Plays URLs, files, assets, custom byte streams, HLS and DASH.
 * Gapless playlists, looping and shuffling with a customisable shuffle order.
 * Compose complex arrangements of audio through concatenating, looping and clipping.
-* Works with [audio_session](https://pub.dev/packages/audio_session) to handle phonecall and other audio interruptions
+* Works with [audio_session](https://pub.dev/packages/audio_session) to handle phonecall and other audio interruptions.
 * Works with [audio_service](https://pub.dev/packages/audio_service) to support background playback and control.
 * Experimental support for caching during playback.
 
