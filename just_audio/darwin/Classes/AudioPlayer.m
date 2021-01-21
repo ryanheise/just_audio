@@ -302,8 +302,7 @@
             @"processingState": @(_processingState),
             @"updatePosition": @((long long)1000 * _updatePosition),
             @"updateTime": @(_updateTime),
-            // TODO: buffer position
-            @"bufferedPosition": @((long long)1000 * _updatePosition),
+            @"bufferedPosition": @((long long)1000 * [self getBufferedPosition]),
             // TODO: Icy Metadata
             @"icyMetadata": (id)[NSNull null],
             @"duration": @((long long)1000 * [self getDuration]),
