@@ -14,12 +14,10 @@ This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and p
 | HLS                            | ✅        | ✅      | ✅      |         |
 | buffer status/position         | ✅        | ✅      | ✅      | ✅      |
 | play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
-| set volume                     | ✅        | ✅      | ✅      | ✅      |
-| set speed                      | ✅        | ✅      | ✅      | ✅      |
+| set volume/speed               | ✅        | ✅      | ✅      | ✅      |
 | clip audio                     | ✅        | ✅      | ✅      | ✅      |
 | playlists                      | ✅        | ✅      | ✅      | ✅      |
-| looping                        | ✅        | ✅      | ✅      | ✅      |
-| custom shuffle order           | ✅        | ✅      | ✅      | ✅      |
+| looping/shuffling              | ✅        | ✅      | ✅      | ✅      |
 | compose audio                  | ✅        | ✅      | ✅      | ✅      |
 | gapless playback               | ✅        | ✅      | ✅      |         |
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
