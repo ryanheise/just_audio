@@ -309,9 +309,9 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
       ConcatenatingInsertAllRequest request) async {
+    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     _concatenating(request.id)
         .insertAll(request.index, getAudioSources(request.children));
-    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     if (request.index <= _index) {
       _index += request.children.length;
     }
@@ -353,8 +353,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request) async {
-    _concatenating(request.id).move(request.currentIndex, request.newIndex);
     _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
+    _concatenating(request.id).move(request.currentIndex, request.newIndex);
     if (request.currentIndex == _index) {
       _index = request.newIndex;
     } else if (request.currentIndex < _index && request.newIndex >= _index) {

@@ -1,3 +1,7 @@
+## 0.2.3
+
+* Fix bug when modifying playlists (insert/move).
+
 ## 0.2.2
 
 * Fix bug with empty playlist.
