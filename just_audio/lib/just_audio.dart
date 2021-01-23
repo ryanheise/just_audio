@@ -1509,7 +1509,6 @@ abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
   final Map headers;
   Uri _overrideUri;
-  File _cacheFile;
 
   UriAudioSource(this.uri, {this.headers, dynamic tag, Duration duration})
       : super(tag, duration: duration);
@@ -1523,35 +1522,48 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
     if (uri.scheme == 'asset') {
-      if (kIsWeb) {
-        throw Exception("Assets not supported on web");
-      }
-      _overrideUri = Uri.file(
-          (await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''))).path);
+      _overrideUri = await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''));
     } else if (headers != null) {
       _overrideUri = player._proxy.addUriAudioSource(this);
     }
   }
 
-  @override
-  void _dispose() {
-    if (_cacheFile?.existsSync() == true) {
-      _cacheFile?.deleteSync();
+  Future<Uri> _loadAsset(String assetPath) async {
+    if (kIsWeb) {
+      // Mapping from extensions to content types for the web player. If an
+      // extension is missing, please submit a pull request.
+      const mimeTypes = {
+        '.aac': 'audio/aac',
+        '.mp3': 'audio/mpeg',
+        '.ogg': 'audio/ogg',
+        '.opus': 'audio/opus',
+        '.wav': 'audio/wav',
+        '.weba': 'audio/webm',
+        '.mp4': 'audio/mp4',
+        '.m4a': 'audio/mp4',
+        '.aif': 'audio/x-aiff',
+        '.aifc': 'audio/x-aiff',
+        '.aiff': 'audio/x-aiff',
+        '.m3u': 'audio/x-mpegurl',
+      };
+      // Default to 'audio/mpeg'
+      final mimeType =
+          mimeTypes[p.extension(assetPath).toLowerCase()] ?? 'audio/mpeg';
+      return Uri.parse(
+          'data:$mimeType;base64,${base64.encode((await rootBundle.load(assetPath)).buffer.asUint8List())}');
+    } else {
+      // For non-web platforms, extract the asset into a cache file and pass
+      // that to the player.
+      final file = await _getCacheFile(assetPath);
+      // Not technically inter-isolate-safe, although low risk. Could consider
+      // locking the file or creating a separate lock file.
+      if (!file.existsSync()) {
+        file.createSync(recursive: true);
+        await file.writeAsBytes(
+            (await rootBundle.load(assetPath)).buffer.asUint8List());
+      }
+      return Uri.file(file.path);
     }
-    super._dispose();
-  }
-
-  Future<File> _loadAsset(String assetPath) async {
-    final file = await _getCacheFile(assetPath);
-    this._cacheFile = file;
-    // Not technically inter-isolate-safe, although low risk. Could consider
-    // locking the file or creating a separate lock file.
-    if (!file.existsSync()) {
-      file.createSync(recursive: true);
-      await file.writeAsBytes(
-          (await rootBundle.load(assetPath)).buffer.asUint8List());
-    }
-    return file;
   }
 
   /// Get file for caching asset media with proper extension
@@ -1562,7 +1574,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       ]));
 
   @override
-  bool get _requiresProxy => headers != null;
+  bool get _requiresProxy => headers != null && !kIsWeb;
 }
 
 /// An [AudioSource] representing a regular media file such as an MP3 or M4A

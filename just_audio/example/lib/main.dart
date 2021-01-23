@@ -47,16 +47,15 @@ class _MyAppState extends State<MyApp> {
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
-    if (!kIsWeb)
-      AudioSource.uri(
-        Uri.parse("asset:///audio/nature.mp3"),
-        tag: AudioMetadata(
-          album: "Public Domain",
-          title: "Nature Sounds",
-          artwork:
-              "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-        ),
+    AudioSource.uri(
+      Uri.parse("asset:///audio/nature.mp3"),
+      tag: AudioMetadata(
+        album: "Public Domain",
+        title: "Nature Sounds",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
+    ),
   ]);
   int _addedCount = 0;
 
@@ -247,22 +246,20 @@ class _MyAppState extends State<MyApp> {
             ],
           ),
         ),
-        floatingActionButton: kIsWeb
-            ? null
-            : FloatingActionButton(
-                child: Icon(Icons.add),
-                onPressed: () {
-                  _playlist.add(AudioSource.uri(
-                    Uri.parse("asset:///audio/nature.mp3"),
-                    tag: AudioMetadata(
-                      album: "Public Domain",
-                      title: "Nature Sounds ${++_addedCount}",
-                      artwork:
-                          "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-                    ),
-                  ));
-                },
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.add),
+          onPressed: () {
+            _playlist.add(AudioSource.uri(
+              Uri.parse("asset:///audio/nature.mp3"),
+              tag: AudioMetadata(
+                album: "Public Domain",
+                title: "Nature Sounds ${++_addedCount}",
+                artwork:
+                    "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
               ),
+            ));
+          },
+        ),
       ),
     );
   }
