@@ -1,3 +1,11 @@
+## 0.6.9
+
+* Support assets on web.
+* Support StreamAudioSource on web.
+* Fix bug on web when manipulating playlists.
+* Asset cache no longer deleted on dispose.
+* Add contentType to StreamAudioResponse.
+
 ## 0.6.8
 
 * Fix pubspec description.
