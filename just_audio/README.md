@@ -14,7 +14,7 @@ A feature-rich audio player for Android, iOS, macOS and web.
 | Feature                        | Android   | iOS     | macOS   | Web     |
 | -------                        | :-------: | :-----: | :-----: | :-----: |
 | read from URL                  | ✅        | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      | ✅[^1]  |
+| read from file                 | ✅        | ✅      | ✅      | ✅(*)   |
 | read from asset                | ✅        | ✅      | ✅      | ✅      |
 | request headers                | ✅        | ✅      | ✅      |         |
 | DASH                           | ✅        |         |         |         |
@@ -30,7 +30,7 @@ A feature-rich audio player for Android, iOS, macOS and web.
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
 | Handle phonecall interruptions | ✅        | ✅      |         |         |
 
-[^1]: Direct access to `file://` URLs is not permitted on the web. Instead, files are accessed using a file picker (e.g. file_picker) to read the bytes and using a `StreamAudioSource` to stream those bytes to the player.
+(*) Direct access to `file://` URLs is not permitted on the web. Instead, use a file picker (e.g. file_picker) to read the bytes and use a `StreamAudioSource` to stream those bytes to the player.
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
