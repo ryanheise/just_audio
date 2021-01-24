@@ -82,6 +82,46 @@ void runTests() {
     await player.dispose();
   });
 
+  test('idle-state', () async {
+    final player = AudioPlayer();
+    player.play();
+    expectState(player: player, playing: true);
+    await player.pause();
+    expectState(player: player, playing: false);
+    await player.setVolume(0.5);
+    expect(player.volume, equals(0.5));
+    await player.setSpeed(0.7);
+    expect(player.speed, equals(0.7));
+    await player.setLoopMode(LoopMode.one);
+    expect(player.loopMode, equals(LoopMode.one));
+    await player.setShuffleModeEnabled(true);
+    expect(player.shuffleModeEnabled, equals(true));
+    await player.seek(Duration(seconds: 1));
+    expectState(player: player, playing: false, position: Duration(seconds: 1));
+    final playlist = ConcatenatingAudioSource(children: []);
+    await player.setAudioSource(playlist, preload: false);
+    await playlist.addAll([
+      AudioSource.uri(
+        Uri.parse("https://foo.foo/foo.mp3"),
+        tag: 'a',
+      ),
+      AudioSource.uri(
+        Uri.parse("https://bar.bar/bar.mp3"),
+        tag: 'b',
+      ),
+      AudioSource.uri(
+        Uri.parse("https://baz.baz/baz.mp3"),
+        tag: 'c',
+      ),
+    ]);
+    await playlist.move(2, 1);
+    await playlist.removeAt(2);
+    await player.load();
+    expect(playlist.sequence.map((s) => s.tag as String).toList(),
+        equals(['a', 'c']));
+    await player.dispose();
+  });
+
   test('load', () async {
     final player = AudioPlayer();
     final duration = await player.setUrl('https://foo.foo/foo.mp3');
