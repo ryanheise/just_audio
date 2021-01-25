@@ -160,7 +160,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             if (permissions[i].equals(Manifest.permission.RECORD_AUDIO)) {
                 if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
                     visualizer.setHasPermission(true);
-                    completeStartVisualizer(true);
+                    if (startVisualizerResult != null) {
+                        completeStartVisualizer(true);
+                    }
                     return true;
                 }
                 completeStartVisualizer(false);
@@ -318,9 +320,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         if (startVisualizerResult == null) return;
         if (success) {
             visualizer.start(visualizerCaptureRate, visualizerCaptureSize, enableWaveform, enableFft);
-            Map<String, Object> resultMap = new HashMap<String, Object>();
-            resultMap.put("samplingRate", visualizer.getSamplingRate());
-            startVisualizerResult.success(resultMap);
+            startVisualizerResult.success(new HashMap<String, Object>());
         } else {
             startVisualizerResult.error("RECORD_AUDIO permission denied", null, null);
         }
@@ -344,9 +344,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 visualizerCaptureSize = captureSize;
                 startVisualizerResult = result;
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    // We have permission
                     visualizer.setHasPermission(true);
-                    completeStartVisualizer(true);
+                    if (audioSessionId != null) {
+                        completeStartVisualizer(true);
+                    }
                 } else if (activityPluginBinding != null && activityPluginBinding.getActivity() != null) {
+                    // We are ready to request permission
                     requestPermissions();
                 } else {
                     // Will request permission in setActivityPluginBinding

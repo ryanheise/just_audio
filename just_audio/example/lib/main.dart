@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
@@ -55,6 +56,18 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _player = AudioPlayer();
+    if (!kIsWeb) {
+      _player.playerStateStream.listen((state) {
+        if (state.playing &&
+            state.processingState != ProcessingState.idle &&
+            state.processingState != ProcessingState.completed) {
+          _player.startVisualizer(
+              enableWaveform: true, enableFft: false, captureRate: 25000);
+        } else {
+          _player.stopVisualizer();
+        }
+      });
+    }
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
@@ -113,6 +126,18 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
               ),
+              if (!kIsWeb)
+                Container(
+                  height: 50.0,
+                  width: double.maxFinite,
+                  child: StreamBuilder<VisualizerWaveformCapture>(
+                    stream: _player.visualizerWaveformStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.data == null) return SizedBox();
+                      return AudioVisualizerWidget(snapshot.data);
+                    },
+                  ),
+                ),
               ControlButtons(_player),
               StreamBuilder<Duration>(
                 stream: _player.durationStream,
@@ -220,6 +245,59 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
     );
+  }
+}
+
+class AudioVisualizerWidget extends StatelessWidget {
+  final VisualizerWaveformCapture capture;
+
+  AudioVisualizerWidget(this.capture);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: CustomPaint(
+        painter: AudioVisualizerPainter(this.capture),
+      ),
+    );
+  }
+}
+
+class AudioVisualizerPainter extends CustomPainter {
+  final VisualizerWaveformCapture capture;
+  final Paint barPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0
+    ..color = Colors.blue;
+
+  AudioVisualizerPainter(this.capture);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    int getSample(double d) {
+      int i = d.toInt();
+      if (i >= 0 && i < capture.data.length) {
+        return capture.data[i] - 128;
+      } else {
+        return 0;
+      }
+    }
+
+    const barCount = 120;
+    final barWidth = size.width / barCount;
+    final midY = size.height / 2;
+    for (var barX = 0.0; barX < size.width; barX += barWidth) {
+      final sample = getSample(barX);
+      canvas.drawLine(
+          Offset(barX.toDouble(), midY),
+          Offset(barX.toDouble(), midY - sample * size.height / 2 / 128),
+          barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant AudioVisualizerPainter oldDelegate) {
+    return true;
   }
 }
 

@@ -38,16 +38,18 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
           .map((map) => PlaybackEventMessage.fromMap(map));
 
   @override
-  Stream<Uint8List> get visualizerWaveformStream =>
+  Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream =>
       EventChannel('com.ryanheise.just_audio.waveform_events.$id')
           .receiveBroadcastStream()
-          .cast<Uint8List>();
+          .map((event) => VisualizerWaveformCaptureMessage(
+              samplingRate: event['samplingRate'], data: event['data']));
 
   @override
-  Stream<Uint8List> get visualizerFftStream =>
+  Stream<VisualizerFftCaptureMessage> get visualizerFftStream =>
       EventChannel('com.ryanheise.just_audio.fft_events.$id')
           .receiveBroadcastStream()
-          .cast<Uint8List>();
+          .map((event) => VisualizerFftCaptureMessage(
+              samplingRate: event['samplingRate'], data: event['data']));
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {

@@ -70,13 +70,13 @@ abstract class AudioPlayerPlatform {
   }
 
   /// A stream of visualizer waveform data.
-  Stream<Uint8List> get visualizerWaveformStream {
+  Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream {
     throw UnimplementedError(
         'visualizerWaveformStream has not been implemented.');
   }
 
   /// A stream of visualizer fft data.
-  Stream<Uint8List> get visualizerFftStream {
+  Stream<VisualizerFftCaptureMessage> get visualizerFftStream {
     throw UnimplementedError('visualizerFftStream has not been implemented.');
   }
 
@@ -673,12 +673,10 @@ class StartVisualizerRequest {
 /// Information returned by the platform implementation after starting the
 /// visualizer.
 class StartVisualizerResponse {
-  final int samplingRate;
-
-  StartVisualizerResponse({@required this.samplingRate});
+  StartVisualizerResponse();
 
   static StartVisualizerResponse fromMap(Map<dynamic, dynamic> map) =>
-      StartVisualizerResponse(samplingRate: map['samplingRate']);
+      StartVisualizerResponse();
 }
 
 /// Information communicated to the platform implementation when stopping the
@@ -692,6 +690,34 @@ class StopVisualizerRequest {
 class StopVisualizerResponse {
   static StopVisualizerResponse fromMap(Map<dynamic, dynamic> map) =>
       StopVisualizerResponse();
+}
+
+/// A capture of audio waveform data.
+class VisualizerWaveformCaptureMessage {
+  /// The sampling rate of the capture.
+  final int samplingRate;
+
+  /// The waveform data.
+  final Uint8List data;
+
+  VisualizerWaveformCaptureMessage({
+    @required this.samplingRate,
+    @required this.data,
+  });
+}
+
+/// A capture of audio FFT data.
+class VisualizerFftCaptureMessage {
+  /// The sampling rate of the capture.
+  final int samplingRate;
+
+  /// The FFT data.
+  final Uint8List data;
+
+  VisualizerFftCaptureMessage({
+    @required this.samplingRate,
+    @required this.data,
+  });
 }
 
 /// Information about an audio source to be communicated with the platform

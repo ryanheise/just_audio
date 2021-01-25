@@ -76,8 +76,9 @@ class AudioPlayer {
 
   PlaybackEvent _playbackEvent;
   final _playbackEventSubject = BehaviorSubject<PlaybackEvent>(sync: true);
-  final _visualizerWaveformSubject = BehaviorSubject<Uint8List>();
-  final _visualizerFftSubject = BehaviorSubject<Uint8List>();
+  final _visualizerWaveformSubject =
+      BehaviorSubject<VisualizerWaveformCapture>();
+  final _visualizerFftSubject = BehaviorSubject<VisualizerFftCapture>();
   Future<Duration> _durationFuture;
   final _durationSubject = BehaviorSubject<Duration>();
   final _processingStateSubject = BehaviorSubject<ProcessingState>();
@@ -238,11 +239,12 @@ class AudioPlayer {
   Stream<PlaybackEvent> get playbackEventStream => _playbackEventSubject.stream;
 
   /// A stream of visualizer waveform data in unsigned 8 bit PCM..
-  Stream<Uint8List> get visualizerWaveformStream =>
+  Stream<VisualizerWaveformCapture> get visualizerWaveformStream =>
       _visualizerWaveformSubject.stream;
 
   /// A stream of visualizer FFT data.
-  Stream<Uint8List> get visualizerFftStream => _visualizerFftSubject.stream;
+  Stream<VisualizerFftCapture> get visualizerFftStream =>
+      _visualizerFftSubject.stream;
 
   /// The duration of the current audio or null if unknown.
   Duration get duration => _playbackEvent.duration;
@@ -912,24 +914,23 @@ class AudioPlayer {
   }
 
   /// Start the visualizer by capturing [captureSize] samples of audio at
-  /// [captureRate] millihertz and return the sampling rate of the audio. If
-  /// [enableWaveform] is `true`, the captured samples will be broadcast via
-  /// [visualizerWaveformStream]. If [enableFft] is `true`, the FFT data for
-  /// each capture will be broadcast via [visualizerFftStream]. You should call
-  /// [stopVisualizer] to stop capturing audio data.
-  Future<int> startVisualizer({
+  /// [captureRate] millihertz. If [enableWaveform] is `true`, the captured
+  /// samples will be broadcast via [visualizerWaveformStream]. If [enableFft]
+  /// is `true`, the FFT data for each capture will be broadcast via
+  /// [visualizerFftStream]. You should call [stopVisualizer] to stop capturing
+  /// audio data.
+  Future<void> startVisualizer({
     bool enableWaveform = true,
     bool enableFft = true,
     int captureRate,
     int captureSize,
   }) async {
-    return (await (await _platform).startVisualizer(_startVisualizerRequest =
-            StartVisualizerRequest(
-                enableWaveform: enableWaveform,
-                enableFft: enableFft,
-                captureRate: captureRate,
-                captureSize: captureSize)))
-        ?.samplingRate;
+    await (await _platform).startVisualizer(_startVisualizerRequest =
+        StartVisualizerRequest(
+            enableWaveform: enableWaveform,
+            enableFft: enableFft,
+            captureRate: captureRate,
+            captureSize: captureSize));
   }
 
   /// Stop capturing audio data for the visualizer.
@@ -1003,10 +1004,18 @@ class AudioPlayer {
           ? await (_nativePlatform =
               JustAudioPlatform.instance.init(InitRequest(id: _id)))
           : _idlePlatform;
-      _visualizerWaveformSubscription = platform.visualizerWaveformStream
-          .listen(_visualizerWaveformSubject.add);
-      _visualizerFftSubscription =
-          platform.visualizerFftStream.listen(_visualizerFftSubject.add);
+      _visualizerWaveformSubscription =
+          platform.visualizerWaveformStream.listen((message) {
+        _visualizerWaveformSubject.add(VisualizerWaveformCapture(
+          samplingRate: message.samplingRate,
+          data: message.data,
+        ));
+      });
+      _visualizerFftSubscription = platform.visualizerFftStream
+          .listen((message) => _visualizerFftSubject.add(VisualizerFftCapture(
+                samplingRate: message.samplingRate,
+                data: message.data,
+              )));
       _playbackEventSubscription =
           platform.playbackEventMessageStream.listen((message) {
         var duration = message.duration;
@@ -1138,6 +1147,34 @@ class PlayerInterruptedException {
 
   @override
   String toString() => "$message";
+}
+
+/// A capture of audio waveform data.
+class VisualizerWaveformCapture {
+  /// The sampling rate of the capture.
+  final int samplingRate;
+
+  /// The waveform data.
+  final Uint8List data;
+
+  VisualizerWaveformCapture({
+    @required this.samplingRate,
+    @required this.data,
+  });
+}
+
+/// A capture of audio FFT data.
+class VisualizerFftCapture {
+  /// The sampling rate of the capture.
+  final int samplingRate;
+
+  /// The FFT data.
+  final Uint8List data;
+
+  VisualizerFftCapture({
+    @required this.samplingRate,
+    @required this.data,
+  });
 }
 
 /// Encapsulates the playback state and current position of the player.
@@ -2330,8 +2367,9 @@ enum LoopMode { off, one, all }
 /// state and the native platform is deallocated.
 class _IdleAudioPlayer extends AudioPlayerPlatform {
   final _eventSubject = BehaviorSubject<PlaybackEventMessage>();
-  final _visualizerWaveformSubject = BehaviorSubject<Uint8List>();
-  final _visualizerFftSubject = BehaviorSubject<Uint8List>();
+  final _visualizerWaveformSubject =
+      BehaviorSubject<VisualizerWaveformCaptureMessage>();
+  final _visualizerFftSubject = BehaviorSubject<VisualizerFftCaptureMessage>();
   Duration _position;
   int _index;
   List<IndexedAudioSource> _sequence;
@@ -2370,11 +2408,12 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
       _eventSubject.stream;
 
   @override
-  Stream<Uint8List> get visualizerWaveformStream =>
+  Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream =>
       _visualizerWaveformSubject.stream;
 
   @override
-  Stream<Uint8List> get visualizerFftStream => _visualizerFftSubject.stream;
+  Stream<VisualizerFftCaptureMessage> get visualizerFftStream =>
+      _visualizerFftSubject.stream;
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {

@@ -2,6 +2,8 @@ package com.ryanheise.just_audio;
 
 import android.media.audiofx.Visualizer;
 import io.flutter.plugin.common.BinaryMessenger;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BetterVisualizer {
     private Visualizer visualizer;
@@ -26,6 +28,13 @@ public class BetterVisualizer {
 
     public void setHasPermission(boolean hasPermission) {
         this.hasPermission = hasPermission;
+        if (audioSessionId != null && hasPermission && pendingStartRequest) {
+            start(captureRate, captureSize, enableWaveform, enableFft);
+        }
+    }
+
+    public boolean hasPermission() {
+        return hasPermission;
     }
 
     public void onAudioSessionId(Integer audioSessionId) {
@@ -61,10 +70,16 @@ public class BetterVisualizer {
         visualizer.setCaptureSize(captureSize);
         visualizer.setDataCaptureListener(new Visualizer.OnDataCaptureListener() {
             public void onWaveFormDataCapture(Visualizer visualizer, byte[] waveform, int samplingRate) {
-                waveformEventChannel.success(waveform);
+                Map<String, Object> event = new HashMap<String, Object>();
+                event.put("samplingRate", samplingRate);
+                event.put("data", waveform);
+                waveformEventChannel.success(event);
             }
             public void onFftDataCapture(Visualizer visualizer, byte[] fft, int samplingRate) {
-                fftEventChannel.success(fft);
+                Map<String, Object> event = new HashMap<String, Object>();
+                event.put("samplingRate", samplingRate);
+                event.put("data", fft);
+                fftEventChannel.success(event);
             }
         }, captureRate, enableWavefrom, enableFft);
         visualizer.setEnabled(true);
