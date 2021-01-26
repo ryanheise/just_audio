@@ -1,29 +1,36 @@
 # just_audio
 
-This Flutter plugin plays audio from URLs, files, assets, DASH/HLS streams and playlists. Furthermore, it can clip, concatenate, loop, shuffle and compose audio into complex arrangements with gapless playback. This plugin can be used with [audio_service](https://pub.dev/packages/audio_service) to play audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
+A feature-rich audio player for Android, iOS, macOS and web.
+
+* Plays URLs, files, assets, custom byte streams, HLS and DASH.
+* Gapless playlists, looping and shuffling with a customisable shuffle order.
+* Compose complex arrangements of audio through concatenating, looping and clipping.
+* Works with [audio_session](https://pub.dev/packages/audio_session) to handle phonecall and other audio interruptions.
+* Works with [audio_service](https://pub.dev/packages/audio_service) to support background playback and control.
+* Experimental support for caching during playback.
 
 ## Features
 
 | Feature                        | Android   | iOS     | macOS   | Web     |
 | -------                        | :-------: | :-----: | :-----: | :-----: |
 | read from URL                  | ✅        | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      |         |
-| read from asset                | ✅        | ✅      | ✅      |         |
+| read from file                 | ✅        | ✅      | ✅      | ✅(*)   |
+| read from asset                | ✅        | ✅      | ✅      | ✅      |
 | request headers                | ✅        | ✅      | ✅      |         |
 | DASH                           | ✅        |         |         |         |
 | HLS                            | ✅        | ✅      | ✅      |         |
 | buffer status/position         | ✅        | ✅      | ✅      | ✅      |
 | play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
-| set volume                     | ✅        | ✅      | ✅      | ✅      |
-| set speed                      | ✅        | ✅      | ✅      | ✅      |
+| set volume/speed               | ✅        | ✅      | ✅      | ✅      |
 | clip audio                     | ✅        | ✅      | ✅      | ✅      |
 | playlists                      | ✅        | ✅      | ✅      | ✅      |
-| looping                        | ✅        | ✅      | ✅      | ✅      |
-| custom shuffle order           | ✅        | ✅      | ✅      | ✅      |
+| looping/shuffling              | ✅        | ✅      | ✅      | ✅      |
 | compose audio                  | ✅        | ✅      | ✅      | ✅      |
 | gapless playback               | ✅        | ✅      | ✅      |         |
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
 | Handle phonecall interruptions | ✅        | ✅      |         |         |
+
+(*) Direct access to `file://` URLs is not permitted on the web. Instead, use a file picker (e.g. file_picker) to read the bytes and use a `StreamAudioSource` to stream those bytes to the player.
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -270,6 +277,8 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 </dict>
 ```
 
+The iOS player relies on server headers (e.g. `Content-Type`, `Content-Length` and [byte range requests](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/CreatingVideoforSafarioniPhone/CreatingVideoforSafarioniPhone.html#//apple_ref/doc/uid/TP40006514-SW6)) to know how to decode the file and where applicable to report its duration. In the case of files, iOS relies on the file extension.
+
 ### macOS
 
 To allow your macOS application to access audio files on the Internet, add the following to your `DebugProfile.entitlements` and `Release.entitlements` files:
@@ -290,6 +299,8 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
     <true/>
 </dict>
 ```
+
+The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length` and [byte range requests](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/CreatingVideoforSafarioniPhone/CreatingVideoforSafarioniPhone.html#//apple_ref/doc/uid/TP40006514-SW6)) to know how to decode the file and where applicable to report its duration. In the case of files, macOS relies on the file extension.
 
 ## Related plugins
 

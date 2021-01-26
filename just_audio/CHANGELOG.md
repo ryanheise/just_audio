@@ -1,3 +1,29 @@
+## 0.6.9
+
+* Support assets on web.
+* Support StreamAudioSource on web.
+* Fix bug on web when manipulating playlists.
+* Asset cache no longer deleted on dispose.
+* Add contentType to StreamAudioResponse.
+
+## 0.6.8
+
+* Fix pubspec description.
+
+## 0.6.7
+
+* Fix bug with bufferedPositionStream on iOS/macOS.
+
+## 0.6.6
+
+* Experimental cache support.
+* Experimental stream audio source.
+* Disable iOS/macOS logs (@pschuegr).
+* Fix bug with empty playlist (iOS/macOS/web).
+* Fix Android bug when initialIndex==null.
+* Avoid duplicates in asset cache.
+* Guard against unsupported assets on web.
+
 ## 0.6.5
 
 * Rewrite setLoopMode on iOS to be gapless.

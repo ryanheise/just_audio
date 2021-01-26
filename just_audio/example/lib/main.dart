@@ -16,19 +16,16 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   AudioPlayer _player;
   ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
-    LoopingAudioSource(
-      count: 2,
-      child: ClippingAudioSource(
-        start: Duration(seconds: 60),
-        end: Duration(seconds: 65),
-        child: AudioSource.uri(Uri.parse(
-            "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
-        tag: AudioMetadata(
-          album: "Science Friday",
-          title: "A Salute To Head-Scratching Science (5 seconds)",
-          artwork:
-              "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-        ),
+    ClippingAudioSource(
+      start: Duration(seconds: 60),
+      end: Duration(seconds: 65),
+      child: AudioSource.uri(Uri.parse(
+          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
+      tag: AudioMetadata(
+        album: "Science Friday",
+        title: "A Salute To Head-Scratching Science (5 seconds)",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
     AudioSource.uri(
@@ -50,7 +47,17 @@ class _MyAppState extends State<MyApp> {
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
+    AudioSource.uri(
+      Uri.parse("asset:///audio/nature.mp3"),
+      tag: AudioMetadata(
+        album: "Public Domain",
+        title: "Nature Sounds",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+      ),
+    ),
   ]);
+  int _addedCount = 0;
 
   @override
   void initState() {
@@ -223,25 +230,59 @@ class _MyAppState extends State<MyApp> {
                   builder: (context, snapshot) {
                     final state = snapshot.data;
                     final sequence = state?.sequence ?? [];
-                    return ListView.builder(
-                      itemCount: sequence.length,
-                      itemBuilder: (context, index) => Material(
-                        color: index == state.currentIndex
-                            ? Colors.grey.shade300
-                            : null,
-                        child: ListTile(
-                          title: Text(sequence[index].tag.title),
-                          onTap: () {
-                            _player.seek(Duration.zero, index: index);
-                          },
-                        ),
-                      ),
+                    return ReorderableListView(
+                      onReorder: (int oldIndex, int newIndex) {
+                        if (oldIndex < newIndex) newIndex--;
+                        _playlist.move(oldIndex, newIndex);
+                      },
+                      children: [
+                        for (var i = 0; i < sequence.length; i++)
+                          Dismissible(
+                            key: ValueKey(sequence[i]),
+                            background: Container(
+                              color: Colors.redAccent,
+                              alignment: Alignment.centerRight,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: Icon(Icons.delete, color: Colors.white),
+                              ),
+                            ),
+                            onDismissed: (dismissDirection) {
+                              _playlist.removeAt(i);
+                            },
+                            child: Material(
+                              color: i == state.currentIndex
+                                  ? Colors.grey.shade300
+                                  : null,
+                              child: ListTile(
+                                title: Text(sequence[i].tag.title),
+                                onTap: () {
+                                  _player.seek(Duration.zero, index: i);
+                                },
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   },
                 ),
               ),
             ],
           ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.add),
+          onPressed: () {
+            _playlist.add(AudioSource.uri(
+              Uri.parse("asset:///audio/nature.mp3"),
+              tag: AudioMetadata(
+                album: "Public Domain",
+                title: "Nature Sounds ${++_addedCount}",
+                artwork:
+                    "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+              ),
+            ));
+          },
         ),
       ),
     );

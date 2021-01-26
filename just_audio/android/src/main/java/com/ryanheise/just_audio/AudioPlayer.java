@@ -227,7 +227,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     @Override
     public void onTimelineChanged(Timeline timeline, int reason) {
         if (initialPos != C.TIME_UNSET || initialIndex != null) {
-            player.seekTo(initialIndex, initialPos);
+            int windowIndex = initialIndex != null ? initialIndex : 0;
+            player.seekTo(windowIndex, initialPos);
             initialIndex = null;
             initialPos = C.TIME_UNSET;
         }

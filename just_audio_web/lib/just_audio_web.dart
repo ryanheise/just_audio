@@ -90,10 +90,10 @@ class Html5AudioPlayer extends JustAudioPlayer {
       _durationCompleter?.completeError(_audioElement.error);
     });
     _audioElement.addEventListener('ended', (event) async {
-      _currentAudioSourcePlayer.complete();
+      _currentAudioSourcePlayer?.complete();
     });
     _audioElement.addEventListener('timeupdate', (event) {
-      _currentAudioSourcePlayer.timeUpdated(_audioElement.currentTime);
+      _currentAudioSourcePlayer?.timeUpdated(_audioElement.currentTime);
     });
     _audioElement.addEventListener('loadstart', (event) {
       transition(ProcessingStateMessage.buffering);
@@ -166,7 +166,9 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   // TODO: Improve efficiency.
   IndexedAudioSourcePlayer get _currentAudioSourcePlayer =>
-      _audioSourcePlayer != null && _index < _audioSourcePlayer.sequence.length
+      _audioSourcePlayer != null &&
+              _audioSourcePlayer.sequence.isNotEmpty &&
+              _index < _audioSourcePlayer.sequence.length
           ? _audioSourcePlayer.sequence[_index]
           : null;
 
@@ -307,12 +309,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
       ConcatenatingInsertAllRequest request) async {
+    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     _concatenating(request.id)
         .insertAll(request.index, getAudioSources(request.children));
-    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     if (request.index <= _index) {
       _index += request.children.length;
     }
+    broadcastPlaybackEvent();
     return ConcatenatingInsertAllResponse();
   }
 
@@ -323,13 +326,14 @@ class Html5AudioPlayer extends JustAudioPlayer {
       // Pause if removing current item
       _currentAudioSourcePlayer.pause();
     }
+    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     _concatenating(request.id)
         .removeRange(request.startIndex, request.endIndex);
-    _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
     if (_index >= request.startIndex && _index < request.endIndex) {
       // Skip backward if there's nothing after this
       if (request.startIndex >= _audioSourcePlayer.sequence.length) {
         _index = request.startIndex - 1;
+        if (_index < 0) _index = 0;
       } else {
         _index = request.startIndex;
       }
@@ -342,14 +346,15 @@ class Html5AudioPlayer extends JustAudioPlayer {
       // Reflect that the current item has shifted its position
       _index -= (request.endIndex - request.startIndex);
     }
+    broadcastPlaybackEvent();
     return ConcatenatingRemoveRangeResponse();
   }
 
   @override
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request) async {
-    _concatenating(request.id).move(request.currentIndex, request.newIndex);
     _concatenating(request.id).setShuffleOrder(request.shuffleOrder);
+    _concatenating(request.id).move(request.currentIndex, request.newIndex);
     if (request.currentIndex == _index) {
       _index = request.newIndex;
     } else if (request.currentIndex < _index && request.newIndex >= _index) {
@@ -357,6 +362,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     } else if (request.currentIndex > _index && request.newIndex <= _index) {
       _index++;
     }
+    broadcastPlaybackEvent();
     return ConcatenatingMoveResponse();
   }
 
@@ -374,10 +380,12 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   @override
-  Duration getCurrentPosition() => _currentAudioSourcePlayer?.position;
+  Duration getCurrentPosition() =>
+      _currentAudioSourcePlayer?.position ?? Duration.zero;
 
   @override
-  Duration getBufferedPosition() => _currentAudioSourcePlayer?.bufferedPosition;
+  Duration getBufferedPosition() =>
+      _currentAudioSourcePlayer?.bufferedPosition ?? Duration.zero;
 
   @override
   Duration getDuration() => _currentAudioSourcePlayer?.duration;

@@ -221,6 +221,7 @@ class AudioPlayer {
   /// is upgrading from an old version of just_audio, this will delete the old
   /// cache directory.
   Future<void> _removeOldAssetCacheDir() async {
+    if (kIsWeb) return;
     final oldAssetCacheDir = Directory(
         p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
     if (oldAssetCacheDir.existsSync()) {
@@ -1117,6 +1118,16 @@ class AudioPlayer {
       }
     }
   }
+
+  /// Clears the plugin's internal asset cache directory. Call this when the
+  /// app's assets have changed to force assets to be re-fetched from the asset
+  /// bundle.
+  static Future<void> clearAssetCache() async {
+    if (kIsWeb) return;
+    await for (var file in (await _getCacheDir()).list()) {
+      await file.delete(recursive: true);
+    }
+  }
 }
 
 /// Captures the details of any error accessing, loading or playing an audio
@@ -1592,7 +1603,6 @@ abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
   final Map headers;
   Uri _overrideUri;
-  File _cacheFile;
 
   UriAudioSource(this.uri, {this.headers, dynamic tag, Duration duration})
       : super(tag, duration: duration);
@@ -1606,32 +1616,50 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
     if (uri.scheme == 'asset') {
-      _overrideUri = Uri.file(
-          (await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''))).path);
+      _overrideUri = await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''));
     } else if (headers != null) {
       _overrideUri = player._proxy.addUriAudioSource(this);
     }
   }
 
-  @override
-  void _dispose() {
-    if (_cacheFile?.existsSync() == true) {
-      _cacheFile?.deleteSync();
+  Future<Uri> _loadAsset(String assetPath) async {
+    if (kIsWeb) {
+      // Mapping from extensions to content types for the web player. If an
+      // extension is missing, please submit a pull request.
+      const mimeTypes = {
+        '.aac': 'audio/aac',
+        '.mp3': 'audio/mpeg',
+        '.ogg': 'audio/ogg',
+        '.opus': 'audio/opus',
+        '.wav': 'audio/wav',
+        '.weba': 'audio/webm',
+        '.mp4': 'audio/mp4',
+        '.m4a': 'audio/mp4',
+        '.aif': 'audio/x-aiff',
+        '.aifc': 'audio/x-aiff',
+        '.aiff': 'audio/x-aiff',
+        '.m3u': 'audio/x-mpegurl',
+      };
+      // Default to 'audio/mpeg'
+      final mimeType =
+          mimeTypes[p.extension(assetPath).toLowerCase()] ?? 'audio/mpeg';
+      return _encodeDataUrl(
+          base64
+              .encode((await rootBundle.load(assetPath)).buffer.asUint8List()),
+          mimeType);
+    } else {
+      // For non-web platforms, extract the asset into a cache file and pass
+      // that to the player.
+      final file = await _getCacheFile(assetPath);
+      // Not technically inter-isolate-safe, although low risk. Could consider
+      // locking the file or creating a separate lock file.
+      if (!file.existsSync()) {
+        file.createSync(recursive: true);
+        await file.writeAsBytes(
+            (await rootBundle.load(assetPath)).buffer.asUint8List());
+      }
+      return Uri.file(file.path);
     }
-    super._dispose();
-  }
-
-  Future<File> _loadAsset(String assetPath) async {
-    final file = await _getCacheFile(assetPath);
-    this._cacheFile = file;
-    // Not technically inter-isolate-safe, although low risk. Could consider
-    // locking the file or creating a separate lock file.
-    if (!file.existsSync()) {
-      file.createSync(recursive: true);
-      await file.writeAsBytes(
-          (await rootBundle.load(assetPath)).buffer.asUint8List());
-    }
-    return file;
   }
 
   /// Get file for caching asset media with proper extension
@@ -1642,7 +1670,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       ]));
 
   @override
-  bool get _requiresProxy => headers != null;
+  bool get _requiresProxy => headers != null && !kIsWeb;
 }
 
 /// An [AudioSource] representing a regular media file such as an MP3 or M4A
@@ -1765,7 +1793,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: [audioSource._toMessage()],
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1781,7 +1809,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: [audioSource._toMessage()],
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1800,7 +1828,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: children.map((child) => child._toMessage()).toList(),
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1818,7 +1846,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               index: index,
               children: children.map((child) => child._toMessage()).toList(),
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1834,7 +1862,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               startIndex: index,
               endIndex: index + 1,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1850,7 +1878,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               startIndex: start,
               endIndex: end,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1866,7 +1894,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               currentIndex: currentIndex,
               newIndex: newIndex,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1881,7 +1909,7 @@ class ConcatenatingAudioSource extends AudioSource {
               id: _id,
               startIndex: 0,
               endIndex: children.length,
-              shuffleOrder: _shuffleOrder.indices));
+              shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
 
@@ -1989,6 +2017,9 @@ class LoopingAudioSource extends AudioSource {
       id: _id, child: child._toMessage(), count: count);
 }
 
+Uri _encodeDataUrl(String base64Data, String mimeType) =>
+    Uri.parse('data:$mimeType;base64,$base64Data');
+
 /// An [AudioSource] that provides audio dynamically. Subclasses must override
 /// [request] to provide the encoded audio data. This API is experimental.
 @experimental
@@ -2000,7 +2031,13 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
-    _uri = player._proxy.addStreamAudioSource(this);
+    if (kIsWeb) {
+      final response = await request();
+      _uri = _encodeDataUrl(await base64.encoder.bind(response.stream).join(),
+          response.contentType);
+    } else {
+      _uri = player._proxy.addStreamAudioSource(this);
+    }
   }
 
   /// Used by the player to request a byte range of encoded audio data in small
@@ -2010,7 +2047,7 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   Future<StreamAudioResponse> request([int start, int end]);
 
   @override
-  bool get _requiresProxy => true;
+  bool get _requiresProxy => !kIsWeb;
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
@@ -2029,6 +2066,9 @@ class StreamAudioResponse {
   /// The starting byte position of the response data.
   final int offset;
 
+  /// The MIME type of the audio.
+  final String contentType;
+
   /// The audio content returned by this response.
   final Stream<List<int>> stream;
 
@@ -2037,6 +2077,7 @@ class StreamAudioResponse {
     @required this.contentLength,
     @required this.offset,
     @required this.stream,
+    @required this.contentType,
   });
 }
 
@@ -2070,6 +2111,21 @@ class LockCachingAudioSource extends StreamAudioSource {
 
   Future<File> get _partialCacheFile async =>
       File('${(await _cacheFile).path}.part');
+
+  /// We use this to record the original content type of the downloaded audio.
+  /// NOTE: We could instead rely on the cache file extension, but the original
+  /// URL might not provide a correct extension. As a fallback, we could map the
+  /// MIME type to an extension but we will need a complete dictionary.
+  Future<File> get _mimeFile async => File('${(await _cacheFile).path}.mime');
+
+  Future<String> _readCachedMimeType() async {
+    final file = await _mimeFile;
+    if (file.existsSync()) {
+      return (await _mimeFile).readAsString();
+    } else {
+      return 'audio/mpeg';
+    }
+  }
 
   Future<HttpClientResponse> _fetch() async {
     HttpClient httpClient = HttpClient();
@@ -2105,6 +2161,7 @@ class LockCachingAudioSource extends StreamAudioSource {
             sourceLength: sourceLength,
             contentLength: end - start,
             offset: start,
+            contentType: await _readCachedMimeType(),
             stream: (await _effectiveCacheFile).openRead(start, end),
           ));
         }
@@ -2135,6 +2192,7 @@ class LockCachingAudioSource extends StreamAudioSource {
         sourceLength: sourceLength,
         contentLength: end - start,
         offset: start,
+        contentType: await _readCachedMimeType(),
         stream: cacheFile.openRead(start, end),
       );
     }
@@ -2186,6 +2244,8 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     final range = _HttpRange(rangeRequest?.start ?? 0, rangeRequest?.end,
         sourceResponse.sourceLength);
     request.response.contentLength = range.length;
+    request.response.headers
+        .set(HttpHeaders.contentTypeHeader, sourceResponse.contentType);
     if (rangeRequest != null) {
       request.response.headers
           .set(HttpHeaders.contentRangeHeader, range.contentRangeHeader);
