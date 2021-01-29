@@ -1,3 +1,4 @@
+#import "BetterEventChannel.h"
 #import "AudioPlayer.h"
 #import "AudioSource.h"
 #import "IndexedAudioSource.h"
@@ -14,8 +15,9 @@
 @implementation AudioPlayer {
     NSObject<FlutterPluginRegistrar>* _registrar;
     FlutterMethodChannel *_methodChannel;
-    FlutterEventChannel *_eventChannel;
-    FlutterEventSink _eventSink;
+    BetterEventChannel *_eventChannel;
+    BetterEventChannel *_waveformEventChannel;
+    BetterEventChannel *_fftEventChannel;
     NSString *_playerId;
     AVQueuePlayer *_player;
     AudioSource *_audioSource;
@@ -51,10 +53,15 @@
     _methodChannel =
         [FlutterMethodChannel methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
                                     binaryMessenger:[registrar messenger]];
-    _eventChannel =
-        [FlutterEventChannel eventChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
-                                  binaryMessenger:[registrar messenger]];
-    [_eventChannel setStreamHandler:self];
+    _eventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
+           messenger:[registrar messenger]];
+    _waveformEventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.waveform_events.%@", _playerId]
+           messenger:[registrar messenger]];
+    _fftEventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.fft_events.%@", _playerId]
+           messenger:[registrar messenger]];
     _index = 0;
     _processingState = none;
     _loopMode = loopOff;
@@ -88,7 +95,11 @@
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     @try {
         NSDictionary *request = (NSDictionary *)call.arguments;
-        if ([@"load" isEqualToString:call.method]) {
+        if ([@"startVisualizer" isEqualToString:call.method]) {
+            result(@{});
+        } else if ([@"stopVisualizer" isEqualToString:call.method]) {
+            result(@{});
+        } else if ([@"load" isEqualToString:call.method]) {
             CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeZero : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
             [self load:request[@"audioSource"] initialPosition:initialPosition initialIndex:request[@"initialIndex"] result:result];
         } else if ([@"play" isEqualToString:call.method]) {
@@ -247,18 +258,7 @@
     [self broadcastPlaybackEvent];
 }
 
-- (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
-    _eventSink = eventSink;
-    return nil;
-}
-
-- (FlutterError*)onCancelWithArguments:(id)arguments {
-    _eventSink = nil;
-    return nil;
-}
-
 - (void)checkForDiscontinuity {
-    if (!_eventSink) return;
     if (!_playing || CMTIME_IS_VALID(_seekPos) || _processingState == completed) return;
     int position = [self getCurrentPosition];
     if (_processingState == buffering) {
@@ -297,8 +297,7 @@
 }
 
 - (void)broadcastPlaybackEvent {
-    if (!_eventSink) return;
-    _eventSink(@{
+    [_eventChannel sendEvent:@{
             @"processingState": @(_processingState),
             @"updatePosition": @((long long)1000 * _updatePosition),
             @"updateTime": @(_updateTime),
@@ -307,7 +306,7 @@
             @"icyMetadata": (id)[NSNull null],
             @"duration": @((long long)1000 * [self getDuration]),
             @"currentIndex": @(_index),
-    });
+    }];
 }
 
 - (int)getCurrentPosition {
@@ -902,10 +901,8 @@
         _loadResult(flutterError);
         _loadResult = nil;
     }
-    if (_eventSink) {
-        // Broadcast all errors even if they aren't on the current item.
-        _eventSink(flutterError);
-    }
+    // Broadcast all errors even if they aren't on the current item.
+    [_eventChannel sendEvent:flutterError];
 }
 
 - (void)abortExistingConnection {
@@ -1234,7 +1231,9 @@
         _player = nil;
     }
     // Untested:
-    [_eventChannel setStreamHandler:nil];
+    [_eventChannel dispose];
+    [_waveformEventChannel dispose];
+    [_fftEventChannel dispose];
     [_methodChannel setMethodCallHandler:nil];
 }
 
