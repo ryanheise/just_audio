@@ -10,6 +10,13 @@
 #import <stdlib.h>
 #include <TargetConditionals.h>
 
+typedef struct JATapStorage {
+    void *self;
+    Float64 samplingRate;
+    int captureSize;
+    void *waveform;
+} JATapStorage;
+
 // TODO: Check for and report invalid state transitions.
 // TODO: Apply Apple's guidance on seeking: https://developer.apple.com/library/archive/qa/qa1820/_index.html
 @implementation AudioPlayer {
@@ -22,6 +29,7 @@
     AVQueuePlayer *_player;
     AudioSource *_audioSource;
     NSMutableArray<IndexedAudioSource *> *_indexedAudioSources;
+    IndexedPlayerItem *_tapPlayerItem;
     NSArray<NSNumber *> *_order;
     NSMutableArray<NSNumber *> *_orderInv;
     int _index;
@@ -43,6 +51,11 @@
     BOOL _playing;
     float _speed;
     BOOL _justAdvanced;
+    BOOL _visualizerEnableWaveform;
+    BOOL _visualizerEnableFft;
+    int _visualizerCaptureRate;
+    int _visualizerCaptureSize;
+    int _visualizerSamplingRate;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
@@ -85,6 +98,11 @@
     _automaticallyWaitsToMinimizeStalling = YES;
     _speed = 1.0f;
     _justAdvanced = NO;
+    _visualizerEnableWaveform = NO;
+    _visualizerEnableFft = NO;
+    _visualizerCaptureRate = 0;
+    _visualizerCaptureSize = 0;
+    _visualizerSamplingRate = 0;
     __weak __typeof__(self) weakSelf = self;
     [_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
         [weakSelf handleMethodCall:call result:result];
@@ -96,8 +114,14 @@
     @try {
         NSDictionary *request = (NSDictionary *)call.arguments;
         if ([@"startVisualizer" isEqualToString:call.method]) {
+            int captureSize = request[@"captureSize"] == (id)[NSNull null] ? 1024 : [request[@"captureSize"] intValue];
+            [self startVisualizer:captureSize
+                      captureRate:[request[@"captureRate"] intValue]
+                   enableWaveform:[request[@"enableWaveform"] boolValue]
+                        enableFft:[request[@"enableFft"] boolValue]];
             result(@{});
         } else if ([@"stopVisualizer" isEqualToString:call.method]) {
+            [self stopVisualizer];
             result(@{});
         } else if ([@"load" isEqualToString:call.method]) {
             CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeZero : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
@@ -294,6 +318,153 @@
 - (void)leaveBuffering:(NSString *)reason {
     //NSLog(@"LEAVE BUFFERING: %@", reason);
     _processingState = ready;
+}
+
+- (void)startVisualizer:(int)captureSize captureRate:(int)captureRate enableWaveform:(BOOL)enableWaveform enableFft:(BOOL)enableFft {
+    if (_visualizerEnableWaveform || _visualizerEnableFft) return;
+    _visualizerCaptureSize = captureSize;
+    _visualizerCaptureRate = captureRate;
+    _visualizerEnableWaveform = enableWaveform;
+    _visualizerEnableFft = enableFft;
+    [self ensureTap];
+}
+
+- (void)stopVisualizer {
+    if (!_visualizerEnableWaveform && !_visualizerEnableFft) return;
+    _visualizerCaptureSize = 0;
+    _visualizerCaptureRate = 0;
+    _visualizerEnableWaveform = NO;
+    _visualizerEnableFft = NO;
+    [self releaseTap];
+}
+
+- (void)releaseTap {
+    if (!_tapPlayerItem) return;
+
+    NSLog(@"Releasing old tap");
+    // release old tap
+    AVMutableAudioMixInputParameters *inputParams = _tapPlayerItem.audioMix.inputParameters[0];
+    MTAudioProcessingTapRef tap = inputParams.audioTapProcessor;
+    CFRetain(tap);
+    _tapPlayerItem.audioMix = nil;
+    CFRelease(tap);
+    _tapPlayerItem = nil;
+}
+
+- (void)ensureTap {
+    if (!_visualizerEnableWaveform && !_visualizerEnableFft) {
+        return;
+    }
+    if (!_player) return;
+    if (!_player.currentItem) return;
+    AVPlayerItem *item = _player.currentItem;
+    if (item == _tapPlayerItem) return;
+    if (item.status != AVPlayerItemStatusReadyToPlay) {
+        _tapPlayerItem = nil;
+        return;
+    }
+    [self releaseTap];
+    NSLog(@"### ensureTap tracks:%d", item.tracks.count);
+    if (item.tracks.count == 0) return;
+    _tapPlayerItem = item;
+    AVAssetTrack *track = item.tracks[0];
+    AVMutableAudioMixInputParameters *inputParams = [AVMutableAudioMixInputParameters audioMixInputParametersWithTrack:track];
+    MTAudioProcessingTapCallbacks callbacks;
+    callbacks.version = kMTAudioProcessingTapCallbacksVersion_0;
+    callbacks.clientInfo = (__bridge void *)self;
+    callbacks.init = initTap;
+    callbacks.prepare = prepareTap;
+    callbacks.process = processTap;
+    callbacks.unprepare = unprepareTap;
+    callbacks.finalize = finalizeTap;
+    MTAudioProcessingTapRef tap;
+    OSStatus err = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap);
+    if (err || !tap) {
+        NSLog(@"Failed to create tap");
+        return;
+    }
+    inputParams.audioTapProcessor = tap;
+    AVMutableAudioMix *audioMix = [AVMutableAudioMix audioMix];
+    audioMix.inputParameters = @[inputParams];
+    item.audioMix = audioMix;
+}
+
+static void initTap(MTAudioProcessingTapRef tap, void *clientInfo, void **tapStorageOut) {
+    JATapStorage *storage = calloc(1, sizeof(JATapStorage));
+    AudioPlayer *self = (__bridge AudioPlayer *)clientInfo;
+    storage->self = clientInfo;
+    storage->captureSize = self.visualizerCaptureSize;
+    storage->waveform = calloc(1, self.visualizerCaptureSize);
+    *tapStorageOut = storage;
+}
+
+static void prepareTap(MTAudioProcessingTapRef tap, CMItemCount maxFrames, const AudioStreamBasicDescription *processingFormat) {
+    JATapStorage *storage = (JATapStorage *)MTAudioProcessingTapGetStorage(tap);
+    storage->samplingRate = processingFormat->mSampleRate;
+    //NSLog(@"samplingRate: %d", (int)(storage->samplingRate));
+    //NSLog(@"is pcm: %d", processingFormat->mFormatID == kAudioFormatLinearPCM);
+    //NSLog(@"is float: %d", processingFormat->mFormatFlags & kAudioFormatFlagIsFloat);
+}
+
+static void processTap(MTAudioProcessingTapRef tap, CMItemCount frameCount, MTAudioProcessingTapFlags flags, AudioBufferList *bufferListInOut, CMItemCount *frameCountOut, MTAudioProcessingTapFlags *flagsOut) {
+    OSStatus err = MTAudioProcessingTapGetSourceAudio(tap, frameCount, bufferListInOut, flagsOut, NULL, frameCountOut);
+    if (err) {
+        NSLog(@"Failed to get source audio");
+        return;
+    }
+    JATapStorage *storage = (JATapStorage *)MTAudioProcessingTapGetStorage(tap);
+    long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
+
+    UInt8 *waveform = (UInt8 *)storage->waveform;
+    int captureSize = storage->captureSize;
+    
+    AudioBuffer *buffer = &bufferListInOut->mBuffers[0];
+    int bufferSize = buffer->mDataByteSize;
+    // TODO: Handle interleaved channels.
+    UInt32 sampleCount = frameCount * buffer->mNumberChannels;
+    // TODO: check the format provided in prepareTap.
+    // TODO: average together channels 0..bufferListInOut->mNumberBuffers
+    // TODO: correctly scale when converting to 8-bit PCM.
+    float *samples = (float *)buffer->mData;
+    for (UInt32 i = 0; i < captureSize; i++) {
+        float sample = i < sampleCount ? samples[i] : 0.0f;
+        int unsignedSample = (int)(samples[i]*128.0*3) + 128;
+        if (unsignedSample > 255) unsignedSample = 255;
+        else if (unsignedSample < 0) unsignedSample = 0;
+        waveform[i] = (UInt8)unsignedSample;
+    }
+
+    // TODO: Take captureRate into account. Maybe let the main thread
+    // periodically take samples, and we provide them here in a CMSimpleQueue.
+    AudioPlayer *self = (__bridge AudioPlayer *)(storage->self);
+    // NOTE: Apple recommends to NOT allocate any memory in the tap process function.
+    // TODO: Check impact on performance and memory.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSData *data = [NSData dataWithBytes:(void *)waveform length:captureSize];
+        [self broadcastVisualizerCapture:data samplingRate:(int)(storage->samplingRate)];
+    });
+}
+
+static void unprepareTap(MTAudioProcessingTapRef tap) {
+}
+
+static void finalizeTap(MTAudioProcessingTapRef tap) {
+    JATapStorage *storage = (JATapStorage *)MTAudioProcessingTapGetStorage(tap);
+    storage->self = NULL;
+    free(storage->waveform);
+    free(storage);
+}
+
+- (int)visualizerCaptureSize {
+    NSLog(@"get visualizerCaptureSize -> %d", _visualizerCaptureSize);
+    return _visualizerCaptureSize;
+}
+
+- (void)broadcastVisualizerCapture:(NSData *)waveform samplingRate:(int)samplingRate {
+    [_waveformEventChannel sendEvent:@{
+        @"data": waveform,
+        @"samplingRate": @(samplingRate),
+    }];
 }
 
 - (void)broadcastPlaybackEvent {
@@ -682,6 +853,8 @@
         switch (status) {
             case AVPlayerItemStatusReadyToPlay: {
                 if (playerItem != _player.currentItem) return;
+                // TODO: Also ensure tap when switching to a new item that is already ready.
+                [self ensureTap];
                 // Detect buffering in different ways depending on whether we're playing
                 if (_playing) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {
@@ -799,6 +972,7 @@
             }
         }
     } else if ([keyPath isEqualToString:@"currentItem"] && _player.currentItem) {
+        [self ensureTap];
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)change[NSKeyValueChangeNewKey];
         //IndexedPlayerItem *oldPlayerItem = (IndexedPlayerItem *)change[NSKeyValueChangeOldKey];
         if (playerItem.status == AVPlayerItemStatusFailed) {
