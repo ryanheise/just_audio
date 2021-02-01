@@ -1,3 +1,7 @@
+## 0.7.0-nullsafety.0
+
+* Null safety.
+
 ## 0.6.9
 
 * Support assets on web.

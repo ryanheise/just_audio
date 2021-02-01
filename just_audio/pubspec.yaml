@@ -1,6 +1,6 @@
 name: just_audio
 description: Audio player for files, assets, URLs and DASH/HLS streams supporting gapless looping, shuffling, concatenating, clipping. Works with audio_service to play audio in the background.
-version: 0.6.9
+version: 0.7.0-nullsafety.0
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio
 
 environment:
@@ -9,9 +9,7 @@ environment:
 
 dependencies:
   just_audio_platform_interface: ^3.0.0-nullsafety.0
-  # just_audio_web: ^0.2.3
-  just_audio_web:
-    path: ../just_audio_web
+  just_audio_web: ^0.3.0-nullsafety.0
   audio_session: ^0.1.0-nullsafety.3
   rxdart: ^0.26.0-nullsafety.1
   path: ^1.8.0-nullsafety.3

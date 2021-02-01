@@ -180,9 +180,9 @@ packages:
   just_audio_web:
     dependency: "direct main"
     description:
-      path: "../just_audio_web"
-      relative: true
-    source: path
+      name: just_audio_web
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "0.3.0-nullsafety.0"
   logging:
     dependency: transitive
