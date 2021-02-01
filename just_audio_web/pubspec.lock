@@ -35,9 +35,9 @@ packages:
   just_audio_platform_interface:
     dependency: "direct main"
     description:
-      name: just_audio_platform_interface
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "../just_audio_platform_interface"
+      relative: true
+    source: path
     version: "2.0.0"
   meta:
     dependency: "direct main"
@@ -52,7 +52,7 @@ packages:
       name: plugin_platform_interface
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.0.3"
+    version: "1.1.0-nullsafety.1"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -73,5 +73,5 @@ packages:
     source: hosted
     version: "2.1.0-nullsafety.5"
 sdks:
-  dart: ">=2.12.0-0 <3.0.0"
+  dart: ">=2.12.0-133.7.beta <3.0.0"
   flutter: ">=1.12.13+hotfix.5"

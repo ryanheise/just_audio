@@ -11,7 +11,9 @@ flutter:
         fileName: just_audio_web.dart
 
 dependencies:
-  just_audio_platform_interface: ^2.0.0
+  # just_audio_platform_interface: ^2.0.0
+  just_audio_platform_interface:
+    path: ../just_audio_platform_interface
   flutter:
     sdk: flutter
   flutter_web_plugins:
@@ -19,5 +21,5 @@ dependencies:
   meta: ^1.1.8
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: '>=2.12.0-133.7.beta <3.0.0'
   flutter: ">=1.12.13+hotfix.5"

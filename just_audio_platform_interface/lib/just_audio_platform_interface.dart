@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-import 'package:meta/meta.dart' show required;
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'method_channel_just_audio.dart';
@@ -166,20 +164,20 @@ class PlaybackEventMessage {
   final DateTime updateTime;
   final Duration updatePosition;
   final Duration bufferedPosition;
-  final Duration duration;
-  final IcyMetadataMessage icyMetadata;
-  final int currentIndex;
-  final int androidAudioSessionId;
+  final Duration? duration;
+  final IcyMetadataMessage? icyMetadata;
+  final int? currentIndex;
+  final int? androidAudioSessionId;
 
   PlaybackEventMessage({
-    @required this.processingState,
-    @required this.updateTime,
-    @required this.updatePosition,
-    @required this.bufferedPosition,
-    @required this.duration,
-    @required this.icyMetadata,
-    @required this.currentIndex,
-    @required this.androidAudioSessionId,
+    required this.processingState,
+    required this.updateTime,
+    required this.updatePosition,
+    required this.bufferedPosition,
+    required this.duration,
+    required this.icyMetadata,
+    required this.currentIndex,
+    required this.androidAudioSessionId,
   });
 
   static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
@@ -210,12 +208,12 @@ enum ProcessingStateMessage {
 
 /// Icy metadata communicated from the platform implementation.
 class IcyMetadataMessage {
-  final IcyInfoMessage info;
-  final IcyHeadersMessage headers;
+  final IcyInfoMessage? info;
+  final IcyHeadersMessage? headers;
 
   IcyMetadataMessage({
-    @required this.info,
-    @required this.headers,
+    required this.info,
+    required this.headers,
   });
 
   static IcyMetadataMessage fromMap(Map<dynamic, dynamic> json) =>
@@ -230,10 +228,13 @@ class IcyMetadataMessage {
 
 /// Icy info communicated from the platform implementation.
 class IcyInfoMessage {
-  final String title;
-  final String url;
+  final String? title;
+  final String? url;
 
-  IcyInfoMessage({@required this.title, @required this.url});
+  IcyInfoMessage({
+    required this.title,
+    required this.url,
+  });
 
   static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) =>
       IcyInfoMessage(title: json['title'], url: json['url']);
@@ -241,20 +242,20 @@ class IcyInfoMessage {
 
 /// Icy headers communicated from the platform implementation.
 class IcyHeadersMessage {
-  final int bitrate;
-  final String genre;
-  final String name;
-  final int metadataInterval;
-  final String url;
-  final bool isPublic;
+  final int? bitrate;
+  final String? genre;
+  final String? name;
+  final int? metadataInterval;
+  final String? url;
+  final bool? isPublic;
 
   IcyHeadersMessage({
-    @required this.bitrate,
-    @required this.genre,
-    @required this.name,
-    @required this.metadataInterval,
-    @required this.url,
-    @required this.isPublic,
+    required this.bitrate,
+    required this.genre,
+    required this.name,
+    required this.metadataInterval,
+    required this.url,
+    required this.isPublic,
   });
 
   static IcyHeadersMessage fromMap(Map<dynamic, dynamic> json) =>
@@ -273,7 +274,7 @@ class IcyHeadersMessage {
 class InitRequest {
   final String id;
 
-  InitRequest({@required this.id});
+  InitRequest({required this.id});
 
   Map<dynamic, dynamic> toMap() => {
         'id': id,
@@ -285,7 +286,7 @@ class InitRequest {
 class DisposePlayerRequest {
   final String id;
 
-  DisposePlayerRequest({@required this.id});
+  DisposePlayerRequest({required this.id});
 
   Map<dynamic, dynamic> toMap() => {
         'id': id,
@@ -303,11 +304,11 @@ class DisposePlayerResponse {
 /// audio source.
 class LoadRequest {
   final AudioSourceMessage audioSourceMessage;
-  final Duration initialPosition;
-  final int initialIndex;
+  final Duration? initialPosition;
+  final int? initialIndex;
 
   LoadRequest({
-    @required this.audioSourceMessage,
+    required this.audioSourceMessage,
     this.initialPosition,
     this.initialIndex,
   });
@@ -322,9 +323,9 @@ class LoadRequest {
 /// Information returned by the platform implementation after loading an audio
 /// source.
 class LoadResponse {
-  final Duration duration;
+  final Duration? duration;
 
-  LoadResponse({@required this.duration});
+  LoadResponse({required this.duration});
 
   static LoadResponse fromMap(Map<dynamic, dynamic> map) => LoadResponse(
       duration: map['duration'] != null
@@ -360,7 +361,7 @@ class PauseResponse {
 class SetVolumeRequest {
   final double volume;
 
-  SetVolumeRequest({@required this.volume});
+  SetVolumeRequest({required this.volume});
 
   Map<dynamic, dynamic> toMap() => {
         'volume': volume,
@@ -379,7 +380,7 @@ class SetVolumeResponse {
 class SetSpeedRequest {
   final double speed;
 
-  SetSpeedRequest({@required this.speed});
+  SetSpeedRequest({required this.speed});
 
   Map<dynamic, dynamic> toMap() => {
         'speed': speed,
@@ -398,7 +399,7 @@ class SetSpeedResponse {
 class SetLoopModeRequest {
   final LoopModeMessage loopMode;
 
-  SetLoopModeRequest({@required this.loopMode});
+  SetLoopModeRequest({required this.loopMode});
 
   Map<dynamic, dynamic> toMap() => {
         'loopMode': loopMode.index,
@@ -420,7 +421,7 @@ enum LoopModeMessage { off, one, all }
 class SetShuffleModeRequest {
   final ShuffleModeMessage shuffleMode;
 
-  SetShuffleModeRequest({@required this.shuffleMode});
+  SetShuffleModeRequest({required this.shuffleMode});
 
   Map<dynamic, dynamic> toMap() => {
         'shuffleMode': shuffleMode.index,
@@ -442,7 +443,7 @@ enum ShuffleModeMessage { none, all }
 class SetShuffleOrderRequest {
   final AudioSourceMessage audioSourceMessage;
 
-  SetShuffleOrderRequest({@required this.audioSourceMessage});
+  SetShuffleOrderRequest({required this.audioSourceMessage});
 
   Map<dynamic, dynamic> toMap() => {
         'audioSource': audioSourceMessage.toMap(),
@@ -461,7 +462,7 @@ class SetShuffleOrderResponse {
 class SetAutomaticallyWaitsToMinimizeStallingRequest {
   final bool enabled;
 
-  SetAutomaticallyWaitsToMinimizeStallingRequest({@required this.enabled});
+  SetAutomaticallyWaitsToMinimizeStallingRequest({required this.enabled});
 
   Map<dynamic, dynamic> toMap() => {
         'enabled': enabled,
@@ -479,13 +480,13 @@ class SetAutomaticallyWaitsToMinimizeStallingResponse {
 /// Information communicated to the platform implementation when seeking to a
 /// position and index.
 class SeekRequest {
-  final Duration position;
-  final int index;
+  final Duration? position;
+  final int? index;
 
-  SeekRequest({@required this.position, this.index});
+  SeekRequest({this.position, this.index});
 
   Map<dynamic, dynamic> toMap() => {
-        'position': position.inMicroseconds,
+        'position': position?.inMicroseconds,
         'index': index,
       };
 }
@@ -504,9 +505,9 @@ class SetAndroidAudioAttributesRequest {
   final int usage;
 
   SetAndroidAudioAttributesRequest({
-    @required this.contentType,
-    @required this.flags,
-    @required this.usage,
+    required this.contentType,
+    required this.flags,
+    required this.usage,
   });
 
   Map<dynamic, dynamic> toMap() => {
@@ -543,10 +544,10 @@ class ConcatenatingInsertAllRequest {
   final List<int> shuffleOrder;
 
   ConcatenatingInsertAllRequest({
-    @required this.id,
-    @required this.index,
-    @required this.children,
-    @required this.shuffleOrder,
+    required this.id,
+    required this.index,
+    required this.children,
+    required this.shuffleOrder,
   });
 
   Map<dynamic, dynamic> toMap() => {
@@ -573,10 +574,10 @@ class ConcatenatingRemoveRangeRequest {
   final List<int> shuffleOrder;
 
   ConcatenatingRemoveRangeRequest({
-    @required this.id,
-    @required this.startIndex,
-    @required this.endIndex,
-    @required this.shuffleOrder,
+    required this.id,
+    required this.startIndex,
+    required this.endIndex,
+    required this.shuffleOrder,
   });
 
   Map<dynamic, dynamic> toMap() => {
@@ -603,10 +604,10 @@ class ConcatenatingMoveRequest {
   final List<int> shuffleOrder;
 
   ConcatenatingMoveRequest({
-    @required this.id,
-    @required this.currentIndex,
-    @required this.newIndex,
-    @required this.shuffleOrder,
+    required this.id,
+    required this.currentIndex,
+    required this.newIndex,
+    required this.shuffleOrder,
   });
 
   Map<dynamic, dynamic> toMap() => {
@@ -629,7 +630,7 @@ class ConcatenatingMoveResponse {
 abstract class AudioSourceMessage {
   final String id;
 
-  AudioSourceMessage({@required this.id});
+  AudioSourceMessage({required this.id});
 
   Map<dynamic, dynamic> toMap();
 }
@@ -637,19 +638,19 @@ abstract class AudioSourceMessage {
 /// Information about an indexed audio source to be communicated with the
 /// platform implementation.
 abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
-  IndexedAudioSourceMessage({@required String id}) : super(id: id);
+  IndexedAudioSourceMessage({required String id}) : super(id: id);
 }
 
 /// Information about a URI audio source to be communicated with the platform
 /// implementation.
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
-  final Map<dynamic, dynamic> headers;
+  final Map<dynamic, dynamic>? headers;
 
   UriAudioSourceMessage({
-    @required String id,
-    @required this.uri,
-    @required this.headers,
+    required String id,
+    required this.uri,
+    this.headers,
   }) : super(id: id);
 }
 
@@ -657,9 +658,9 @@ abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
 /// platform implementation.
 class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
   ProgressiveAudioSourceMessage({
-    @required String id,
-    @required String uri,
-    @required Map<dynamic, dynamic> headers,
+    required String id,
+    required String uri,
+    Map<dynamic, dynamic>? headers,
   }) : super(id: id, uri: uri, headers: headers);
 
   @override
@@ -675,9 +676,9 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
 /// implementation.
 class DashAudioSourceMessage extends UriAudioSourceMessage {
   DashAudioSourceMessage({
-    @required String id,
-    @required String uri,
-    @required Map<dynamic, dynamic> headers,
+    required String id,
+    required String uri,
+    Map<dynamic, dynamic>? headers,
   }) : super(id: id, uri: uri, headers: headers);
 
   @override
@@ -693,9 +694,9 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
 /// implementation.
 class HlsAudioSourceMessage extends UriAudioSourceMessage {
   HlsAudioSourceMessage({
-    @required String id,
-    @required String uri,
-    @required Map<dynamic, dynamic> headers,
+    required String id,
+    required String uri,
+    Map<dynamic, dynamic>? headers,
   }) : super(id: id, uri: uri, headers: headers);
 
   @override
@@ -715,10 +716,10 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
   final List<int> shuffleOrder;
 
   ConcatenatingAudioSourceMessage({
-    @required String id,
-    @required this.children,
-    @required this.useLazyPreparation,
-    @required this.shuffleOrder,
+    required String id,
+    required this.children,
+    required this.useLazyPreparation,
+    required this.shuffleOrder,
   }) : super(id: id);
 
   @override
@@ -735,14 +736,14 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
 /// platform implementation.
 class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
   final UriAudioSourceMessage child;
-  final Duration start;
-  final Duration end;
+  final Duration? start;
+  final Duration? end;
 
   ClippingAudioSourceMessage({
-    @required String id,
-    @required this.child,
-    @required this.start,
-    @required this.end,
+    required String id,
+    required this.child,
+    this.start,
+    this.end,
   }) : super(id: id);
 
   @override
@@ -750,8 +751,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
         'type': 'clipping',
         'id': id,
         'child': child.toMap(),
-        'start': start.inMicroseconds,
-        'end': end.inMicroseconds,
+        'start': start?.inMicroseconds,
+        'end': end?.inMicroseconds,
       };
 }
 
@@ -762,9 +763,9 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
   final int count;
 
   LoopingAudioSourceMessage({
-    @required String id,
-    @required this.child,
-    @required this.count,
+    required String id,
+    required this.child,
+    required this.count,
   }) : super(id: id);
 
   @override

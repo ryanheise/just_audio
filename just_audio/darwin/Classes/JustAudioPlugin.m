@@ -14,6 +14,16 @@
               binaryMessenger:[registrar messenger]];
     JustAudioPlugin* instance = [[JustAudioPlugin alloc] initWithRegistrar:registrar];
     [registrar addMethodCallDelegate:instance channel:channel];
+
+    FlutterMethodChannel* pathProviderChannel = [FlutterMethodChannel
+        methodChannelWithName:@"com.ryanheise.just_audio.path_provider"
+              binaryMessenger:[registrar messenger]];
+    // XXX: We should set this to nil in dealloc
+    [pathProviderChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
+        // Assume the method is "getTemporaryDirectory"
+        NSArray* paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+        result(paths.firstObject);
+    }];
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar {
