@@ -198,7 +198,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
     if (src != _audioElement.src) {
-      _durationCompleter = Completer<num>();
+      _durationCompleter = Completer();
       _audioElement.src = src;
       _audioElement.preload = 'auto';
       _audioElement.load();
@@ -286,7 +286,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
-    await _seek(request.position.inMilliseconds, request.index);
+    await _seek(request.position?.inMilliseconds ?? 0, request.index);
     return SeekResponse();
   }
 
@@ -677,8 +677,8 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<Duration?> load() async {
     _resumePos = (start ?? Duration.zero).inMilliseconds / 1000.0;
-    Duration fullDuration = await (html5AudioPlayer
-        .loadUri(audioSourcePlayer.uri) as FutureOr<Duration>);
+    Duration fullDuration =
+        (await html5AudioPlayer.loadUri(audioSourcePlayer.uri))!;
     _audioElement.currentTime = _resumePos!;
     _duration = Duration(
         milliseconds: min((end ?? fullDuration).inMilliseconds,
