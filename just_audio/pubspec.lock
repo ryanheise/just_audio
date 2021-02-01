@@ -173,17 +173,17 @@ packages:
   just_audio_platform_interface:
     dependency: "direct main"
     description:
-      path: "../just_audio_platform_interface"
-      relative: true
-    source: path
-    version: "2.0.0"
+      name: just_audio_platform_interface
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "3.0.0-nullsafety.0"
   just_audio_web:
     dependency: "direct main"
     description:
       path: "../just_audio_web"
       relative: true
     source: path
-    version: "0.2.3"
+    version: "0.3.0-nullsafety.0"
   logging:
     dependency: transitive
     description:

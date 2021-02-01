@@ -1,7 +1,7 @@
 name: just_audio_web
 description: Web platform implementation of just_audio
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_web
-version: 0.2.3
+version: 0.3.0-nullsafety.0
 
 flutter:
   plugin:
@@ -16,7 +16,6 @@ dependencies:
     sdk: flutter
   flutter_web_plugins:
     sdk: flutter
-  meta: ^1.1.8
 
 environment:
   sdk: '>=2.12.0-133.7.beta <3.0.0'
