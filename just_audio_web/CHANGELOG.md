@@ -1,3 +1,7 @@
+## 0.3.0-nullsafety.0
+
+* Null safety.
+
 ## 0.2.3
 
 * Fix bug when modifying playlists (insert/move).
