@@ -101,7 +101,7 @@ class _MyAppState extends State<MyApp> {
                   stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
                     final state = snapshot.data;
-                    if (state?.sequence?.isEmpty ?? true) return SizedBox();
+                    if (state?.sequence.isEmpty ?? true) return SizedBox();
                     final metadata = state!.currentSource.tag as AudioMetadata;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
