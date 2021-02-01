@@ -14,7 +14,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  AudioPlayer _player;
+  late AudioPlayer _player;
   ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
     ClippingAudioSource(
       start: Duration(seconds: 60),
@@ -97,12 +97,12 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Expanded(
-                child: StreamBuilder<SequenceState>(
+                child: StreamBuilder<SequenceState?>(
                   stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
                     final state = snapshot.data;
                     if (state?.sequence?.isEmpty ?? true) return SizedBox();
-                    final metadata = state.currentSource.tag as AudioMetadata;
+                    final metadata = state!.currentSource.tag as AudioMetadata;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -113,16 +113,16 @@ class _MyAppState extends State<MyApp> {
                                 Center(child: Image.network(metadata.artwork)),
                           ),
                         ),
-                        Text(metadata.album ?? '',
+                        Text(metadata.album,
                             style: Theme.of(context).textTheme.headline6),
-                        Text(metadata.title ?? ''),
+                        Text(metadata.title),
                       ],
                     );
                   },
                 ),
               ),
               ControlButtons(_player),
-              StreamBuilder<Duration>(
+              StreamBuilder<Duration?>(
                 stream: _player.durationStream,
                 builder: (context, snapshot) {
                   final duration = snapshot.data ?? Duration.zero;
@@ -201,7 +201,7 @@ class _MyAppState extends State<MyApp> {
               ),
               Container(
                 height: 240.0,
-                child: StreamBuilder<SequenceState>(
+                child: StreamBuilder<SequenceState?>(
                   stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
                     final state = snapshot.data;
@@ -227,7 +227,7 @@ class _MyAppState extends State<MyApp> {
                               _playlist.removeAt(i);
                             },
                             child: Material(
-                              color: i == state.currentIndex
+                              color: i == state!.currentIndex
                                   ? Colors.grey.shade300
                                   : null,
                               child: ListTile(
@@ -289,7 +289,7 @@ class ControlButtons extends StatelessWidget {
             );
           },
         ),
-        StreamBuilder<SequenceState>(
+        StreamBuilder<SequenceState?>(
           stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_previous),
@@ -327,12 +327,12 @@ class ControlButtons extends StatelessWidget {
                 icon: Icon(Icons.replay),
                 iconSize: 64.0,
                 onPressed: () => player.seek(Duration.zero,
-                    index: player.effectiveIndices.first),
+                    index: player.effectiveIndices!.first),
               );
             }
           },
         ),
-        StreamBuilder<SequenceState>(
+        StreamBuilder<SequenceState?>(
           stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_next),
@@ -365,12 +365,12 @@ class ControlButtons extends StatelessWidget {
 class SeekBar extends StatefulWidget {
   final Duration duration;
   final Duration position;
-  final ValueChanged<Duration> onChanged;
-  final ValueChanged<Duration> onChangeEnd;
+  final ValueChanged<Duration>? onChanged;
+  final ValueChanged<Duration>? onChangeEnd;
 
   SeekBar({
-    @required this.duration,
-    @required this.position,
+    required this.duration,
+    required this.position,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -380,7 +380,7 @@ class SeekBar extends StatefulWidget {
 }
 
 class _SeekBarState extends State<SeekBar> {
-  double _dragValue;
+  double? _dragValue;
 
   @override
   Widget build(BuildContext context) {
@@ -396,12 +396,12 @@ class _SeekBarState extends State<SeekBar> {
               _dragValue = value;
             });
             if (widget.onChanged != null) {
-              widget.onChanged(Duration(milliseconds: value.round()));
+              widget.onChanged!(Duration(milliseconds: value.round()));
             }
           },
           onChangeEnd: (value) {
             if (widget.onChangeEnd != null) {
-              widget.onChangeEnd(Duration(milliseconds: value.round()));
+              widget.onChangeEnd!(Duration(milliseconds: value.round()));
             }
             _dragValue = null;
           },
@@ -424,14 +424,14 @@ class _SeekBarState extends State<SeekBar> {
 }
 
 _showSliderDialog({
-  BuildContext context,
-  String title,
-  int divisions,
-  double min,
-  double max,
+  required BuildContext context,
+  required String title,
+  required int divisions,
+  required double min,
+  required double max,
   String valueSuffix = '',
-  Stream<double> stream,
-  ValueChanged<double> onChanged,
+  required Stream<double> stream,
+  required ValueChanged<double> onChanged,
 }) {
   showDialog(
     context: context,
@@ -468,5 +468,6 @@ class AudioMetadata {
   final String title;
   final String artwork;
 
-  AudioMetadata({this.album, this.title, this.artwork});
+  AudioMetadata(
+      {required this.album, required this.title, required this.artwork});
 }

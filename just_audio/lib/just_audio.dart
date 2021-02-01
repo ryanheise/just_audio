@@ -969,7 +969,7 @@ class AudioPlayer {
     final position = this.position;
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
-    final durationCompleter = Completer<Duration>();
+    final durationCompleter = Completer<Duration?>();
     _platform = Future<AudioPlayerPlatform>(() async {
       _playbackEventSubscription?.cancel();
       if (!force) {

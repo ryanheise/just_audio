@@ -14,7 +14,7 @@ dependencies:
   # just_audio_web: ^0.2.3
   just_audio_web:
     path: ../just_audio_web
-  audio_session: ^0.1.0-nullsafety.2
+  audio_session: ^0.1.0-nullsafety.3
   rxdart: ^0.26.0-nullsafety.1
   path: ^1.8.0-nullsafety.3
   #path_provider: ^1.6.10
