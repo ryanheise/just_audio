@@ -7,13 +7,16 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 
+/// The web implementation of [JustAudioPlatform].
 class JustAudioPlugin extends JustAudioPlatform {
   final Map<String, JustAudioPlayer> players = {};
 
+  /// The entrypoint called by the generated plugin registrant.
   static void registerWith(Registrar registrar) {
     JustAudioPlatform.instance = JustAudioPlugin();
   }
 
+  @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     if (players.containsKey(request.id)) {
       throw PlatformException(
@@ -25,6 +28,7 @@ class JustAudioPlugin extends JustAudioPlatform {
     return player;
   }
 
+  @override
   Future<DisposePlayerResponse> disposePlayer(
       DisposePlayerRequest request) async {
     await players[request.id]?.release();
@@ -33,28 +37,34 @@ class JustAudioPlugin extends JustAudioPlatform {
   }
 }
 
+/// The web impluementation of [AudioPlayerPlatform].
 abstract class JustAudioPlayer extends AudioPlayerPlatform {
-  final eventController = StreamController<PlaybackEventMessage>();
+  final _eventController = StreamController<PlaybackEventMessage>();
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   bool _playing = false;
   int? _index;
 
+  /// Creates a platform player with the given [id].
   JustAudioPlayer({required String id}) : super(id);
 
   @mustCallSuper
   Future<void> release() async {
-    eventController.close();
+    _eventController.close();
   }
 
+  /// Returns the current position of the player.
   Duration getCurrentPosition();
 
+  /// Returns the current buffered position of the player.
   Duration getBufferedPosition();
 
+  /// Returns the duration of the current player item or `null` if unknown.
   Duration? getDuration();
 
+  /// Broadcasts a playback event from the platform side to the plugin side.
   broadcastPlaybackEvent() {
     var updateTime = DateTime.now();
-    eventController.add(PlaybackEventMessage(
+    _eventController.add(PlaybackEventMessage(
       processingState: _processingState,
       updatePosition: getCurrentPosition(),
       updateTime: updateTime,
@@ -67,12 +77,14 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
     ));
   }
 
+  /// Transitions to [processingState] and broadcasts a playback event.
   transition(ProcessingStateMessage processingState) {
     _processingState = processingState;
     broadcastPlaybackEvent();
   }
 }
 
+/// An HTML5-specific implementation of [JustAudioPlayer].
 class Html5AudioPlayer extends JustAudioPlayer {
   AudioElement _audioElement = AudioElement();
   Completer? _durationCompleter;
@@ -81,6 +93,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   bool _shuffleModeEnabled = false;
   final Map<String, AudioSourcePlayer> _audioSourcePlayers = {};
 
+  /// Creates an [Html5AudioPlayer] with the given [id].
   Html5AudioPlayer({required String id}) : super(id: id) {
     _audioElement.addEventListener('durationchange', (event) {
       _durationCompleter?.complete();
@@ -113,6 +126,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     });
   }
 
+  /// The current playback order, depending on whether shuffle mode is enabled.
   List<int> get order {
     final sequence = _audioSourcePlayer!.sequence;
     return _shuffleModeEnabled
@@ -120,6 +134,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
         : List.generate(sequence.length, (i) => i);
   }
 
+  /// gets the inverted order for the given order.
   List<int> getInv(List<int> order) {
     final orderInv = List<int>.filled(order.length, 0);
     for (var i = 0; i < order.length; i++) {
@@ -128,6 +143,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     return orderInv;
   }
 
+  /// Called when playback reaches the end of an item.
   onEnded() async {
     if (_loopMode == LoopModeMessage.one) {
       await _seek(0, null);
@@ -176,7 +192,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
-      eventController.stream;
+      _eventController.stream;
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
@@ -194,6 +210,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
     return LoadResponse(duration: duration);
   }
 
+  /// Loads audio from [uri] and returns the duration of the loaded audio if
+  /// known.
   Future<Duration?> loadUri(final Uri uri) async {
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
@@ -410,9 +428,12 @@ class Html5AudioPlayer extends JustAudioPlayer {
     return await super.release();
   }
 
-  List<AudioSourcePlayer> getAudioSources(List messages) =>
+  /// Converts a list of audio source messages to players.
+  List<AudioSourcePlayer> getAudioSources(List<AudioSourceMessage> messages) =>
       messages.map((message) => getAudioSource(message)).toList();
 
+  /// Converts an audio source message to a player, using the cache if it is
+  /// already cached.
   AudioSourcePlayer getAudioSource(AudioSourceMessage audioSourceMessage) {
     final String id = audioSourceMessage.id;
     var audioSourcePlayer = _audioSourcePlayers[id];
@@ -423,6 +444,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     return audioSourcePlayer;
   }
 
+  /// Converts an audio source message to a player.
   AudioSourcePlayer decodeAudioSource(AudioSourceMessage audioSourceMessage) {
     if (audioSourceMessage is ProgressiveAudioSourceMessage) {
       return ProgressiveAudioSourcePlayer(this, audioSourceMessage.id,
@@ -456,47 +478,68 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 }
 
+/// A player for a single audio source.
 abstract class AudioSourcePlayer {
+  /// The [Html5AudioPlayer] responsible for audio I/O.
   Html5AudioPlayer html5AudioPlayer;
+
+  /// The ID of the underlying audio source.
   final String id;
 
   AudioSourcePlayer(this.html5AudioPlayer, this.id);
 
+  /// The sequence of players for the indexed items nested in this player.
   List<IndexedAudioSourcePlayer> get sequence;
 
+  /// The order to use over [sequence] when in shuffle mode.
   List<int> get shuffleIndices;
 }
 
+/// A player for an [IndexedAudioSourceMessage].
 abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
   IndexedAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id)
       : super(html5AudioPlayer, id);
 
+  /// Loads the audio for the underlying audio source.
   Future<Duration?> load();
 
+  /// Plays the underlying audio source.
   Future<void> play();
 
+  /// Pauses playback of the underlying audio source.
   Future<void> pause();
 
+  /// Seeks to [position] milliseconds.
   Future<void> seek(int position);
 
+  /// Called when playback reaches the end of the underlying audio source.
   Future<void> complete();
 
+  /// Called when the playback position of the underlying HTML5 player changes.
   Future<void> timeUpdated(double seconds) async {}
 
+  /// The duration of the underlying audio source.
   Duration? get duration;
 
+  /// The current playback position.
   Duration get position;
 
+  /// The current buffered position.
   Duration get bufferedPosition;
 
+  /// The audio element that renders the audio.
   AudioElement get _audioElement => html5AudioPlayer._audioElement;
 
   @override
   String toString() => "${this.runtimeType}";
 }
 
+/// A player for an [UriAudioSourceMessage].
 abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
+  /// The URL to play.
   final Uri uri;
+
+  /// The headers to include in the request (unsupported).
   final Map? headers;
   double? _resumePos;
   Duration? _duration;
@@ -580,26 +623,33 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   }
 }
 
+/// A player for a [ProgressiveAudioSourceMessage].
 class ProgressiveAudioSourcePlayer extends UriAudioSourcePlayer {
   ProgressiveAudioSourcePlayer(
       Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
       : super(html5AudioPlayer, id, uri, headers);
 }
 
+/// A player for a [DashAudioSourceMessage].
 class DashAudioSourcePlayer extends UriAudioSourcePlayer {
   DashAudioSourcePlayer(
       Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
       : super(html5AudioPlayer, id, uri, headers);
 }
 
+/// A player for a [HlsAudioSourceMessage].
 class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
   HlsAudioSourcePlayer(
       Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
       : super(html5AudioPlayer, id, uri, headers);
 }
 
+/// A player for a [ConcatenatingAudioSourceMessage].
 class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
+  /// The players for each child audio source.
   final List<AudioSourcePlayer> audioSourcePlayers;
+
+  /// Whether audio should be loaded as late as possible. (Currently ignored.)
   final bool useLazyPreparation;
   List<int> _shuffleOrder;
 
@@ -628,10 +678,12 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
     return order;
   }
 
+  /// Sets the current shuffle order.
   void setShuffleOrder(List<int> shuffleOrder) {
     _shuffleOrder = shuffleOrder;
   }
 
+  /// Inserts [players] into this player at position [index].
   insertAll(int index, List<AudioSourcePlayer> players) {
     audioSourcePlayers.insertAll(index, players);
     for (var i = 0; i < audioSourcePlayers.length; i++) {
@@ -641,6 +693,7 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
     }
   }
 
+  /// Removes the child players in the specified range.
   removeRange(int start, int end) {
     audioSourcePlayers.removeRange(start, end);
     for (var i = 0; i < audioSourcePlayers.length; i++) {
@@ -650,12 +703,14 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
     }
   }
 
+  /// Moves a child player from [currentIndex] to [newIndex].
   move(int currentIndex, int newIndex) {
     audioSourcePlayers.insert(
         newIndex, audioSourcePlayers.removeAt(currentIndex));
   }
 }
 
+/// A player for a [ClippingAudioSourceMessage].
 class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   final UriAudioSourcePlayer audioSourcePlayer;
   final Duration? start;
@@ -780,10 +835,15 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   }
 }
 
+/// Reasons why playback of a clipping audio source may be interrupted.
 enum ClipInterruptReason { end, pause, seek, simultaneous }
 
+/// A player for a [LoopingAudioSourceMessage].
 class LoopingAudioSourcePlayer extends AudioSourcePlayer {
+  /// The child audio source player to loop.
   final AudioSourcePlayer audioSourcePlayer;
+
+  /// The number of times to loop.
   final int count;
 
   LoopingAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id,
