@@ -848,6 +848,8 @@ class AudioPlayer {
   }
 
   /// Recursively shuffles the children of the currently loaded [AudioSource].
+  /// Each [ConcatenatingAudioSource] will be shuffled according to its
+  /// configured [ShuffleOrder].
   Future<void> shuffle() async {
     if (_disposed) return;
     if (_audioSource == null) return;
@@ -1683,6 +1685,12 @@ class ConcatenatingAudioSource extends AudioSource {
   final bool useLazyPreparation;
   ShuffleOrder _shuffleOrder;
 
+  /// Creates a [ConcatenatingAudioSorce] with the specified [children]. If
+  /// [useLazyPreparation] is `true`, children will be loaded/buffered as late
+  /// as possible before needed for playback (currently supported on Android
+  /// only). When [AudioPlayer.shuffleModeEnabled] is `true`, [shuffleOrder]
+  /// will be used to determine the playback order (defaulting to
+  /// [DefaultShuffleOrder]).
   ConcatenatingAudioSource({
     required this.children,
     this.useLazyPreparation = true,
@@ -2294,8 +2302,10 @@ abstract class ShuffleOrder {
   /// [2,0,1] specifies to play the 3rd, then the 1st, then the 2nd item.
   List<int> get indices;
 
-  /// Shuffles the [indices]. If [initialIndex] is provided, the [indices]
-  /// should be shuffled so that [initialIndex] appears in `indices[0]`.
+  /// Shuffles the [indices]. If the current item in the player falls within the
+  /// [ConcatenatingAudioSource] being shuffled, [initialIndex] will point to
+  /// that item. Subclasses may use this information as a hint, for example, to
+  /// make [initialIndex] the first item in the shuffle order.
   void shuffle({int? initialIndex});
 
   /// Inserts [count] new consecutive indices starting from [index] into
@@ -2309,7 +2319,8 @@ abstract class ShuffleOrder {
   void clear();
 }
 
-/// A default implementation of [ShuffleOrder].
+/// The default implementation of [ShuffleOrder] which shuffles items with the
+/// currently playing item at the head of the order.
 class DefaultShuffleOrder extends ShuffleOrder {
   final _random;
   @override
