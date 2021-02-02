@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.1
+
+- Relax SDK version constraints.
+
 ## 3.0.0-nullsafety.0
 
 - Null safety.
