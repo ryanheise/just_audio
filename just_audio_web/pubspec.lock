@@ -38,7 +38,7 @@ packages:
       name: just_audio_platform_interface
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.0-nullsafety.0"
+    version: "3.0.0-nullsafety.1"
   meta:
     dependency: transitive
     description:
@@ -73,5 +73,5 @@ packages:
     source: hosted
     version: "2.1.0-nullsafety.5"
 sdks:
-  dart: ">=2.12.0-133.7.beta <3.0.0"
+  dart: ">=2.12.0-0 <3.0.0"
   flutter: ">=1.12.13+hotfix.5"
