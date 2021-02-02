@@ -1,3 +1,8 @@
+## 0.7.0-nullsafety.1
+
+* Relax SDK version constraints.
+* Improve shuffle documentation.
+
 ## 0.7.0-nullsafety.0
 
 * Null safety.

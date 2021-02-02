@@ -162,21 +162,21 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.7.0-nullsafety.0"
+    version: "0.7.0-nullsafety.1"
   just_audio_platform_interface:
     dependency: transitive
     description:
       name: just_audio_platform_interface
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.0-nullsafety.0"
+    version: "3.0.0-nullsafety.1"
   just_audio_web:
     dependency: transitive
     description:
       name: just_audio_web
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.3.0-nullsafety.0"
+    version: "0.3.0-nullsafety.1"
   logging:
     dependency: transitive
     description:
@@ -435,5 +435,5 @@ packages:
     source: hosted
     version: "2.2.1"
 sdks:
-  dart: "2.12.0-133.7.beta"
+  dart: ">=2.12.0-29.10.beta <=2.12.0-133.7.beta"
   flutter: ">=1.12.13+hotfix.5"
