@@ -129,7 +129,7 @@ class AudioPlayer {
       (sequence, shuffleIndices, currentIndex, shuffleModeEnabled, loopMode) {
         if (sequence == null) return null;
         if (currentIndex == null) currentIndex = 0;
-        currentIndex = min(sequence.length - 1, max(0, currentIndex));
+        currentIndex = max(min(sequence.length - 1, max(0, currentIndex)), 0);
         return SequenceState(
           sequence,
           currentIndex,
@@ -1310,7 +1310,8 @@ class SequenceState {
       this.shuffleModeEnabled, this.loopMode);
 
   /// The current source in the sequence.
-  IndexedAudioSource get currentSource => sequence[currentIndex];
+  IndexedAudioSource get currentSource =>
+      sequence.isEmpty ? null : sequence[currentIndex];
 
   /// The effective sequence. This is equivalent to [sequence]. If
   /// [shuffleModeEnabled] is true, this is modulated by [shuffleIndices].
