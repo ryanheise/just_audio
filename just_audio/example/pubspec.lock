@@ -221,7 +221,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.6.9"
+    version: "0.6.10"
   just_audio_platform_interface:
     dependency: transitive
     description:
