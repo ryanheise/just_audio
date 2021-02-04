@@ -418,6 +418,41 @@ void runTests() {
     await player.dispose();
   });
 
+  test('sequence-state', () async {
+    final player = AudioPlayer();
+    expect(player.sequenceState, equals(null));
+    final playlist = ConcatenatingAudioSource(
+      children: [
+        AudioSource.uri(
+          Uri.parse("https://bar.bar/foo.mp3"),
+          tag: 'foo',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/bar.mp3"),
+          tag: 'bar',
+        ),
+      ],
+    );
+    await player.setAudioSource(playlist);
+    expect(player.sequenceState?.sequence, equals(playlist.children));
+    expect(player.sequenceState?.currentIndex, equals(0));
+    expect(player.sequenceState?.currentSource, equals(playlist.children[0]));
+    await player.seekToNext();
+    expect(player.sequenceState?.sequence, equals(playlist.children));
+    expect(player.sequenceState?.currentIndex, equals(1));
+    expect(player.sequenceState?.currentSource, equals(playlist.children[1]));
+    await playlist.removeAt(1);
+    expect(player.sequenceState?.sequence, equals(playlist.children));
+    expect(player.sequenceState?.currentIndex, equals(0));
+    expect(player.sequenceState?.currentSource, equals(playlist.children[0]));
+    await playlist.removeAt(0);
+    expect(player.sequenceState?.sequence, equals(playlist.children));
+    // expecting 0 here may change in a future version.
+    expect(player.sequenceState?.currentIndex, equals(0));
+    expect(player.sequenceState?.currentSource, equals(null));
+    await player.dispose();
+  });
+
   test('detect', () async {
     expect(AudioSource.uri(Uri.parse('https://a.a/a.mpd')) is DashAudioSource,
         equals(true));
