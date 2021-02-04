@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -119,28 +118,3 @@ void main() {
     });
   });
 }
-
-//// Imports the Flutter Driver API.
-//import 'package:flutter_driver/flutter_driver.dart';
-//import 'package:test/test.dart';
-//
-//void main() {
-//  group('just_audio example', () {
-//    final playButtonFinder = find.byValueKey('play_button');
-//
-//    FlutterDriver driver;
-//
-//    setUpAll(() async {
-//      driver = await FlutterDriver.connect();
-//    });
-//
-//    tearDownAll(() async {
-//      driver?.close();
-//    });
-//
-//    test('run', () async {
-//      await driver.tap(playButtonFinder);
-//      await Future.delayed(Duration(seconds: 10));
-//    });
-//  });
-//}

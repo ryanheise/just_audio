@@ -233,7 +233,7 @@ void runTests() {
 
   test('speed', () async {
     final player = AudioPlayer();
-    final duration = await player.setUrl('https://foo.foo/foo.mp3');
+    /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
     final period1 = Duration(seconds: 2);
     final period2 = Duration(seconds: 2);
     final speed1 = 0.75;
@@ -253,7 +253,7 @@ void runTests() {
 
   test('positionStream', () async {
     final player = AudioPlayer();
-    final duration = await player.setUrl('https://foo.foo/foo.mp3');
+    /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
     final period = Duration(seconds: 3);
     final position1 = period;
     final position2 = position1 + period;
@@ -299,7 +299,7 @@ void runTests() {
   test('icyMetadata', () async {
     final player = AudioPlayer();
     expect(player.icyMetadata, equals(null));
-    final duration = await player.setUrl('https://foo.foo/foo.mp3');
+    /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
     player.play();
     expect(player.icyMetadata.headers.genre, equals(icyMetadata.headers.genre));
     expect((await player.icyMetadataStream.first).headers.genre,
@@ -865,13 +865,9 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   Duration _updatePosition = Duration.zero;
   DateTime _updateTime = DateTime.now();
   Duration _duration = audioSourceDuration;
-  int _currentIndex;
   int _index;
   var _playing = false;
   var _speed = 1.0;
-  var _volume = 1.0;
-  var _loopMode = LoopModeMessage.off;
-  var _shuffleModeEnabled = false;
   Completer<dynamic> _playCompleter;
   Timer _playTimer;
 
@@ -956,14 +952,12 @@ class MockAudioPlayer implements AudioPlayerPlatform {
 
   @override
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async {
-    _loopMode = request.loopMode;
     return SetLoopModeResponse();
   }
 
   @override
   Future<SetShuffleModeResponse> setShuffleMode(
       SetShuffleModeRequest request) async {
-    _shuffleModeEnabled = request.shuffleMode == ShuffleModeMessage.all;
     return SetShuffleModeResponse();
   }
 
@@ -982,7 +976,6 @@ class MockAudioPlayer implements AudioPlayerPlatform {
 
   @override
   Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async {
-    _volume = request.volume;
     return SetVolumeResponse();
   }
 
