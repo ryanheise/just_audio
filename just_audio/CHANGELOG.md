@@ -7,6 +7,10 @@
 
 * Null safety.
 
+## 0.6.10
+
+* Fix range error in SequenceState (@smkhalsa).
+
 ## 0.6.9
 
 * Support assets on web.

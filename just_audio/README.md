@@ -1,21 +1,15 @@
 # just_audio
 
-A feature-rich audio player for Android, iOS, macOS and web.
-
-* Plays URLs, files, assets, custom byte streams, HLS and DASH.
-* Gapless playlists, looping and shuffling with a customisable shuffle order.
-* Compose complex arrangements of audio through concatenating, looping and clipping.
-* Works with [audio_session](https://pub.dev/packages/audio_session) to handle phonecall and other audio interruptions.
-* Works with [audio_service](https://pub.dev/packages/audio_service) to support background playback and control.
-* Experimental support for caching during playback.
+This Flutter plugin plays audio from URLs, files, assets, radio/live streams, and custom byte streams. Furthermore, it can clip, concatenate, loop, shuffle and compose audio into complex arrangements with gapless playback. This plugin can be used with audio_service to play audio in the background and control playback from the lock screen, media notifications, and headset buttons.
 
 ## Features
 
 | Feature                        | Android   | iOS     | macOS   | Web     |
 | -------                        | :-------: | :-----: | :-----: | :-----: |
 | read from URL                  | ✅        | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      | ✅(*)   |
+| read from file                 | ✅        | ✅      | ✅      | ✅      |
 | read from asset                | ✅        | ✅      | ✅      | ✅      |
+| read from byte stream          | ✅        | ✅      | ✅      | ✅      |
 | request headers                | ✅        | ✅      | ✅      |         |
 | DASH                           | ✅        |         |         |         |
 | HLS                            | ✅        | ✅      | ✅      |         |
@@ -30,7 +24,14 @@ A feature-rich audio player for Android, iOS, macOS and web.
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
 | Handle phonecall interruptions | ✅        | ✅      |         |         |
 
-(*) Direct access to `file://` URLs is not permitted on the web. Instead, use a file picker (e.g. file_picker) to read the bytes and use a `StreamAudioSource` to stream those bytes to the player.
+## Experimental features
+
+| Feature                                                                            | Android   | iOS     | macOS   | Web     |
+| -------                                                                            | :-------: | :-----: | :-----: | :-----: |
+| Simultaneous downloading+caching                                                   | ✅        | ✅      | ✅      |         |
+| Waveform visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97)) | ✅        | ✅      |         |         |
+| FFT visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97))      | ✅        |         |         |         |
+| Null safety (Via `0.7` prerelease)                                                 | ✅        | ✅      | ✅      | ✅      |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -75,6 +76,7 @@ Clipping audio:
 await player.setClip(start: Duration(seconds: 10), end: Duration(seconds: 20));
 await player.play(); // Waits until the clip has finished playing
 ```
+
 Adjusting audio:
 
 ```dart
