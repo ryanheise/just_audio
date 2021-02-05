@@ -1,3 +1,8 @@
+## 0.6.11
+
+* Update example to indicate buffer position.
+* Document pre-release and experimental features in README.
+
 ## 0.6.10
 
 * Fix range error in SequenceState (@smkhalsa).
