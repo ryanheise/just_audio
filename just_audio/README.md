@@ -1,6 +1,14 @@
 # just_audio
 
-This Flutter plugin plays audio from URLs, files, assets, radio/live streams, and custom byte streams. Furthermore, it can clip, concatenate, loop, shuffle and compose audio into complex arrangements with gapless playback. This plugin can be used with audio_service to play audio in the background and control playback from the lock screen, media notifications, and headset buttons.
+just_audio is a feature-rich audio player for Android, iOS, macOS and web.
+
+![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/107045433-9f3d5500-6819-11eb-9188-73940ffbdb47.png)
+
+This plugin does not do _everything_, it "just" plays audio. However, it attempts to do this one job well, leaving other plugins to handle other responsibilities, and thereby allowing you to mix and match your favourite audio plugins in one app. If you want to play audio in the background with a media notification and headset/lockscreen/smartwatch controls, mix in the [audio_service](https://pub.dev/packages/audio_service) plugin. If you want to correctly handle your app's interaction with other audio apps (e.g. navigator or phone call interruptions), mix in the [audio_session](https://pub.dev/packages/audio_session) plugin. If you need an audio recorder or text to speech, you will find many great single-responsibility plugins to choose from.
+
+## Credits
+
+This project continues to improve in quality and features thanks to its many contributors and sponsors in the GitHub community. Thank you!
 
 ## Features
 
