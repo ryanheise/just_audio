@@ -269,7 +269,7 @@ packages:
     source: hosted
     version: "1.4.4"
   rxdart:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: rxdart
       url: "https://pub.dartlang.org"
