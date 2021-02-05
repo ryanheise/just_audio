@@ -8,7 +8,7 @@ This plugin does not do _everything_, it "just" plays audio. However, it attempt
 
 ## Credits
 
-This project continues to improve in quality and features thanks to its many contributors and sponsors in the GitHub community. Thank you!
+This project continues to improve thanks to its many contributors and sponsors in the GitHub community. Thank you!
 
 ## Features
 
@@ -51,8 +51,6 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 * Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);`
 
 ## Example
-
-![just_audio](https://user-images.githubusercontent.com/19899190/89558581-bf369080-d857-11ea-9376-3a5055284bab.png)
 
 Initialisation:
 
