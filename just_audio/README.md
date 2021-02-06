@@ -4,11 +4,18 @@ just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
 ![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/107045433-9f3d5500-6819-11eb-9188-73940ffbdb47.png)
 
-This plugin does not do _everything_, it "just" plays audio. However, it attempts to do this one job well, leaving other plugins to handle other responsibilities, and thereby allowing you to mix and match your favourite audio plugins in one app. If you want to play audio in the background with a media notification and headset/lockscreen/smartwatch controls, mix in the [audio_service](https://pub.dev/packages/audio_service) plugin. If you want to correctly handle your app's interaction with other audio apps (e.g. navigator or phone call interruptions), mix in the [audio_session](https://pub.dev/packages/audio_session) plugin. If you need an audio recorder or text to speech, you will find many great single-responsibility plugins to choose from.
+### Mixing and matching audio plugins
+
+The flutter plugin ecosystem contains a wide variety of useful audio plugins. In order to allow these to work together in a single app, just_audio "just" plays audio. By focusing on a single responsibility, different audio plugins can safely work together without overlapping responsibilities causing runtime conflicts.
+
+Other common audio capabilities are optionally provided by separate plugins:
+
+* [audio_service](https://pub.dev/packages/audio_service): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
 
 ## Credits
 
-This project continues to improve thanks to its many contributors and sponsors in the GitHub community. Thank you!
+This project is supported by the amazing open source community of GitHub contributors and sponsors. Thank you!
 
 ## Features
 
