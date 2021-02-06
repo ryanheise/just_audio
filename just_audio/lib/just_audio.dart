@@ -89,14 +89,26 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
   AndroidAudioAttributes _androidAudioAttributes;
+  bool _androidApplyAudioAttributes;
+  bool _handleAudioSessionActivation;
 
   /// Creates an [AudioPlayer]. The player will automatically pause/duck and
   /// resume/unduck when audio interruptions occur (e.g. a phone call) or when
   /// headphones are unplugged. If you wish to handle audio interruptions
-  /// manually, set [handleInterruptions] to `false` and interface directly
-  /// with the audio session via the
-  /// [audio_session](https://pub.dev/packages/audio_session) package.
-  AudioPlayer({bool handleInterruptions = true}) : _id = _uuid.v4() {
+  /// manually, set [handleInterruptions] to `false` and interface directly with
+  /// the audio session via the
+  /// [audio_session](https://pub.dev/packages/audio_session) package. If you do
+  /// not wish just_audio to automatically activate the audio session when
+  /// playing audio, set [handleAudioSessionActivation] to `false`. If you do
+  /// not want just_audio to respect the global [AndroidAudioAttributes]
+  /// configured by audio_session, set [androidApplyAudioAttributes] to `false`.
+  AudioPlayer({
+    bool handleInterruptions = true,
+    bool androidApplyAudioAttributes = true,
+    bool handleAudioSessionActivation = true,
+  })  : _id = _uuid.v4(),
+        _androidApplyAudioAttributes = androidApplyAudioAttributes,
+        _handleAudioSessionActivation = handleAudioSessionActivation {
     _idlePlatform = _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream);
     _playbackEventSubject.add(_playbackEvent = PlaybackEvent());
     _processingStateSubject.addStream(playbackEventStream
@@ -151,13 +163,15 @@ class AudioPlayer {
     _setPlatformActive(false);
     _sequenceSubject.add(null);
     // Respond to changes to AndroidAudioAttributes configuration.
-    AudioSession.instance.then((audioSession) {
-      audioSession.configurationStream
-          .map((conf) => conf?.androidAudioAttributes)
-          .where((attributes) => attributes != null)
-          .distinct()
-          .listen(setAndroidAudioAttributes);
-    });
+    if (androidApplyAudioAttributes) {
+      AudioSession.instance.then((audioSession) {
+        audioSession.configurationStream
+            .map((conf) => conf?.androidAudioAttributes)
+            .where((attributes) => attributes != null)
+            .distinct()
+            .listen(setAndroidAudioAttributes);
+      });
+    }
     if (handleInterruptions) {
       AudioSession.instance.then((session) {
         session.becomingNoisyEventStream.listen((_) {
@@ -713,7 +727,7 @@ class AudioPlayer {
     _playbackEventSubject.add(_playbackEvent);
     final playCompleter = Completer();
     final audioSession = await AudioSession.instance;
-    if (await audioSession.setActive(true)) {
+    if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
       // TODO: rewrite this to more cleanly handle simultaneous load/play
       // requests which each may result in platform play requests.
       final requireActive = _audioSource != null;
@@ -991,10 +1005,12 @@ class AudioPlayer {
         final playing = this.playing;
         // To avoid a glitch in ExoPlayer, ensure that any requested audio
         // attributes are set before loading the audio source.
-        final audioSession = await AudioSession.instance;
-        if (_androidAudioAttributes == null) {
-          _androidAudioAttributes =
-              audioSession.configuration?.androidAudioAttributes;
+        if (_androidApplyAudioAttributes) {
+          final audioSession = await AudioSession.instance;
+          if (_androidAudioAttributes == null) {
+            _androidAudioAttributes =
+                audioSession.configuration?.androidAudioAttributes;
+          }
         }
         if (_androidAudioAttributes != null) {
           await _internalSetAndroidAudioAttributes(
