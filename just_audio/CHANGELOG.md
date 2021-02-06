@@ -1,3 +1,8 @@
+## 0.6.12
+
+* Fix non-completing seek-to-index bug on iOS/macOS.
+* More options to manage audio_session.
+
 ## 0.6.11
 
 * Update example to indicate buffer position.
