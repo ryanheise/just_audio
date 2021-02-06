@@ -1360,7 +1360,7 @@ class SequenceState {
       this.shuffleModeEnabled, this.loopMode);
 
   /// The current source in the sequence.
-  IndexedAudioSource get currentSource =>
+  IndexedAudioSource? get currentSource =>
       sequence.isEmpty ? null : sequence[currentIndex];
 
   /// The effective sequence. This is equivalent to [sequence]. If

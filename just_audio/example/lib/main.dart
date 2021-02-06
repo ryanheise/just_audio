@@ -103,7 +103,7 @@ class _MyAppState extends State<MyApp> {
                   builder: (context, snapshot) {
                     final state = snapshot.data;
                     if (state?.sequence.isEmpty ?? true) return SizedBox();
-                    final metadata = state!.currentSource.tag as AudioMetadata;
+                    final metadata = state!.currentSource!.tag as AudioMetadata;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -136,12 +136,11 @@ class _MyAppState extends State<MyApp> {
                     builder: (context, snapshot) {
                       final positionData = snapshot.data ??
                           PositionData(Duration.zero, Duration.zero);
-                      var position = positionData.position ?? Duration.zero;
+                      var position = positionData.position;
                       if (position > duration) {
                         position = duration;
                       }
-                      var bufferedPosition =
-                          positionData.bufferedPosition ?? Duration.zero;
+                      var bufferedPosition = positionData.bufferedPosition;
                       if (bufferedPosition > duration) {
                         bufferedPosition = duration;
                       }
@@ -427,12 +426,12 @@ class _SeekBarState extends State<SeekBar> {
                   _dragValue = value;
                 });
                 if (widget.onChanged != null) {
-                  widget.onChanged(Duration(milliseconds: value.round()));
+                  widget.onChanged!(Duration(milliseconds: value.round()));
                 }
               },
               onChangeEnd: (value) {
                 if (widget.onChangeEnd != null) {
-                  widget.onChangeEnd(Duration(milliseconds: value.round()));
+                  widget.onChangeEnd!(Duration(milliseconds: value.round()));
                 }
                 _dragValue = null;
               },
@@ -538,16 +537,16 @@ class HiddenThumbComponentShape extends SliderComponentShape {
   void paint(
     PaintingContext context,
     Offset center, {
-    Animation<double> activationAnimation,
-    Animation<double> enableAnimation,
-    bool isDiscrete,
-    TextPainter labelPainter,
-    RenderBox parentBox,
-    SliderThemeData sliderTheme,
-    TextDirection textDirection,
-    double value,
-    double textScaleFactor,
-    Size sizeWithOverflow,
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
   }) {}
 }
 
