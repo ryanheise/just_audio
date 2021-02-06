@@ -1150,6 +1150,7 @@
                         _player.rate = _speed;
                     }
                 }
+                completionHandler(YES);
             }
         }
     } else {
