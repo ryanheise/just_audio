@@ -4,14 +4,10 @@ just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
 ![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/107045433-9f3d5500-6819-11eb-9188-73940ffbdb47.png)
 
-### Mixing and matching audio plugins
+just_audio is a "single responsibility" audio plugin designed to cooperate with other audio plugins within your app. This helps to avoid potential conflicts between plugins having overlapping responsibilities (such as conflicting audio session settings, or conflicting background services). Some features commonly found in audio apps are provided by separate plugins:
 
-The flutter plugin ecosystem contains a wide variety of useful audio plugins. In order to allow these to work together in a single app, just_audio "just" plays audio. By focusing on a single responsibility, different audio plugins can safely work together without overlapping responsibilities causing runtime conflicts.
-
-Other common audio capabilities are optionally provided by separate plugins:
-
-* [audio_service](https://pub.dev/packages/audio_service): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
-* [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
+* [audio_service](https://pub.dev/packages/audio_service) allows your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [audio_session](https://pub.dev/packages/audio_session) manages how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
 
 ## Credits
 
