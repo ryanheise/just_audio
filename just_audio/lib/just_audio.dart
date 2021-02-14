@@ -2050,14 +2050,32 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
   }
 
+  /// Start downloading the whole audio file to the cache and fulfill byte-range
+  /// requests during the download. There are 3 scenarios:
+  ///
+  /// 1. If the byte range request falls entirely within the cache region, it is
+  /// fulfilled from the cache.
+  /// 2. If the byte range request overlaps the cached region, the first part is
+  /// fulfilled from the cache, and the region beyond the cache is fulfilled
+  /// from a memory buffer of the downloaded data.
+  /// 3. If the byte range request is entirely outside the cached region, a
+  /// separate HTTP request is made to fulfill it while the download of the
+  /// entire file continues in parallel.
   Future<HttpClientResponse> _fetch() async {
+    final cacheFile = await _cacheFile;
+    final partialCacheFile = await _partialCacheFile;
+    final mimeType = await _readCachedMimeType();
+
+    File getEffectiveCacheFile() =>
+        partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
+
     HttpClient httpClient = HttpClient();
-    final request = await httpClient.getUrl(uri);
+    final httpRequest = await httpClient.getUrl(uri);
     if (headers != null) {
-      request.headers.clear();
-      headers.forEach((name, value) => request.headers.set(name, value));
+      httpRequest.headers.clear();
+      headers.forEach((name, value) => httpRequest.headers.set(name, value));
     }
-    final response = await request.close();
+    final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
       throw Exception('HTTP Status Error: ${response.statusCode}');
@@ -2067,28 +2085,92 @@ class LockCachingAudioSource extends StreamAudioSource {
     // ignore: close_sinks
     final sink = (await _partialCacheFile).openWrite();
     var sourceLength = response.contentLength;
+    final inProgressResponses = <_InProgressCacheResponse>[];
     StreamSubscription subscription;
-    subscription = response.listen((data) {
+    //int percentProgress = 0;
+    subscription = response.listen((data) async {
       _progress += data.length;
+      //int newPercentProgress = 100 * _progress ~/ sourceLength;
+      //if (newPercentProgress != percentProgress) {
+      //  percentProgress = newPercentProgress;
+      //  print("### Progress: $percentProgress%");
+      //}
       sink.add(data);
-      final readyRequests = _requests
-          .where((request) => request.end ?? sourceLength <= _progress)
-          .toList();
-      if (readyRequests.isEmpty) return;
-      sink.flush().then((_) async {
-        for (var request in readyRequests) {
-          _requests.remove(request);
-          final start = request.start ?? 0;
-          final end = request.end ?? sourceLength;
+      final readyRequests =
+          _requests.where((request) => (request.start) < _progress).toList();
+      final notReadyRequests =
+          _requests.where((request) => (request.start) >= _progress).toList();
+      // Add this live data to any responses in progress.
+      for (var cacheResponse in inProgressResponses) {
+        if (_progress >= cacheResponse.end) {
+          // We've received enough data to fulfill the byte range request.
+          cacheResponse.controller.add(
+              data.sublist(0, data.length - (_progress - cacheResponse.end)));
+          cacheResponse.controller.close();
+        } else {
+          cacheResponse.controller.add(data);
+        }
+      }
+      if (_requests.isEmpty) return;
+      // Prevent further data coming from the HTTP source until we have set up
+      // an entry in inProgressResponses to continue receiving live HTTP data.
+      subscription.pause();
+      await sink.flush();
+      // Process any requests that start within the cache.
+      for (var request in readyRequests) {
+        _requests.remove(request);
+        final start = request.start ?? 0;
+        final end = request.end ?? sourceLength;
+        Stream<List<int>> responseStream;
+        if (end <= _progress) {
+          responseStream = getEffectiveCacheFile().openRead(start, end);
+        } else {
+          final cacheResponse = _InProgressCacheResponse(end: end);
+          inProgressResponses.add(cacheResponse);
+          responseStream = Rx.concatEager([
+            // NOTE: The cache file part of the stream must not overlap with
+            // the live part. "_progress" should
+            // to the cache file at the time
+            getEffectiveCacheFile().openRead(start, _progress),
+            cacheResponse.controller.stream,
+          ]);
+        }
+        request.complete(StreamAudioResponse(
+          sourceLength: sourceLength,
+          contentLength: end - start,
+          offset: start,
+          contentType: mimeType,
+          stream: responseStream,
+        ));
+      }
+      subscription.resume();
+      // Process any requests that start beyond the cache.
+      for (var request in notReadyRequests) {
+        _requests.remove(request);
+        final start = request.start ?? 0;
+        final end = request.end ?? sourceLength;
+        httpClient.getUrl(uri).then((httpRequest) async {
+          if (headers != null) {
+            httpRequest.headers.clear();
+            headers
+                .forEach((name, value) => httpRequest.headers.set(name, value));
+          }
+          httpRequest.headers
+              .set(HttpHeaders.rangeHeader, 'bytes=$start-${end - 1}');
+          final response = await httpRequest.close();
+          if (response.statusCode != 206) {
+            httpClient.close();
+            throw Exception('HTTP Status Error: ${response.statusCode}');
+          }
           request.complete(StreamAudioResponse(
             sourceLength: sourceLength,
             contentLength: end - start,
             offset: start,
-            contentType: await _readCachedMimeType(),
-            stream: (await _effectiveCacheFile).openRead(start, end),
+            contentType: mimeType,
+            stream: response,
           ));
-        }
-      });
+        });
+      }
     }, onDone: () async {
       (await _partialCacheFile).renameSync((await _cacheFile).path);
       await subscription.cancel();
@@ -2100,9 +2182,6 @@ class LockCachingAudioSource extends StreamAudioSource {
     });
     return response;
   }
-
-  Future<File> get _effectiveCacheFile async =>
-      (await _partialCacheFile).existsSync() ? _partialCacheFile : _cacheFile;
 
   @override
   Future<StreamAudioResponse> request([int start, int end]) async {
@@ -2121,11 +2200,29 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
-    if (_response == null) {
-      _response = _fetch();
-    } else {}
+    _response ??= _fetch();
     return byteRangeRequest.future;
   }
+}
+
+/// When a byte range request on a [LockCachingAudioSource] overlaps partially
+/// with the cache file and partially with the live HTTP stream, the consumer
+/// needs to first consume the cached part before the live part. This class
+/// provides a place to buffer the live part until the consumer reaches it, and
+/// also keeps track of the [end] of the byte range so that the producer knows
+/// when to stop adding data.
+class _InProgressCacheResponse {
+  // NOTE: This isn't necessarily memory efficient. Since the entire audio file
+  // will likely be downloaded at a faster rate than the rate at which the
+  // player is consuming audio data, it is also likely that this buffered data
+  // will never be used.
+  // TODO: Improve this code.
+  // ignore: close_sinks
+  final controller = ReplaySubject<List<int>>();
+  final int end;
+  _InProgressCacheResponse({
+    @required this.end,
+  });
 }
 
 /// Request parameters for a [StreamingAudioSource].
