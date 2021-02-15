@@ -36,6 +36,9 @@ final _uuid = Uuid();
 /// You must call [dispose] to release the resources used by this player,
 /// including any temporary files created to cache assets.
 class AudioPlayer {
+  /// The user agent to set on all HTTP requests.
+  final String _userAgent;
+
   /// This is `true` when the audio player needs to engage the native platform
   /// side of the plugin to decode or play audio, and is `false` when the native
   /// resources are not needed (i.e. after initial instantiation and after [stop]).
@@ -92,21 +95,33 @@ class AudioPlayer {
   bool _androidApplyAudioAttributes;
   bool _handleAudioSessionActivation;
 
-  /// Creates an [AudioPlayer]. The player will automatically pause/duck and
-  /// resume/unduck when audio interruptions occur (e.g. a phone call) or when
-  /// headphones are unplugged. If you wish to handle audio interruptions
-  /// manually, set [handleInterruptions] to `false` and interface directly with
-  /// the audio session via the
-  /// [audio_session](https://pub.dev/packages/audio_session) package. If you do
-  /// not wish just_audio to automatically activate the audio session when
-  /// playing audio, set [handleAudioSessionActivation] to `false`. If you do
-  /// not want just_audio to respect the global [AndroidAudioAttributes]
-  /// configured by audio_session, set [androidApplyAudioAttributes] to `false`.
+  /// Creates an [AudioPlayer].
+  ///
+  /// If [userAgent] is specified, it will be included in the header of all HTTP
+  /// requests on Android, iOS and macOS to identify your agent to the server.
+  /// If set, just_audio will create a cleartext local HTTP proxy on your device
+  /// to forward HTTP requests with headers included. If [userAgent] is not
+  /// specified, this will default to Apple's Core Audio user agent on iOS/macOS
+  /// and to just_audio's own user agent on Android. On Web, the browser will
+  /// override any specified user-agent string with its own.
+  ///
+  /// The player will automatically pause/duck and resume/unduck when audio
+  /// interruptions occur (e.g. a phone call) or when headphones are unplugged.
+  /// If you wish to handle audio interruptions manually, set
+  /// [handleInterruptions] to `false` and interface directly with the audio
+  /// session via the [audio_session](https://pub.dev/packages/audio_session)
+  /// package. If you do not wish just_audio to automatically activate the audio
+  /// session when playing audio, set [handleAudioSessionActivation] to `false`.
+  /// If you do not want just_audio to respect the global
+  /// [AndroidAudioAttributes] configured by audio_session, set
+  /// [androidApplyAudioAttributes] to `false`.
   AudioPlayer({
+    String userAgent,
     bool handleInterruptions = true,
     bool androidApplyAudioAttributes = true,
     bool handleAudioSessionActivation = true,
   })  : _id = _uuid.v4(),
+        _userAgent = userAgent,
         _androidApplyAudioAttributes = androidApplyAudioAttributes,
         _handleAudioSessionActivation = handleAudioSessionActivation {
     _idlePlatform = _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream);
@@ -492,6 +507,8 @@ class AudioPlayer {
 
   /// Convenience method to set the audio source to a URL with optional headers,
   /// preloaded by default, with an initial position of zero by default.
+  /// If headers are set, just_audio will create a cleartext local HTTP proxy on
+  /// your device to forward HTTP requests with headers included.
   ///
   /// This is equivalent to:
   ///
@@ -514,7 +531,7 @@ class AudioPlayer {
   /// default, with an initial position of zero by default.
   ///
   /// ```
-  /// setAudioSource(AudioSource.uri(Uri.file(filePath)), headers: headers,
+  /// setAudioSource(AudioSource.uri(Uri.file(filePath)),
   ///     initialPosition: Duration.zero, preload: true);
   /// ```
   ///
@@ -532,7 +549,7 @@ class AudioPlayer {
   ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
-  ///     headers: headers, initialPosition: Duration.zero, preload: true);
+  ///     initialPosition: Duration.zero, preload: true);
   /// ```
   ///
   /// See [setAudioSource] for a detailed explanation of the options.
@@ -640,7 +657,7 @@ class AudioPlayer {
   Future<Duration> _load(AudioPlayerPlatform platform, AudioSource source,
       {_InitialSeekValues initialSeekValues}) async {
     try {
-      if (!kIsWeb && source._requiresProxy) {
+      if (!kIsWeb && (source._requiresProxy || _userAgent != null)) {
         if (_proxy == null) {
           _proxy = _ProxyHttpServer();
           await _proxy.start();
@@ -1351,7 +1368,13 @@ class _ProxyHttpServer {
   /// called only after [start] has completed.
   Uri addUriAudioSource(UriAudioSource source) {
     final uri = source.uri;
-    final headers = source.headers?.cast<String, String>();
+    final headers = <String, String>{};
+    if (source.headers != null) {
+      headers.addAll(source.headers.cast<String, String>());
+    }
+    if (source._player._userAgent != null) {
+      headers['user-agent'] = source._player._userAgent;
+    }
     final path = _requestKey(uri);
     _handlerMap[path] = _proxyHandlerForUri(uri, headers);
     return uri.replace(
@@ -1461,6 +1484,9 @@ abstract class AudioSource {
   /// stream type on Android. If you know in advance what type of audio stream
   /// it is, you should instantiate [DashAudioSource] or [HlsAudioSource]
   /// directly.
+  ///
+  /// If headers are set, just_audio will create a cleartext local HTTP proxy on
+  /// your device to forward HTTP requests with headers included.
   static AudioSource uri(Uri uri, {Map headers, dynamic tag}) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
@@ -1540,7 +1566,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
     await super._setup(player);
     if (uri.scheme == 'asset') {
       _overrideUri = await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''));
-    } else if (headers != null) {
+    } else if (headers != null || player._userAgent != null) {
       _overrideUri = player._proxy.addUriAudioSource(this);
     }
   }
@@ -1606,6 +1632,9 @@ abstract class UriAudioSource extends IndexedAudioSource {
 ///
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request.
+///
+/// If headers are set, just_audio will create a cleartext local HTTP proxy on
+/// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
   ProgressiveAudioSource(Uri uri, {Map headers, dynamic tag, Duration duration})
       : super(uri, headers: headers, tag: tag, duration: duration);
@@ -1626,6 +1655,9 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request. Currently headers are not recursively applied to items
 /// the HTTP(S) request. Currently headers are not applied recursively.
+///
+/// If headers are set, just_audio will create a cleartext local HTTP proxy on
+/// your device to forward HTTP requests with headers included.
 class DashAudioSource extends UriAudioSource {
   DashAudioSource(Uri uri, {Map headers, dynamic tag, Duration duration})
       : super(uri, headers: headers, tag: tag, duration: duration);
@@ -1645,6 +1677,9 @@ class DashAudioSource extends UriAudioSource {
 ///
 /// On platforms except for the web, the supplied [headers] will be passed with
 /// the HTTP(S) request. Currently headers are not applied recursively.
+///
+/// If headers are set, just_audio will create a cleartext local HTTP proxy on
+/// your device to forward HTTP requests with headers included.
 class HlsAudioSource extends UriAudioSource {
   HlsAudioSource(Uri uri, {Map headers, dynamic tag, Duration duration})
       : super(uri, headers: headers, tag: tag, duration: duration);
@@ -2015,6 +2050,12 @@ class LockCachingAudioSource extends StreamAudioSource {
   int _progress = 0;
   final _requests = <_StreamingByteRangeRequest>[];
 
+  /// Creates a [LockCachingAudioSource] to that provides [uri] to the player
+  /// while simultaneously caching it to [cacheFile]. If no cache file is
+  /// supplied, just_audio will allocate a cache file internally.
+  ///
+  /// If headers are set, just_audio will create a cleartext local HTTP proxy on
+  /// your device to forward HTTP requests with headers included.
   LockCachingAudioSource(
     this.uri, {
     this.headers,
