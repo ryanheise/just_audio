@@ -305,7 +305,7 @@
             @"bufferedPosition": @((long long)1000 * [self getBufferedPosition]),
             // TODO: Icy Metadata
             @"icyMetadata": (id)[NSNull null],
-            @"duration": @((long long)1000 * [self getDuration]),
+            @"duration": @([self getDurationMicroseconds]),
             @"currentIndex": @(_index),
     });
 }
@@ -345,6 +345,11 @@
     } else {
         return 0;
     }
+}
+
+- (long long)getDurationMicroseconds {
+    int duration = [self getDuration];
+    return duration < 0 ? -1 : ((long long)1000 * duration);
 }
 
 - (void)removeItemObservers:(AVPlayerItem *)playerItem {
@@ -597,7 +602,7 @@
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
-        _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
+        _loadResult(@{@"duration": @([self getDurationMicroseconds])});
         _loadResult = nil;
     } else {
         // We send result after the playerItem is ready in observeValueForKeyPath.
@@ -718,7 +723,7 @@
                 }
                 [self broadcastPlaybackEvent];
                 if (_loadResult) {
-                    _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
+                    _loadResult(@{@"duration": @([self getDurationMicroseconds])});
                     _loadResult = nil;
                 }
                 if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {
