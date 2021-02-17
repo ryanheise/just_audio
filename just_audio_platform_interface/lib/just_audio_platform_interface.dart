@@ -68,6 +68,10 @@ abstract class AudioPlayerPlatform {
         'playbackEventMessageStream has not been implemented.');
   }
 
+  /// A stream of data updates.
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      Stream<PlayerDataMessage>.empty();
+
   /// Loads an audio source.
   Future<LoadResponse> load(LoadRequest request) {
     throw UnimplementedError("load() has not been implemented.");
@@ -159,6 +163,37 @@ abstract class AudioPlayerPlatform {
   }
 }
 
+/// A data update communicated from the platform implementation to the Flutter
+/// plugin.
+class PlayerDataMessage {
+  final AudioSourceMessage audioSource;
+  final double volume;
+  final double speed;
+  final LoopModeMessage loopMode;
+  final ShuffleModeMessage shuffleMode;
+
+  PlayerDataMessage({
+    this.audioSource,
+    this.volume,
+    this.speed,
+    this.loopMode,
+    this.shuffleMode,
+  });
+
+  static PlayerDataMessage fromMap(Map<dynamic, dynamic> map) =>
+      PlayerDataMessage(
+        audioSource: AudioSourceMessage.fromMap(map['audioSource']),
+        volume: map['volume'],
+        speed: map['speed'],
+        loopMode: map['loopMode'] != null
+            ? LoopModeMessage.values[map['loopMode']]
+            : null,
+        shuffleMode: map['shuffleMode'] != null
+            ? ShuffleModeMessage.values[map['shuffleMode']]
+            : null,
+      );
+}
+
 /// A playback event communicated from the platform implementation to the
 /// Flutter plugin.
 class PlaybackEventMessage {
@@ -171,6 +206,10 @@ class PlaybackEventMessage {
   final int currentIndex;
   final int androidAudioSessionId;
 
+  // TODO: Should this be moved to PlayerDataMessage?
+  /// If not null, triggers a state change in the main plugin.
+  final bool playing;
+
   PlaybackEventMessage({
     @required this.processingState,
     @required this.updateTime,
@@ -180,6 +219,7 @@ class PlaybackEventMessage {
     @required this.icyMetadata,
     @required this.currentIndex,
     @required this.androidAudioSessionId,
+    this.playing,
   });
 
   static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
@@ -196,6 +236,7 @@ class PlaybackEventMessage {
             : IcyMetadataMessage.fromMap(map['icyMetadata']),
         currentIndex: map['currentIndex'],
         androidAudioSessionId: map['androidAudioSessionId'],
+        playing: map['playing'],
       );
 }
 
@@ -632,12 +673,65 @@ abstract class AudioSourceMessage {
   AudioSourceMessage({@required this.id});
 
   Map<dynamic, dynamic> toMap();
+
+  static AudioSourceMessage fromMap(Map<dynamic, dynamic> map) {
+    if (map == null) return null;
+    switch (map['type']) {
+      case 'progressive':
+        return ProgressiveAudioSourceMessage(
+          id: map['id'],
+          uri: map['uri'],
+          headers: map['headers'],
+        );
+      case 'dash':
+        return DashAudioSourceMessage(
+          id: map['id'],
+          uri: map['uri'],
+          headers: map['headers'],
+        );
+      case 'hls':
+        return HlsAudioSourceMessage(
+          id: map['id'],
+          uri: map['uri'],
+          headers: map['headers'],
+        );
+      case 'concatenating':
+        final children = (map['children'] as List)
+            .cast<Map>()
+            .map<AudioSourceMessage>(AudioSourceMessage.fromMap)
+            .toList();
+        return ConcatenatingAudioSourceMessage(
+          id: map['id'],
+          children: children,
+          useLazyPreparation: map['useLazyPreparation'],
+          shuffleOrder: map['shuffleOrder'].cast<int>(),
+        );
+      case 'clipping':
+        return ClippingAudioSourceMessage(
+          id: map['id'],
+          child: AudioSourceMessage.fromMap(map['child']),
+          start: Duration(microseconds: map['start']),
+          end: Duration(microseconds: map['end']),
+        );
+      case 'looping':
+        return LoopingAudioSourceMessage(
+          id: map['id'],
+          child: AudioSourceMessage.fromMap(map['child']),
+          count: map['count'],
+        );
+      default:
+        throw Exception('Invalid audio source type: ${map['type']}');
+    }
+  }
 }
 
 /// Information about an indexed audio source to be communicated with the
 /// platform implementation.
 abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
-  IndexedAudioSourceMessage({@required String id}) : super(id: id);
+  /// Since the tag type is unknown, this can only be used by platform
+  /// implementations that pass by value.
+  final dynamic tag;
+  IndexedAudioSourceMessage({@required String id, this.tag}) : super(id: id);
 }
 
 /// Information about a URI audio source to be communicated with the platform
@@ -650,7 +744,8 @@ abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
     @required String id,
     @required this.uri,
     @required this.headers,
-  }) : super(id: id);
+    dynamic tag,
+  }) : super(id: id, tag: tag);
 }
 
 /// Information about a progressive audio source to be communicated with the
@@ -660,7 +755,8 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
     @required String id,
     @required String uri,
     @required Map<dynamic, dynamic> headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => {
@@ -678,7 +774,8 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
     @required String id,
     @required String uri,
     @required Map<dynamic, dynamic> headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => {
@@ -696,7 +793,8 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
     @required String id,
     @required String uri,
     @required Map<dynamic, dynamic> headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => {
@@ -743,7 +841,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
     @required this.child,
     @required this.start,
     @required this.end,
-  }) : super(id: id);
+    dynamic tag,
+  }) : super(id: id, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => {

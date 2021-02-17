@@ -1,0 +1,27 @@
+name: just_audio_background
+description: Background implementation of just_audio
+homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_background
+version: 0.0.1
+
+# flutter:
+#   plugin:
+#     platforms:
+#       # web:
+#       #   pluginClass: JustAudioBackgroundPlugin
+#       #   fileName: just_audio_background_plugin.dart
+
+dependencies:
+  #just_audio_platform_interface: ^2.0.0
+  just_audio_platform_interface:
+    path: ../just_audio_platform_interface
+  audio_service: ^0.16.2
+  audio_session: ^0.0.11
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  meta: ^1.1.8
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+  flutter: ">=1.12.13+hotfix.5"

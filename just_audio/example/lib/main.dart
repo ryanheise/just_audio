@@ -1,10 +1,12 @@
 import 'dart:math';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:rxdart/rxdart.dart';
 
 void main() => runApp(MyApp());
@@ -15,6 +17,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  static int _nextMediaId = 0;
   AudioPlayer _player;
   ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
     ClippingAudioSource(
@@ -22,38 +25,42 @@ class _MyAppState extends State<MyApp> {
       end: Duration(seconds: 90),
       child: AudioSource.uri(Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
-      tag: AudioMetadata(
+      tag: MediaItem(
+        id: '${_nextMediaId++}',
         album: "Science Friday",
         title: "A Salute To Head-Scratching Science (30 seconds)",
-        artwork:
+        artUri:
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
     AudioSource.uri(
       Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
-      tag: AudioMetadata(
+      tag: MediaItem(
+        id: '${_nextMediaId++}',
         album: "Science Friday",
         title: "A Salute To Head-Scratching Science",
-        artwork:
+        artUri:
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
     AudioSource.uri(
       Uri.parse("https://s3.amazonaws.com/scifri-segments/scifri201711241.mp3"),
-      tag: AudioMetadata(
+      tag: MediaItem(
+        id: '${_nextMediaId++}',
         album: "Science Friday",
         title: "From Cat Rheology To Operatic Incompetence",
-        artwork:
+        artUri:
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
     AudioSource.uri(
       Uri.parse("asset:///audio/nature.mp3"),
-      tag: AudioMetadata(
+      tag: MediaItem(
+        id: '${_nextMediaId++}',
         album: "Public Domain",
         title: "Nature Sounds",
-        artwork:
+        artUri:
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
@@ -63,6 +70,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    JustAudioBackground.init();
     _player = AudioPlayer();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.black,
@@ -73,11 +81,21 @@ class _MyAppState extends State<MyApp> {
   _init() async {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
-    try {
-      await _player.setAudioSource(_playlist);
-    } catch (e) {
-      // catch load errors: 404, invalid url ...
-      print("An error occured $e");
+    if (await JustAudioBackground.running) {
+      // If the player is already running in the background, load its state into
+      // the current isolate.
+      _player.load();
+    } else {
+      // If nothing is already running, initialise the player.
+      try {
+        await _player.setAudioSource(_playlist);
+      } catch (e) {
+        // catch load errors: 404, invalid url ...
+        print("An error occured $e");
+        if (e is PlayerException) {
+          print(e.stackTrace);
+        }
+      }
     }
   }
 
@@ -91,187 +109,192 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(
-                child: StreamBuilder<SequenceState>(
-                  stream: _player.sequenceStateStream,
-                  builder: (context, snapshot) {
-                    final state = snapshot.data;
-                    if (state?.sequence?.isEmpty ?? true) return SizedBox();
-                    final metadata = state.currentSource.tag as AudioMetadata;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child:
-                                Center(child: Image.network(metadata.artwork)),
+      home: AudioServiceWidget(
+        child: Scaffold(
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: StreamBuilder<SequenceState>(
+                    stream: _player.sequenceStateStream,
+                    builder: (context, snapshot) {
+                      final state = snapshot.data;
+                      if (state?.sequence?.isEmpty ?? true) return SizedBox();
+                      final metadata = state.currentSource.tag as MediaItem;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child:
+                                  Center(child: Image.network(metadata.artUri)),
+                            ),
                           ),
-                        ),
-                        Text(metadata.album ?? '',
-                            style: Theme.of(context).textTheme.headline6),
-                        Text(metadata.title ?? ''),
-                      ],
-                    );
-                  },
+                          Text(metadata.album ?? '',
+                              style: Theme.of(context).textTheme.headline6),
+                          Text(metadata.title ?? ''),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-              ControlButtons(_player),
-              StreamBuilder<Duration>(
-                stream: _player.durationStream,
-                builder: (context, snapshot) {
-                  final duration = snapshot.data ?? Duration.zero;
-                  return StreamBuilder<PositionData>(
-                    stream: Rx.combineLatest2<Duration, Duration, PositionData>(
-                        _player.positionStream,
-                        _player.bufferedPositionStream,
-                        (position, bufferedPosition) =>
-                            PositionData(position, bufferedPosition)),
-                    builder: (context, snapshot) {
-                      final positionData = snapshot.data ??
-                          PositionData(Duration.zero, Duration.zero);
-                      var position = positionData.position ?? Duration.zero;
-                      if (position > duration) {
-                        position = duration;
-                      }
-                      var bufferedPosition =
-                          positionData.bufferedPosition ?? Duration.zero;
-                      if (bufferedPosition > duration) {
-                        bufferedPosition = duration;
-                      }
-                      return SeekBar(
-                        duration: duration,
-                        position: position,
-                        bufferedPosition: bufferedPosition,
-                        onChangeEnd: (newPosition) {
-                          _player.seek(newPosition);
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-              SizedBox(height: 8.0),
-              Row(
-                children: [
-                  StreamBuilder<LoopMode>(
-                    stream: _player.loopModeStream,
-                    builder: (context, snapshot) {
-                      final loopMode = snapshot.data ?? LoopMode.off;
-                      const icons = [
-                        Icon(Icons.repeat, color: Colors.grey),
-                        Icon(Icons.repeat, color: Colors.orange),
-                        Icon(Icons.repeat_one, color: Colors.orange),
-                      ];
-                      const cycleModes = [
-                        LoopMode.off,
-                        LoopMode.all,
-                        LoopMode.one,
-                      ];
-                      final index = cycleModes.indexOf(loopMode);
-                      return IconButton(
-                        icon: icons[index],
-                        onPressed: () {
-                          _player.setLoopMode(cycleModes[
-                              (cycleModes.indexOf(loopMode) + 1) %
-                                  cycleModes.length]);
-                        },
-                      );
-                    },
-                  ),
-                  Expanded(
-                    child: Text(
-                      "Playlist",
-                      style: Theme.of(context).textTheme.headline6,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  StreamBuilder<bool>(
-                    stream: _player.shuffleModeEnabledStream,
-                    builder: (context, snapshot) {
-                      final shuffleModeEnabled = snapshot.data ?? false;
-                      return IconButton(
-                        icon: shuffleModeEnabled
-                            ? Icon(Icons.shuffle, color: Colors.orange)
-                            : Icon(Icons.shuffle, color: Colors.grey),
-                        onPressed: () async {
-                          final enable = !shuffleModeEnabled;
-                          if (enable) {
-                            await _player.shuffle();
-                          }
-                          await _player.setShuffleModeEnabled(enable);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-              Container(
-                height: 240.0,
-                child: StreamBuilder<SequenceState>(
-                  stream: _player.sequenceStateStream,
+                ControlButtons(_player),
+                StreamBuilder<Duration>(
+                  stream: _player.durationStream,
                   builder: (context, snapshot) {
-                    final state = snapshot.data;
-                    final sequence = state?.sequence ?? [];
-                    return ReorderableListView(
-                      onReorder: (int oldIndex, int newIndex) {
-                        if (oldIndex < newIndex) newIndex--;
-                        _playlist.move(oldIndex, newIndex);
+                    final duration = snapshot.data ?? Duration.zero;
+                    return StreamBuilder<PositionData>(
+                      stream:
+                          Rx.combineLatest2<Duration, Duration, PositionData>(
+                              _player.positionStream,
+                              _player.bufferedPositionStream,
+                              (position, bufferedPosition) =>
+                                  PositionData(position, bufferedPosition)),
+                      builder: (context, snapshot) {
+                        final positionData = snapshot.data ??
+                            PositionData(Duration.zero, Duration.zero);
+                        var position = positionData.position ?? Duration.zero;
+                        if (position > duration) {
+                          position = duration;
+                        }
+                        var bufferedPosition =
+                            positionData.bufferedPosition ?? Duration.zero;
+                        if (bufferedPosition > duration) {
+                          bufferedPosition = duration;
+                        }
+                        return SeekBar(
+                          duration: duration,
+                          position: position,
+                          bufferedPosition: bufferedPosition,
+                          onChangeEnd: (newPosition) {
+                            _player.seek(newPosition);
+                          },
+                        );
                       },
-                      children: [
-                        for (var i = 0; i < sequence.length; i++)
-                          Dismissible(
-                            key: ValueKey(sequence[i]),
-                            background: Container(
-                              color: Colors.redAccent,
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: Icon(Icons.delete, color: Colors.white),
-                              ),
-                            ),
-                            onDismissed: (dismissDirection) {
-                              _playlist.removeAt(i);
-                            },
-                            child: Material(
-                              color: i == state.currentIndex
-                                  ? Colors.grey.shade300
-                                  : null,
-                              child: ListTile(
-                                title: Text(sequence[i].tag.title),
-                                onTap: () {
-                                  _player.seek(Duration.zero, index: i);
-                                },
-                              ),
-                            ),
-                          ),
-                      ],
                     );
                   },
                 ),
-              ),
-            ],
+                SizedBox(height: 8.0),
+                Row(
+                  children: [
+                    StreamBuilder<LoopMode>(
+                      stream: _player.loopModeStream,
+                      builder: (context, snapshot) {
+                        final loopMode = snapshot.data ?? LoopMode.off;
+                        const icons = [
+                          Icon(Icons.repeat, color: Colors.grey),
+                          Icon(Icons.repeat, color: Colors.orange),
+                          Icon(Icons.repeat_one, color: Colors.orange),
+                        ];
+                        const cycleModes = [
+                          LoopMode.off,
+                          LoopMode.all,
+                          LoopMode.one,
+                        ];
+                        final index = cycleModes.indexOf(loopMode);
+                        return IconButton(
+                          icon: icons[index],
+                          onPressed: () {
+                            _player.setLoopMode(cycleModes[
+                                (cycleModes.indexOf(loopMode) + 1) %
+                                    cycleModes.length]);
+                          },
+                        );
+                      },
+                    ),
+                    Expanded(
+                      child: Text(
+                        "Playlist",
+                        style: Theme.of(context).textTheme.headline6,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    StreamBuilder<bool>(
+                      stream: _player.shuffleModeEnabledStream,
+                      builder: (context, snapshot) {
+                        final shuffleModeEnabled = snapshot.data ?? false;
+                        return IconButton(
+                          icon: shuffleModeEnabled
+                              ? Icon(Icons.shuffle, color: Colors.orange)
+                              : Icon(Icons.shuffle, color: Colors.grey),
+                          onPressed: () async {
+                            final enable = !shuffleModeEnabled;
+                            if (enable) {
+                              await _player.shuffle();
+                            }
+                            await _player.setShuffleModeEnabled(enable);
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                Container(
+                  height: 240.0,
+                  child: StreamBuilder<SequenceState>(
+                    stream: _player.sequenceStateStream,
+                    builder: (context, snapshot) {
+                      final state = snapshot.data;
+                      final sequence = state?.sequence ?? [];
+                      return ReorderableListView(
+                        onReorder: (int oldIndex, int newIndex) {
+                          if (oldIndex < newIndex) newIndex--;
+                          _playlist.move(oldIndex, newIndex);
+                        },
+                        children: [
+                          for (var i = 0; i < sequence.length; i++)
+                            Dismissible(
+                              key: ValueKey(sequence[i]),
+                              background: Container(
+                                color: Colors.redAccent,
+                                alignment: Alignment.centerRight,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child:
+                                      Icon(Icons.delete, color: Colors.white),
+                                ),
+                              ),
+                              onDismissed: (dismissDirection) {
+                                _playlist.removeAt(i);
+                              },
+                              child: Material(
+                                color: i == state.currentIndex
+                                    ? Colors.grey.shade300
+                                    : null,
+                                child: ListTile(
+                                  title: Text(sequence[i].tag.title),
+                                  onTap: () {
+                                    _player.seek(Duration.zero, index: i);
+                                  },
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          child: Icon(Icons.add),
-          onPressed: () {
-            _playlist.add(AudioSource.uri(
-              Uri.parse("asset:///audio/nature.mp3"),
-              tag: AudioMetadata(
-                album: "Public Domain",
-                title: "Nature Sounds ${++_addedCount}",
-                artwork:
-                    "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-              ),
-            ));
-          },
+          floatingActionButton: FloatingActionButton(
+            child: Icon(Icons.add),
+            onPressed: () {
+              _playlist.add(AudioSource.uri(
+                Uri.parse("asset:///audio/nature.mp3"),
+                tag: MediaItem(
+                  id: '${_nextMediaId++}',
+                  album: "Public Domain",
+                  title: "Nature Sounds ${++_addedCount}",
+                  artUri:
+                      "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+                ),
+              ));
+            },
+          ),
         ),
       ),
     );
@@ -519,14 +542,6 @@ _showSliderDialog({
       ),
     ),
   );
-}
-
-class AudioMetadata {
-  final String album;
-  final String title;
-  final String artwork;
-
-  AudioMetadata({this.album, this.title, this.artwork});
 }
 
 class HiddenThumbComponentShape extends SliderComponentShape {

@@ -12,6 +12,9 @@ dependencies:
   rxdart: ">= 0.24.1 < 0.26.0"
   just_audio:
     path: ../
+  just_audio_background:
+    path: ../../just_audio_background
+  audio_service: ^0.16.2
 
 dev_dependencies:
   flutter_driver:
