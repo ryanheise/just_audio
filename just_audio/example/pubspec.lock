@@ -214,14 +214,14 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.6.12"
+    version: "0.6.13"
   just_audio_platform_interface:
     dependency: transitive
     description:
       name: just_audio_platform_interface
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.0.0"
+    version: "2.0.1"
   just_audio_web:
     dependency: transitive
     description:
