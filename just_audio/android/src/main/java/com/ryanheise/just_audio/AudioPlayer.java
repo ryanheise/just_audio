@@ -134,7 +134,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         handler.post(bufferWatcher);
     }
 
-    @Override
     public void onAudioSessionId(int audioSessionId) {
         if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) {
             this.audioSessionId = null;
@@ -215,7 +214,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 prepareResult.success(response);
                 prepareResult = null;
                 if (pendingAudioAttributes != null) {
-                    player.setAudioAttributes(pendingAudioAttributes);
+                    player.setAudioAttributes(pendingAudioAttributes, false);
                     pendingAudioAttributes = null;
                 }
             } else {
@@ -549,7 +548,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             // avoid an ExoPlayer glitch.
             pendingAudioAttributes = audioAttributes;
         } else {
-            player.setAudioAttributes(audioAttributes);
+            player.setAudioAttributes(audioAttributes, false);
         }
     }
 
