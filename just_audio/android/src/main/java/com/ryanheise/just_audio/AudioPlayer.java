@@ -134,7 +134,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         handler.post(bufferWatcher);
     }
 
-    public void onAudioSessionId(int audioSessionId) {
+    @Override
+    public void onAudioSessionIdChanged(int audioSessionId) {
         if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) {
             this.audioSessionId = null;
         } else {
