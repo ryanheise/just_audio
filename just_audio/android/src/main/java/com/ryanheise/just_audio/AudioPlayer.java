@@ -141,6 +141,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } else {
             this.audioSessionId = audioSessionId;
         }
+        broadcastPlaybackEvent();
     }
 
     @Override
@@ -530,6 +531,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void ensurePlayerInitialized() {
         if (player == null) {
             player = new SimpleExoPlayer.Builder(context).build();
+            onAudioSessionIdChanged(player.getAudioSessionId());
             player.addMetadataOutput(this);
             player.addListener(this);
             player.addAudioListener(this);
