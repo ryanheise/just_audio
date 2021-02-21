@@ -1,7 +1,7 @@
 #import <Flutter/Flutter.h>
 #import <AVFoundation/AVFoundation.h>
 
-@interface AudioPlayer : NSObject
+@interface AudioPlayer : NSObject<FlutterStreamHandler, AVPlayerItemMetadataOutputPushDelegate>
 
 @property (readonly, nonatomic) AVQueuePlayer *player;
 @property (readonly, nonatomic) float speed;

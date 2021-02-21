@@ -1,6 +1,6 @@
 name: just_audio
-description: Audio player for files, assets, URLs and DASH/HLS streams supporting gapless looping, shuffling, concatenating, clipping. Works with audio_service to play audio in the background.
-version: 0.6.9
+description: A feature-rich audio player for Flutter. Loop, clip and concatenate any sound from any source (asset/file/URL/stream) in a variety of audio formats with gapless playback.
+version: 0.6.13
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio
 
 environment:
@@ -8,19 +8,19 @@ environment:
   flutter: ">=1.12.13+hotfix.5"
 
 dependencies:
-  # just_audio_platform_interface: ^2.0.0
+  # just_audio_platform_interface: ^2.0.1
   just_audio_platform_interface:
     path: ../just_audio_platform_interface
   # just_audio_web: ^0.2.3
   just_audio_web:
     path: ../just_audio_web
-  audio_session: ^0.0.10
+  audio_session: ^0.0.11
   rxdart: ">= 0.24.1 < 0.26.0"
   path: ^1.6.4
   path_provider: ^1.6.10
   async: ^2.4.0
   uuid: ^2.2.0
-  crypto: ^2.1.5
+  crypto: ">= 2.1.5 < 4.0.0"
   meta: ^1.2.4
   flutter:
     sdk: flutter

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:rxdart/rxdart.dart';
 
 void main() => runApp(MyApp());
 
@@ -18,12 +19,12 @@ class _MyAppState extends State<MyApp> {
   ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
     ClippingAudioSource(
       start: Duration(seconds: 60),
-      end: Duration(seconds: 65),
+      end: Duration(seconds: 90),
       child: AudioSource.uri(Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
       tag: AudioMetadata(
         album: "Science Friday",
-        title: "A Salute To Head-Scratching Science (5 seconds)",
+        title: "A Salute To Head-Scratching Science (30 seconds)",
         artwork:
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
@@ -150,16 +151,28 @@ class _MyAppState extends State<MyApp> {
                 stream: _player.durationStream,
                 builder: (context, snapshot) {
                   final duration = snapshot.data ?? Duration.zero;
-                  return StreamBuilder<Duration>(
-                    stream: _player.positionStream,
+                  return StreamBuilder<PositionData>(
+                    stream: Rx.combineLatest2<Duration, Duration, PositionData>(
+                        _player.positionStream,
+                        _player.bufferedPositionStream,
+                        (position, bufferedPosition) =>
+                            PositionData(position, bufferedPosition)),
                     builder: (context, snapshot) {
-                      var position = snapshot.data ?? Duration.zero;
+                      final positionData = snapshot.data ??
+                          PositionData(Duration.zero, Duration.zero);
+                      var position = positionData.position ?? Duration.zero;
                       if (position > duration) {
                         position = duration;
+                      }
+                      var bufferedPosition =
+                          positionData.bufferedPosition ?? Duration.zero;
+                      if (bufferedPosition > duration) {
+                        bufferedPosition = duration;
                       }
                       return SeekBar(
                         duration: duration,
                         position: position,
+                        bufferedPosition: bufferedPosition,
                         onChangeEnd: (newPosition) {
                           _player.seek(newPosition);
                         },
@@ -442,12 +455,14 @@ class ControlButtons extends StatelessWidget {
 class SeekBar extends StatefulWidget {
   final Duration duration;
   final Duration position;
+  final Duration bufferedPosition;
   final ValueChanged<Duration> onChanged;
   final ValueChanged<Duration> onChangeEnd;
 
   SeekBar({
     @required this.duration,
     @required this.position,
+    @required this.bufferedPosition,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -458,30 +473,73 @@ class SeekBar extends StatefulWidget {
 
 class _SeekBarState extends State<SeekBar> {
   double _dragValue;
+  SliderThemeData _sliderThemeData;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _sliderThemeData = SliderTheme.of(context).copyWith(
+      trackHeight: 2.0,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Slider(
-          min: 0.0,
-          max: widget.duration.inMilliseconds.toDouble(),
-          value: min(_dragValue ?? widget.position.inMilliseconds.toDouble(),
-              widget.duration.inMilliseconds.toDouble()),
-          onChanged: (value) {
-            setState(() {
-              _dragValue = value;
-            });
-            if (widget.onChanged != null) {
-              widget.onChanged(Duration(milliseconds: value.round()));
-            }
-          },
-          onChangeEnd: (value) {
-            if (widget.onChangeEnd != null) {
-              widget.onChangeEnd(Duration(milliseconds: value.round()));
-            }
-            _dragValue = null;
-          },
+        SliderTheme(
+          data: _sliderThemeData.copyWith(
+            thumbShape: HiddenThumbComponentShape(),
+            activeTrackColor: Colors.blue.shade100,
+            inactiveTrackColor: Colors.grey.shade300,
+          ),
+          child: ExcludeSemantics(
+            child: Slider(
+              min: 0.0,
+              max: widget.duration.inMilliseconds.toDouble(),
+              value: widget.bufferedPosition.inMilliseconds.toDouble(),
+              onChanged: (value) {
+                setState(() {
+                  _dragValue = value;
+                });
+                if (widget.onChanged != null) {
+                  widget.onChanged(Duration(milliseconds: value.round()));
+                }
+              },
+              onChangeEnd: (value) {
+                if (widget.onChangeEnd != null) {
+                  widget.onChangeEnd(Duration(milliseconds: value.round()));
+                }
+                _dragValue = null;
+              },
+            ),
+          ),
+        ),
+        SliderTheme(
+          data: _sliderThemeData.copyWith(
+            inactiveTrackColor: Colors.transparent,
+          ),
+          child: Slider(
+            min: 0.0,
+            max: widget.duration.inMilliseconds.toDouble(),
+            value: min(_dragValue ?? widget.position.inMilliseconds.toDouble(),
+                widget.duration.inMilliseconds.toDouble()),
+            onChanged: (value) {
+              setState(() {
+                _dragValue = value;
+              });
+              if (widget.onChanged != null) {
+                widget.onChanged(Duration(milliseconds: value.round()));
+              }
+            },
+            onChangeEnd: (value) {
+              if (widget.onChangeEnd != null) {
+                widget.onChangeEnd(Duration(milliseconds: value.round()));
+              }
+              _dragValue = null;
+            },
+          ),
         ),
         Positioned(
           right: 16.0,
@@ -546,4 +604,32 @@ class AudioMetadata {
   final String artwork;
 
   AudioMetadata({this.album, this.title, this.artwork});
+}
+
+class HiddenThumbComponentShape extends SliderComponentShape {
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) => Size.zero;
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    Animation<double> activationAnimation,
+    Animation<double> enableAnimation,
+    bool isDiscrete,
+    TextPainter labelPainter,
+    RenderBox parentBox,
+    SliderThemeData sliderTheme,
+    TextDirection textDirection,
+    double value,
+    double textScaleFactor,
+    Size sizeWithOverflow,
+  }) {}
+}
+
+class PositionData {
+  final Duration position;
+  final Duration bufferedPosition;
+
+  PositionData(this.position, this.bufferedPosition);
 }

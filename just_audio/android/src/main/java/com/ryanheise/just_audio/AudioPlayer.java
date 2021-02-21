@@ -173,7 +173,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     @Override
-    public void onAudioSessionId(int audioSessionId) {
+    public void onAudioSessionIdChanged(int audioSessionId) {
         if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) {
             this.audioSessionId = null;
         } else {
@@ -254,7 +254,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 prepareResult.success(response);
                 prepareResult = null;
                 if (pendingAudioAttributes != null) {
-                    player.setAudioAttributes(pendingAudioAttributes);
+                    player.setAudioAttributes(pendingAudioAttributes, false);
                     pendingAudioAttributes = null;
                 }
             } else {
@@ -607,6 +607,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void ensurePlayerInitialized() {
         if (player == null) {
             player = new SimpleExoPlayer.Builder(context).build();
+            int audioSessionId = player.getAudioSessionId();
+            if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+                visualizer.onAudioSessionId(audioSessionId);
+            }
             player.addMetadataOutput(this);
             player.addListener(this);
             player.addAudioListener(this);
@@ -626,7 +630,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             // avoid an ExoPlayer glitch.
             pendingAudioAttributes = audioAttributes;
         } else {
-            player.setAudioAttributes(audioAttributes);
+            player.setAudioAttributes(audioAttributes, false);
         }
     }
 

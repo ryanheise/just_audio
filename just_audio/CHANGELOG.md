@@ -1,3 +1,23 @@
+## 0.6.13
+
+* Add userAgent parameter to AudioPlayer constructor.
+* Support seeks during download in LockCachingAudioSource.
+* Fix negative duration bug on iOS/macOS.
+
+## 0.6.12
+
+* Fix non-completing seek-to-index bug on iOS/macOS.
+* More options to manage audio_session.
+
+## 0.6.11
+
+* Update example to indicate buffer position.
+* Document pre-release and experimental features in README.
+
+## 0.6.10
+
+* Fix range error in SequenceState (@smkhalsa).
+
 ## 0.6.9
 
 * Support assets on web.

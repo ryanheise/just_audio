@@ -1,21 +1,41 @@
 # just_audio
 
-A feature-rich audio player for Android, iOS, macOS and web.
+just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
-* Plays URLs, files, assets, custom byte streams, HLS and DASH.
-* Gapless playlists, looping and shuffling with a customisable shuffle order.
-* Compose complex arrangements of audio through concatenating, looping and clipping.
-* Works with [audio_session](https://pub.dev/packages/audio_session) to handle phonecall and other audio interruptions.
-* Works with [audio_service](https://pub.dev/packages/audio_service) to support background playback and control.
-* Experimental support for caching during playback.
+![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/107045433-9f3d5500-6819-11eb-9188-73940ffbdb47.png)
+### Mixing and matching audio plugins
+
+The flutter plugin ecosystem contains a wide variety of useful audio plugins. In order to allow these to work together in a single app, just_audio "just" plays audio. By focusing on a single responsibility, different audio plugins can safely work together without overlapping responsibilities causing runtime conflicts.
+
+Other common audio capabilities are optionally provided by separate plugins:
+
+* [audio_service](https://pub.dev/packages/audio_service): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
+
+## Vote on upcoming features
+
+Press the thumbs up icon on the GitHub issues you would like to vote on:
+
+* ICY Metadata on iOS/macOS: [#56](https://github.com/ryanheise/just_audio/issues/56)
+* Equaliser: [#147](https://github.com/ryanheise/just_audio/issues/147)
+* Casting support (Chromecast and AirPlay): [#211](https://github.com/ryanheise/just_audio/issues/211)
+* Volume boost and skip silence: [#307](https://github.com/ryanheise/just_audio/issues/307)
+* [All feature requests sorted by popularity](https://github.com/ryanheise/just_audio/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement+sort%3Areactions-%2B1-desc)
+
+Please also consider pressing the thumbs up button at the top of [this page](https://pub.dev/packages/just_audio) (pub.dev) if you would like to bring more momentum to the project. More users leads to more bug reports and feature requests, which leads to increased stability and functionality.
+
+## Credits
+
+This project is supported by the amazing open source community of GitHub contributors and sponsors. Thank you!
 
 ## Features
 
 | Feature                        | Android   | iOS     | macOS   | Web     |
 | -------                        | :-------: | :-----: | :-----: | :-----: |
 | read from URL                  | ✅        | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      | ✅(*)   |
+| read from file                 | ✅        | ✅      | ✅      | ✅      |
 | read from asset                | ✅        | ✅      | ✅      | ✅      |
+| read from byte stream          | ✅        | ✅      | ✅      | ✅      |
 | request headers                | ✅        | ✅      | ✅      |         |
 | DASH                           | ✅        |         |         |         |
 | HLS                            | ✅        | ✅      | ✅      |         |
@@ -30,7 +50,14 @@ A feature-rich audio player for Android, iOS, macOS and web.
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
 | Handle phonecall interruptions | ✅        | ✅      |         |         |
 
-(*) Direct access to `file://` URLs is not permitted on the web. Instead, use a file picker (e.g. file_picker) to read the bytes and use a `StreamAudioSource` to stream those bytes to the player.
+## Experimental features
+
+| Feature                                                                            | Android   | iOS     | macOS   | Web     |
+| -------                                                                            | :-------: | :-----: | :-----: | :-----: |
+| Simultaneous downloading+caching                                                   | ✅        | ✅      | ✅      |         |
+| Waveform visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97)) | ✅        | ✅      |         |         |
+| FFT visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97))      | ✅        |         |         |         |
+| Null safety (Via `0.7` prerelease)                                                 | ✅        | ✅      | ✅      | ✅      |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -43,8 +70,6 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 
 ## Example
 
-![just_audio](https://user-images.githubusercontent.com/19899190/89558581-bf369080-d857-11ea-9376-3a5055284bab.png)
-
 Initialisation:
 
 ```dart
@@ -52,6 +77,14 @@ final player = AudioPlayer();
 var duration = await player.setUrl('https://foo.com/bar.mp3');
 var duration = await player.setFilePath('/path/to/file.mp3');
 var duration = await player.setAsset('path/to/asset.mp3');
+```
+
+Setting the HTTP user agent:
+
+```dart
+final player = AudioPlayer(
+  userAgent: 'myradioapp/1.0 (Linux;Android 11) https://myradioapp.com',
+);
 ```
 
 Headers:
@@ -75,6 +108,7 @@ Clipping audio:
 await player.setClip(start: Duration(seconds: 10), end: Duration(seconds: 20));
 await player.play(); // Waits until the clip has finished playing
 ```
+
 Adjusting audio:
 
 ```dart
