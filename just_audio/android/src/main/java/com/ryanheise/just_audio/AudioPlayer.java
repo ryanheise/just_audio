@@ -180,6 +180,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             this.audioSessionId = audioSessionId;
         }
         visualizer.onAudioSessionId(this.audioSessionId);
+        broadcastPlaybackEvent();
     }
 
     @Override
@@ -607,11 +608,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void ensurePlayerInitialized() {
         if (player == null) {
             player = new SimpleExoPlayer.Builder(context).build();
-            int audioSessionId = player.getAudioSessionId();
-            if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
-                this.audioSessionId = audioSessionId;
-                visualizer.onAudioSessionId(audioSessionId);
-            }
+            onAudioSessionIdChanged(player.getAudioSessionId());
             player.addMetadataOutput(this);
             player.addListener(this);
             player.addAudioListener(this);
