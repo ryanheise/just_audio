@@ -1209,6 +1209,9 @@ enum ProcessingState {
 
   /// The player has reached the end of the audio.
   completed,
+
+  /// The player has found an error and had to stop.
+  error
 }
 
 /// Encapsulates the playing and processing states. These two states vary
