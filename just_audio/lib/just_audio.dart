@@ -681,6 +681,7 @@ class AudioPlayer {
           .firstWhere((state) => state != ProcessingState.loading);
       return duration;
     } on PlatformException catch (e) {
+      _playbackEvent.copyWith(processingState: ProcessingState.error);
       try {
         throw PlayerException(int.parse(e.code), e.message);
       } on FormatException catch (_) {
