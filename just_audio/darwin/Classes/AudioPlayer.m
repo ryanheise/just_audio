@@ -137,6 +137,7 @@
         }
     } @catch (id exception) {
         //NSLog(@"Error in handleMethodCall");
+        _processingState = error;
         FlutterError *flutterError = [FlutterError errorWithCode:@"error" message:@"Error in handleMethodCall" details:nil];
         result(flutterError);
     }
@@ -778,10 +779,12 @@
             }
             case AVPlayerItemStatusFailed: {
                 //NSLog(@"AVPlayerItemStatusFailed");
+                _processingState = error;
                 [self sendErrorForItem:playerItem];
                 break;
             }
             case AVPlayerItemStatusUnknown:
+                _processingState = error;
                 break;
         }
     } else if ([keyPath isEqualToString:@"playbackBufferEmpty"] || [keyPath isEqualToString:@"playbackBufferFull"]) {
@@ -935,6 +938,7 @@
 }
 
 - (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
+    _processingState = error;
     FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%d", (int)playerItem.error.code]
                                                      message:playerItem.error.localizedDescription
                                                      details:nil];
@@ -942,6 +946,7 @@
 }
 
 - (void)sendError:(FlutterError *)flutterError playerItem:(IndexedPlayerItem *)playerItem {
+    _processingState = error;
     //NSLog(@"sendError");
     if (_loadResult && playerItem == _player.currentItem) {
         _loadResult(flutterError);
@@ -954,6 +959,7 @@
 }
 
 - (void)abortExistingConnection {
+    _processingState = error;
     FlutterError *flutterError = [FlutterError errorWithCode:@"abort"
                                                      message:@"Connection aborted"
                                                      details:nil];
