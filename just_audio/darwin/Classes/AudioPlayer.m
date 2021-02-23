@@ -251,11 +251,13 @@
 }
 
 - (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
+    _processingState = error;
     _eventSink = eventSink;
     return nil;
 }
 
 - (FlutterError*)onCancelWithArguments:(id)arguments {
+    _processingState = error;
     _eventSink = nil;
     return nil;
 }
