@@ -328,9 +328,9 @@ class LoadResponse {
   LoadResponse({required this.duration});
 
   static LoadResponse fromMap(Map<dynamic, dynamic> map) => LoadResponse(
-      duration: map['duration'] != null
-          ? Duration(microseconds: map['duration'])
-          : null);
+      duration: map['duration'] == null || map['duration'] < 0
+          ? null
+          : Duration(microseconds: map['duration']));
 }
 
 /// Information communicated to the platform implementation when playing an

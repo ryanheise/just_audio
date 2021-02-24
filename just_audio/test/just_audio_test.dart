@@ -779,8 +779,7 @@ void runTests() {
     await player.setUrl('https://bar.bar/bar.mp3', preload: false);
     expect(player.processingState, equals(ProcessingState.idle));
     expect(player.playing, equals(false));
-    // TODO: Decide whether we want player.position to be null here.
-    expectDuration(player.position ?? Duration.zero, Duration.zero);
+    expectDuration(player.position, Duration.zero);
     await player.load();
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(false));
@@ -1019,7 +1018,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       processingState: _processingState,
       updatePosition: _updatePosition,
       updateTime: _updateTime,
-      bufferedPosition: _position ?? Duration.zero,
+      bufferedPosition: _position,
       icyMetadata: IcyMetadataMessage(
         headers: IcyHeadersMessage(
           url: url,
@@ -1044,7 +1043,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     if (_playing && _processingState == ProcessingStateMessage.ready) {
       final result =
           _updatePosition + (DateTime.now().difference(_updateTime)) * _speed;
-      return _duration == null || result <= _duration ? result : _duration;
+      return result <= _duration ? result : _duration;
     } else {
       return _updatePosition;
     }

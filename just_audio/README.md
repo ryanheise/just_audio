@@ -3,7 +3,6 @@
 just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
 ![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/107045433-9f3d5500-6819-11eb-9188-73940ffbdb47.png)
-
 ### Mixing and matching audio plugins
 
 The flutter plugin ecosystem contains a wide variety of useful audio plugins. In order to allow these to work together in a single app, just_audio "just" plays audio. By focusing on a single responsibility, different audio plugins can safely work together without overlapping responsibilities causing runtime conflicts.
@@ -12,6 +11,17 @@ Other common audio capabilities are optionally provided by separate plugins:
 
 * [audio_service](https://pub.dev/packages/audio_service): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
 * [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
+
+## Vote on upcoming features
+
+Press the thumbs up icon on the GitHub issues you would like to vote on:
+
+* Equaliser: [#147](https://github.com/ryanheise/just_audio/issues/147)
+* Casting support (Chromecast and AirPlay): [#211](https://github.com/ryanheise/just_audio/issues/211)
+* Volume boost and skip silence: [#307](https://github.com/ryanheise/just_audio/issues/307)
+* [All feature requests sorted by popularity](https://github.com/ryanheise/just_audio/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement+sort%3Areactions-%2B1-desc)
+
+Please also consider pressing the thumbs up button at the top of [this page](https://pub.dev/packages/just_audio) (pub.dev) if you would like to bring more momentum to the project. More users leads to more bug reports and feature requests, which leads to increased stability and functionality.
 
 ## Credits
 
@@ -28,6 +38,7 @@ This project is supported by the amazing open source community of GitHub contrib
 | request headers                | ✅        | ✅      | ✅      |         |
 | DASH                           | ✅        |         |         |         |
 | HLS                            | ✅        | ✅      | ✅      |         |
+| ICY metadata                   | ✅        | ✅      | ✅      |         |
 | buffer status/position         | ✅        | ✅      | ✅      | ✅      |
 | play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
 | set volume/speed               | ✅        | ✅      | ✅      | ✅      |
@@ -66,6 +77,14 @@ final player = AudioPlayer();
 var duration = await player.setUrl('https://foo.com/bar.mp3');
 var duration = await player.setFilePath('/path/to/file.mp3');
 var duration = await player.setAsset('path/to/asset.mp3');
+```
+
+Setting the HTTP user agent:
+
+```dart
+final player = AudioPlayer(
+  userAgent: 'myradioapp/1.0 (Linux;Android 11) https://myradioapp.com',
+);
 ```
 
 Headers:
