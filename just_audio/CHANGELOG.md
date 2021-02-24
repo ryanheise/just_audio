@@ -1,3 +1,8 @@
+## 0.6.14
+
+* Initial support for ICY metadata on iOS.
+* Upgrade to ExoPlayer 2.13.1 (@MichealReed).
+
 ## 0.6.13
 
 * Add userAgent parameter to AudioPlayer constructor.
