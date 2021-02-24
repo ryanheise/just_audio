@@ -16,7 +16,6 @@ Other common audio capabilities are optionally provided by separate plugins:
 
 Press the thumbs up icon on the GitHub issues you would like to vote on:
 
-* ICY Metadata on iOS/macOS: [#56](https://github.com/ryanheise/just_audio/issues/56)
 * Equaliser: [#147](https://github.com/ryanheise/just_audio/issues/147)
 * Casting support (Chromecast and AirPlay): [#211](https://github.com/ryanheise/just_audio/issues/211)
 * Volume boost and skip silence: [#307](https://github.com/ryanheise/just_audio/issues/307)
@@ -39,6 +38,7 @@ This project is supported by the amazing open source community of GitHub contrib
 | request headers                | ✅        | ✅      | ✅      |         |
 | DASH                           | ✅        |         |         |         |
 | HLS                            | ✅        | ✅      | ✅      |         |
+| ICY metadata                   | ✅        | ✅      | ✅      |         |
 | buffer status/position         | ✅        | ✅      | ✅      | ✅      |
 | play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
 | set volume/speed               | ✅        | ✅      | ✅      | ✅      |

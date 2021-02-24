@@ -1,3 +1,7 @@
+## 0.6.14+1
+
+* Update ICY metadata feature status in README.
+
 ## 0.6.14
 
 * Initial support for ICY metadata on iOS.
