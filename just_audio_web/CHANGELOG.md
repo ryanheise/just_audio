@@ -1,3 +1,7 @@
+## Unreleased
+
+* Update dependency to just_audio_platform_interface 3.0.0-nullsafety.2
+
 ## 0.3.0-nullsafety.1
 
 * Relax SDK version constraints.
