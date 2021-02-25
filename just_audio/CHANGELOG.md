@@ -1,3 +1,7 @@
+## 0.7.0-nullsafety.2
+
+* Reintroduce path_provider dependency.
+
 ## 0.7.0-nullsafety.1
 
 * Relax SDK version constraints.
