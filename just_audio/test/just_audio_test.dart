@@ -166,8 +166,7 @@ void runTests() {
 
   test('control', () async {
     final player = AudioPlayer();
-    final duration =
-        await (player.setUrl('https://foo.foo/foo.mp3') as FutureOr<Duration>);
+    final duration = (await (player.setUrl('https://foo.foo/foo.mp3')))!;
     final point1 = duration * 0.3;
     final stopwatch = Stopwatch();
     expectState(
@@ -861,7 +860,7 @@ final icyMetadataMessage = IcyMetadataMessage(
 class MockAudioPlayer implements AudioPlayerPlatform {
   final String _id;
   final eventController = StreamController<PlaybackEventMessage>();
-  late AudioSourceMessage _audioSource;
+  AudioSourceMessage? _audioSource;
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   Duration _updatePosition = Duration.zero;
   DateTime _updateTime = DateTime.now();
