@@ -11,21 +11,9 @@ import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:meta/meta.dart' show experimental;
 import 'package:path/path.dart' as p;
-//import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
-
-const MethodChannel _pathProviderChannel =
-    const MethodChannel('com.ryanheise.just_audio.path_provider');
-
-// Temporary placeholder until path_provider migrates.
-Future<Directory?> _getTemporaryDirectory() async {
-  if (kIsWeb) return null;
-  final path =
-      await _pathProviderChannel.invokeMethod<String>('getTemporaryDirectory');
-  if (path == null) return null;
-  return Directory(path);
-}
 
 final _uuid = Uuid();
 
@@ -255,8 +243,8 @@ class AudioPlayer {
   /// cache directory.
   Future<void> _removeOldAssetCacheDir() async {
     if (kIsWeb) return;
-    final oldAssetCacheDir = Directory(p.join(
-        (await _getTemporaryDirectory())!.path, 'just_audio_asset_cache'));
+    final oldAssetCacheDir = Directory(
+        p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
     if (oldAssetCacheDir.existsSync()) {
       try {
         oldAssetCacheDir.deleteSync(recursive: true);
@@ -2446,8 +2434,8 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map? headers) {
   return handler;
 }
 
-Future<Directory> _getCacheDir() async => Directory(
-    p.join((await _getTemporaryDirectory())!.path, 'just_audio_cache'));
+Future<Directory> _getCacheDir() async =>
+    Directory(p.join((await getTemporaryDirectory()).path, 'just_audio_cache'));
 
 /// Defines the algorithm for shuffling the order of a
 /// [ConcatenatingAudioSource]. See [DefaultShuffleOrder] for a default

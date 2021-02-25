@@ -16,9 +16,7 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 public class JustAudioPlugin implements FlutterPlugin {
 
     private MethodChannel channel;
-    private MethodChannel pathProviderChannel;
     private MainMethodCallHandler methodCallHandler;
-    private MethodCallHandler pathProviderMethodCallHandler;
 
     public JustAudioPlugin() {
     }
@@ -51,28 +49,11 @@ public class JustAudioPlugin implements FlutterPlugin {
 
         channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
         channel.setMethodCallHandler(methodCallHandler);
-
-        pathProviderChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.path_provider");
-        pathProviderChannel.setMethodCallHandler(pathProviderMethodCallHandler = new MethodCallHandler() {
-            @Override
-            public void onMethodCall(MethodCall call, @NonNull Result result) {
-                switch (call.method) {
-                case "getTemporaryDirectory":
-                    result.success(applicationContext.getCacheDir().getPath());
-                    break;
-                default:
-                    result.notImplemented();
-                    break;
-                }
-            }
-        });
     }
 
     private void stopListening() {
         methodCallHandler.dispose();
         methodCallHandler = null;
-        pathProviderChannel.setMethodCallHandler(null);
-        pathProviderMethodCallHandler = null;
 
         channel.setMethodCallHandler(null);
     }
