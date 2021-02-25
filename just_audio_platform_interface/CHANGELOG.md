@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.2
+
+- Merge negative duration bug fix into nullsafety version.
+
 ## 3.0.0-nullsafety.1
 
 - Relax SDK version constraints.
