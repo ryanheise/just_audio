@@ -41,7 +41,7 @@
     BOOL _playing;
     float _speed;
     BOOL _justAdvanced;
-    NSDictionary<NSString *, NSString *> *_icyMetadata;
+    NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
@@ -586,11 +586,22 @@
         } else if ([_audioSource isKindOfClass:[UriAudioSource class]]) {
             child = (UriAudioSource *)_audioSource;
         }
-        if (child) {
-            _audioSource = [[ClippingAudioSource alloc] initWithId:source[@"id"]
-                                                       audioSource:child
-                                                             start:source[@"start"]
-                                                               end:source[@"end"]];
+        NSString *type = source[@"child"][@"type"];
+        NSString *uri = nil;
+        if ([@"progressive" isEqualToString:type] || [@"dash" isEqualToString:type] || [@"hls" isEqualToString:type]) {
+            uri = source[@"child"][@"uri"];
+        }
+        if (child && uri && [child.uri isEqualToString:uri]) {
+            ClippingAudioSource *clipper =
+                [[ClippingAudioSource alloc] initWithId:source[@"id"]
+                                            audioSource:child
+                                                  start:source[@"start"]
+                                                    end:source[@"end"]];
+            clipper.playerItem.audioSource = clipper;
+            if (clipper.playerItem2) {
+                clipper.playerItem2.audioSource = clipper;
+            }
+            _audioSource = clipper;
         } else {
             _audioSource = [self decodeAudioSource:source];
         }
@@ -642,6 +653,7 @@
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
+        _processingState = ready;
         _loadResult(@{@"duration": @([self getDurationMicroseconds])});
         _loadResult = nil;
     } else {
