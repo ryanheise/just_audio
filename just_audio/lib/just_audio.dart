@@ -1588,7 +1588,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
     if (uri.scheme == 'asset') {
-      _overrideUri = await _loadAsset(uri.path.replaceFirst(RegExp(r'^/'), ''));
+      _overrideUri = await _loadAsset(uri.pathSegments.join('/'));
     } else if (headers != null || player._userAgent != null) {
       _overrideUri = player._proxy!.addUriAudioSource(this);
     }
