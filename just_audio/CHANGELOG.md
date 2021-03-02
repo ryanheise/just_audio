@@ -1,3 +1,8 @@
+## 0.6.15
+
+* Fix bug with spaces in asset paths.
+* Fix bug setting a ClippingAudioSource after another source.
+
 ## 0.6.14+1
 
 * Update ICY metadata feature status in README.
