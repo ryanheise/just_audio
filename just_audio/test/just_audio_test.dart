@@ -355,6 +355,58 @@ void runTests() {
     await player.dispose();
   });
 
+  test('stream-source', () async {
+    final server = MockWebServer();
+    await server.start();
+    final player = AudioPlayer();
+    // This simulates an actual URL
+    await player.setAudioSource(TestStreamAudioSource(tag: 'stream-test'));
+    // Obtain the proxy URL that the platform side should use to load the data.
+    final proxyUri = Uri.parse(player.icyMetadata!.info!.url!);
+    // Simulate the platform side requesting the data.
+    Future<void> testRequest(int? start, int? end) async {
+      final request = await HttpClient().getUrl(proxyUri);
+      if (start != null && end != null) {
+        request.headers.set(HttpHeaders.rangeHeader, 'bytes=$start-${end - 1}');
+      } else if (start != null) {
+        request.headers.set(HttpHeaders.rangeHeader, 'bytes=$start-');
+      }
+      final response = await request.close();
+      //final responseData = await response.expand((chunk) => chunk).toList();
+      final responseData = <int>[];
+      await for (var chunk in response) {
+        responseData.addAll(chunk);
+      }
+      expect(
+          responseData,
+          equals(
+              byteRangeData.sublist(start ?? 0, end ?? byteRangeData.length)));
+      expect(
+          response.contentLength, (end ?? byteRangeData.length) - (start ?? 0));
+      if (start != null && end != null) {
+        expect(response.headers.value(HttpHeaders.contentRangeHeader),
+            'bytes $start-${end - 1}/${byteRangeData.length}');
+        expect(response.statusCode, equals(HttpStatus.partialContent));
+      } else if (start != null) {
+        expect(response.headers.value(HttpHeaders.contentRangeHeader),
+            'bytes $start-/${byteRangeData.length}');
+        expect(response.statusCode, equals(HttpStatus.partialContent));
+      } else {
+        expect(response.headers.value(HttpHeaders.contentRangeHeader), null);
+        expect(response.statusCode, equals(HttpStatus.ok));
+      }
+      expect(response.headers.value(HttpHeaders.contentTypeHeader),
+          equals('audio/mock'));
+    }
+
+    await testRequest(null, null);
+    await testRequest(20, null);
+    await testRequest(20, 60);
+
+    await server.stop();
+    await player.dispose();
+  });
+
   test('sequence', () async {
     final source1 = ConcatenatingAudioSource(children: [
       LoopingAudioSource(
@@ -422,35 +474,88 @@ void runTests() {
   test('sequence-state', () async {
     final player = AudioPlayer();
     expect(player.sequenceState, equals(null));
-    final playlist = ConcatenatingAudioSource(
-      children: [
-        AudioSource.uri(
-          Uri.parse("https://bar.bar/foo.mp3"),
-          tag: 'foo',
-        ),
-        AudioSource.uri(
-          Uri.parse("https://baz.baz/bar.mp3"),
-          tag: 'bar',
-        ),
-      ],
-    );
-    await player.setAudioSource(playlist);
-    expect(player.sequenceState?.sequence, equals(playlist.children));
-    expect(player.sequenceState?.currentIndex, equals(0));
-    expect(player.sequenceState?.currentSource, equals(playlist.children[0]));
-    await player.seekToNext();
-    expect(player.sequenceState?.sequence, equals(playlist.children));
-    expect(player.sequenceState?.currentIndex, equals(1));
-    expect(player.sequenceState?.currentSource, equals(playlist.children[1]));
-    await playlist.removeAt(1);
-    expect(player.sequenceState?.sequence, equals(playlist.children));
-    expect(player.sequenceState?.currentIndex, equals(0));
-    expect(player.sequenceState?.currentSource, equals(playlist.children[0]));
-    await playlist.removeAt(0);
-    expect(player.sequenceState?.sequence, equals(playlist.children));
-    // expecting 0 here may change in a future version.
-    expect(player.sequenceState?.currentIndex, equals(0));
-    expect(player.sequenceState?.currentSource, equals(null));
+    for (var shuffle in [false, true]) {
+      if (shuffle) {
+        await player.setShuffleModeEnabled(shuffle);
+      }
+      final playlist = ConcatenatingAudioSource(
+        children: [
+          AudioSource.uri(
+            Uri.parse("https://bar.bar/a.mp3"),
+            tag: 'a',
+          ),
+          AudioSource.uri(
+            Uri.parse("https://baz.baz/b.mp3"),
+            tag: 'b',
+          ),
+          AudioSource.uri(
+            Uri.parse("https://baz.baz/c.mp3"),
+            tag: 'c',
+          ),
+          AudioSource.uri(
+            Uri.parse("https://baz.baz/d.mp3"),
+            tag: 'd',
+          ),
+          AudioSource.uri(
+            Uri.parse("https://baz.baz/e.mp3"),
+            tag: 'e',
+          ),
+        ],
+      );
+      void expectEffectiveSequence() {
+        expect(
+            player.sequenceState?.effectiveSequence,
+            shuffle
+                ? player.effectiveIndices!
+                    .map((i) => player.sequence![i])
+                    .toList()
+                : player.sequence);
+      }
+
+      //List<int> effectiveSequenceToIndices() {
+      //  return player.effectiveSequence.map((IndexedAudioSource item) => player1.sequence.indexOf(item)).toList();
+      //}
+      await player.setAudioSource(playlist);
+      expect(player.sequenceState?.sequence, equals(playlist.children));
+      expect(player.sequenceState?.currentIndex, equals(0));
+      expect(player.sequenceState?.currentSource, equals(playlist.children[0]));
+      expectEffectiveSequence();
+      await player.seek(Duration.zero, index: 4);
+      expect(player.sequenceState?.sequence, equals(playlist.children));
+      expect(player.sequenceState?.currentIndex, equals(4));
+      expect(player.sequenceState?.currentSource, equals(playlist.children[4]));
+      await playlist.removeAt(4);
+      expectEffectiveSequence();
+      expect(player.sequenceState?.sequence, equals(playlist.children));
+      expect(player.sequenceState?.currentIndex, equals(3));
+      expect(player.sequenceState?.currentSource, equals(playlist.children[3]));
+      await playlist.removeAt(1);
+      expect(player.sequenceState?.sequence, equals(playlist.children));
+      expect(player.sequenceState?.currentIndex, equals(2));
+      expect(player.sequenceState?.currentSource, equals(playlist.children[2]));
+      await playlist.clear();
+      expect(player.sequenceState?.sequence, equals(playlist.children));
+      // expecting 0 here may change in a future version.
+      expect(player.sequenceState?.currentIndex, equals(0));
+      expect(player.sequenceState?.currentSource, equals(null));
+      expectEffectiveSequence();
+    }
+    await player.dispose();
+  });
+
+  test('setClip', () async {
+    final player = AudioPlayer();
+    final duration1 = await player.setUrl('https://bar.bar/foo.mp3');
+    expectDuration(duration1!, audioSourceDuration);
+    final duration2 = await player.setClip(start: Duration(seconds: 10));
+    expectDuration(duration2!, audioSourceDuration - Duration(seconds: 10));
+    final duration3 = await player.setClip(end: Duration(seconds: 15));
+    expectDuration(duration3!, Duration(seconds: 15));
+    final duration4 = await player.setClip(
+        start: Duration(seconds: 10), end: Duration(seconds: 21));
+    expectDuration(duration4!, Duration(seconds: 11));
+    final duration5 = await player.setClip();
+    expectDuration(duration5!, audioSourceDuration);
     await player.dispose();
   });
 
@@ -544,10 +649,16 @@ void runTests() {
     await player1.setAudioSource(source1);
     checkIndices(player1.shuffleIndices!, 5);
     expect(player1.shuffleIndices!.first, equals(0));
+    expect(player1.effectiveIndices!,
+        List.generate(player1.sequence!.length, (i) => i));
     await player1.seek(Duration.zero, index: 3);
     await player1.shuffle();
     checkIndices(player1.shuffleIndices!, 5);
     expect(player1.shuffleIndices!.first, equals(3));
+    expect(player1.effectiveIndices!,
+        List.generate(player1.sequence!.length, (i) => i));
+    await player1.setShuffleModeEnabled(true);
+    expect(player1.effectiveIndices!, player1.shuffleIndices!);
     await player1.dispose();
 
     final source2 = createSource();
@@ -556,6 +667,38 @@ void runTests() {
     checkIndices(player2.shuffleIndices!, 5);
     expect(player2.shuffleIndices!.first, equals(3));
     await player2.dispose();
+  });
+
+  test('seekToIndex', () async {
+    final source = ConcatenatingAudioSource(
+      shuffleOrder: DefaultShuffleOrder(random: Random(1001)),
+      children: [
+        AudioSource.uri(
+          Uri.parse("https://bar.bar/foo.mp3"),
+          tag: 'foo',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/bar.mp3"),
+          tag: 'bar',
+        ),
+      ],
+    );
+    final player = AudioPlayer();
+    await player.setAudioSource(source);
+    expect(player.currentIndex, 0);
+    expect(player.hasPrevious, false);
+    expect(player.hasNext, true);
+    await player.seekToPrevious();
+    expect(player.currentIndex, 0);
+    await player.seekToNext();
+    expect(player.currentIndex, 1);
+    expect(player.hasPrevious, true);
+    expect(player.hasNext, false);
+    await player.seekToNext();
+    expect(player.currentIndex, 1);
+    await player.seekToPrevious();
+    expect(player.currentIndex, 0);
+    await player.dispose();
   });
 
   test('stop', () async {
@@ -866,7 +1009,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   Duration _updatePosition = Duration.zero;
   DateTime _updateTime = DateTime.now();
   // ignore: prefer_final_fields
-  Duration _duration = audioSourceDuration;
+  Duration? _duration;
   int? _index;
   var _playing = false;
   var _speed = 1.0;
@@ -893,6 +1036,14 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       } else if (audioSource.uri.contains('error')) {
         throw PlatformException(code: 'error', message: 'Unknown error');
       }
+      _duration = audioSourceDuration;
+    } else if (audioSource is ClippingAudioSourceMessage) {
+      _duration = (audioSource.end ?? audioSourceDuration) -
+          (audioSource.start ?? Duration.zero);
+    } else {
+      // TODO: pull the sequence out of the audio source and return the duration
+      // of the first item in the sequence.
+      _duration = audioSourceDuration;
     }
     _audioSource = audioSource;
     _index = request.initialIndex ?? 0;
@@ -901,6 +1052,9 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _setPosition(request.initialPosition ?? Duration.zero);
     _processingState = ProcessingStateMessage.ready;
     _broadcastPlaybackEvent();
+    if (_playing) {
+      _startTimer();
+    }
     return LoadResponse(duration: _duration);
   }
 
@@ -908,16 +1062,22 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   Future<PlayResponse> play(PlayRequest request) async {
     if (_playing) return PlayResponse();
     _playing = true;
+    if (_duration != null) {
+      _startTimer();
+    }
+    _playCompleter = Completer<dynamic>();
+    _broadcastPlaybackEvent();
+    await _playCompleter!.future;
+    return PlayResponse();
+  }
+
+  void _startTimer() {
     _playTimer = Timer(_remaining, () {
       _setPosition(_position);
       _processingState = ProcessingStateMessage.completed;
       _broadcastPlaybackEvent();
       _playCompleter?.complete();
     });
-    _playCompleter = Completer<dynamic>();
-    _broadcastPlaybackEvent();
-    await _playCompleter!.future;
-    return PlayResponse();
   }
 
   @override
@@ -1044,17 +1204,34 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     if (_playing && _processingState == ProcessingStateMessage.ready) {
       final result =
           _updatePosition + (DateTime.now().difference(_updateTime)) * _speed;
-      return result <= _duration ? result : _duration;
+      return result <= _duration! ? result : _duration!;
     } else {
       return _updatePosition;
     }
   }
 
-  Duration get _remaining => (_duration - _position) * (1 / _speed);
+  Duration get _remaining => (_duration! - _position) * (1 / _speed);
 
   void _setPosition(Duration position) {
     _updatePosition = position;
     _updateTime = DateTime.now();
+  }
+}
+
+final byteRangeData = List.generate(200, (i) => i);
+
+class TestStreamAudioSource extends StreamAudioSource {
+  TestStreamAudioSource({dynamic tag}) : super(tag);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    return StreamAudioResponse(
+      contentType: 'audio/mock',
+      stream: Stream.value(byteRangeData.sublist(start ?? 0, end)),
+      contentLength: (end ?? byteRangeData.length) - (start ?? 0),
+      offset: start ?? 0,
+      sourceLength: byteRangeData.length,
+    );
   }
 }
 
@@ -1066,14 +1243,15 @@ class MockWebServer {
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
       final response = request.response;
-      final body = utf8.encode('Hello');
       if (request.uri.path == '/proxy0.9/foo.mp3') {
+        final body = utf8.encode('Hello');
         final clientSocket =
             await request.response.detachSocket(writeHeaders: false);
         clientSocket.add(body);
         await clientSocket.flush();
         await clientSocket.close();
       } else {
+        final body = utf8.encode('Hello');
         response.contentLength = body.length;
         response.statusCode = HttpStatus.ok;
         response.headers.set(HttpHeaders.contentTypeHeader, 'audio/mock');
