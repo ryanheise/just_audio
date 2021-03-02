@@ -10,7 +10,7 @@ class MethodChannelJustAudio extends JustAudioPlatform {
 
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
-    await _mainChannel.invokeMethod('init', request.toMap());
+    await _mainChannel.invokeMethod<void>('init', request.toMap());
     return MethodChannelAudioPlayer(request.id);
   }
 
@@ -35,6 +35,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
       EventChannel('com.ryanheise.just_audio.events.$id')
           .receiveBroadcastStream()
+          .cast<Map<dynamic, dynamic>>()
           .map((map) => PlaybackEventMessage.fromMap(map));
 
   @override

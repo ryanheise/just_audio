@@ -65,7 +65,7 @@ class AudioPlayer {
   final String _id;
   _ProxyHttpServer? _proxy;
   AudioSource? _audioSource;
-  Map<String, AudioSource> _audioSources = {};
+  final Map<String, AudioSource> _audioSources = {};
   bool _disposed = false;
   _InitialSeekValues? _initialSeekValues;
 
@@ -93,8 +93,8 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _playInterrupted = false;
   AndroidAudioAttributes? _androidAudioAttributes;
-  bool _androidApplyAudioAttributes;
-  bool _handleAudioSessionActivation;
+  final bool _androidApplyAudioAttributes;
+  final bool _handleAudioSessionActivation;
 
   /// Creates an [AudioPlayer].
   ///
@@ -130,23 +130,23 @@ class AudioPlayer {
     _processingStateSubject.addStream(playbackEventStream
         .map((event) => event.processingState)
         .distinct()
-        .handleError((err, stack) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _bufferedPositionSubject.addStream(playbackEventStream
         .map((event) => event.bufferedPosition)
         .distinct()
-        .handleError((err, stack) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _icyMetadataSubject.addStream(playbackEventStream
         .map((event) => event.icyMetadata)
         .distinct()
-        .handleError((err, stack) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _currentIndexSubject.addStream(playbackEventStream
         .map((event) => event.currentIndex)
         .distinct()
-        .handleError((err, stack) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _androidAudioSessionIdSubject.addStream(playbackEventStream
         .map((event) => event.androidAudioSessionId)
         .distinct()
-        .handleError((err, stack) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _sequenceStateSubject.addStream(Rx.combineLatest5<List<IndexedAudioSource>?,
         List<int>?, int?, bool, LoopMode, SequenceState?>(
       sequenceStream,
@@ -157,7 +157,7 @@ class AudioPlayer {
       (sequence, shuffleIndices, currentIndex, shuffleModeEnabled, loopMode) {
         if (sequence == null) return null;
         if (shuffleIndices == null) return null;
-        if (currentIndex == null) currentIndex = 0;
+        currentIndex ??= 0;
         currentIndex = max(min(sequence.length - 1, max(0, currentIndex)), 0);
         return SequenceState(
           sequence,
@@ -167,14 +167,14 @@ class AudioPlayer {
           loopMode,
         );
       },
-    ).distinct().handleError((err, stack) {/* noop */}));
+    ).distinct().handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _playerStateSubject.addStream(
         Rx.combineLatest2<bool, PlaybackEvent, PlayerState>(
                 playingStream,
                 playbackEventStream,
                 (playing, event) => PlayerState(playing, event.processingState))
             .distinct()
-            .handleError((err, stack) {/* noop */}));
+            .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
     _setPlatformActive(false, force: true);
@@ -478,7 +478,7 @@ class AudioPlayer {
   }) {
     assert(minPeriod <= maxPeriod);
     assert(minPeriod > Duration.zero);
-    StreamController<Duration> controller = StreamController.broadcast();
+    final controller = StreamController<Duration>.broadcast();
     if (_disposed) return controller.stream;
 
     Duration duration() => this.duration ?? Duration.zero;
@@ -536,7 +536,7 @@ class AudioPlayer {
   /// See [setAudioSource] for a detailed explanation of the options.
   Future<Duration?> setUrl(
     String url, {
-    Map? headers,
+    Map<String, String>? headers,
     Duration? initialPosition,
     bool preload = true,
   }) =>
@@ -652,7 +652,7 @@ class AudioPlayer {
     _updateShuffleIndices();
   }
 
-  _updateShuffleIndices() {
+  void _updateShuffleIndices() {
     _shuffleIndicesSubject.add(_audioSource?.shuffleIndices);
     final shuffleIndicesLength = shuffleIndices?.length ?? 0;
     if (_shuffleIndicesInv.length > shuffleIndicesLength) {
@@ -667,7 +667,7 @@ class AudioPlayer {
     }
   }
 
-  _registerAudioSource(AudioSource source) {
+  void _registerAudioSource(AudioSource source) {
     _audioSources[source._id] = source;
   }
 
@@ -758,7 +758,7 @@ class AudioPlayer {
     );
     _playingSubject.add(true);
     _playbackEventSubject.add(_playbackEvent);
-    final playCompleter = Completer();
+    final playCompleter = Completer<dynamic>();
     final audioSession = await AudioSession.instance;
     if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
       // TODO: rewrite this to more cleanly handle simultaneous load/play
@@ -1045,10 +1045,8 @@ class AudioPlayer {
         // attributes are set before loading the audio source.
         if (_androidApplyAudioAttributes) {
           final audioSession = await AudioSession.instance;
-          if (_androidAudioAttributes == null) {
-            _androidAudioAttributes =
-                audioSession.configuration?.androidAudioAttributes;
-          }
+          _androidAudioAttributes ??=
+              audioSession.configuration?.androidAudioAttributes;
         }
         if (_androidAudioAttributes != null) {
           await _internalSetAndroidAudioAttributes(
@@ -1184,7 +1182,7 @@ class PlaybackEvent {
     this.icyMetadata,
     this.currentIndex,
     this.androidAudioSessionId,
-  }) : this.updateTime = updateTime ?? DateTime.now();
+  }) : updateTime = updateTime ?? DateTime.now();
 
   /// Returns a copy of this event with given properties replaced.
   PlaybackEvent copyWith({
@@ -1509,7 +1507,8 @@ abstract class AudioSource {
   ///
   /// If headers are set, just_audio will create a cleartext local HTTP proxy on
   /// your device to forward HTTP requests with headers included.
-  static UriAudioSource uri(Uri uri, {Map? headers, dynamic tag}) {
+  static UriAudioSource uri(Uri uri,
+      {Map<String, String>? headers, dynamic tag}) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
@@ -1573,7 +1572,7 @@ abstract class IndexedAudioSource extends AudioSource {
 /// An abstract class representing audio sources that are loaded from a URI.
 abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
-  final Map? headers;
+  final Map<String, String>? headers;
   Uri? _overrideUri;
 
   UriAudioSource(this.uri, {this.headers, dynamic tag, Duration? duration})
@@ -1660,7 +1659,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
   ProgressiveAudioSource(Uri uri,
-      {Map? headers, dynamic tag, Duration? duration})
+      {Map<String, String>? headers, dynamic tag, Duration? duration})
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
@@ -1683,7 +1682,8 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class DashAudioSource extends UriAudioSource {
-  DashAudioSource(Uri uri, {Map? headers, dynamic tag, Duration? duration})
+  DashAudioSource(Uri uri,
+      {Map<String, String>? headers, dynamic tag, Duration? duration})
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
@@ -1705,7 +1705,8 @@ class DashAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class HlsAudioSource extends UriAudioSource {
-  HlsAudioSource(Uri uri, {Map? headers, dynamic tag, Duration? duration})
+  HlsAudioSource(Uri uri,
+      {Map<String, String>? headers, dynamic tag, Duration? duration})
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
@@ -1723,7 +1724,7 @@ class HlsAudioSource extends UriAudioSource {
 class ConcatenatingAudioSource extends AudioSource {
   final List<AudioSource> children;
   final bool useLazyPreparation;
-  ShuffleOrder _shuffleOrder;
+  final ShuffleOrder _shuffleOrder;
 
   /// Creates a [ConcatenatingAudioSorce] with the specified [children]. If
   /// [useLazyPreparation] is `true`, children will be loaded/buffered as late
@@ -1803,7 +1804,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Appends multiple [AudioSource]s.
   Future<void> addAll(List<AudioSource> children) async {
-    int index = this.children.length;
+    final index = this.children.length;
     this.children.addAll(children);
     _shuffleOrder.insert(index, children.length);
     if (_player != null) {
@@ -1904,7 +1905,7 @@ class ConcatenatingAudioSource extends AudioSource {
   /// The number of [AudioSource]s.
   int get length => children.length;
 
-  operator [](int index) => children[index];
+  AudioSource operator [](int index) => children[index];
 
   @override
   List<IndexedAudioSource> get sequence =>
@@ -2077,7 +2078,7 @@ class StreamAudioResponse {
 class LockCachingAudioSource extends StreamAudioSource {
   Future<HttpClientResponse>? _response;
   final Uri uri;
-  final Map? headers;
+  final Map<String, String>? headers;
   final Future<File> _cacheFile;
   int _progress = 0;
   final _requests = <_StreamingByteRangeRequest>[];
@@ -2142,7 +2143,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
-    HttpClient httpClient = HttpClient();
+    final httpClient = HttpClient();
     final httpRequest = await httpClient.getUrl(uri);
     if (headers != null) {
       httpRequest.headers.clear();
@@ -2248,7 +2249,7 @@ class LockCachingAudioSource extends StreamAudioSource {
       (await _partialCacheFile).renameSync((await _cacheFile).path);
       await subscription.cancel();
       httpClient.close();
-    }, onError: (e, stackTrace) async {
+    }, onError: (Object e, StackTrace stackTrace) async {
       print(stackTrace);
       (await _partialCacheFile).deleteSync();
       httpClient.close();
@@ -2321,7 +2322,7 @@ class _StreamingByteRangeRequest {
 }
 
 /// The type of functions that can handle HTTP requests sent to the proxy.
-typedef void _ProxyHandler(HttpRequest request);
+typedef _ProxyHandler = void Function(HttpRequest request);
 
 /// A proxy handler for serving audio from a [StreamAudioSource].
 _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
@@ -2355,7 +2356,7 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 /// A proxy handler for serving audio from a URI with optional headers.
 ///
 /// TODO: Recursively attach headers to items in playlists like m3u8.
-_ProxyHandler _proxyHandlerForUri(Uri uri, Map? headers) {
+_ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
   Future<void> handler(HttpRequest request) async {
     final originRequest = await HttpClient().getUrl(uri);
 
@@ -2365,11 +2366,9 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map? headers) {
     request.headers.forEach((name, value) {
       originRequest.headers.set(name, value);
     });
-    if (headers != null) {
-      for (var name in headers.keys) {
-        originRequest.headers.set(name, headers[name]);
-      }
-    }
+    headers?.entries.forEach((entry) {
+      originRequest.headers.set(entry.key, entry.value);
+    });
     if (host != null) {
       originRequest.headers.set('host', host);
     } else {
@@ -2397,7 +2396,7 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map? headers) {
         final socket = await Socket.connect(uri.host, uri.port);
         final clientSocket =
             await request.response.detachSocket(writeHeaders: false);
-        Completer done = Completer();
+        final done = Completer<dynamic>();
         socket.listen(
           clientSocket.add,
           onDone: () async {
@@ -2465,7 +2464,7 @@ abstract class ShuffleOrder {
 /// The default implementation of [ShuffleOrder] which shuffles items with the
 /// currently playing item at the head of the order.
 class DefaultShuffleOrder extends ShuffleOrder {
-  final _random;
+  final Random _random;
   @override
   final indices = <int>[];
 
@@ -2543,7 +2542,7 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
     sequenceStream.listen((sequence) => _sequence = sequence);
   }
 
-  _broadcastPlaybackEvent() {
+  void _broadcastPlaybackEvent() {
     var updateTime = DateTime.now();
     _eventSubject.add(PlaybackEventMessage(
       processingState: ProcessingStateMessage.idle,

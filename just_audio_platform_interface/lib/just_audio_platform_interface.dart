@@ -182,18 +182,22 @@ class PlaybackEventMessage {
 
   static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
       PlaybackEventMessage(
-        processingState: ProcessingStateMessage.values[map['processingState']],
-        updateTime: DateTime.fromMillisecondsSinceEpoch(map['updateTime']),
-        updatePosition: Duration(microseconds: map['updatePosition']),
-        bufferedPosition: Duration(microseconds: map['bufferedPosition']),
-        duration: map['duration'] == null || map['duration'] < 0
+        processingState:
+            ProcessingStateMessage.values[map['processingState'] as int],
+        updateTime:
+            DateTime.fromMillisecondsSinceEpoch(map['updateTime'] as int),
+        updatePosition: Duration(microseconds: map['updatePosition'] as int),
+        bufferedPosition:
+            Duration(microseconds: map['bufferedPosition'] as int),
+        duration: map['duration'] == null || map['duration'] as int < 0
             ? null
-            : Duration(microseconds: map['duration']),
+            : Duration(microseconds: map['duration'] as int),
         icyMetadata: map['icyMetadata'] == null
             ? null
-            : IcyMetadataMessage.fromMap(map['icyMetadata']),
-        currentIndex: map['currentIndex'],
-        androidAudioSessionId: map['androidAudioSessionId'],
+            : IcyMetadataMessage.fromMap(
+                map['icyMetadata'] as Map<dynamic, dynamic>),
+        currentIndex: map['currentIndex'] as int?,
+        androidAudioSessionId: map['androidAudioSessionId'] as int?,
       );
 }
 
@@ -218,11 +222,13 @@ class IcyMetadataMessage {
 
   static IcyMetadataMessage fromMap(Map<dynamic, dynamic> json) =>
       IcyMetadataMessage(
-        info:
-            json['info'] == null ? null : IcyInfoMessage.fromMap(json['info']),
+        info: json['info'] == null
+            ? null
+            : IcyInfoMessage.fromMap(json['info'] as Map<dynamic, dynamic>),
         headers: json['headers'] == null
             ? null
-            : IcyHeadersMessage.fromMap(json['headers']),
+            : IcyHeadersMessage.fromMap(
+                json['headers'] as Map<dynamic, dynamic>),
       );
 }
 
@@ -236,8 +242,8 @@ class IcyInfoMessage {
     required this.url,
   });
 
-  static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) =>
-      IcyInfoMessage(title: json['title'], url: json['url']);
+  static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) => IcyInfoMessage(
+      title: json['title'] as String?, url: json['url'] as String?);
 }
 
 /// Icy headers communicated from the platform implementation.
@@ -260,12 +266,12 @@ class IcyHeadersMessage {
 
   static IcyHeadersMessage fromMap(Map<dynamic, dynamic> json) =>
       IcyHeadersMessage(
-        bitrate: json['bitrate'],
-        genre: json['genre'],
-        name: json['name'],
-        metadataInterval: json['metadataInterval'],
-        url: json['url'],
-        isPublic: json['isPublic'],
+        bitrate: json['bitrate'] as int?,
+        genre: json['genre'] as String?,
+        name: json['name'] as String?,
+        metadataInterval: json['metadataInterval'] as int?,
+        url: json['url'] as String?,
+        isPublic: json['isPublic'] as bool?,
       );
 }
 
@@ -276,7 +282,7 @@ class InitRequest {
 
   InitRequest({required this.id});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
       };
 }
@@ -288,7 +294,7 @@ class DisposePlayerRequest {
 
   DisposePlayerRequest({required this.id});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
       };
 }
@@ -313,7 +319,7 @@ class LoadRequest {
     this.initialIndex,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'audioSource': audioSourceMessage.toMap(),
         'initialPosition': initialPosition?.inMicroseconds,
         'initialIndex': initialIndex,
@@ -328,15 +334,15 @@ class LoadResponse {
   LoadResponse({required this.duration});
 
   static LoadResponse fromMap(Map<dynamic, dynamic> map) => LoadResponse(
-      duration: map['duration'] == null || map['duration'] < 0
+      duration: map['duration'] == null || map['duration'] as int < 0
           ? null
-          : Duration(microseconds: map['duration']));
+          : Duration(microseconds: map['duration'] as int));
 }
 
 /// Information communicated to the platform implementation when playing an
 /// audio source.
 class PlayRequest {
-  Map<dynamic, dynamic> toMap() => {};
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// Information returned by the platform implementation after playing an audio
@@ -348,7 +354,7 @@ class PlayResponse {
 /// Information communicated to the platform implementation when pausing
 /// playback.
 class PauseRequest {
-  Map<dynamic, dynamic> toMap() => {};
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// Information returned by the platform implementation after pausing playback.
@@ -363,7 +369,7 @@ class SetVolumeRequest {
 
   SetVolumeRequest({required this.volume});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'volume': volume,
       };
 }
@@ -382,7 +388,7 @@ class SetSpeedRequest {
 
   SetSpeedRequest({required this.speed});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'speed': speed,
       };
 }
@@ -401,7 +407,7 @@ class SetLoopModeRequest {
 
   SetLoopModeRequest({required this.loopMode});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'loopMode': loopMode.index,
       };
 }
@@ -423,7 +429,7 @@ class SetShuffleModeRequest {
 
   SetShuffleModeRequest({required this.shuffleMode});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'shuffleMode': shuffleMode.index,
       };
 }
@@ -445,7 +451,7 @@ class SetShuffleOrderRequest {
 
   SetShuffleOrderRequest({required this.audioSourceMessage});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'audioSource': audioSourceMessage.toMap(),
       };
 }
@@ -464,7 +470,7 @@ class SetAutomaticallyWaitsToMinimizeStallingRequest {
 
   SetAutomaticallyWaitsToMinimizeStallingRequest({required this.enabled});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'enabled': enabled,
       };
 }
@@ -485,7 +491,7 @@ class SeekRequest {
 
   SeekRequest({this.position, this.index});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'position': position?.inMicroseconds,
         'index': index,
       };
@@ -510,7 +516,7 @@ class SetAndroidAudioAttributesRequest {
     required this.usage,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'contentType': contentType,
         'flags': flags,
         'usage': usage,
@@ -526,7 +532,7 @@ class SetAndroidAudioAttributesResponse {
 
 /// The parameter of [AudioPlayerPlatform.dispose] which is deprecated.
 class DisposeRequest {
-  Map<dynamic, dynamic> toMap() => {};
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// The result of [AudioPlayerPlatform.dispose] which is deprecated.
@@ -550,7 +556,7 @@ class ConcatenatingInsertAllRequest {
     required this.shuffleOrder,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'index': index,
         'children': children.map((child) => child.toMap()).toList(),
@@ -580,7 +586,7 @@ class ConcatenatingRemoveRangeRequest {
     required this.shuffleOrder,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'startIndex': startIndex,
         'endIndex': endIndex,
@@ -610,7 +616,7 @@ class ConcatenatingMoveRequest {
     required this.shuffleOrder,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'currentIndex': currentIndex,
         'newIndex': newIndex,
@@ -664,7 +670,7 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
   }) : super(id: id, uri: uri, headers: headers);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'progressive',
         'id': id,
         'uri': uri,
@@ -682,7 +688,7 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
   }) : super(id: id, uri: uri, headers: headers);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'dash',
         'id': id,
         'uri': uri,
@@ -700,7 +706,7 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
   }) : super(id: id, uri: uri, headers: headers);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'hls',
         'id': id,
         'uri': uri,
@@ -723,7 +729,7 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
   }) : super(id: id);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'concatenating',
         'id': id,
         'children': children.map((child) => child.toMap()).toList(),
@@ -747,7 +753,7 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
   }) : super(id: id);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'clipping',
         'id': id,
         'child': child.toMap(),
@@ -769,7 +775,7 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
   }) : super(id: id);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'looping',
         'id': id,
         'child': child.toMap(),

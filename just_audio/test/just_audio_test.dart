@@ -139,7 +139,7 @@ void runTests() {
 
   test('load error', () async {
     final player = AudioPlayer();
-    var exception;
+    Object? exception;
     try {
       await player.setUrl('https://foo.foo/404.mp3');
       exception = null;
@@ -188,9 +188,9 @@ void runTests() {
       position: point1,
       processingState: ProcessingState.ready,
     );
-    await Future.delayed(Duration(milliseconds: 100));
+    await Future<dynamic>.delayed(Duration(milliseconds: 100));
     expectState(player: player, playing: true);
-    await Future.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(Duration(seconds: 1));
     expectState(
       player: player,
       position: point1 + Duration(seconds: 1),
@@ -243,10 +243,10 @@ void runTests() {
     expectState(player: player, position: Duration.zero);
     await player.setSpeed(speed1);
     player.play();
-    await Future.delayed(period1);
+    await Future<dynamic>.delayed(period1);
     expectState(player: player, position: position1);
     await player.setSpeed(speed2);
-    await Future.delayed(period2);
+    await Future<dynamic>.delayed(period2);
     expectState(player: player, position: position2);
     await player.dispose();
   });
@@ -266,7 +266,7 @@ void runTests() {
     final stopwatch = Stopwatch();
     stopwatch.start();
 
-    var completer = Completer();
+    var completer = Completer<dynamic>();
     late StreamSubscription subscription;
     subscription = player.positionStream.listen((position) {
       if (position >= position1) {
@@ -282,7 +282,7 @@ void runTests() {
     stopwatch.reset();
 
     target = position1 + target;
-    completer = Completer();
+    completer = Completer<dynamic>();
     subscription = player.positionStream.listen((position) {
       if (position >= position2) {
         subscription.cancel();
@@ -346,7 +346,7 @@ void runTests() {
     socket.write('GET ${uri.path} HTTP/1.0\n\n');
     await socket.flush();
     final responseText = await socket
-        .transform(Converter.castFrom<List<int>, String, Uint8List, dynamic>(
+        .transform(Converter.castFrom<List<int>, String, Uint8List, String>(
             utf8.decoder))
         .join();
     await socket.close();
@@ -415,7 +415,7 @@ void runTests() {
     await source2.removeRange(1, 3);
     expect(source2.sequence.map((s) => s.tag as String?), equals(['e']));
     await source2.clear();
-    expect(source2.sequence.map((s) => s.tag as String?), equals([]));
+    expect(source2.sequence.map((s) => s.tag as String?), equals(<String>[]));
     await player.dispose();
   });
 
@@ -605,7 +605,7 @@ void runTests() {
       final player = AudioPlayer();
       player.play();
       if (delayMs != 0) {
-        await Future.delayed(Duration(milliseconds: delayMs));
+        await Future<dynamic>.delayed(Duration(milliseconds: delayMs));
       }
       expect(player.playing, equals(true));
       expect(player.processingState, equals(ProcessingState.idle));
@@ -613,7 +613,7 @@ void runTests() {
       expect(player.processingState, equals(ProcessingState.ready));
       expect(player.playing, equals(true));
       expectDuration(player.position, Duration.zero);
-      await Future.delayed(Duration(seconds: 1));
+      await Future<dynamic>.delayed(Duration(seconds: 1));
       expectDuration(player.position, Duration(seconds: 1));
       await player.dispose();
     }
@@ -624,7 +624,7 @@ void runTests() {
       final player = AudioPlayer();
       player.play();
       if (delayMs != 0) {
-        await Future.delayed(Duration(milliseconds: delayMs));
+        await Future<dynamic>.delayed(Duration(milliseconds: delayMs));
       }
       expect(player.playing, equals(true));
       expect(player.processingState, equals(ProcessingState.idle));
@@ -632,7 +632,7 @@ void runTests() {
       expect(player.processingState, equals(ProcessingState.ready));
       expect(player.playing, equals(true));
       expectDuration(player.position, Duration.zero);
-      await Future.delayed(Duration(seconds: 1));
+      await Future<dynamic>.delayed(Duration(seconds: 1));
       expectDuration(player.position, Duration(seconds: 1));
       await player.dispose();
     }
@@ -650,7 +650,7 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration.zero);
-    await Future.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(Duration(seconds: 1));
     expectDuration(player.position, Duration(seconds: 1));
     await player.dispose();
   });
@@ -753,13 +753,13 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration(seconds: 0));
-    await Future.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(Duration(seconds: 1));
     expectDuration(player.position, Duration(seconds: 1));
     await player.setUrl('https://bar.bar/bar.mp3');
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration(seconds: 0));
-    await Future.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(Duration(seconds: 1));
     expectDuration(player.position, Duration(seconds: 1));
     await player.dispose();
   });
@@ -771,7 +771,7 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration(seconds: 0));
-    await Future.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(Duration(seconds: 1));
     expectDuration(player.position, Duration(seconds: 1));
     player.pause();
     expect(player.playing, equals(false));
@@ -786,7 +786,7 @@ void runTests() {
     player.play();
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration(seconds: 0));
-    await Future.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(Duration(seconds: 1));
     expectDuration(player.position, Duration(seconds: 1));
     await player.dispose();
   });
@@ -807,10 +807,11 @@ class MockJustAudio extends Mock
 
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
-    if (_players.containsKey(request.id))
+    if (_players.containsKey(request.id)) {
       throw PlatformException(
           code: "error",
           message: "Platform player ${request.id} already exists");
+    }
     final player = MockAudioPlayer(request.id);
     _players[request.id] = player;
     return player;
@@ -864,6 +865,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   Duration _updatePosition = Duration.zero;
   DateTime _updateTime = DateTime.now();
+  // ignore: prefer_final_fields
   Duration _duration = audioSourceDuration;
   int? _index;
   var _playing = false;
@@ -871,7 +873,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   Completer<dynamic>? _playCompleter;
   Timer? _playTimer;
 
-  MockAudioPlayer(String id) : this._id = id;
+  MockAudioPlayer(String id) : _id = id;
 
   @override
   String get id => _id;
@@ -895,7 +897,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _audioSource = audioSource;
     _index = request.initialIndex ?? 0;
     // Simulate loading time.
-    await Future.delayed(Duration(milliseconds: 100));
+    await Future<dynamic>.delayed(Duration(milliseconds: 100));
     _setPosition(request.initialPosition ?? Duration.zero);
     _processingState = ProcessingStateMessage.ready;
     _broadcastPlaybackEvent();
@@ -912,7 +914,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       _broadcastPlaybackEvent();
       _playCompleter?.complete();
     });
-    _playCompleter = Completer();
+    _playCompleter = Completer<dynamic>();
     _broadcastPlaybackEvent();
     await _playCompleter!.future;
     return PlayResponse();
@@ -1007,7 +1009,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     return ConcatenatingRemoveRangeResponse();
   }
 
-  _broadcastPlaybackEvent() {
+  void _broadcastPlaybackEvent() {
     String? url;
     if (_audioSource is UriAudioSourceMessage) {
       // Not sure why this cast is necessary...

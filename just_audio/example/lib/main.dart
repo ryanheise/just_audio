@@ -16,7 +16,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late AudioPlayer _player;
-  ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
+  final _playlist = ConcatenatingAudioSource(children: [
     ClippingAudioSource(
       start: Duration(seconds: 60),
       end: Duration(seconds: 90),
@@ -70,7 +70,7 @@ class _MyAppState extends State<MyApp> {
     _init();
   }
 
-  _init() async {
+  Future<void> _init() async {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
     try {
@@ -243,7 +243,7 @@ class _MyAppState extends State<MyApp> {
                                   ? Colors.grey.shade300
                                   : null,
                               child: ListTile(
-                                title: Text(sequence[i].tag.title),
+                                title: Text(sequence[i].tag.title as String),
                                 onTap: () {
                                   _player.seek(Duration.zero, index: i);
                                 },
@@ -480,7 +480,7 @@ class _SeekBarState extends State<SeekBar> {
   Duration get _remaining => widget.duration - widget.position;
 }
 
-_showSliderDialog({
+void _showSliderDialog({
   required BuildContext context,
   required String title,
   required int divisions,
@@ -490,7 +490,7 @@ _showSliderDialog({
   required Stream<double> stream,
   required ValueChanged<double> onChanged,
 }) {
-  showDialog(
+  showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(title, textAlign: TextAlign.center),

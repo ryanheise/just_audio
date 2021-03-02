@@ -62,7 +62,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
   Duration? getDuration();
 
   /// Broadcasts a playback event from the platform side to the plugin side.
-  broadcastPlaybackEvent() {
+  void broadcastPlaybackEvent() {
     var updateTime = DateTime.now();
     _eventController.add(PlaybackEventMessage(
       processingState: _processingState,
@@ -78,7 +78,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
   }
 
   /// Transitions to [processingState] and broadcasts a playback event.
-  transition(ProcessingStateMessage processingState) {
+  void transition(ProcessingStateMessage processingState) {
     _processingState = processingState;
     broadcastPlaybackEvent();
   }
@@ -86,7 +86,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
 
 /// An HTML5-specific implementation of [JustAudioPlayer].
 class Html5AudioPlayer extends JustAudioPlayer {
-  AudioElement _audioElement = AudioElement();
+  final _audioElement = AudioElement();
   Completer? _durationCompleter;
   AudioSourcePlayer? _audioSourcePlayer;
   LoopModeMessage _loopMode = LoopModeMessage.off;
@@ -144,7 +144,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   /// Called when playback reaches the end of an item.
-  onEnded() async {
+  Future<void> onEnded() async {
     if (_loopMode == LoopModeMessage.one) {
       await _seek(0, null);
       _play();
@@ -216,7 +216,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
     if (src != _audioElement.src) {
-      _durationCompleter = Completer();
+      _durationCompleter = Completer<dynamic>();
       _audioElement.src = src;
       _audioElement.preload = 'auto';
       _audioElement.load();
@@ -309,7 +309,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   Future<void> _seek(int position, int? newIndex) async {
-    int? index = newIndex ?? _index;
+    var index = newIndex ?? _index;
     if (index != _index) {
       _currentAudioSourcePlayer!.pause();
       _index = index;
@@ -435,7 +435,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   /// Converts an audio source message to a player, using the cache if it is
   /// already cached.
   AudioSourcePlayer getAudioSource(AudioSourceMessage audioSourceMessage) {
-    final String id = audioSourceMessage.id;
+    final id = audioSourceMessage.id;
     var audioSourcePlayer = _audioSourcePlayers[id];
     if (audioSourcePlayer == null) {
       audioSourcePlayer = decodeAudioSource(audioSourceMessage);
@@ -531,7 +531,7 @@ abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
   AudioElement get _audioElement => html5AudioPlayer._audioElement;
 
   @override
-  String toString() => "${this.runtimeType}";
+  String toString() => "$runtimeType";
 }
 
 /// A player for an [UriAudioSourceMessage].
@@ -565,7 +565,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Future<void> play() async {
     _audioElement.currentTime = _resumePos!;
     _audioElement.play();
-    _completer = Completer();
+    _completer = Completer<dynamic>();
     await _completer!.future;
     _completer = null;
   }
@@ -588,7 +588,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
     html5AudioPlayer.onEnded();
   }
 
-  _interruptPlay() {
+  void _interruptPlay() {
     if (_completer?.isCompleted == false) {
       _completer!.complete();
     }
@@ -605,7 +605,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
   @override
   Duration get position {
-    double seconds = _audioElement.currentTime as double;
+    final seconds = _audioElement.currentTime as double;
     return Duration(milliseconds: (seconds * 1000).toInt());
   }
 
@@ -684,7 +684,7 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
   }
 
   /// Inserts [players] into this player at position [index].
-  insertAll(int index, List<AudioSourcePlayer> players) {
+  void insertAll(int index, List<AudioSourcePlayer> players) {
     audioSourcePlayers.insertAll(index, players);
     for (var i = 0; i < audioSourcePlayers.length; i++) {
       if (_shuffleOrder[i] >= index) {
@@ -694,7 +694,7 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
   }
 
   /// Removes the child players in the specified range.
-  removeRange(int start, int end) {
+  void removeRange(int start, int end) {
     audioSourcePlayers.removeRange(start, end);
     for (var i = 0; i < audioSourcePlayers.length; i++) {
       if (_shuffleOrder[i] >= end) {
@@ -704,7 +704,7 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
   }
 
   /// Moves a child player from [currentIndex] to [newIndex].
-  move(int currentIndex, int newIndex) {
+  void move(int currentIndex, int newIndex) {
     audioSourcePlayers.insert(
         newIndex, audioSourcePlayers.removeAt(currentIndex));
   }
@@ -732,7 +732,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<Duration?> load() async {
     _resumePos = (start ?? Duration.zero).inMilliseconds / 1000.0;
-    Duration fullDuration =
+    final fullDuration =
         (await html5AudioPlayer.loadUri(audioSourcePlayer.uri))!;
     _audioElement.currentTime = _resumePos!;
     _duration = Duration(
@@ -796,7 +796,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
   @override
   Duration get position {
-    double seconds = _audioElement.currentTime as double;
+    final seconds = _audioElement.currentTime as double;
     var position = Duration(milliseconds: (seconds * 1000).toInt());
     if (start != null) {
       position -= start!;
@@ -812,7 +812,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
     if (_audioElement.buffered.length > 0) {
       var seconds =
           _audioElement.buffered.end(_audioElement.buffered.length - 1);
-      Duration position = Duration(milliseconds: (seconds * 1000).toInt());
+      var position = Duration(milliseconds: (seconds * 1000).toInt());
       if (start != null) {
         position -= start!;
       }
@@ -828,7 +828,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
     }
   }
 
-  _interruptPlay(ClipInterruptReason reason) {
+  void _interruptPlay(ClipInterruptReason reason) {
     if (_completer?.isCompleted == false) {
       _completer!.complete(reason);
     }
