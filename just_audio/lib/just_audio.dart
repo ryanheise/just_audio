@@ -388,6 +388,7 @@ class AudioPlayer {
     final effectiveIndices = this.effectiveIndices;
     if (effectiveIndices == null || effectiveIndices.isEmpty) return null;
     final effectiveIndicesInv = _effectiveIndicesInv!;
+    if (currentIndex! >= effectiveIndicesInv.length) return null;
     final invPos = effectiveIndicesInv[currentIndex!];
     var newInvPos = invPos + offset;
     if (newInvPos >= effectiveIndices.length || newInvPos < 0) {
@@ -648,6 +649,8 @@ class AudioPlayer {
   }
 
   void _broadcastSequence() {
+    // TODO: update currentIndex first if it's out of range as a result of
+    // removing items from the playlist.
     _sequenceSubject.add(_audioSource?.sequence);
     _updateShuffleIndices();
   }
