@@ -1,3 +1,7 @@
+## 0.6.15+1
+
+* Fix doc references.
+
 ## 0.6.15
 
 * Fix bug with spaces in asset paths.
