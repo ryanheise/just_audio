@@ -1,3 +1,8 @@
+## 0.7.0-nullsafety.3
+
+* Apply pedantic rules.
+* Retype headers from Map to Map<String, String>
+
 ## 0.7.0-nullsafety.2
 
 * Reintroduce path_provider dependency.
