@@ -1,6 +1,6 @@
-## Unreleased
+## 0.3.0-nullsafety.2
 
-* Update dependency to just_audio_platform_interface 3.0.0-nullsafety.2
+* Apply pedantic rules.
 
 ## 0.3.0-nullsafety.1
 
