@@ -1,20 +1,7 @@
-## 0.7.0-nullsafety.3
-
-* Apply pedantic rules.
-* Retype headers from Map to Map<String, String>
-
-## 0.7.0-nullsafety.2
-
-* Reintroduce path_provider dependency.
-
-## 0.7.0-nullsafety.1
-
-* Relax SDK version constraints.
-* Improve shuffle documentation.
-
-## 0.7.0-nullsafety.0
+## 0.7.0
 
 * Null safety.
+* Retype headers from Map to Map<String, String>
 
 ## 0.6.15+1
 
