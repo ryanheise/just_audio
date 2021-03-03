@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.3
+
+- Apply pedantic rules.
+
 ## 3.0.0-nullsafety.2
 
 - Merge negative duration bug fix into nullsafety version.
