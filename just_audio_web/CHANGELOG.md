@@ -1,12 +1,4 @@
-## 0.3.0-nullsafety.2
-
-* Apply pedantic rules.
-
-## 0.3.0-nullsafety.1
-
-* Relax SDK version constraints.
-
-## 0.3.0-nullsafety.0
+## 0.3.0
 
 * Null safety.
 
