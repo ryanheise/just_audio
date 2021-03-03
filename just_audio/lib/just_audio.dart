@@ -1344,7 +1344,7 @@ class IcyMetadata {
 
 /// Encapsulates the [sequence] and [currentIndex] state and ensures
 /// consistency such that [currentIndex] is within the range of
-/// [sequence.length]. If [sequence.length] is 0, then [currentIndex] is also
+/// `sequence.length`. If `sequence.length` is 0, then [currentIndex] is also
 /// 0.
 class SequenceState {
   /// The sequence of the current [AudioSource].
@@ -1890,7 +1890,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// (Untested) Removes all [AudioSources].
+  /// (Untested) Removes all [AudioSource]s.
   Future<void> clear() async {
     children.clear();
     _shuffleOrder.clear();
