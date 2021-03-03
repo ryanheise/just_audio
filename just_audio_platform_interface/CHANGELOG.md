@@ -1,16 +1,4 @@
-## 3.0.0-nullsafety.3
-
-- Apply pedantic rules.
-
-## 3.0.0-nullsafety.2
-
-- Merge negative duration bug fix into nullsafety version.
-
-## 3.0.0-nullsafety.1
-
-- Relax SDK version constraints.
-
-## 3.0.0-nullsafety.0
+## 3.0.0
 
 - Null safety.
 
