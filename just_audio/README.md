@@ -2,7 +2,8 @@
 
 just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
-![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/107045433-9f3d5500-6819-11eb-9188-73940ffbdb47.png)
+![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/109920560-92bff580-7d0e-11eb-82fe-bbaaba50d87d.png)
+
 ### Mixing and matching audio plugins
 
 The flutter plugin ecosystem contains a wide variety of useful audio plugins. In order to allow these to work together in a single app, just_audio "just" plays audio. By focusing on a single responsibility, different audio plugins can safely work together without overlapping responsibilities causing runtime conflicts.
