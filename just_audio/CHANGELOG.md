@@ -1,3 +1,26 @@
+## 0.7.0
+
+* Null safety.
+* Retype headers from Map to Map<String, String>
+
+## 0.6.15+1
+
+* Fix doc references.
+
+## 0.6.15
+
+* Fix bug with spaces in asset paths.
+* Fix bug setting a ClippingAudioSource after another source.
+
+## 0.6.14+1
+
+* Update ICY metadata feature status in README.
+
+## 0.6.14
+
+* Initial support for ICY metadata on iOS.
+* Upgrade to ExoPlayer 2.13.1 (@MichealReed).
+
 ## 0.6.13
 
 * Add userAgent parameter to AudioPlayer constructor.

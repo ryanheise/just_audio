@@ -15,8 +15,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  AudioPlayer _player;
-  ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
+  late AudioPlayer _player;
+  final _playlist = ConcatenatingAudioSource(children: [
     ClippingAudioSource(
       start: Duration(seconds: 60),
       end: Duration(seconds: 90),
@@ -82,7 +82,7 @@ class _MyAppState extends State<MyApp> {
     _init();
   }
 
-  _init() async {
+  Future<void> _init() async {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
     try {
@@ -110,12 +110,12 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Expanded(
-                child: StreamBuilder<SequenceState>(
+                child: StreamBuilder<SequenceState?>(
                   stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
                     final state = snapshot.data;
-                    if (state?.sequence?.isEmpty ?? true) return SizedBox();
-                    final metadata = state.currentSource.tag as AudioMetadata;
+                    if (state?.sequence.isEmpty ?? true) return SizedBox();
+                    final metadata = state!.currentSource!.tag as AudioMetadata;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -126,9 +126,9 @@ class _MyAppState extends State<MyApp> {
                                 Center(child: Image.network(metadata.artwork)),
                           ),
                         ),
-                        Text(metadata.album ?? '',
+                        Text(metadata.album,
                             style: Theme.of(context).textTheme.headline6),
-                        Text(metadata.title ?? ''),
+                        Text(metadata.title),
                       ],
                     );
                   },
@@ -142,12 +142,12 @@ class _MyAppState extends State<MyApp> {
                     stream: _player.visualizerWaveformStream,
                     builder: (context, snapshot) {
                       if (snapshot.data == null) return SizedBox();
-                      return AudioVisualizerWidget(snapshot.data);
+                      return AudioVisualizerWidget(snapshot.data!);
                     },
                   ),
                 ),
               ControlButtons(_player),
-              StreamBuilder<Duration>(
+              StreamBuilder<Duration?>(
                 stream: _player.durationStream,
                 builder: (context, snapshot) {
                   final duration = snapshot.data ?? Duration.zero;
@@ -160,12 +160,11 @@ class _MyAppState extends State<MyApp> {
                     builder: (context, snapshot) {
                       final positionData = snapshot.data ??
                           PositionData(Duration.zero, Duration.zero);
-                      var position = positionData.position ?? Duration.zero;
+                      var position = positionData.position;
                       if (position > duration) {
                         position = duration;
                       }
-                      var bufferedPosition =
-                          positionData.bufferedPosition ?? Duration.zero;
+                      var bufferedPosition = positionData.bufferedPosition;
                       if (bufferedPosition > duration) {
                         bufferedPosition = duration;
                       }
@@ -238,7 +237,7 @@ class _MyAppState extends State<MyApp> {
               ),
               Container(
                 height: 240.0,
-                child: StreamBuilder<SequenceState>(
+                child: StreamBuilder<SequenceState?>(
                   stream: _player.sequenceStateStream,
                   builder: (context, snapshot) {
                     final state = snapshot.data;
@@ -264,11 +263,11 @@ class _MyAppState extends State<MyApp> {
                               _playlist.removeAt(i);
                             },
                             child: Material(
-                              color: i == state.currentIndex
+                              color: i == state!.currentIndex
                                   ? Colors.grey.shade300
                                   : null,
                               child: ListTile(
-                                title: Text(sequence[i].tag.title),
+                                title: Text(sequence[i].tag.title as String),
                                 onTap: () {
                                   _player.seek(Duration.zero, index: i);
                                 },
@@ -311,7 +310,7 @@ class AudioVisualizerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRect(
       child: CustomPaint(
-        painter: AudioVisualizerPainter(this.capture),
+        painter: AudioVisualizerPainter(capture),
       ),
     );
   }
@@ -329,7 +328,7 @@ class AudioVisualizerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     int getSample(double d) {
-      int i = d.toInt();
+      final i = d.toInt();
       if (i >= 0 && i < capture.data.length) {
         return capture.data[i] - 128;
       } else {
@@ -379,7 +378,7 @@ class ControlButtons extends StatelessWidget {
             );
           },
         ),
-        StreamBuilder<SequenceState>(
+        StreamBuilder<SequenceState?>(
           stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_previous),
@@ -417,12 +416,12 @@ class ControlButtons extends StatelessWidget {
                 icon: Icon(Icons.replay),
                 iconSize: 64.0,
                 onPressed: () => player.seek(Duration.zero,
-                    index: player.effectiveIndices.first),
+                    index: player.effectiveIndices!.first),
               );
             }
           },
         ),
-        StreamBuilder<SequenceState>(
+        StreamBuilder<SequenceState?>(
           stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_next),
@@ -456,13 +455,13 @@ class SeekBar extends StatefulWidget {
   final Duration duration;
   final Duration position;
   final Duration bufferedPosition;
-  final ValueChanged<Duration> onChanged;
-  final ValueChanged<Duration> onChangeEnd;
+  final ValueChanged<Duration>? onChanged;
+  final ValueChanged<Duration>? onChangeEnd;
 
   SeekBar({
-    @required this.duration,
-    @required this.position,
-    @required this.bufferedPosition,
+    required this.duration,
+    required this.position,
+    required this.bufferedPosition,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -472,8 +471,8 @@ class SeekBar extends StatefulWidget {
 }
 
 class _SeekBarState extends State<SeekBar> {
-  double _dragValue;
-  SliderThemeData _sliderThemeData;
+  double? _dragValue;
+  late SliderThemeData _sliderThemeData;
 
   @override
   void didChangeDependencies() {
@@ -504,12 +503,12 @@ class _SeekBarState extends State<SeekBar> {
                   _dragValue = value;
                 });
                 if (widget.onChanged != null) {
-                  widget.onChanged(Duration(milliseconds: value.round()));
+                  widget.onChanged!(Duration(milliseconds: value.round()));
                 }
               },
               onChangeEnd: (value) {
                 if (widget.onChangeEnd != null) {
-                  widget.onChangeEnd(Duration(milliseconds: value.round()));
+                  widget.onChangeEnd!(Duration(milliseconds: value.round()));
                 }
                 _dragValue = null;
               },
@@ -530,12 +529,12 @@ class _SeekBarState extends State<SeekBar> {
                 _dragValue = value;
               });
               if (widget.onChanged != null) {
-                widget.onChanged(Duration(milliseconds: value.round()));
+                widget.onChanged!(Duration(milliseconds: value.round()));
               }
             },
             onChangeEnd: (value) {
               if (widget.onChangeEnd != null) {
-                widget.onChangeEnd(Duration(milliseconds: value.round()));
+                widget.onChangeEnd!(Duration(milliseconds: value.round()));
               }
               _dragValue = null;
             },
@@ -558,17 +557,17 @@ class _SeekBarState extends State<SeekBar> {
   Duration get _remaining => widget.duration - widget.position;
 }
 
-_showSliderDialog({
-  BuildContext context,
-  String title,
-  int divisions,
-  double min,
-  double max,
+void _showSliderDialog({
+  required BuildContext context,
+  required String title,
+  required int divisions,
+  required double min,
+  required double max,
   String valueSuffix = '',
-  Stream<double> stream,
-  ValueChanged<double> onChanged,
+  required Stream<double> stream,
+  required ValueChanged<double> onChanged,
 }) {
-  showDialog(
+  showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(title, textAlign: TextAlign.center),
@@ -603,7 +602,8 @@ class AudioMetadata {
   final String title;
   final String artwork;
 
-  AudioMetadata({this.album, this.title, this.artwork});
+  AudioMetadata(
+      {required this.album, required this.title, required this.artwork});
 }
 
 class HiddenThumbComponentShape extends SliderComponentShape {
@@ -614,16 +614,16 @@ class HiddenThumbComponentShape extends SliderComponentShape {
   void paint(
     PaintingContext context,
     Offset center, {
-    Animation<double> activationAnimation,
-    Animation<double> enableAnimation,
-    bool isDiscrete,
-    TextPainter labelPainter,
-    RenderBox parentBox,
-    SliderThemeData sliderTheme,
-    TextDirection textDirection,
-    double value,
-    double textScaleFactor,
-    Size sizeWithOverflow,
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
   }) {}
 }
 

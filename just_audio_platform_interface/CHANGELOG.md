@@ -1,3 +1,7 @@
+## 3.0.0
+
+- Null safety.
+
 ## 2.0.1
 
 - Fix bug where negative duration is returned instead of null.

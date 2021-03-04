@@ -62,7 +62,7 @@ public class JustAudioPlugin implements FlutterPlugin, ActivityAware {
         methodCallHandler.setActivityPluginBinding(null);
     }
 
-    private void startListening(Context applicationContext, BinaryMessenger messenger) {
+    private void startListening(final Context applicationContext, BinaryMessenger messenger) {
         methodCallHandler = new MainMethodCallHandler(applicationContext, messenger);
 
         channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
