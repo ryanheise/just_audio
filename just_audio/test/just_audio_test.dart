@@ -1185,12 +1185,12 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   @override
   // TODO: implement visualizerFftStream
   Stream<VisualizerFftCaptureMessage> get visualizerFftStream =>
-      throw UnimplementedError();
+      StreamController<VisualizerFftCaptureMessage>().stream;
 
   @override
   // TODO: implement visualizerWaveformStream
   Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream =>
-      throw UnimplementedError();
+      StreamController<VisualizerWaveformCaptureMessage>().stream;
 
   void _broadcastPlaybackEvent() {
     String? url;
