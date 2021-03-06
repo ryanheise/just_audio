@@ -3,26 +3,34 @@ description: Demonstrates how to use the just_audio plugin.
 publish_to: 'none'
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: ">=2.12.0 <3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  audio_session: ^0.0.11
-  rxdart: ">= 0.24.1 < 0.26.0"
+  audio_session: ^0.1.0
+  rxdart: ^0.26.0
   just_audio:
     path: ../
   just_audio_background:
     path: ../../just_audio_background
-  audio_service: ^0.16.2
+  audio_service: ^0.17.0-nullsafety.0
+
+# Uncomment when testing platform interface changes.
+# dependency_overrides:
+#   just_audio_platform_interface:
+#     path: ../../just_audio_platform_interface
+#   just_audio_web:
+#     path: ../../just_audio_web
 
 dev_dependencies:
-  flutter_driver:
-    sdk: flutter
+  # TODO: uncomment these dependencies when they have nullsafe versions.
+  # flutter_driver:
+  #   sdk: flutter
   flutter_test:
     sdk: flutter
-  integration_test: ^1.0.1
-  test:
+  # integration_test: ^1.0.1
+  test: ^1.16.5
 
 flutter:
   uses-material-design: true

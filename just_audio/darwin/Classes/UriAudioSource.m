@@ -19,6 +19,10 @@
     return self;
 }
 
+- (NSString *)uri {
+    return _uri;
+}
+
 - (IndexedPlayerItem *)createPlayerItem:(NSString *)uri {
     IndexedPlayerItem *item;
     if ([uri hasPrefix:@"file://"]) {

@@ -3,8 +3,8 @@ import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
+import 'package:rxdart/rxdart.dart';
 
 class JustAudioBackgroundPlugin extends JustAudioPlatform {
   static void setup() {
@@ -15,7 +15,7 @@ class JustAudioBackgroundPlugin extends JustAudioPlatform {
     return await AudioService.runningStream.first;
   }
 
-  JustAudioPlayer _player;
+  JustAudioPlayer? _player;
 
   JustAudioBackgroundPlugin();
 
@@ -29,7 +29,7 @@ class JustAudioBackgroundPlugin extends JustAudioPlatform {
     _player = JustAudioPlayer(
       id: request.id,
     );
-    return _player;
+    return _player!;
   }
 
   Future<DisposePlayerResponse> disposePlayer(
@@ -43,14 +43,14 @@ class JustAudioBackgroundPlugin extends JustAudioPlatform {
 class JustAudioPlayer extends AudioPlayerPlatform {
   final eventController = StreamController<PlaybackEventMessage>();
   final playerDataController = StreamController<PlayerDataMessage>();
-  int _index;
-  Duration _duration;
-  IcyMetadataMessage _icyMetadata;
-  int _androidAudioSessionId;
+  int? _index;
+  Duration? _duration;
+  IcyMetadataMessage? _icyMetadata;
+  int? _androidAudioSessionId;
 
-  Future<bool> _startFuture;
+  Future<bool>? _startFuture;
 
-  JustAudioPlayer({@required String id}) : super(id) {
+  JustAudioPlayer({required String id}) : super(id) {
     _startFuture = _start();
     AudioService.playbackStateStream.listen((playbackState) {
       broadcastPlaybackEvent();
@@ -109,7 +109,7 @@ class JustAudioPlayer extends AudioPlayerPlatform {
 
   Future<void> updateQueue(List<MediaItem> queue) async {
     await _startFuture;
-    await AudioService.updateQueue(queue ?? []);
+    await AudioService.updateQueue(queue);
   }
 
   broadcastPlaybackEvent() {
@@ -131,15 +131,15 @@ class JustAudioPlayer extends AudioPlayerPlatform {
         AudioProcessingState.completed: ProcessingStateMessage.completed,
         AudioProcessingState.stopped: ProcessingStateMessage.idle,
         AudioProcessingState.error: ProcessingStateMessage.idle,
-      }[playbackState?.processingState ?? AudioProcessingState.none],
-      updatePosition: playbackState?.position ?? Duration.zero,
-      updateTime: playbackState?.updateTime ?? DateTime.now(),
-      bufferedPosition: playbackState?.bufferedPosition ?? Duration.zero,
+      }[playbackState.processingState]!,
+      updatePosition: playbackState.position,
+      updateTime: playbackState.updateTime,
+      bufferedPosition: playbackState.bufferedPosition,
       icyMetadata: _icyMetadata,
       duration: _duration,
       currentIndex: _index,
       androidAudioSessionId: _androidAudioSessionId,
-      playing: playbackState?.playing ?? false,
+      playing: playbackState.playing,
     ));
   }
 
@@ -281,29 +281,39 @@ void _audioPlayerTaskEntrypoint() async {
 
 class AudioPlayerTask extends BackgroundAudioTask {
   Completer<AudioPlayerPlatform> _playerCompleter = Completer();
-  AudioProcessingState _skipState;
-  PlaybackEventMessage _event;
-  AudioSourceMessage _source;
+  AudioProcessingState? _skipState;
+  PlaybackEventMessage _event = PlaybackEventMessage(
+    processingState: ProcessingStateMessage.idle,
+    updateTime: DateTime.now(),
+    updatePosition: Duration.zero,
+    bufferedPosition: Duration.zero,
+    duration: null,
+    icyMetadata: null,
+    currentIndex: null,
+    androidAudioSessionId: null,
+    playing: false,
+  );
+  AudioSourceMessage? _source;
   bool _playing = false;
   double _speed = 1.0;
   double _volume = 1.0;
   AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
   AudioServiceShuffleMode _shuffleMode = AudioServiceShuffleMode.none;
-  Seeker _seeker;
+  Seeker? _seeker;
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
-  int get index => _event?.currentIndex;
-  MediaItem get mediaItem =>
-      index != null && queue != null && index >= 0 && index < queue.length
-          ? queue[index]
+  int? get index => _event.currentIndex;
+  MediaItem? get mediaItem =>
+      index != null && queue != null && index! >= 0 && index! < queue!.length
+          ? queue![index!]
           : null;
 
-  List<MediaItem> get queue => AudioServiceBackground.queue;
+  List<MediaItem>? get queue => AudioServiceBackground.queue;
 
   @override
-  Future<void> onStart(Map<String, dynamic> params) async {
+  Future<void> onStart(Map<String, dynamic>? params) async {
     final player = await JustAudioPlatform.instance
-        .init(InitRequest(id: params['playerId']));
+        .init(InitRequest(id: params!['playerId']));
     _playerCompleter.complete(player);
     final playbackEventMessageStream = player.playbackEventMessageStream;
     playbackEventMessageStream.listen((event) {
@@ -329,34 +339,27 @@ class AudioPlayerTask extends BackgroundAudioTask {
       });
     });
     playbackEventMessageStream
+        .map((event) => TrackInfo(event.currentIndex, event.duration))
+        .distinct()
+        .debounceTime(const Duration(milliseconds: 100))
+        .listen((track) {
+      final mediaItem = this.mediaItem;
+      if (mediaItem != null) {
+        if (track.duration != mediaItem.duration) {
+          queue![index!] = queue![index!].copyWith(duration: _event.duration);
+          AudioServiceBackground.setQueue(queue!);
+        }
+        AudioServiceBackground.setMediaItem(this.mediaItem!);
+      }
+    });
+    playbackEventMessageStream
         .map((event) => event.currentIndex)
         .distinct()
         .listen((index) {
-      final mediaItem = this.mediaItem;
-      if (mediaItem != null) {
-        if (mediaItem.duration == null) {
-          queue[index] = queue[index].copyWith(duration: _event.duration);
-          AudioServiceBackground.setQueue(queue);
-        }
-        AudioServiceBackground.setMediaItem(this.mediaItem);
-      }
       AudioServiceBackground.sendCustomEvent({
         'type': 'currentIndex',
         'value': index,
       });
-    });
-    playbackEventMessageStream
-        .map((event) => event.duration)
-        .distinct()
-        .listen((duration) {
-      final mediaItem = this.mediaItem;
-      if (mediaItem != null &&
-          mediaItem.duration == null &&
-          _event.duration != mediaItem.duration) {
-        queue[index] = queue[index].copyWith(duration: _event.duration);
-        AudioServiceBackground.setMediaItem(this.mediaItem);
-        AudioServiceBackground.setQueue(queue);
-      }
     });
     playbackEventMessageStream
         .map((event) => event.processingState)
@@ -368,29 +371,29 @@ class AudioPlayerTask extends BackgroundAudioTask {
   Future<void> onUpdateQueue(List<MediaItem> queue) async {
     await AudioServiceBackground.setQueue(queue);
     if (AudioServiceBackground.mediaItem == null &&
-        queue != null &&
         index != null &&
-        index >= 0 &&
-        index < queue.length) {
-      AudioServiceBackground.setMediaItem(queue[index]);
+        index! >= 0 &&
+        index! < queue.length) {
+      AudioServiceBackground.setMediaItem(queue[index!]);
     }
   }
 
-  Map _encodeIcyMetadata(IcyMetadataMessage icyMetadata) => icyMetadata == null
-      ? null
-      : {
-          'info': _encodeIcyInfo(icyMetadata.info),
-          'headers': _encodeIcyHeaders(icyMetadata.headers),
-        };
+  Map? _encodeIcyMetadata(IcyMetadataMessage? icyMetadata) =>
+      icyMetadata == null
+          ? null
+          : {
+              'info': _encodeIcyInfo(icyMetadata.info),
+              'headers': _encodeIcyHeaders(icyMetadata.headers),
+            };
 
-  Map _encodeIcyInfo(IcyInfoMessage icyInfo) => icyInfo == null
+  Map? _encodeIcyInfo(IcyInfoMessage? icyInfo) => icyInfo == null
       ? null
       : {
           'title': icyInfo.title,
           'url': icyInfo.url,
         };
 
-  Map _encodeIcyHeaders(IcyHeadersMessage icyHeaders) => icyHeaders == null
+  Map? _encodeIcyHeaders(IcyHeadersMessage? icyHeaders) => icyHeaders == null
       ? null
       : {
           'bitrate': icyHeaders.bitrate,
@@ -423,13 +426,12 @@ class AudioPlayerTask extends BackgroundAudioTask {
             });
           }
           return {
-            'audioSource': _source.toMap2(),
+            'audioSource': _source!.toMap2(),
             'volume': _volume,
             'speed': _speed,
             'repeatMode': _repeatMode.index,
             'shuffleMode': _shuffleMode.index,
           };
-          break;
         case 'setVolume':
           _volume = arguments['volume'];
           await (await _player).setVolume(SetVolumeRequest(volume: _volume));
@@ -438,8 +440,10 @@ class AudioPlayerTask extends BackgroundAudioTask {
           _source = _decodeAudioSource(arguments['audioSource']);
           _updateQueue();
           final response = await (await _player).load(LoadRequest(
-            audioSourceMessage: _source,
-            initialPosition: arguments['initialPosition'],
+            audioSourceMessage: _source!,
+            initialPosition: arguments['initialPosition'] != null
+                ? Duration(microseconds: arguments['initialPosition'])
+                : null,
             initialIndex: arguments['initialIndex'],
           ));
           return {
@@ -454,7 +458,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
         case 'setShuffleOrder':
           _source = _decodeAudioSource(arguments['audioSource']);
           await (await _player).setShuffleOrder(SetShuffleOrderRequest(
-            audioSourceMessage: _source,
+            audioSourceMessage: _source!,
           ));
           break;
         case 'concatenatingInsertAll':
@@ -468,7 +472,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
             children: children,
             shuffleOrder: arguments['shuffleOrder'].cast<int>(),
           );
-          final cat = _source.findCat(request.id);
+          final cat = _source!.findCat(request.id)!;
           cat.children.insertAll(request.index, request.children);
           _updateQueue();
           await (await _player).concatenatingInsertAll(request);
@@ -480,7 +484,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
             endIndex: arguments['endIndex'],
             shuffleOrder: arguments['shuffleOrder'].cast<int>(),
           );
-          final cat = _source.findCat(request.id);
+          final cat = _source!.findCat(request.id)!;
           cat.children.removeRange(request.startIndex, request.endIndex);
           _updateQueue();
           await (await _player).concatenatingRemoveRange(request);
@@ -492,7 +496,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
             newIndex: arguments['newIndex'],
             shuffleOrder: arguments['shuffleOrder'].cast<int>(),
           );
-          final cat = _source.findCat(request.id);
+          final cat = _source!.findCat(request.id)!;
           cat.children.insert(
               request.newIndex, cat.children.removeAt(request.currentIndex));
           _updateQueue();
@@ -524,7 +528,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
         sequence.map((source) => source.tag as MediaItem).toList());
   }
 
-  List<IndexedAudioSourceMessage> get sequence => _source.sequence;
+  List<IndexedAudioSourceMessage> get sequence => _source!.sequence;
 
   AudioSourceMessage _decodeAudioSource(Map map) {
     switch (map['type']) {
@@ -562,7 +566,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
       case 'clipping':
         return ClippingAudioSourceMessage(
           id: map['id'],
-          child: _decodeAudioSource(map['child']),
+          child: _decodeAudioSource(map['child']) as UriAudioSourceMessage,
           start: Duration(microseconds: map['start']),
           end: Duration(microseconds: map['end']),
           tag: map['tag'] == null ? null : MediaItem.fromJson(map['tag']),
@@ -580,9 +584,9 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   Future<void> onSkipToQueueItem(String mediaId) async {
-    final newIndex = queue.indexWhere((item) => item.id == mediaId);
+    final newIndex = queue!.indexWhere((item) => item.id == mediaId);
     if (newIndex == -1) return;
-    _skipState = newIndex > index
+    _skipState = newIndex > index!
         ? AudioProcessingState.skippingToNext
         : AudioProcessingState.skippingToPrevious;
     (await _player).seek(SeekRequest(position: Duration.zero, index: newIndex));
@@ -668,7 +672,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
           milliseconds: (_event.updatePosition.inMilliseconds +
                   ((DateTime.now().millisecondsSinceEpoch -
                           _event.updateTime.millisecondsSinceEpoch) *
-                      (_speed ?? 1.0)))
+                      _speed))
               .toInt());
     } else {
       return _event.updatePosition;
@@ -680,7 +684,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
     var newPosition = currentPosition + offset;
     // Make sure we don't jump out of bounds.
     if (newPosition < Duration.zero) newPosition = Duration.zero;
-    if (newPosition > mediaItem.duration) newPosition = mediaItem.duration;
+    if (newPosition > mediaItem!.duration!) newPosition = mediaItem!.duration!;
     // Perform the jump via a seek.
     await (await _player).seek(SeekRequest(position: newPosition));
   }
@@ -692,7 +696,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
     _seeker?.stop();
     if (begin) {
       _seeker = Seeker(this, Duration(seconds: 10 * direction),
-          Duration(seconds: 1), mediaItem)
+          Duration(seconds: 1), mediaItem!.duration!)
         ..start();
     }
   }
@@ -732,14 +736,14 @@ class Seeker {
   final AudioPlayerTask task;
   final Duration positionInterval;
   final Duration stepInterval;
-  final MediaItem mediaItem;
+  final Duration duration;
   bool _running = false;
 
   Seeker(
     this.task,
     this.positionInterval,
     this.stepInterval,
-    this.mediaItem,
+    this.duration,
   );
 
   start() async {
@@ -747,7 +751,7 @@ class Seeker {
     while (_running) {
       Duration newPosition = task.currentPosition + positionInterval;
       if (newPosition < Duration.zero) newPosition = Duration.zero;
-      if (newPosition > mediaItem.duration) newPosition = mediaItem.duration;
+      if (newPosition > duration) newPosition = duration;
       task.onSeekTo(newPosition);
       await Future.delayed(stepInterval);
     }
@@ -760,15 +764,15 @@ class Seeker {
 
 extension PlaybackEventMessageExtension on PlaybackEventMessage {
   PlaybackEventMessage copyWith({
-    ProcessingStateMessage processingState,
-    DateTime updateTime,
-    Duration updatePosition,
-    Duration bufferedPosition,
-    Duration duration,
-    IcyMetadataMessage icyMetadata,
-    int currentIndex,
-    int androidAudioSessionId,
-    bool playing,
+    ProcessingStateMessage? processingState,
+    DateTime? updateTime,
+    Duration? updatePosition,
+    Duration? bufferedPosition,
+    Duration? duration,
+    IcyMetadataMessage? icyMetadata,
+    int? currentIndex,
+    int? androidAudioSessionId,
+    bool? playing,
   }) =>
       PlaybackEventMessage(
         processingState: processingState ?? this.processingState,
@@ -785,7 +789,6 @@ extension PlaybackEventMessageExtension on PlaybackEventMessage {
 }
 
 AudioSourceMessage _audioSourceMessageFromMap(Map<dynamic, dynamic> map) {
-  if (map == null) return null;
   final tag = map['tag'] != null ? MediaItem.fromJson(map['tag']) : null;
   switch (map['type']) {
     case 'progressive':
@@ -823,7 +826,8 @@ AudioSourceMessage _audioSourceMessageFromMap(Map<dynamic, dynamic> map) {
     case 'clipping':
       return ClippingAudioSourceMessage(
         id: map['id'],
-        child: _audioSourceMessageFromMap(map['child']),
+        child:
+            _audioSourceMessageFromMap(map['child']) as UriAudioSourceMessage,
         start: Duration(microseconds: map['start']),
         end: Duration(microseconds: map['end']),
         tag: tag,
@@ -855,9 +859,9 @@ extension AudioSourceExtension on AudioSourceMessage {
         'type': 'clipping',
         'id': self.id,
         'child': self.child.toMap2(),
-        'start': self.start.inMicroseconds,
-        'end': self.end.inMicroseconds,
-        'tag': (self.tag as MediaItem)?.toJson(),
+        'start': self.start?.inMicroseconds,
+        'end': self.end?.inMicroseconds,
+        'tag': (self.tag as MediaItem).toJson(),
       };
     } else if (self is LoopingAudioSourceMessage) {
       return {
@@ -868,14 +872,14 @@ extension AudioSourceExtension on AudioSourceMessage {
       };
     } else if (self is IndexedAudioSourceMessage) {
       final map = toMap();
-      map['tag'] = (self.tag as MediaItem)?.toJson();
+      map['tag'] = (self.tag as MediaItem?)?.toJson();
       return map;
     } else {
       throw Exception('Unsupported audio source message');
     }
   }
 
-  ConcatenatingAudioSourceMessage findCat(String id) {
+  ConcatenatingAudioSourceMessage? findCat(String id) {
     final self = this;
     if (self is ConcatenatingAudioSourceMessage) {
       if (self.id == id) return self;
@@ -901,4 +905,21 @@ extension AudioSourceExtension on AudioSourceMessage {
       return [self as IndexedAudioSourceMessage];
     }
   }
+}
+
+class TrackInfo {
+  final int? index;
+  final Duration? duration;
+
+  const TrackInfo(this.index, this.duration);
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrackInfo && index == other.index && duration == other.duration;
+
+  @override
+  int get hashCode => "$index,$duration".hashCode;
+
+  @override
+  String toString() => '($index, $duration)';
 }

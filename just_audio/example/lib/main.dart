@@ -18,8 +18,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   static int _nextMediaId = 0;
-  AudioPlayer _player;
-  ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: [
+  late AudioPlayer _player;
+  final _playlist = ConcatenatingAudioSource(children: [
     ClippingAudioSource(
       start: Duration(seconds: 60),
       end: Duration(seconds: 90),
@@ -29,8 +29,8 @@ class _MyAppState extends State<MyApp> {
         id: '${_nextMediaId++}',
         album: "Science Friday",
         title: "A Salute To Head-Scratching Science (30 seconds)",
-        artUri:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+        artUri: Uri.parse(
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
       ),
     ),
     AudioSource.uri(
@@ -40,8 +40,8 @@ class _MyAppState extends State<MyApp> {
         id: '${_nextMediaId++}',
         album: "Science Friday",
         title: "A Salute To Head-Scratching Science",
-        artUri:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+        artUri: Uri.parse(
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
       ),
     ),
     AudioSource.uri(
@@ -50,8 +50,8 @@ class _MyAppState extends State<MyApp> {
         id: '${_nextMediaId++}',
         album: "Science Friday",
         title: "From Cat Rheology To Operatic Incompetence",
-        artUri:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+        artUri: Uri.parse(
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
       ),
     ),
     AudioSource.uri(
@@ -60,8 +60,8 @@ class _MyAppState extends State<MyApp> {
         id: '${_nextMediaId++}',
         album: "Public Domain",
         title: "Nature Sounds",
-        artUri:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+        artUri: Uri.parse(
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
       ),
     ),
   ]);
@@ -78,7 +78,7 @@ class _MyAppState extends State<MyApp> {
     _init();
   }
 
-  _init() async {
+  Future<void> _init() async {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
     if (await JustAudioBackground.running) {
@@ -89,12 +89,10 @@ class _MyAppState extends State<MyApp> {
       // If nothing is already running, initialise the player.
       try {
         await _player.setAudioSource(_playlist);
-      } catch (e) {
+      } catch (e, stackTrace) {
         // catch load errors: 404, invalid url ...
         print("An error occured $e");
-        if (e is PlayerException) {
-          print(e.stackTrace);
-        }
+        print(stackTrace);
       }
     }
   }
@@ -117,32 +115,33 @@ class _MyAppState extends State<MyApp> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Expanded(
-                  child: StreamBuilder<SequenceState>(
+                  child: StreamBuilder<SequenceState?>(
                     stream: _player.sequenceStateStream,
                     builder: (context, snapshot) {
                       final state = snapshot.data;
-                      if (state?.sequence?.isEmpty ?? true) return SizedBox();
-                      final metadata = state.currentSource.tag as MediaItem;
+                      if (state?.sequence.isEmpty ?? true) return SizedBox();
+                      final metadata = state!.currentSource!.tag as MediaItem;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.all(8.0),
-                              child:
-                                  Center(child: Image.network(metadata.artUri)),
+                              child: Center(
+                                  child: Image.network(
+                                      metadata.artUri.toString())),
                             ),
                           ),
-                          Text(metadata.album ?? '',
+                          Text(metadata.album,
                               style: Theme.of(context).textTheme.headline6),
-                          Text(metadata.title ?? ''),
+                          Text(metadata.title),
                         ],
                       );
                     },
                   ),
                 ),
                 ControlButtons(_player),
-                StreamBuilder<Duration>(
+                StreamBuilder<Duration?>(
                   stream: _player.durationStream,
                   builder: (context, snapshot) {
                     final duration = snapshot.data ?? Duration.zero;
@@ -156,12 +155,11 @@ class _MyAppState extends State<MyApp> {
                       builder: (context, snapshot) {
                         final positionData = snapshot.data ??
                             PositionData(Duration.zero, Duration.zero);
-                        var position = positionData.position ?? Duration.zero;
+                        var position = positionData.position;
                         if (position > duration) {
                           position = duration;
                         }
-                        var bufferedPosition =
-                            positionData.bufferedPosition ?? Duration.zero;
+                        var bufferedPosition = positionData.bufferedPosition;
                         if (bufferedPosition > duration) {
                           bufferedPosition = duration;
                         }
@@ -234,7 +232,7 @@ class _MyAppState extends State<MyApp> {
                 ),
                 Container(
                   height: 240.0,
-                  child: StreamBuilder<SequenceState>(
+                  child: StreamBuilder<SequenceState?>(
                     stream: _player.sequenceStateStream,
                     builder: (context, snapshot) {
                       final state = snapshot.data;
@@ -261,11 +259,11 @@ class _MyAppState extends State<MyApp> {
                                 _playlist.removeAt(i);
                               },
                               child: Material(
-                                color: i == state.currentIndex
+                                color: i == state!.currentIndex
                                     ? Colors.grey.shade300
                                     : null,
                                 child: ListTile(
-                                  title: Text(sequence[i].tag.title),
+                                  title: Text(sequence[i].tag.title as String),
                                   onTap: () {
                                     _player.seek(Duration.zero, index: i);
                                   },
@@ -289,8 +287,8 @@ class _MyAppState extends State<MyApp> {
                   id: '${_nextMediaId++}',
                   album: "Public Domain",
                   title: "Nature Sounds ${++_addedCount}",
-                  artUri:
-                      "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+                  artUri: Uri.parse(
+                      "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
                 ),
               ));
             },
@@ -325,7 +323,7 @@ class ControlButtons extends StatelessWidget {
             );
           },
         ),
-        StreamBuilder<SequenceState>(
+        StreamBuilder<SequenceState?>(
           stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_previous),
@@ -363,12 +361,12 @@ class ControlButtons extends StatelessWidget {
                 icon: Icon(Icons.replay),
                 iconSize: 64.0,
                 onPressed: () => player.seek(Duration.zero,
-                    index: player.effectiveIndices.first),
+                    index: player.effectiveIndices!.first),
               );
             }
           },
         ),
-        StreamBuilder<SequenceState>(
+        StreamBuilder<SequenceState?>(
           stream: player.sequenceStateStream,
           builder: (context, snapshot) => IconButton(
             icon: Icon(Icons.skip_next),
@@ -402,13 +400,13 @@ class SeekBar extends StatefulWidget {
   final Duration duration;
   final Duration position;
   final Duration bufferedPosition;
-  final ValueChanged<Duration> onChanged;
-  final ValueChanged<Duration> onChangeEnd;
+  final ValueChanged<Duration>? onChanged;
+  final ValueChanged<Duration>? onChangeEnd;
 
   SeekBar({
-    @required this.duration,
-    @required this.position,
-    @required this.bufferedPosition,
+    required this.duration,
+    required this.position,
+    required this.bufferedPosition,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -418,8 +416,8 @@ class SeekBar extends StatefulWidget {
 }
 
 class _SeekBarState extends State<SeekBar> {
-  double _dragValue;
-  SliderThemeData _sliderThemeData;
+  double? _dragValue;
+  late SliderThemeData _sliderThemeData;
 
   @override
   void didChangeDependencies() {
@@ -450,12 +448,12 @@ class _SeekBarState extends State<SeekBar> {
                   _dragValue = value;
                 });
                 if (widget.onChanged != null) {
-                  widget.onChanged(Duration(milliseconds: value.round()));
+                  widget.onChanged!(Duration(milliseconds: value.round()));
                 }
               },
               onChangeEnd: (value) {
                 if (widget.onChangeEnd != null) {
-                  widget.onChangeEnd(Duration(milliseconds: value.round()));
+                  widget.onChangeEnd!(Duration(milliseconds: value.round()));
                 }
                 _dragValue = null;
               },
@@ -476,12 +474,12 @@ class _SeekBarState extends State<SeekBar> {
                 _dragValue = value;
               });
               if (widget.onChanged != null) {
-                widget.onChanged(Duration(milliseconds: value.round()));
+                widget.onChanged!(Duration(milliseconds: value.round()));
               }
             },
             onChangeEnd: (value) {
               if (widget.onChangeEnd != null) {
-                widget.onChangeEnd(Duration(milliseconds: value.round()));
+                widget.onChangeEnd!(Duration(milliseconds: value.round()));
               }
               _dragValue = null;
             },
@@ -504,17 +502,17 @@ class _SeekBarState extends State<SeekBar> {
   Duration get _remaining => widget.duration - widget.position;
 }
 
-_showSliderDialog({
-  BuildContext context,
-  String title,
-  int divisions,
-  double min,
-  double max,
+void _showSliderDialog({
+  required BuildContext context,
+  required String title,
+  required int divisions,
+  required double min,
+  required double max,
   String valueSuffix = '',
-  Stream<double> stream,
-  ValueChanged<double> onChanged,
+  required Stream<double> stream,
+  required ValueChanged<double> onChanged,
 }) {
-  showDialog(
+  showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(title, textAlign: TextAlign.center),
@@ -552,16 +550,16 @@ class HiddenThumbComponentShape extends SliderComponentShape {
   void paint(
     PaintingContext context,
     Offset center, {
-    Animation<double> activationAnimation,
-    Animation<double> enableAnimation,
-    bool isDiscrete,
-    TextPainter labelPainter,
-    RenderBox parentBox,
-    SliderThemeData sliderTheme,
-    TextDirection textDirection,
-    double value,
-    double textScaleFactor,
-    Size sizeWithOverflow,
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
   }) {}
 }
 

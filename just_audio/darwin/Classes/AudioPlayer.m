@@ -41,6 +41,7 @@
     BOOL _playing;
     float _speed;
     BOOL _justAdvanced;
+    NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
@@ -78,6 +79,7 @@
     _automaticallyWaitsToMinimizeStalling = YES;
     _speed = 1.0f;
     _justAdvanced = NO;
+    _icyMetadata = @{};
     __weak __typeof__(self) weakSelf = self;
     [_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
         [weakSelf handleMethodCall:call result:result];
@@ -303,9 +305,8 @@
             @"updatePosition": @((long long)1000 * _updatePosition),
             @"updateTime": @(_updateTime),
             @"bufferedPosition": @((long long)1000 * [self getBufferedPosition]),
-            // TODO: Icy Metadata
-            @"icyMetadata": (id)[NSNull null],
-            @"duration": @((long long)1000 * [self getDuration]),
+            @"icyMetadata": _icyMetadata,
+            @"duration": @([self getDurationMicroseconds]),
             @"currentIndex": @(_index),
     });
 }
@@ -347,6 +348,11 @@
     }
 }
 
+- (long long)getDurationMicroseconds {
+    int duration = [self getDuration];
+    return duration < 0 ? -1 : ((long long)1000 * duration);
+}
+
 - (void)removeItemObservers:(AVPlayerItem *)playerItem {
     [playerItem removeObserver:self forKeyPath:@"status"];
     [playerItem removeObserver:self forKeyPath:@"playbackBufferEmpty"];
@@ -372,6 +378,45 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onFailToComplete:) name:AVPlayerItemFailedToPlayToEndTimeNotification object:playerItem];
     // Get notified when playback stalls (currently unused)
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onItemStalled:) name:AVPlayerItemPlaybackStalledNotification object:playerItem];
+
+    AVPlayerItemMetadataOutput *metadataOutput = [[AVPlayerItemMetadataOutput alloc] initWithIdentifiers:nil];
+    [metadataOutput setDelegate:self queue:dispatch_get_main_queue()];
+    // Since the delegate is stored as a weak reference,
+    // there shouldn't be a retain cycle.
+    // TODO: Check this. Shouldn't need to removeOutput
+    // later?
+    [playerItem addOutput:metadataOutput];
+}
+
+- (void)metadataOutput:(AVPlayerItemMetadataOutput *)output didOutputTimedMetadataGroups:(NSArray<AVTimedMetadataGroup *> *)groups fromPlayerItemTrack:(AVPlayerItemTrack *)track {
+    BOOL hasIcyData = NO;
+    NSString *title = (NSString *)[NSNull null];
+    for (int i = 0; i < groups.count; i++) {
+        //NSLog(@"group %d", i);
+        AVTimedMetadataGroup *group = groups[i];
+        for (int j = 0; j < group.items.count; j++) {
+            //NSLog(@"item %d", j);
+            AVMetadataItem *item = group.items[i];
+            //NSLog(@"key: %@", item.key);
+            //NSLog(@"keySpace: %@", item.keySpace);
+            //NSLog(@"commonKey: %@", item.commonKey);
+            //NSLog(@"value: %@", item.value);
+            //NSLog(@"identifier: %@", item.identifier);
+            // TODO: Detect more metadata
+            if ([@"icy/StreamTitle" isEqualToString:item.identifier]) {
+                hasIcyData = YES;
+                title = (NSString *)item.value;
+            }
+        }
+    }
+    if (hasIcyData) {
+        _icyMetadata = @{
+            @"info": @{
+                @"title": title,
+            },
+        };
+        [self broadcastPlaybackEvent];
+    }
 }
 
 - (NSMutableArray<AudioSource *> *)decodeAudioSources:(NSArray *)data {
@@ -541,11 +586,22 @@
         } else if ([_audioSource isKindOfClass:[UriAudioSource class]]) {
             child = (UriAudioSource *)_audioSource;
         }
-        if (child) {
-            _audioSource = [[ClippingAudioSource alloc] initWithId:source[@"id"]
-                                                       audioSource:child
-                                                             start:source[@"start"]
-                                                               end:source[@"end"]];
+        NSString *type = source[@"child"][@"type"];
+        NSString *uri = nil;
+        if ([@"progressive" isEqualToString:type] || [@"dash" isEqualToString:type] || [@"hls" isEqualToString:type]) {
+            uri = source[@"child"][@"uri"];
+        }
+        if (child && uri && [child.uri isEqualToString:uri]) {
+            ClippingAudioSource *clipper =
+                [[ClippingAudioSource alloc] initWithId:source[@"id"]
+                                            audioSource:child
+                                                  start:source[@"start"]
+                                                    end:source[@"end"]];
+            clipper.playerItem.audioSource = clipper;
+            if (clipper.playerItem2) {
+                clipper.playerItem2.audioSource = clipper;
+            }
+            _audioSource = clipper;
         } else {
             _audioSource = [self decodeAudioSource:source];
         }
@@ -597,7 +653,8 @@
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
-        _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
+        _processingState = ready;
+        _loadResult(@{@"duration": @([self getDurationMicroseconds])});
         _loadResult = nil;
     } else {
         // We send result after the playerItem is ready in observeValueForKeyPath.
@@ -718,7 +775,7 @@
                 }
                 [self broadcastPlaybackEvent];
                 if (_loadResult) {
-                    _loadResult(@{@"duration": @((long long)1000 * [self getDuration])});
+                    _loadResult(@{@"duration": @([self getDurationMicroseconds])});
                     _loadResult = nil;
                 }
                 if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {

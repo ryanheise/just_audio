@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-import 'package:meta/meta.dart' show required;
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'method_channel_just_audio.dart';
@@ -166,11 +164,11 @@ abstract class AudioPlayerPlatform {
 /// A data update communicated from the platform implementation to the Flutter
 /// plugin.
 class PlayerDataMessage {
-  final AudioSourceMessage audioSource;
-  final double volume;
-  final double speed;
-  final LoopModeMessage loopMode;
-  final ShuffleModeMessage shuffleMode;
+  final AudioSourceMessage? audioSource;
+  final double? volume;
+  final double? speed;
+  final LoopModeMessage? loopMode;
+  final ShuffleModeMessage? shuffleMode;
 
   PlayerDataMessage({
     this.audioSource,
@@ -182,14 +180,17 @@ class PlayerDataMessage {
 
   static PlayerDataMessage fromMap(Map<dynamic, dynamic> map) =>
       PlayerDataMessage(
-        audioSource: AudioSourceMessage.fromMap(map['audioSource']),
-        volume: map['volume'],
-        speed: map['speed'],
+        audioSource: map['audioSource'] != null
+            ? AudioSourceMessage.fromMap(
+                map['audioSource'] as Map<dynamic, dynamic>)
+            : null,
+        volume: map['volume'] as double?,
+        speed: map['speed'] as double?,
         loopMode: map['loopMode'] != null
-            ? LoopModeMessage.values[map['loopMode']]
+            ? LoopModeMessage.values[map['loopMode'] as int]
             : null,
         shuffleMode: map['shuffleMode'] != null
-            ? ShuffleModeMessage.values[map['shuffleMode']]
+            ? ShuffleModeMessage.values[map['shuffleMode'] as int]
             : null,
       );
 }
@@ -201,42 +202,46 @@ class PlaybackEventMessage {
   final DateTime updateTime;
   final Duration updatePosition;
   final Duration bufferedPosition;
-  final Duration duration;
-  final IcyMetadataMessage icyMetadata;
-  final int currentIndex;
-  final int androidAudioSessionId;
+  final Duration? duration;
+  final IcyMetadataMessage? icyMetadata;
+  final int? currentIndex;
+  final int? androidAudioSessionId;
 
   // TODO: Should this be moved to PlayerDataMessage?
   /// If not null, triggers a state change in the main plugin.
-  final bool playing;
+  final bool? playing;
 
   PlaybackEventMessage({
-    @required this.processingState,
-    @required this.updateTime,
-    @required this.updatePosition,
-    @required this.bufferedPosition,
-    @required this.duration,
-    @required this.icyMetadata,
-    @required this.currentIndex,
-    @required this.androidAudioSessionId,
+    required this.processingState,
+    required this.updateTime,
+    required this.updatePosition,
+    required this.bufferedPosition,
+    required this.duration,
+    required this.icyMetadata,
+    required this.currentIndex,
+    required this.androidAudioSessionId,
     this.playing,
   });
 
   static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
       PlaybackEventMessage(
-        processingState: ProcessingStateMessage.values[map['processingState']],
-        updateTime: DateTime.fromMillisecondsSinceEpoch(map['updateTime']),
-        updatePosition: Duration(microseconds: map['updatePosition']),
-        bufferedPosition: Duration(microseconds: map['bufferedPosition']),
-        duration: map['duration'] == null || map['duration'] < 0
+        processingState:
+            ProcessingStateMessage.values[map['processingState'] as int],
+        updateTime:
+            DateTime.fromMillisecondsSinceEpoch(map['updateTime'] as int),
+        updatePosition: Duration(microseconds: map['updatePosition'] as int),
+        bufferedPosition:
+            Duration(microseconds: map['bufferedPosition'] as int),
+        duration: map['duration'] == null || map['duration'] as int < 0
             ? null
-            : Duration(microseconds: map['duration']),
+            : Duration(microseconds: map['duration'] as int),
         icyMetadata: map['icyMetadata'] == null
             ? null
-            : IcyMetadataMessage.fromMap(map['icyMetadata']),
-        currentIndex: map['currentIndex'],
-        androidAudioSessionId: map['androidAudioSessionId'],
-        playing: map['playing'],
+            : IcyMetadataMessage.fromMap(
+                map['icyMetadata'] as Map<dynamic, dynamic>),
+        currentIndex: map['currentIndex'] as int?,
+        androidAudioSessionId: map['androidAudioSessionId'] as int?,
+        playing: map['playing'] as bool?,
       );
 }
 
@@ -251,61 +256,66 @@ enum ProcessingStateMessage {
 
 /// Icy metadata communicated from the platform implementation.
 class IcyMetadataMessage {
-  final IcyInfoMessage info;
-  final IcyHeadersMessage headers;
+  final IcyInfoMessage? info;
+  final IcyHeadersMessage? headers;
 
   IcyMetadataMessage({
-    @required this.info,
-    @required this.headers,
+    required this.info,
+    required this.headers,
   });
 
   static IcyMetadataMessage fromMap(Map<dynamic, dynamic> json) =>
       IcyMetadataMessage(
-        info:
-            json['info'] == null ? null : IcyInfoMessage.fromMap(json['info']),
+        info: json['info'] == null
+            ? null
+            : IcyInfoMessage.fromMap(json['info'] as Map<dynamic, dynamic>),
         headers: json['headers'] == null
             ? null
-            : IcyHeadersMessage.fromMap(json['headers']),
+            : IcyHeadersMessage.fromMap(
+                json['headers'] as Map<dynamic, dynamic>),
       );
 }
 
 /// Icy info communicated from the platform implementation.
 class IcyInfoMessage {
-  final String title;
-  final String url;
+  final String? title;
+  final String? url;
 
-  IcyInfoMessage({@required this.title, @required this.url});
+  IcyInfoMessage({
+    required this.title,
+    required this.url,
+  });
 
-  static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) =>
-      IcyInfoMessage(title: json['title'], url: json['url']);
+  static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) => IcyInfoMessage(
+      title: json['title'] as String?, url: json['url'] as String?);
 }
 
 /// Icy headers communicated from the platform implementation.
 class IcyHeadersMessage {
-  final int bitrate;
-  final String genre;
-  final String name;
-  final int metadataInterval;
-  final String url;
-  final bool isPublic;
+  final int? bitrate;
+  final String? genre;
+  final String? name;
+  final int? metadataInterval;
+  final String? url;
+  final bool? isPublic;
 
   IcyHeadersMessage({
-    @required this.bitrate,
-    @required this.genre,
-    @required this.name,
-    @required this.metadataInterval,
-    @required this.url,
-    @required this.isPublic,
+    required this.bitrate,
+    required this.genre,
+    required this.name,
+    required this.metadataInterval,
+    required this.url,
+    required this.isPublic,
   });
 
   static IcyHeadersMessage fromMap(Map<dynamic, dynamic> json) =>
       IcyHeadersMessage(
-        bitrate: json['bitrate'],
-        genre: json['genre'],
-        name: json['name'],
-        metadataInterval: json['metadataInterval'],
-        url: json['url'],
-        isPublic: json['isPublic'],
+        bitrate: json['bitrate'] as int?,
+        genre: json['genre'] as String?,
+        name: json['name'] as String?,
+        metadataInterval: json['metadataInterval'] as int?,
+        url: json['url'] as String?,
+        isPublic: json['isPublic'] as bool?,
       );
 }
 
@@ -314,9 +324,9 @@ class IcyHeadersMessage {
 class InitRequest {
   final String id;
 
-  InitRequest({@required this.id});
+  InitRequest({required this.id});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
       };
 }
@@ -326,9 +336,9 @@ class InitRequest {
 class DisposePlayerRequest {
   final String id;
 
-  DisposePlayerRequest({@required this.id});
+  DisposePlayerRequest({required this.id});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
       };
 }
@@ -344,16 +354,16 @@ class DisposePlayerResponse {
 /// audio source.
 class LoadRequest {
   final AudioSourceMessage audioSourceMessage;
-  final Duration initialPosition;
-  final int initialIndex;
+  final Duration? initialPosition;
+  final int? initialIndex;
 
   LoadRequest({
-    @required this.audioSourceMessage,
+    required this.audioSourceMessage,
     this.initialPosition,
     this.initialIndex,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'audioSource': audioSourceMessage.toMap(),
         'initialPosition': initialPosition?.inMicroseconds,
         'initialIndex': initialIndex,
@@ -363,20 +373,20 @@ class LoadRequest {
 /// Information returned by the platform implementation after loading an audio
 /// source.
 class LoadResponse {
-  final Duration duration;
+  final Duration? duration;
 
-  LoadResponse({@required this.duration});
+  LoadResponse({required this.duration});
 
   static LoadResponse fromMap(Map<dynamic, dynamic> map) => LoadResponse(
-      duration: map['duration'] != null
-          ? Duration(microseconds: map['duration'])
-          : null);
+      duration: map['duration'] == null || map['duration'] as int < 0
+          ? null
+          : Duration(microseconds: map['duration'] as int));
 }
 
 /// Information communicated to the platform implementation when playing an
 /// audio source.
 class PlayRequest {
-  Map<dynamic, dynamic> toMap() => {};
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// Information returned by the platform implementation after playing an audio
@@ -388,7 +398,7 @@ class PlayResponse {
 /// Information communicated to the platform implementation when pausing
 /// playback.
 class PauseRequest {
-  Map<dynamic, dynamic> toMap() => {};
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// Information returned by the platform implementation after pausing playback.
@@ -401,9 +411,9 @@ class PauseResponse {
 class SetVolumeRequest {
   final double volume;
 
-  SetVolumeRequest({@required this.volume});
+  SetVolumeRequest({required this.volume});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'volume': volume,
       };
 }
@@ -420,9 +430,9 @@ class SetVolumeResponse {
 class SetSpeedRequest {
   final double speed;
 
-  SetSpeedRequest({@required this.speed});
+  SetSpeedRequest({required this.speed});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'speed': speed,
       };
 }
@@ -439,9 +449,9 @@ class SetSpeedResponse {
 class SetLoopModeRequest {
   final LoopModeMessage loopMode;
 
-  SetLoopModeRequest({@required this.loopMode});
+  SetLoopModeRequest({required this.loopMode});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'loopMode': loopMode.index,
       };
 }
@@ -461,9 +471,9 @@ enum LoopModeMessage { off, one, all }
 class SetShuffleModeRequest {
   final ShuffleModeMessage shuffleMode;
 
-  SetShuffleModeRequest({@required this.shuffleMode});
+  SetShuffleModeRequest({required this.shuffleMode});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'shuffleMode': shuffleMode.index,
       };
 }
@@ -483,9 +493,9 @@ enum ShuffleModeMessage { none, all }
 class SetShuffleOrderRequest {
   final AudioSourceMessage audioSourceMessage;
 
-  SetShuffleOrderRequest({@required this.audioSourceMessage});
+  SetShuffleOrderRequest({required this.audioSourceMessage});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'audioSource': audioSourceMessage.toMap(),
       };
 }
@@ -502,9 +512,9 @@ class SetShuffleOrderResponse {
 class SetAutomaticallyWaitsToMinimizeStallingRequest {
   final bool enabled;
 
-  SetAutomaticallyWaitsToMinimizeStallingRequest({@required this.enabled});
+  SetAutomaticallyWaitsToMinimizeStallingRequest({required this.enabled});
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'enabled': enabled,
       };
 }
@@ -520,13 +530,13 @@ class SetAutomaticallyWaitsToMinimizeStallingResponse {
 /// Information communicated to the platform implementation when seeking to a
 /// position and index.
 class SeekRequest {
-  final Duration position;
-  final int index;
+  final Duration? position;
+  final int? index;
 
-  SeekRequest({@required this.position, this.index});
+  SeekRequest({this.position, this.index});
 
-  Map<dynamic, dynamic> toMap() => {
-        'position': position.inMicroseconds,
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'position': position?.inMicroseconds,
         'index': index,
       };
 }
@@ -545,12 +555,12 @@ class SetAndroidAudioAttributesRequest {
   final int usage;
 
   SetAndroidAudioAttributesRequest({
-    @required this.contentType,
-    @required this.flags,
-    @required this.usage,
+    required this.contentType,
+    required this.flags,
+    required this.usage,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'contentType': contentType,
         'flags': flags,
         'usage': usage,
@@ -566,7 +576,7 @@ class SetAndroidAudioAttributesResponse {
 
 /// The parameter of [AudioPlayerPlatform.dispose] which is deprecated.
 class DisposeRequest {
-  Map<dynamic, dynamic> toMap() => {};
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// The result of [AudioPlayerPlatform.dispose] which is deprecated.
@@ -584,13 +594,13 @@ class ConcatenatingInsertAllRequest {
   final List<int> shuffleOrder;
 
   ConcatenatingInsertAllRequest({
-    @required this.id,
-    @required this.index,
-    @required this.children,
-    @required this.shuffleOrder,
+    required this.id,
+    required this.index,
+    required this.children,
+    required this.shuffleOrder,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'index': index,
         'children': children.map((child) => child.toMap()).toList(),
@@ -614,13 +624,13 @@ class ConcatenatingRemoveRangeRequest {
   final List<int> shuffleOrder;
 
   ConcatenatingRemoveRangeRequest({
-    @required this.id,
-    @required this.startIndex,
-    @required this.endIndex,
-    @required this.shuffleOrder,
+    required this.id,
+    required this.startIndex,
+    required this.endIndex,
+    required this.shuffleOrder,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'startIndex': startIndex,
         'endIndex': endIndex,
@@ -644,13 +654,13 @@ class ConcatenatingMoveRequest {
   final List<int> shuffleOrder;
 
   ConcatenatingMoveRequest({
-    @required this.id,
-    @required this.currentIndex,
-    @required this.newIndex,
-    @required this.shuffleOrder,
+    required this.id,
+    required this.currentIndex,
+    required this.newIndex,
+    required this.shuffleOrder,
   });
 
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'currentIndex': currentIndex,
         'newIndex': newIndex,
@@ -670,30 +680,29 @@ class ConcatenatingMoveResponse {
 abstract class AudioSourceMessage {
   final String id;
 
-  AudioSourceMessage({@required this.id});
+  AudioSourceMessage({required this.id});
 
   Map<dynamic, dynamic> toMap();
 
   static AudioSourceMessage fromMap(Map<dynamic, dynamic> map) {
-    if (map == null) return null;
-    switch (map['type']) {
+    switch (map['type']!) {
       case 'progressive':
         return ProgressiveAudioSourceMessage(
-          id: map['id'],
-          uri: map['uri'],
-          headers: map['headers'],
+          id: map['id'] as String,
+          uri: map['uri'] as String,
+          headers: map['headers'] as Map<String, String>?,
         );
       case 'dash':
         return DashAudioSourceMessage(
-          id: map['id'],
-          uri: map['uri'],
-          headers: map['headers'],
+          id: map['id'] as String,
+          uri: map['uri'] as String,
+          headers: map['headers'] as Map<String, String>?,
         );
       case 'hls':
         return HlsAudioSourceMessage(
-          id: map['id'],
-          uri: map['uri'],
-          headers: map['headers'],
+          id: map['id'] as String,
+          uri: map['uri'] as String,
+          headers: map['headers'] as Map<String, String>?,
         );
       case 'concatenating':
         final children = (map['children'] as List)
@@ -701,23 +710,30 @@ abstract class AudioSourceMessage {
             .map<AudioSourceMessage>(AudioSourceMessage.fromMap)
             .toList();
         return ConcatenatingAudioSourceMessage(
-          id: map['id'],
+          id: map['id'] as String,
           children: children,
-          useLazyPreparation: map['useLazyPreparation'],
-          shuffleOrder: map['shuffleOrder'].cast<int>(),
+          useLazyPreparation: map['useLazyPreparation'] as bool,
+          shuffleOrder: (map['shuffleOrder'] as List<dynamic>).cast<int>(),
         );
       case 'clipping':
         return ClippingAudioSourceMessage(
-          id: map['id'],
-          child: AudioSourceMessage.fromMap(map['child']),
-          start: Duration(microseconds: map['start']),
-          end: Duration(microseconds: map['end']),
+          id: map['id'] as String,
+          child:
+              AudioSourceMessage.fromMap(map['child'] as Map<dynamic, dynamic>)
+                  as UriAudioSourceMessage,
+          start: map['start'] != null
+              ? Duration(microseconds: map['start'] as int)
+              : null,
+          end: map['end'] != null
+              ? Duration(microseconds: map['end'] as int)
+              : null,
         );
       case 'looping':
         return LoopingAudioSourceMessage(
-          id: map['id'],
-          child: AudioSourceMessage.fromMap(map['child']),
-          count: map['count'],
+          id: map['id'] as String,
+          child:
+              AudioSourceMessage.fromMap(map['child'] as Map<dynamic, dynamic>),
+          count: map['count'] as int,
         );
       default:
         throw Exception('Invalid audio source type: ${map['type']}');
@@ -731,19 +747,19 @@ abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
   /// Since the tag type is unknown, this can only be used by platform
   /// implementations that pass by value.
   final dynamic tag;
-  IndexedAudioSourceMessage({@required String id, this.tag}) : super(id: id);
+  IndexedAudioSourceMessage({required String id, this.tag}) : super(id: id);
 }
 
 /// Information about a URI audio source to be communicated with the platform
 /// implementation.
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
-  final Map<dynamic, dynamic> headers;
+  final Map<String, String>? headers;
 
   UriAudioSourceMessage({
-    @required String id,
-    @required this.uri,
-    @required this.headers,
+    required String id,
+    required this.uri,
+    this.headers,
     dynamic tag,
   }) : super(id: id, tag: tag);
 }
@@ -752,14 +768,14 @@ abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
 /// platform implementation.
 class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
   ProgressiveAudioSourceMessage({
-    @required String id,
-    @required String uri,
-    @required Map<dynamic, dynamic> headers,
+    required String id,
+    required String uri,
+    Map<String, String>? headers,
     dynamic tag,
   }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'progressive',
         'id': id,
         'uri': uri,
@@ -771,14 +787,14 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
 /// implementation.
 class DashAudioSourceMessage extends UriAudioSourceMessage {
   DashAudioSourceMessage({
-    @required String id,
-    @required String uri,
-    @required Map<dynamic, dynamic> headers,
+    required String id,
+    required String uri,
+    Map<String, String>? headers,
     dynamic tag,
   }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'dash',
         'id': id,
         'uri': uri,
@@ -790,14 +806,14 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
 /// implementation.
 class HlsAudioSourceMessage extends UriAudioSourceMessage {
   HlsAudioSourceMessage({
-    @required String id,
-    @required String uri,
-    @required Map<dynamic, dynamic> headers,
+    required String id,
+    required String uri,
+    Map<String, String>? headers,
     dynamic tag,
   }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'hls',
         'id': id,
         'uri': uri,
@@ -813,14 +829,14 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
   final List<int> shuffleOrder;
 
   ConcatenatingAudioSourceMessage({
-    @required String id,
-    @required this.children,
-    @required this.useLazyPreparation,
-    @required this.shuffleOrder,
+    required String id,
+    required this.children,
+    required this.useLazyPreparation,
+    required this.shuffleOrder,
   }) : super(id: id);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'concatenating',
         'id': id,
         'children': children.map((child) => child.toMap()).toList(),
@@ -833,24 +849,24 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
 /// platform implementation.
 class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
   final UriAudioSourceMessage child;
-  final Duration start;
-  final Duration end;
+  final Duration? start;
+  final Duration? end;
 
   ClippingAudioSourceMessage({
-    @required String id,
-    @required this.child,
-    @required this.start,
-    @required this.end,
+    required String id,
+    required this.child,
+    this.start,
+    this.end,
     dynamic tag,
   }) : super(id: id, tag: tag);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'clipping',
         'id': id,
         'child': child.toMap(),
-        'start': start.inMicroseconds,
-        'end': end.inMicroseconds,
+        'start': start?.inMicroseconds,
+        'end': end?.inMicroseconds,
       };
 }
 
@@ -861,13 +877,13 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
   final int count;
 
   LoopingAudioSourceMessage({
-    @required String id,
-    @required this.child,
-    @required this.count,
+    required String id,
+    required this.child,
+    required this.count,
   }) : super(id: id);
 
   @override
-  Map<dynamic, dynamic> toMap() => {
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'type': 'looping',
         'id': id,
         'child': child.toMap(),

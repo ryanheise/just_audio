@@ -14,3 +14,4 @@ GeneratedPluginRegistrant.swift
 build/
 .flutter-plugins
 coverage
+pubspec.lock
