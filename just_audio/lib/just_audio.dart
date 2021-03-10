@@ -1083,7 +1083,11 @@ class AudioPlayer {
         }
         await platform.setVolume(SetVolumeRequest(volume: volume));
         await platform.setSpeed(SetSpeedRequest(speed: speed));
-        await platform.setPitch(SetPitchRequest(pitch: pitch));
+        try {
+          await platform.setPitch(SetPitchRequest(pitch: pitch));
+        } catch (e) {
+          print('setPitch not supported on this platform');
+        }
         await platform.setLoopMode(SetLoopModeRequest(
             loopMode: LoopModeMessage.values[loopMode.index]));
         await platform.setShuffleMode(SetShuffleModeRequest(

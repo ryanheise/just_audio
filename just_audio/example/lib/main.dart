@@ -288,16 +288,16 @@ class ControlButtons extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: Icon(Icons.music_note),
+          icon: Icon(Icons.volume_up),
           onPressed: () {
             _showSliderDialog(
               context: context,
-              title: "Adjust pitch",
+              title: "Adjust volume",
               divisions: 10,
-              min: 0.5,
-              max: 1.5,
-              stream: player.pitchStream,
-              onChanged: player.setPitch,
+              min: 0.0,
+              max: 1.0,
+              stream: player.volumeStream,
+              onChanged: player.setVolume,
             );
           },
         ),
