@@ -1,6 +1,7 @@
 #import "AudioPlayer.h"
 #import "AudioSource.h"
 #import "IndexedAudioSource.h"
+#import "LoadControl.h"
 #import "UriAudioSource.h"
 #import "ConcatenatingAudioSource.h"
 #import "LoopingAudioSource.h"
@@ -38,13 +39,14 @@
     FlutterResult _playResult;
     id _timeObserver;
     BOOL _automaticallyWaitsToMinimizeStalling;
+    LoadControl *_loadControl;
     BOOL _playing;
     float _speed;
     BOOL _justAdvanced;
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
 
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _registrar = registrar;
@@ -77,6 +79,23 @@
     _loadResult = nil;
     _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
+    _loadControl = nil;
+    if (loadConfiguration != (id)[NSNull null]) {
+        NSDictionary *map = loadConfiguration[@"darwinLoadControl"];
+        if (map != (id)[NSNull null]) {
+            _loadControl = [[LoadControl alloc] init];
+            _loadControl.preferredForwardBufferDuration = (NSNumber *)map[@"preferredForwardBufferDuration"];
+            _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused = (BOOL)[map[@"canUseNetworkResourcesForLiveStreamingWhilePaused"] boolValue];
+            _loadControl.preferredPeakBitRate = (NSNumber *)map[@"preferredPeakBitRate"];
+            _automaticallyWaitsToMinimizeStalling = (BOOL)[map[@"automaticallyWaitsToMinimizeStalling"] boolValue];
+        }
+    }
+    if (!_loadControl) {
+        _loadControl = [[LoadControl alloc] init];
+        _loadControl.preferredForwardBufferDuration = (NSNumber *)[NSNull null];
+        _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused = NO;
+        _loadControl.preferredPeakBitRate = (NSNumber *)[NSNull null];
+    }
     _speed = 1.0f;
     _justAdvanced = NO;
     _icyMetadata = @{};
@@ -115,6 +134,12 @@
             result(@{});
         } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
             [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];
+            result(@{});
+        } else if ([@"setCanUseNetworkResourcesForLiveStreamingWhilePaused" isEqualToString:call.method]) {
+            [self setCanUseNetworkResourcesForLiveStreamingWhilePaused:(BOOL)[request[@"enabled"] boolValue]];
+            result(@{});
+        } else if ([@"setPreferredPeakBitRate" isEqualToString:call.method]) {
+            [self setPreferredPeakBitRate:(NSNumber *)request[@"bitRate"]];
             result(@{});
         } else if ([@"seek" isEqualToString:call.method]) {
             CMTime position = request[@"position"] == (id)[NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
@@ -431,11 +456,11 @@
 - (AudioSource *)decodeAudioSource:(NSDictionary *)data {
     NSString *type = data[@"type"];
     if ([@"progressive" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
+        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"dash" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
+        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"hls" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
+        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"concatenating" isEqualToString:type]) {
         return [[ConcatenatingAudioSource alloc] initWithId:data[@"id"]
                                                audioSources:[self decodeAudioSources:data[@"children"]]
@@ -1123,6 +1148,22 @@
         if(_player) {
             _player.automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
         }
+    }
+}
+
+- (void)setCanUseNetworkResourcesForLiveStreamingWhilePaused:(BOOL)enabled {
+    _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused = enabled;
+    if (!_indexedAudioSources) return;
+    for (int i = 0; i < [_indexedAudioSources count]; i++) {
+        [_indexedAudioSources[i] applyCanUseNetworkResourcesForLiveStreamingWhilePaused];
+    }
+}
+
+- (void)setPreferredPeakBitRate:(NSNumber *)preferredPeakBitRate {
+    _loadControl.preferredPeakBitRate = preferredPeakBitRate;
+    if (!_indexedAudioSources) return;
+    for (int i = 0; i < [_indexedAudioSources count]; i++) {
+        [_indexedAudioSources[i] applyPreferredPeakBitRate];
     }
 }
 

@@ -34,7 +34,7 @@ public class MainMethodCallHandler implements MethodCallHandler {
                 result.error("Platform player " + id + " already exists", null, null);
                 break;
             }
-            players.put(id, new AudioPlayer(applicationContext, messenger, id));
+            players.put(id, new AudioPlayer(applicationContext, messenger, id, (Map<?, ?>)request.get("audioLoadConfiguration")));
             result.success(null);
             break;
         }

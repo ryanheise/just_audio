@@ -106,6 +106,25 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
+    return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setCanUseNetworkResourcesForLiveStreamingWhilePaused',
+            request.toMap()))!);
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) async {
+    return SetPreferredPeakBitRateResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setPreferredPeakBitRate', request.toMap()))!);
+  }
+
+  @override
   Future<SeekResponse> seek(SeekRequest request) async {
     return SeekResponse.fromMap((await _channel
         .invokeMethod<Map<dynamic, dynamic>>('seek', request.toMap()))!);

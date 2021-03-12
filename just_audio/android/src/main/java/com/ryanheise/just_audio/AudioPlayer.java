@@ -4,7 +4,11 @@ import android.content.Context;
 import android.net.Uri;
 import android.os.Handler;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.DefaultLivePlaybackSpeedControl;
+import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.LivePlaybackSpeedControl;
+import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -48,6 +52,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.google.android.exoplayer2.LoadControl;
 import java.util.Random;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
@@ -77,6 +82,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private IcyHeaders icyHeaders;
     private int errorCount;
     private AudioAttributes pendingAudioAttributes;
+    private LoadControl loadControl;
+    private LivePlaybackSpeedControl livePlaybackSpeedControl;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
@@ -110,7 +117,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
     };
 
-    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id) {
+    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration) {
         this.context = applicationContext;
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
@@ -127,6 +134,36 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             }
         });
         processingState = ProcessingState.none;
+        if (audioLoadConfiguration != null) {
+            Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
+            if (loadControlMap != null) {
+                DefaultLoadControl.Builder builder = new DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        (int)((getLong(loadControlMap.get("minBufferDuration")))/1000),
+                        (int)((getLong(loadControlMap.get("maxBufferDuration")))/1000),
+                        (int)((getLong(loadControlMap.get("bufferForPlaybackDuration")))/1000),
+                        (int)((getLong(loadControlMap.get("bufferForPlaybackAfterRebufferDuration")))/1000)
+                    )
+                    .setPrioritizeTimeOverSizeThresholds((Boolean)loadControlMap.get("prioritizeTimeOverSizeThresholds"))
+                    .setBackBuffer((int)((getLong(loadControlMap.get("backBufferDuration")))/1000), false);
+                if (loadControlMap.get("targetBufferBytes") != null) {
+                    builder.setTargetBufferBytes((Integer)loadControlMap.get("targetBufferBytes"));
+                }
+                loadControl = builder.build();
+            }
+            Map<?, ?> livePlaybackSpeedControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLivePlaybackSpeedControl");
+            if (livePlaybackSpeedControlMap != null) {
+                DefaultLivePlaybackSpeedControl.Builder builder = new DefaultLivePlaybackSpeedControl.Builder()
+                    .setFallbackMinPlaybackSpeed((float)((double)((Double)livePlaybackSpeedControlMap.get("fallbackMinPlaybackSpeed"))))
+                    .setFallbackMaxPlaybackSpeed((float)((double)((Double)livePlaybackSpeedControlMap.get("fallbackMaxPlaybackSpeed"))))
+                    .setMinUpdateIntervalMs((int)((getLong(livePlaybackSpeedControlMap.get("minUpdateInterval")))/1000))
+                    .setProportionalControlFactor((float)((double)((Double)livePlaybackSpeedControlMap.get("proportionalControlFactor"))))
+                    .setMaxLiveOffsetErrorMsForUnitSpeed((int)((getLong(livePlaybackSpeedControlMap.get("maxLiveOffsetErrorForUnitSpeed")))/1000))
+                    .setTargetLiveOffsetIncrementOnRebufferMs((int)((getLong(livePlaybackSpeedControlMap.get("targetLiveOffsetIncrementOnRebuffer")))/1000))
+                    .setMinPossibleLiveOffsetSmoothingFactor((float)((double)((Double)livePlaybackSpeedControlMap.get("minPossibleLiveOffsetSmoothingFactor"))));
+                livePlaybackSpeedControl = builder.build();
+            }
+        }
     }
 
     private void startWatchingBuffer() {
@@ -324,6 +361,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 result.success(new HashMap<String, Object>());
                 break;
             case "setAutomaticallyWaitsToMinimizeStalling":
+                result.success(new HashMap<String, Object>());
+                break;
+            case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
+                result.success(new HashMap<String, Object>());
+                break;
+            case "setPreferredPeakBitRate":
                 result.success(new HashMap<String, Object>());
                 break;
             case "seek":
@@ -534,7 +577,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void ensurePlayerInitialized() {
         if (player == null) {
-            player = new SimpleExoPlayer.Builder(context).build();
+            SimpleExoPlayer.Builder builder = new SimpleExoPlayer.Builder(context);
+            if (loadControl != null) {
+                builder.setLoadControl(loadControl);
+            }
+            if (livePlaybackSpeedControl != null) {
+                builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
+            }
+            player = builder.build();
             onAudioSessionIdChanged(player.getAudioSessionId());
             player.addMetadataOutput(this);
             player.addListener(this);
@@ -738,6 +788,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         sendError("abort", "Connection aborted");
     }
 
+    // Dart can't distinguish between int sizes so
+    // Flutter may send us a Long or an Integer
+    // depending on the number of bits required to
+    // represent it.
     public static Long getLong(Object o) {
         return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
     }
