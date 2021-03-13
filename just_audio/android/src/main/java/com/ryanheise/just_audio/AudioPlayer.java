@@ -307,6 +307,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 setSpeed((float) ((double) ((Double) call.argument("speed"))));
                 result.success(new HashMap<String, Object>());
                 break;
+            case "setPitch":
+                setPitch((float) ((double) ((Double) call.argument("pitch"))));
+                result.success(new HashMap<String, Object>());
+                break;
             case "setLoopMode":
                 setLoopMode((Integer) call.argument("loopMode"));
                 result.success(new HashMap<String, Object>());
@@ -669,8 +673,16 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void setSpeed(final float speed) {
-        if (player.getPlaybackParameters().speed != speed)
-            player.setPlaybackParameters(new PlaybackParameters(speed));
+        PlaybackParameters params = player.getPlaybackParameters();
+        if (params.speed != speed)
+            player.setPlaybackParameters(new PlaybackParameters(speed, params.pitch));
+        broadcastPlaybackEvent();
+    }
+
+    public void setPitch(final float pitch) {
+        PlaybackParameters params = player.getPlaybackParameters();
+        if (params.pitch != pitch)
+            player.setPlaybackParameters(new PlaybackParameters(params.speed, pitch));
         broadcastPlaybackEvent();
     }
 
