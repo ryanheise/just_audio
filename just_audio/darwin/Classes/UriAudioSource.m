@@ -1,6 +1,7 @@
 #import "UriAudioSource.h"
 #import "IndexedAudioSource.h"
 #import "IndexedPlayerItem.h"
+#import "LoadControl.h"
 #import <AVFoundation/AVFoundation.h>
 
 @implementation UriAudioSource {
@@ -28,7 +29,7 @@
 - (IndexedPlayerItem *)createPlayerItem:(NSString *)uri {
     IndexedPlayerItem *item;
     if ([uri hasPrefix:@"file://"]) {
-        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding] substringFromIndex:7]]];
+        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByRemovingPercentEncoding] substringFromIndex:7]]];
     } else {
         item = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:uri]];
     }
@@ -37,7 +38,7 @@
         item.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
     }
     if (@available(macOS 10.12, iOS 10.0, *)) {
-        if (_preferredForwardBufferDuration != (id)[NSNull null]) {
+        if (_loadControl.preferredForwardBufferDuration != (id)[NSNull null]) {
             item.preferredForwardBufferDuration = (double)([_loadControl.preferredForwardBufferDuration longLongValue]/1000) / 1000.0;
         }
     }
@@ -45,7 +46,7 @@
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused;
     }
     if (@available(iOS 8.0, macOS 10.10, *)) {
-        if (_preferredPeakBitRate != (id)[NSNull null]) {
+        if (_loadControl.preferredPeakBitRate != (id)[NSNull null]) {
             item.preferredPeakBitRate = [_loadControl.preferredPeakBitRate doubleValue];
         }
     }
@@ -56,7 +57,7 @@
 // Not used. XXX: Remove?
 - (void)applyPreferredForwardBufferDuration {
     if (@available(macOS 10.12, iOS 10.0, *)) {
-        if (_preferredForwardBufferDuration != (id)[NSNull null]) {
+        if (_loadControl.preferredForwardBufferDuration != (id)[NSNull null]) {
             double value = (double)([_loadControl.preferredForwardBufferDuration longLongValue]/1000) / 1000.0;
             _playerItem.preferredForwardBufferDuration = value;
             if (_playerItem2) {
