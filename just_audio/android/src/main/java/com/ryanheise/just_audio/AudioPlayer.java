@@ -267,7 +267,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         if (player.hasNext() && currentIndex != null && errorCount <= 5) {
             int nextIndex = currentIndex + 1;
             Timeline timeline = player.getCurrentTimeline();
-            if (nextIndex >= 0 && (timeline.isEmpty() || nextIndex < timeline.getWindowCount())) {
+            // This condition is due to: https://github.com/ryanheise/just_audio/pull/310
+            if (nextIndex < timeline.getWindowCount()) {
                 // TODO: pass in initial position here.
                 player.setMediaSource(mediaSource);
                 player.prepare();
