@@ -1591,7 +1591,9 @@ abstract class UriAudioSource extends IndexedAudioSource {
     await super._setup(player);
     if (uri.scheme == 'asset') {
       _overrideUri = await _loadAsset(uri.pathSegments.join('/'));
-    } else if (headers != null || player._userAgent != null) {
+    } else if (uri.scheme != 'file' &&
+        !kIsWeb &&
+        (headers != null || player._userAgent != null)) {
       _overrideUri = player._proxy!.addUriAudioSource(this);
     }
   }
@@ -1644,7 +1646,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       ]));
 
   @override
-  bool get _requiresProxy => headers != null && !kIsWeb;
+  bool get _requiresProxy => uri.scheme != 'file' && headers != null && !kIsWeb;
 }
 
 /// An [AudioSource] representing a regular media file such as an MP3 or M4A
