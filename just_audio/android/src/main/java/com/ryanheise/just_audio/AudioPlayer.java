@@ -266,10 +266,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         errorCount++;
         if (player.hasNext() && currentIndex != null && errorCount <= 5) {
             int nextIndex = currentIndex + 1;
-            // TODO: pass in initial position here.
-            player.setMediaSource(mediaSource);
-            player.prepare();
-            player.seekTo(nextIndex, 0);
+            Timeline timeline = player.getCurrentTimeline();
+            if (nextIndex >= 0 && (timeline.isEmpty() || nextIndex < timeline.getWindowCount())) {
+                // TODO: pass in initial position here.
+                player.setMediaSource(mediaSource);
+                player.prepare();
+                player.seekTo(nextIndex, 0);
+            }
         }
     }
 
