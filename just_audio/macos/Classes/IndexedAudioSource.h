@@ -21,5 +21,8 @@
 - (void)seek:(CMTime)position completionHandler:(void (^)(BOOL))completionHandler;
 - (void)preparePlayerItem2;
 - (void)flip;
+- (void)applyPreferredForwardBufferDuration;
+- (void)applyCanUseNetworkResourcesForLiveStreamingWhilePaused;
+- (void)applyPreferredPeakBitRate;
 
 @end

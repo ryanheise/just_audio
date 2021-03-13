@@ -409,6 +409,20 @@ class Html5AudioPlayer extends JustAudioPlayer {
   }
 
   @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
+    return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse();
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) async {
+    return SetPreferredPeakBitRateResponse();
+  }
+
+  @override
   Duration getCurrentPosition() =>
       _currentAudioSourcePlayer?.position ?? Duration.zero;
 

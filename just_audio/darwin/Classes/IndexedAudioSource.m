@@ -91,4 +91,13 @@
     return kCMTimeInvalid;
 }
 
+- (void)applyPreferredForwardBufferDuration {
+}
+
+- (void)applyCanUseNetworkResourcesForLiveStreamingWhilePaused {
+}
+
+- (void)applyPreferredPeakBitRate {
+}
+
 @end

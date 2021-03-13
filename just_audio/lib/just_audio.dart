@@ -39,6 +39,8 @@ class AudioPlayer {
   /// The user agent to set on all HTTP requests.
   final String? _userAgent;
 
+  final AudioLoadConfiguration? _audioLoadConfiguration;
+
   /// This is `true` when the audio player needs to engage the native platform
   /// side of the plugin to decode or play audio, and is `false` when the native
   /// resources are not needed (i.e. after initial instantiation and after [stop]).
@@ -92,6 +94,8 @@ class AudioPlayer {
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
+  bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
+  double? _preferredPeakBitRate;
   bool _playInterrupted = false;
   AndroidAudioAttributes? _androidAudioAttributes;
   final bool _androidApplyAudioAttributes;
@@ -117,16 +121,25 @@ class AudioPlayer {
   /// If you do not want just_audio to respect the global
   /// [AndroidAudioAttributes] configured by audio_session, set
   /// [androidApplyAudioAttributes] to `false`.
+  ///
+  /// The default audio loading and buffering behaviour can be configured via
+  /// the [audioLoadConfiguration] parameter.
   AudioPlayer({
     String? userAgent,
     bool handleInterruptions = true,
     bool androidApplyAudioAttributes = true,
     bool handleAudioSessionActivation = true,
+    AudioLoadConfiguration? audioLoadConfiguration,
   })  : _id = _uuid.v4(),
         _userAgent = userAgent,
         _androidApplyAudioAttributes = androidApplyAudioAttributes,
-        _handleAudioSessionActivation = handleAudioSessionActivation {
+        _handleAudioSessionActivation = handleAudioSessionActivation,
+        _audioLoadConfiguration = audioLoadConfiguration {
     _idlePlatform = _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream);
+    if (_audioLoadConfiguration?.darwinLoadControl != null) {
+      _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
+          .darwinLoadControl!.automaticallyWaitsToMinimizeStalling;
+    }
     _playbackEventSubject.add(_playbackEvent);
     _processingStateSubject.addStream(playbackEventStream
         .map((event) => event.processingState)
@@ -912,6 +925,28 @@ class AudioPlayer {
             enabled: automaticallyWaitsToMinimizeStalling));
   }
 
+  /// Sets canUseNetworkResourcesForLiveStreamingWhilePaused on iOS/macOS,
+  /// defaults to false.
+  Future<void> setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+      final bool canUseNetworkResourcesForLiveStreamingWhilePaused) async {
+    if (_disposed) return;
+    _canUseNetworkResourcesForLiveStreamingWhilePaused =
+        canUseNetworkResourcesForLiveStreamingWhilePaused;
+    await (await _platform)
+        .setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+            SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest(
+                enabled: canUseNetworkResourcesForLiveStreamingWhilePaused));
+  }
+
+  /// Sets preferredPeakBitRate on iOS/macOS, defaults to true.
+  Future<void> setPreferredPeakBitRate(
+      final double preferredPeakBitRate) async {
+    if (_disposed) return;
+    _preferredPeakBitRate = preferredPeakBitRate;
+    await (await _platform).setPreferredPeakBitRate(
+        SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
+  }
+
   /// Seeks to a particular [position]. If a composition of multiple
   /// [AudioSource]s has been loaded, you may also specify [index] to seek to a
   /// particular item within that sequence. This method has no effect unless
@@ -1026,8 +1061,11 @@ class AudioPlayer {
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
       final platform = active
-          ? await (_nativePlatform =
-              JustAudioPlatform.instance.init(InitRequest(id: _id)))
+          ? await (_nativePlatform = JustAudioPlatform.instance.init(
+              InitRequest(
+                  id: _id,
+                  audioLoadConfiguration:
+                      _audioLoadConfiguration?._toMessage())))
           : _idlePlatform!;
       _playbackEventSubscription =
           platform.playbackEventMessageStream.listen((message) {
@@ -1398,6 +1436,173 @@ class SequenceState {
   List<IndexedAudioSource> get effectiveSequence => shuffleModeEnabled
       ? shuffleIndices.map((i) => sequence[i]).toList()
       : sequence;
+}
+
+/// Configuration options to use when loading audio from a source.
+class AudioLoadConfiguration {
+  /// Bufferring and loading options for iOS/macOS.
+  final DarwinLoadControl? darwinLoadControl;
+
+  /// Buffering and loading options for Android.
+  final AndroidLoadControl? androidLoadControl;
+
+  /// Speed control for live streams on Android.
+  final AndroidLivePlaybackSpeedControl? androidLivePlaybackSpeedControl;
+
+  AudioLoadConfiguration({
+    this.darwinLoadControl,
+    this.androidLoadControl,
+    this.androidLivePlaybackSpeedControl,
+  });
+
+  AudioLoadConfigurationMessage _toMessage() => AudioLoadConfigurationMessage(
+        darwinLoadControl: darwinLoadControl?._toMessage(),
+        androidLoadControl: androidLoadControl?._toMessage(),
+        androidLivePlaybackSpeedControl:
+            androidLivePlaybackSpeedControl?._toMessage(),
+      );
+}
+
+/// Buffering and loading options for iOS/macOS.
+class DarwinLoadControl {
+  /// (iOS/macOS) Whether the player will wait for sufficient data to be
+  /// buffered before starting playback to avoid the likelihood of stalling.
+  final bool automaticallyWaitsToMinimizeStalling;
+
+  /// (iOS/macOS) The duration of audio that should be buffered ahead of the
+  /// current position. If not set or `null`, the system will try to set an
+  /// appropriate buffer duration.
+  final Duration? preferredForwardBufferDuration;
+
+  /// (iOS/macOS) Whether the player can continue downloading while paused to
+  /// keep the state up to date with the live stream.
+  final bool canUseNetworkResourcesForLiveStreamingWhilePaused;
+
+  /// (iOS/macOS) If specified, limits the download bandwidth in bits per
+  /// second.
+  final double? preferredPeakBitRate;
+
+  DarwinLoadControl({
+    this.automaticallyWaitsToMinimizeStalling = true,
+    this.preferredForwardBufferDuration,
+    this.canUseNetworkResourcesForLiveStreamingWhilePaused = false,
+    this.preferredPeakBitRate,
+  });
+
+  DarwinLoadControlMessage _toMessage() => DarwinLoadControlMessage(
+        automaticallyWaitsToMinimizeStalling:
+            automaticallyWaitsToMinimizeStalling,
+        preferredForwardBufferDuration: preferredForwardBufferDuration,
+        canUseNetworkResourcesForLiveStreamingWhilePaused:
+            canUseNetworkResourcesForLiveStreamingWhilePaused,
+        preferredPeakBitRate: preferredPeakBitRate,
+      );
+}
+
+/// Buffering and loading options for Android.
+class AndroidLoadControl {
+  /// (Android) The minimum duration of audio that should be buffered ahead of
+  /// the current position.
+  final Duration minBufferDuration;
+
+  /// (Android) The maximum duration of audio that should be buffered ahead of
+  /// the current position.
+  final Duration maxBufferDuration;
+
+  /// (Android) The duration of audio that must be buffered before starting
+  /// playback after a user action.
+  final Duration bufferForPlaybackDuration;
+
+  /// (Android) The duration of audio that must be buffered before starting
+  /// playback after a buffer depletion.
+  final Duration bufferForPlaybackAfterRebufferDuration;
+
+  /// (Android) The target buffer size in bytes.
+  final int? targetBufferBytes;
+
+  /// (Android) Whether to prioritize buffer time constraints over buffer size
+  /// constraints.
+  final bool prioritizeTimeOverSizeThresholds;
+
+  /// (Android) The back buffer duration.
+  final Duration backBufferDuration;
+
+  AndroidLoadControl({
+    this.minBufferDuration = const Duration(seconds: 50),
+    this.maxBufferDuration = const Duration(seconds: 50),
+    this.bufferForPlaybackDuration = const Duration(milliseconds: 2500),
+    this.bufferForPlaybackAfterRebufferDuration = const Duration(seconds: 5),
+    this.targetBufferBytes,
+    this.prioritizeTimeOverSizeThresholds = false,
+    this.backBufferDuration = Duration.zero,
+  });
+
+  AndroidLoadControlMessage _toMessage() => AndroidLoadControlMessage(
+        minBufferDuration: minBufferDuration,
+        maxBufferDuration: maxBufferDuration,
+        bufferForPlaybackDuration: bufferForPlaybackDuration,
+        bufferForPlaybackAfterRebufferDuration:
+            bufferForPlaybackAfterRebufferDuration,
+        targetBufferBytes: targetBufferBytes,
+        prioritizeTimeOverSizeThresholds: prioritizeTimeOverSizeThresholds,
+        backBufferDuration: backBufferDuration,
+      );
+}
+
+/// Speed control for live streams on Android.
+class AndroidLivePlaybackSpeedControl {
+  /// (Android) The minimum playback speed to use when adjusting playback speed
+  /// to approach the target live offset, if none is defined by the media.
+  final double fallbackMinPlaybackSpeed;
+
+  /// (Android) The maximum playback speed to use when adjusting playback speed
+  /// to approach the target live offset, if none is defined by the media.
+  final double fallbackMaxPlaybackSpeed;
+
+  /// (Android) The minimum interval between playback speed changes on a live
+  /// stream.
+  final Duration minUpdateInterval;
+
+  /// (Android) The proportional control factor used to adjust playback speed on
+  /// a live stream. The adjusted speed is calculated as: `1.0 +
+  /// proportionalControlFactor * (currentLiveOffsetSec - targetLiveOffsetSec)`.
+  final double proportionalControlFactor;
+
+  /// (Android) The maximum difference between the current live offset and the
+  /// target live offset within which the speed 1.0 is used.
+  final Duration maxLiveOffsetErrorForUnitSpeed;
+
+  /// (Android) The increment applied to the target live offset whenever the
+  /// player rebuffers.
+  final Duration targetLiveOffsetIncrementOnRebuffer;
+
+  /// (Android) The factor for smoothing the minimum possible live offset
+  /// achievable during playback.
+  final double minPossibleLiveOffsetSmoothingFactor;
+
+  AndroidLivePlaybackSpeedControl({
+    this.fallbackMinPlaybackSpeed = 0.97,
+    this.fallbackMaxPlaybackSpeed = 1.03,
+    this.minUpdateInterval = const Duration(seconds: 1),
+    this.proportionalControlFactor = 1.0,
+    this.maxLiveOffsetErrorForUnitSpeed = const Duration(milliseconds: 20),
+    this.targetLiveOffsetIncrementOnRebuffer =
+        const Duration(milliseconds: 500),
+    this.minPossibleLiveOffsetSmoothingFactor = 0.999,
+  });
+
+  AndroidLivePlaybackSpeedControlMessage _toMessage() =>
+      AndroidLivePlaybackSpeedControlMessage(
+        fallbackMinPlaybackSpeed: fallbackMinPlaybackSpeed,
+        fallbackMaxPlaybackSpeed: fallbackMaxPlaybackSpeed,
+        minUpdateInterval: minUpdateInterval,
+        proportionalControlFactor: proportionalControlFactor,
+        maxLiveOffsetErrorForUnitSpeed: maxLiveOffsetErrorForUnitSpeed,
+        targetLiveOffsetIncrementOnRebuffer:
+            targetLiveOffsetIncrementOnRebuffer,
+        minPossibleLiveOffsetSmoothingFactor:
+            minPossibleLiveOffsetSmoothingFactor,
+      );
 }
 
 /// A local proxy HTTP server for making remote GET requests with headers.
@@ -2647,6 +2852,20 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
       setAutomaticallyWaitsToMinimizeStalling(
           SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
     return SetAutomaticallyWaitsToMinimizeStallingResponse();
+  }
+
+  @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
+    return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse();
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) async {
+    return SetPreferredPeakBitRateResponse();
   }
 
   @override
