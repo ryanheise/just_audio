@@ -78,7 +78,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   Future<SetSkipSilenceResponse> setSkipSilence(
       SetSkipSilenceRequest request) async {
     return SetSkipSilenceResponse.fromMap(
-        (await _channel.invokeMethod<map<dynamic, dynamic>>(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'setSkipSilence', request.toMap()))!);
   }
 
@@ -136,14 +136,6 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   Future<SeekResponse> seek(SeekRequest request) async {
     return SeekResponse.fromMap((await _channel
         .invokeMethod<Map<dynamic, dynamic>>('seek', request.toMap()))!);
-  }
-
-  @override
-  Future<SetVolumeBoostResponse> setVolumeBoost(
-      SetVolumeBoostRequest request) async {
-    return SetVolumeBoostResponse.fromMap(
-        (await _channel.invokeMethod<map<dynamic, dynamic>>(
-            'setVolumeBoost', request.toMap()))!);
   }
 
   @override
