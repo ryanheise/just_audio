@@ -80,6 +80,7 @@ class AudioPlayer {
   final _volumeSubject = BehaviorSubject.seeded(1.0);
   final _speedSubject = BehaviorSubject.seeded(1.0);
   final _pitchSubject = BehaviorSubject.seeded(1.0);
+  final _skipSilenceEnabledSubject = BehaviorSubject.seeded(false);
   final _bufferedPositionSubject = BehaviorSubject<Duration>();
   final _icyMetadataSubject = BehaviorSubject<IcyMetadata?>();
   final _playerStateSubject = BehaviorSubject<PlayerState>();
@@ -313,6 +314,13 @@ class AudioPlayer {
 
   /// A stream of current pitch factor values.
   Stream<double> get pitchStream => _pitchSubject.stream;
+
+  /// The current skipSilenceEnabled factor of the player.
+  bool get skipSilenceEnabled => _skipSilenceEnabledSubject.value!;
+
+  /// A stream of current skipSilenceEnabled factor values.
+  Stream<bool> get skipSilenceEnabledStream =>
+      _skipSilenceEnabledSubject.stream;
 
   /// The position up to which buffered audio is available.
   Duration get bufferedPosition =>
@@ -857,6 +865,22 @@ class AudioPlayer {
     await (await _platform).setVolume(SetVolumeRequest(volume: volume));
   }
 
+  /// Sets whether silence should be skipped in audio playback. (Currently
+  /// Android only).
+  Future<void> setSkipSilenceEnabled(bool enabled) async {
+    if (_disposed) return;
+    final previouslyEnabled = skipSilenceEnabled;
+    if (enabled == previouslyEnabled) return;
+    _skipSilenceEnabledSubject.add(enabled);
+    try {
+      await (await _platform)
+          .setSkipSilence(SetSkipSilenceRequest(enabled: enabled));
+    } catch (e) {
+      _skipSilenceEnabledSubject.add(previouslyEnabled);
+      rethrow;
+    }
+  }
+
   /// Sets the playback speed of this player, where 1.0 is normal speed. Note
   /// that values in excess of 1.0 may result in stalls if the playback speed is
   /// faster than the player is able to downloaded the audio.
@@ -1125,6 +1149,12 @@ class AudioPlayer {
           await platform.setPitch(SetPitchRequest(pitch: pitch));
         } catch (e) {
           print('setPitch not supported on this platform');
+        }
+        try {
+          await platform.setSkipSilence(
+              SetSkipSilenceRequest(enabled: skipSilenceEnabled));
+        } catch (e) {
+          print('setSkipSilence not supported on this platform');
         }
         await platform.setLoopMode(SetLoopModeRequest(
             loopMode: LoopModeMessage.values[loopMode.index]));
@@ -2830,6 +2860,12 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<SetPitchResponse> setPitch(SetPitchRequest request) async {
     return SetPitchResponse();
+  }
+
+  @override
+  Future<SetSkipSilenceResponse> setSkipSilence(
+      SetSkipSilenceRequest request) async {
+    return SetSkipSilenceResponse();
   }
 
   @override

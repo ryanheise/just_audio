@@ -50,7 +50,10 @@ This project is supported by the amazing open source community of GitHub contrib
 | compose audio                  | ✅        | ✅      | ✅      | ✅      |
 | gapless playback               | ✅        | ✅      | ✅      |         |
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
-| Handle phonecall interruptions | ✅        | ✅      |         |         |
+| handle phonecall interruptions | ✅        | ✅      |         |         |
+| set pitch                      | ✅        |         |         |         |
+| skip silence                   | ✅        |         |         |         |
+| buffering/loading options      | ✅        | ✅      | ✅      |         |
 
 ## Experimental features
 

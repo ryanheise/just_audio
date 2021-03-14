@@ -96,6 +96,11 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError("setPitch() has not been implemented.");
   }
 
+  /// sets skipSilence to true/false.
+  Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) {
+    throw UnimplementedError("setSkipSilence() has not been implemented.");
+  }
+
   /// Sets the loop mode.
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) {
     throw UnimplementedError("setLoopMode() has not been implemented.");
@@ -442,6 +447,25 @@ class SetPitchRequest {
 class SetPitchResponse {
   static SetPitchResponse fromMap(Map<dynamic, dynamic> map) =>
       SetPitchResponse();
+}
+
+/// Information communicated to the platform implementation when setting the
+/// skipSilence.
+class SetSkipSilenceRequest {
+  final bool enabled;
+
+  SetSkipSilenceRequest({required this.enabled});
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'enabled': enabled,
+      };
+}
+
+/// Information returned by the platform implementation after setting the
+/// speed.
+class SetSkipSilenceResponse {
+  static SetSkipSilenceResponse fromMap(Map<dynamic, dynamic> map) =>
+      SetSkipSilenceResponse();
 }
 
 /// Information communicated to the platform implementation when setting the
