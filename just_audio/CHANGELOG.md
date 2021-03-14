@@ -1,3 +1,9 @@
+## Next release
+
+* Add setSkipSilenceEnabled (@subhash279).
+* Add buffer options via AudioLoadConfiguration.
+* Add setPitch.
+
 ## 0.7.1
 
 * Fix IllegalSeekPositionException on Android (@DenisShakinov).
