@@ -120,6 +120,9 @@
         } else if ([@"setVolume" isEqualToString:call.method]) {
             [self setVolume:(float)[request[@"volume"] doubleValue]];
             result(@{});
+        } else if ([@"setSkipSilence" isEqualToString:call.method]) {
+            /// TODO on iOS side; Seems more involved, so someone with ObjectiveC experience might look at it.
+            result(nil);
         } else if ([@"setSpeed" isEqualToString:call.method]) {
             [self setSpeed:(float)[request[@"speed"] doubleValue]];
             result(@{});
