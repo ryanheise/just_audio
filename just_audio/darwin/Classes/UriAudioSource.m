@@ -1,6 +1,7 @@
 #import "UriAudioSource.h"
 #import "IndexedAudioSource.h"
 #import "IndexedPlayerItem.h"
+#import "LoadControl.h"
 #import <AVFoundation/AVFoundation.h>
 
 @implementation UriAudioSource {
@@ -8,12 +9,14 @@
     IndexedPlayerItem *_playerItem;
     IndexedPlayerItem *_playerItem2;
     /* CMTime _duration; */
+    LoadControl *_loadControl;
 }
 
-- (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri {
+- (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl {
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _uri = uri;
+    _loadControl = loadControl;
     _playerItem = [self createPlayerItem:uri];
     _playerItem2 = nil;
     return self;
@@ -26,7 +29,7 @@
 - (IndexedPlayerItem *)createPlayerItem:(NSString *)uri {
     IndexedPlayerItem *item;
     if ([uri hasPrefix:@"file://"]) {
-        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding] substringFromIndex:7]]];
+        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByRemovingPercentEncoding] substringFromIndex:7]]];
     } else {
         item = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:uri]];
     }
@@ -34,7 +37,55 @@
         // This does the best at reducing distortion on voice with speeds below 1.0
         item.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
     }
+    if (@available(macOS 10.12, iOS 10.0, *)) {
+        if (_loadControl.preferredForwardBufferDuration != (id)[NSNull null]) {
+            item.preferredForwardBufferDuration = (double)([_loadControl.preferredForwardBufferDuration longLongValue]/1000) / 1000.0;
+        }
+    }
+    if (@available(iOS 9.0, macOS 10.11, *)) {
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused;
+    }
+    if (@available(iOS 8.0, macOS 10.10, *)) {
+        if (_loadControl.preferredPeakBitRate != (id)[NSNull null]) {
+            item.preferredPeakBitRate = [_loadControl.preferredPeakBitRate doubleValue];
+        }
+    }
+
     return item;
+}
+
+// Not used. XXX: Remove?
+- (void)applyPreferredForwardBufferDuration {
+    if (@available(macOS 10.12, iOS 10.0, *)) {
+        if (_loadControl.preferredForwardBufferDuration != (id)[NSNull null]) {
+            double value = (double)([_loadControl.preferredForwardBufferDuration longLongValue]/1000) / 1000.0;
+            _playerItem.preferredForwardBufferDuration = value;
+            if (_playerItem2) {
+                _playerItem2.preferredForwardBufferDuration = value;
+            }
+        }
+    }
+}
+
+- (void)applyCanUseNetworkResourcesForLiveStreamingWhilePaused {
+    if (@available(iOS 9.0, macOS 10.11, *)) {
+        _playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused;
+        if (_playerItem2) {
+            _playerItem2.canUseNetworkResourcesForLiveStreamingWhilePaused = _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused;
+        }
+    }
+}
+
+- (void)applyPreferredPeakBitRate {
+    if (@available(iOS 8.0, macOS 10.10, *)) {
+        if (_loadControl.preferredPeakBitRate != (id)[NSNull null]) {
+            double value = [_loadControl.preferredPeakBitRate doubleValue];
+            _playerItem.preferredPeakBitRate = value;
+            if (_playerItem2) {
+                _playerItem2.preferredPeakBitRate = value;
+            }
+        }
+    }
 }
 
 - (IndexedPlayerItem *)playerItem {

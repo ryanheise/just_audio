@@ -11,10 +11,9 @@ flutter:
         fileName: just_audio_web.dart
 
 dependencies:
-# Uncomment when testing platform interface changes.
+  #just_audio_platform_interface: ^3.0.0
   just_audio_platform_interface:
     path: ../just_audio_platform_interface
-  # just_audio_platform_interface: ^3.0.0
   flutter:
     sdk: flutter
   flutter_web_plugins:

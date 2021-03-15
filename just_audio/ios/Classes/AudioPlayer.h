@@ -7,7 +7,7 @@
 @property (readonly, nonatomic) float speed;
 @property (readonly, nonatomic) int visualizerCaptureSize;
 
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam;
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration;
 - (void)dispose;
 
 @end

@@ -44,7 +44,7 @@ public class MainMethodCallHandler implements MethodCallHandler {
                 result.error("Platform player " + id + " already exists", null, null);
                 break;
             }
-            final AudioPlayer player = new AudioPlayer(applicationContext, messenger, id);
+            final AudioPlayer player = new AudioPlayer(applicationContext, messenger, id, (Map<?, ?>)request.get("audioLoadConfiguration"));
             players.put(id, player);
             if (activityPluginBinding != null) {
                 player.setActivityPluginBinding(activityPluginBinding);
