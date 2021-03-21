@@ -564,7 +564,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<void> play() async {
     _audioElement.currentTime = _resumePos!;
-    _audioElement.play();
+    await _audioElement.play();
     _completer = Completer<dynamic>();
     await _completer!.future;
     _completer = null;
