@@ -836,8 +836,12 @@ class AudioPlayer {
 
   Future<void> _sendPlayRequest(
       AudioPlayerPlatform platform, Completer<void>? playCompleter) async {
-    await platform.play(PlayRequest());
-    playCompleter?.complete();
+    try {
+      await platform.play(PlayRequest());
+      playCompleter?.complete();
+    } catch (e, stackTrace) {
+      playCompleter?.completeError(e, stackTrace);
+    }
   }
 
   /// Stops playing audio and releases decoders and other native platform

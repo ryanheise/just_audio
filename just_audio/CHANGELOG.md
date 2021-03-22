@@ -4,6 +4,10 @@
 * Add buffer options via AudioLoadConfiguration.
 * Add setPitch.
 
+## 0.7.2
+
+* Propagate play() exceptions (@twogood).
+
 ## 0.7.1
 
 * Fix IllegalSeekPositionException on Android (@DenisShakinov).
