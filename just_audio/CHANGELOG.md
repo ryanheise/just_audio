@@ -1,6 +1,6 @@
-## Next release
+## 0.7.2
 
-* Propagate play() exceptions on web (@twogood).
+* Propagate play() exceptions (@twogood).
 
 ## 0.7.1
 
