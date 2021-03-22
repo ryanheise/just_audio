@@ -808,13 +808,11 @@ class AudioPlayer {
 
   Future<void> _sendPlayRequest(
       AudioPlayerPlatform platform, Completer<void>? playCompleter) async {
-    try
-    {
+    try {
       await platform.play(PlayRequest());
       playCompleter?.complete();
-    }
-    catch (e) {
-      playCompleter?.completeError(e);
+    } catch (e, stackTrace) {
+      playCompleter?.completeError(e, stackTrace);
     }
   }
 

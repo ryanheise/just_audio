@@ -1,3 +1,7 @@
+## Next release
+
+* Propagate play() exceptions on web (@twogood).
+
 ## 0.7.1
 
 * Fix IllegalSeekPositionException on Android (@DenisShakinov).

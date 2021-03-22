@@ -1,3 +1,7 @@
+## 0.3.1
+
+* Propagate play() exceptions (@twogood).
+
 ## 0.3.0
 
 * Null safety.

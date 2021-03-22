@@ -749,7 +749,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Future<void> play() async {
     _interruptPlay(ClipInterruptReason.simultaneous);
     _audioElement.currentTime = _resumePos!;
-    _audioElement.play();
+    await _audioElement.play();
     _completer = Completer<ClipInterruptReason>();
     ClipInterruptReason reason;
     while ((reason = await _completer!.future) == ClipInterruptReason.seek) {
