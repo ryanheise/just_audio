@@ -71,5 +71,6 @@ public class MainMethodCallHandler implements MethodCallHandler {
         for (AudioPlayer player : players.values()) {
             player.dispose();
         }
+        players.clear();
     }
 }
