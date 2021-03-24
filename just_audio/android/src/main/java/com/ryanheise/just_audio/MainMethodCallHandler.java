@@ -6,10 +6,16 @@ import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
+
+import static java.util.Collections.*;
+import static java.util.Collections.emptyMap;
 
 public class MainMethodCallHandler implements MethodCallHandler {
 
@@ -45,7 +51,14 @@ public class MainMethodCallHandler implements MethodCallHandler {
                 player.dispose();
                 players.remove(id);
             }
-            result.success(new HashMap<String, Object>());
+            result.success(emptyMap());
+            break;
+        }
+        case "disposeAllPlayers": {
+            Set<String> disposedPlayers = players.keySet();
+            this.dispose();
+
+            result.success(singletonMap("disposedPlayers", new ArrayList<>(disposedPlayers)));
             break;
         }
         default:
@@ -55,7 +68,7 @@ public class MainMethodCallHandler implements MethodCallHandler {
     }
 
     void dispose() {
-        for (AudioPlayer player : new ArrayList<AudioPlayer>(players.values())) {
+        for (AudioPlayer player : players.values()) {
             player.dispose();
         }
     }

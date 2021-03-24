@@ -50,6 +50,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import static java.util.Collections.emptyMap;
+
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
 
     static final String TAG = "AudioPlayer";
@@ -72,7 +74,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private Result playResult;
     private Result seekResult;
     private boolean playing;
-    private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
+    private Map<String, MediaSource> mediaSources = new HashMap<>();
     private IcyInfo icyInfo;
     private IcyHeaders icyHeaders;
     private int errorCount;
@@ -198,7 +200,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private void onItemMayHaveChanged() {
-        Integer newIndex = player.getCurrentWindowIndex();
+        int newIndex = player.getCurrentWindowIndex();
         if (newIndex != currentIndex) {
             currentIndex = newIndex;
         }
@@ -237,7 +239,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 transition(ProcessingState.completed);
             }
             if (playResult != null) {
-                playResult.success(new HashMap<String, Object>());
+                playResult.success(emptyMap());
                 playResult = null;
             }
             break;
@@ -279,7 +281,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void completeSeek() {
         seekPos = null;
-        seekResult.success(new HashMap<String, Object>());
+        seekResult.success(emptyMap());
         seekResult = null;
     }
 
@@ -301,30 +303,30 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 break;
             case "pause":
                 pause();
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "setVolume":
                 setVolume((float) ((double) ((Double) call.argument("volume"))));
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "setSpeed":
                 setSpeed((float) ((double) ((Double) call.argument("speed"))));
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "setLoopMode":
                 setLoopMode((Integer) call.argument("loopMode"));
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "setShuffleMode":
                 setShuffleModeEnabled((Integer) call.argument("shuffleMode") == 1);
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "setShuffleOrder":
                 setShuffleOrder(call.argument("audioSource"));
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "setAutomaticallyWaitsToMinimizeStalling":
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             case "seek":
                 Long position = getLong(call.argument("position"));
@@ -333,25 +335,25 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 break;
             case "concatenatingInsertAll":
                 concatenating(call.argument("id"))
-                        .addMediaSources(call.argument("index"), getAudioSources(call.argument("children")), handler, () -> result.success(new HashMap<String, Object>()));
+                        .addMediaSources(call.argument("index"), getAudioSources(call.argument("children")), handler, () -> result.success(emptyMap()));
                 concatenating(call.argument("id"))
                         .setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                 break;
             case "concatenatingRemoveRange":
                 concatenating(call.argument("id"))
-                        .removeMediaSourceRange(call.argument("startIndex"), call.argument("endIndex"), handler, () -> result.success(new HashMap<String, Object>()));
+                        .removeMediaSourceRange(call.argument("startIndex"), call.argument("endIndex"), handler, () -> result.success(emptyMap()));
                 concatenating(call.argument("id"))
                         .setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                 break;
             case "concatenatingMove":
                 concatenating(call.argument("id"))
-                        .moveMediaSource(call.argument("currentIndex"), call.argument("newIndex"), handler, () -> result.success(new HashMap<String, Object>()));
+                        .moveMediaSource(call.argument("currentIndex"), call.argument("newIndex"), handler, () -> result.success(emptyMap()));
                 concatenating(call.argument("id"))
                         .setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                 break;
             case "setAndroidAudioAttributes":
                 setAudioAttributes(call.argument("contentType"), call.argument("flags"), call.argument("usage"));
-                result.success(new HashMap<String, Object>());
+                result.success(emptyMap());
                 break;
             default:
                 result.notImplemented();
@@ -560,7 +562,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private void broadcastPlaybackEvent() {
-        final Map<String, Object> event = new HashMap<String, Object>();
+        final Map<String, Object> event = emptyMap();
         long updatePosition = getCurrentPosition();
         Long duration = getDuration() == C.TIME_UNSET ? null : (1000 * getDuration());
         event.put("processingState", processingState.ordinal());
@@ -644,17 +646,17 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     public void play(Result result) {
         if (player.getPlayWhenReady()) {
-            result.success(new HashMap<String, Object>());
+            result.success(emptyMap());
             return;
         }
         if (playResult != null) {
-            playResult.success(new HashMap<String, Object>());
+            playResult.success(emptyMap());
         }
         playResult = result;
         startWatchingBuffer();
         player.setPlayWhenReady(true);
         if (processingState == ProcessingState.completed && playResult != null) {
-            playResult.success(new HashMap<String, Object>());
+            playResult.success(emptyMap());
             playResult = null;
         }
     }
@@ -663,7 +665,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         if (!player.getPlayWhenReady()) return;
         player.setPlayWhenReady(false);
         if (playResult != null) {
-            playResult.success(new HashMap<String, Object>());
+            playResult.success(emptyMap());
             playResult = null;
         }
     }
@@ -688,7 +690,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     public void seek(final long position, final Integer index, final Result result) {
         if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
-            result.success(new HashMap<String, Object>());
+            result.success(emptyMap());
             return;
         }
         abortSeek();
@@ -703,7 +705,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             abortExistingConnection();
         }
         if (playResult != null) {
-            playResult.success(new HashMap<String, Object>());
+            playResult.success(emptyMap());
             playResult = null;
         }
         mediaSources.clear();
@@ -720,7 +722,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void abortSeek() {
         if (seekResult != null) {
-            seekResult.success(new HashMap<String, Object>());
+            seekResult.success(emptyMap());
             seekResult = null;
             seekPos = null;
         }

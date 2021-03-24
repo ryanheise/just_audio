@@ -17,6 +17,9 @@ import 'package:uuid/uuid.dart';
 
 final _uuid = Uuid();
 
+/// Tracks whether the audio has been globally initialized
+Completer? _globalInit;
+
 /// An object to manage playing audio from a URL, a locale file or an asset.
 ///
 /// ```
@@ -36,6 +39,8 @@ final _uuid = Uuid();
 /// You must call [dispose] to release the resources used by this player,
 /// including any temporary files created to cache assets.
 class AudioPlayer {
+  static Future<void> cleanUp() async {}
+
   /// The user agent to set on all HTTP requests.
   final String? _userAgent;
 
@@ -950,6 +955,10 @@ class AudioPlayer {
         contentType: audioAttributes.contentType.index,
         flags: audioAttributes.flags.value,
         usage: audioAttributes.usage.value));
+  }
+
+  static Future<DisposeAllPlayersResponse> disposeAllPlayers() async {
+    return await JustAudioPlatform.instance.disposeAllPlayers();
   }
 
   /// Release all resources associated with this player. You must invoke this

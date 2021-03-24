@@ -44,6 +44,11 @@ abstract class JustAudioPlatform extends PlatformInterface {
   Future<DisposePlayerResponse> disposePlayer(DisposePlayerRequest request) {
     throw UnimplementedError('disposePlayer() has not been implemented.');
   }
+
+  /// Disposes of a platform player.
+  Future<DisposeAllPlayersResponse> disposeAllPlayers() {
+    throw UnimplementedError('disposeAllPlayers() has not been implemented.');
+  }
 }
 
 /// A nested platform interface for communicating with a particular player
@@ -285,6 +290,17 @@ class InitRequest {
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
       };
+}
+
+/// Information returned by the platform implementation after disposing of a
+/// player instance.
+class DisposeAllPlayersResponse {
+  final List<String> disposedPlayers;
+
+  DisposeAllPlayersResponse({required this.disposedPlayers});
+  static DisposeAllPlayersResponse fromMap(Map<dynamic, dynamic> map) =>
+      DisposeAllPlayersResponse(
+          disposedPlayers: (map["disposedPlayers"] as List).cast());
 }
 
 /// Information communicated to the platform implementation when disposing of a

@@ -7,12 +7,16 @@ import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
 
-void main() => runApp(MyApp());
+Future main() async {
+  runApp(MyApp());
+}
 
 class MyApp extends StatefulWidget {
   @override
   _MyAppState createState() => _MyAppState();
 }
+
+AudioPlayer? _global;
 
 class _MyAppState extends State<MyApp> {
   late AudioPlayer _player;
@@ -61,9 +65,21 @@ class _MyAppState extends State<MyApp> {
   int _addedCount = 0;
 
   @override
+  void reassemble() {
+    // print("Reassemble");
+    // _player.dispose();
+    // initState();
+    super.reassemble();
+  }
+
+  @override
   void initState() {
     super.initState();
-    _player = AudioPlayer();
+    if (_global != null) {
+      print("FOUND A GLOBAL!");
+      _global!.dispose();
+    }
+    _player = _global = AudioPlayer();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));

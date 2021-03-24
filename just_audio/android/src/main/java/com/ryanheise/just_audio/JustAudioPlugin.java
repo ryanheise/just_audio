@@ -15,6 +15,7 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
  */
 public class JustAudioPlugin implements FlutterPlugin {
 
+
     private MethodChannel channel;
     private MainMethodCallHandler methodCallHandler;
 

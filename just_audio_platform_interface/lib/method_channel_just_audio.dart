@@ -4,14 +4,33 @@ import 'package:flutter/services.dart';
 
 import 'just_audio_platform_interface.dart';
 
+Completer<void>? _globalInit;
+
 /// An implementation of [JustAudioPlatform] that uses method channels.
 class MethodChannelJustAudio extends JustAudioPlatform {
   static final _mainChannel = MethodChannel('com.ryanheise.just_audio.methods');
 
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
+    if (_globalInit == null) {
+      _globalInit = Completer<void>();
+      var response = await disposeAllPlayers();
+      if (response.disposedPlayers.isNotEmpty) {
+        print("Disposed ${response.disposedPlayers.length} orphaned players");
+      }
+      _globalInit!.complete();
+    } else {
+      await _globalInit!.future;
+    }
     await _mainChannel.invokeMethod<void>('init', request.toMap());
     return MethodChannelAudioPlayer(request.id);
+  }
+
+  @override
+  Future<DisposeAllPlayersResponse> disposeAllPlayers() async {
+    final result = await _mainChannel
+        .invokeMethod<Map<dynamic, dynamic>>('disposeAllPlayers');
+    return DisposeAllPlayersResponse.fromMap(result!);
   }
 
   @override
