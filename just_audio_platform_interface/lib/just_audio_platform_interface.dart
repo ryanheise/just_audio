@@ -45,7 +45,7 @@ abstract class JustAudioPlatform extends PlatformInterface {
     throw UnimplementedError('disposePlayer() has not been implemented.');
   }
 
-  /// Disposes of a platform player.
+  /// Disposes of all currently registered platform players.
   Future<DisposeAllPlayersResponse> disposeAllPlayers() {
     throw UnimplementedError('disposeAllPlayers() has not been implemented.');
   }

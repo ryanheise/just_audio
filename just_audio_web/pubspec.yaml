@@ -17,6 +17,10 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
 
+dependency_overrides:
+  just_audio_platform_interface:
+    path: ../just_audio_platform_interface
+
 dev_dependencies:
   pedantic: ^1.10.0
 
