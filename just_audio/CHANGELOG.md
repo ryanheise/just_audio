@@ -1,3 +1,18 @@
+## Next release
+
+* Add setSkipSilenceEnabled (@subhash279).
+* Add buffer options via AudioLoadConfiguration.
+* Add setPitch.
+
+## 0.7.2
+
+* Propagate play() exceptions (@twogood).
+
+## 0.7.1
+
+* Fix IllegalSeekPositionException on Android (@DenisShakinov).
+* Fix error playing files when a user agent is set.
+
 ## 0.7.0
 
 * Null safety.

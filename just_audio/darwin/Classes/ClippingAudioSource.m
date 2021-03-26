@@ -95,4 +95,16 @@
     return CMTimeCompare(pos, dur) >= 0 ? dur : pos;
 }
 
+- (void)applyPreferredForwardBufferDuration {
+    [_audioSource applyPreferredForwardBufferDuration];
+}
+
+- (void)applyCanUseNetworkResourcesForLiveStreamingWhilePaused {
+    [_audioSource applyCanUseNetworkResourcesForLiveStreamingWhilePaused];
+}
+
+- (void)applyPreferredPeakBitRate {
+    [_audioSource applyPreferredPeakBitRate];
+}
+
 @end

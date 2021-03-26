@@ -76,6 +76,20 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
+  Future<SetPitchResponse> setPitch(SetPitchRequest request) async {
+    return SetPitchResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setPitch', request.toMap()))!);
+  }
+
+  @override
+  Future<SetSkipSilenceResponse> setSkipSilence(
+      SetSkipSilenceRequest request) async {
+    return SetSkipSilenceResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setSkipSilence', request.toMap()))!);
+  }
+
+  @override
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async {
     return SetLoopModeResponse.fromMap((await _channel
         .invokeMethod<Map<dynamic, dynamic>>('setLoopMode', request.toMap()))!);
@@ -104,6 +118,25 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
     return SetAutomaticallyWaitsToMinimizeStallingResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'setAutomaticallyWaitsToMinimizeStalling', request.toMap()))!);
+  }
+
+  @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
+    return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setCanUseNetworkResourcesForLiveStreamingWhilePaused',
+            request.toMap()))!);
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) async {
+    return SetPreferredPeakBitRateResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setPreferredPeakBitRate', request.toMap()))!);
   }
 
   @override

@@ -1,10 +1,16 @@
 package com.ryanheise.just_audio;
 
 import android.content.Context;
+import android.media.audiofx.LoudnessEnhancer;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.DefaultLivePlaybackSpeedControl;
+import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.LivePlaybackSpeedControl;
+import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -48,6 +54,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.google.android.exoplayer2.LoadControl;
 import java.util.Random;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
@@ -77,11 +84,16 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private IcyHeaders icyHeaders;
     private int errorCount;
     private AudioAttributes pendingAudioAttributes;
+    private LoadControl loadControl;
+    private LivePlaybackSpeedControl livePlaybackSpeedControl;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
     private MediaSource mediaSource;
     private Integer currentIndex;
+    //private boolean _volumeBoostEnabled = false;
+    //private int _volumeBoostGainMB = 0;
+    //private LoudnessEnhancer loudness;
     private final Handler handler = new Handler();
     private final Runnable bufferWatcher = new Runnable() {
         @Override
@@ -110,7 +122,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
     };
 
-    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id) {
+    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration) {
         this.context = applicationContext;
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
@@ -127,6 +139,36 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             }
         });
         processingState = ProcessingState.none;
+        if (audioLoadConfiguration != null) {
+            Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
+            if (loadControlMap != null) {
+                DefaultLoadControl.Builder builder = new DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        (int)((getLong(loadControlMap.get("minBufferDuration")))/1000),
+                        (int)((getLong(loadControlMap.get("maxBufferDuration")))/1000),
+                        (int)((getLong(loadControlMap.get("bufferForPlaybackDuration")))/1000),
+                        (int)((getLong(loadControlMap.get("bufferForPlaybackAfterRebufferDuration")))/1000)
+                    )
+                    .setPrioritizeTimeOverSizeThresholds((Boolean)loadControlMap.get("prioritizeTimeOverSizeThresholds"))
+                    .setBackBuffer((int)((getLong(loadControlMap.get("backBufferDuration")))/1000), false);
+                if (loadControlMap.get("targetBufferBytes") != null) {
+                    builder.setTargetBufferBytes((Integer)loadControlMap.get("targetBufferBytes"));
+                }
+                loadControl = builder.build();
+            }
+            Map<?, ?> livePlaybackSpeedControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLivePlaybackSpeedControl");
+            if (livePlaybackSpeedControlMap != null) {
+                DefaultLivePlaybackSpeedControl.Builder builder = new DefaultLivePlaybackSpeedControl.Builder()
+                    .setFallbackMinPlaybackSpeed((float)((double)((Double)livePlaybackSpeedControlMap.get("fallbackMinPlaybackSpeed"))))
+                    .setFallbackMaxPlaybackSpeed((float)((double)((Double)livePlaybackSpeedControlMap.get("fallbackMaxPlaybackSpeed"))))
+                    .setMinUpdateIntervalMs((int)((getLong(livePlaybackSpeedControlMap.get("minUpdateInterval")))/1000))
+                    .setProportionalControlFactor((float)((double)((Double)livePlaybackSpeedControlMap.get("proportionalControlFactor"))))
+                    .setMaxLiveOffsetErrorMsForUnitSpeed((int)((getLong(livePlaybackSpeedControlMap.get("maxLiveOffsetErrorForUnitSpeed")))/1000))
+                    .setTargetLiveOffsetIncrementOnRebufferMs((int)((getLong(livePlaybackSpeedControlMap.get("targetLiveOffsetIncrementOnRebuffer")))/1000))
+                    .setMinPossibleLiveOffsetSmoothingFactor((float)((double)((Double)livePlaybackSpeedControlMap.get("minPossibleLiveOffsetSmoothingFactor"))));
+                livePlaybackSpeedControl = builder.build();
+            }
+        }
     }
 
     private void startWatchingBuffer() {
@@ -142,6 +184,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             this.audioSessionId = audioSessionId;
         }
         broadcastPlaybackEvent();
+        //if (_volumeBoostEnabled) {
+        //    setVolumeBoost(true, _volumeBoostGainMB);
+        //}
     }
 
     @Override
@@ -266,10 +311,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         errorCount++;
         if (player.hasNext() && currentIndex != null && errorCount <= 5) {
             int nextIndex = currentIndex + 1;
-            // TODO: pass in initial position here.
-            player.setMediaSource(mediaSource);
-            player.prepare();
-            player.seekTo(nextIndex, 0);
+            Timeline timeline = player.getCurrentTimeline();
+            // This condition is due to: https://github.com/ryanheise/just_audio/pull/310
+            if (nextIndex < timeline.getWindowCount()) {
+                // TODO: pass in initial position here.
+                player.setMediaSource(mediaSource);
+                player.prepare();
+                player.seekTo(nextIndex, 0);
+            }
         }
     }
 
@@ -307,6 +356,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 setSpeed((float) ((double) ((Double) call.argument("speed"))));
                 result.success(new HashMap<String, Object>());
                 break;
+            case "setPitch":
+                setPitch((float) ((double) ((Double) call.argument("pitch"))));
+                result.success(new HashMap<String, Object>());
+                break;
+            case "setSkipSilence":
+                setSkipSilenceEnabled((Boolean) call.argument("enabled"));
+                result.success(new HashMap<String, Object>());
+                break;
             case "setLoopMode":
                 setLoopMode((Integer) call.argument("loopMode"));
                 result.success(new HashMap<String, Object>());
@@ -320,6 +377,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 result.success(new HashMap<String, Object>());
                 break;
             case "setAutomaticallyWaitsToMinimizeStalling":
+                result.success(new HashMap<String, Object>());
+                break;
+            case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
+                result.success(new HashMap<String, Object>());
+                break;
+            case "setPreferredPeakBitRate":
                 result.success(new HashMap<String, Object>());
                 break;
             case "seek":
@@ -530,7 +593,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void ensurePlayerInitialized() {
         if (player == null) {
-            player = new SimpleExoPlayer.Builder(context).build();
+            SimpleExoPlayer.Builder builder = new SimpleExoPlayer.Builder(context);
+            if (loadControl != null) {
+                builder.setLoadControl(loadControl);
+            }
+            if (livePlaybackSpeedControl != null) {
+                builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
+            }
+            player = builder.build();
             onAudioSessionIdChanged(player.getAudioSessionId());
             player.addMetadataOutput(this);
             player.addListener(this);
@@ -669,10 +739,36 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     public void setSpeed(final float speed) {
-        if (player.getPlaybackParameters().speed != speed)
-            player.setPlaybackParameters(new PlaybackParameters(speed));
+        PlaybackParameters params = player.getPlaybackParameters();
+        if (params.speed != speed)
+            player.setPlaybackParameters(new PlaybackParameters(speed, params.pitch));
         broadcastPlaybackEvent();
     }
+
+    public void setPitch(final float pitch) {
+        PlaybackParameters params = player.getPlaybackParameters();
+        if (params.pitch != pitch)
+            player.setPlaybackParameters(new PlaybackParameters(params.speed, pitch));
+        broadcastPlaybackEvent();
+    }
+
+    public void setSkipSilenceEnabled(final boolean enabled) {
+        player.setSkipSilenceEnabled(enabled);
+    }
+
+    // TODO: Incorporate this after coming up with a generic API for audio effects.
+    /*
+    public void setVolumeBoost(final boolean enabled, final int gainmB) {
+        if (android.os.Build.VERSION.SDK_INT >= 19 && audioSessionId != null) {
+            _volumeBoostEnabled = enabled;
+            _volumeBoostGainMB = gainmB;
+            Log.e(TAG, "setVolumeBoost in android 2 : " + enabled);
+            loudness = new LoudnessEnhancer(audioSessionId);
+            loudness.setEnabled(enabled);
+            loudness.setTargetGain(gainmB);
+        }
+    }
+    */
 
     public void setLoopMode(final int mode) {
         player.setRepeatMode(mode);
@@ -709,6 +805,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             player = null;
             transition(ProcessingState.none);
         }
+        /*
+        if (loudness != null) {
+            loudness.release();
+        }
+        */
         if (eventSink != null) {
             eventSink.endOfStream();
         }
@@ -726,6 +827,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         sendError("abort", "Connection aborted");
     }
 
+    // Dart can't distinguish between int sizes so
+    // Flutter may send us a Long or an Integer
+    // depending on the number of bits required to
+    // represent it.
     public static Long getLong(Object o) {
         return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
     }
