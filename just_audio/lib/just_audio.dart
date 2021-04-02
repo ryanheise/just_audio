@@ -243,14 +243,18 @@ class AudioPlayer {
   /// cache directory.
   Future<void> _removeOldAssetCacheDir() async {
     if (kIsWeb) return;
-    final oldAssetCacheDir = Directory(
-        p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
-    if (oldAssetCacheDir.existsSync()) {
-      try {
-        oldAssetCacheDir.deleteSync(recursive: true);
-      } catch (e) {
-        print("Failed to delete old asset cache dir: $e");
+    try {
+      final oldAssetCacheDir = Directory(p.join(
+          (await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
+      if (oldAssetCacheDir.existsSync()) {
+        try {
+          oldAssetCacheDir.deleteSync(recursive: true);
+        } catch (e) {
+          print("Failed to delete old asset cache dir: $e");
+        }
       }
+    } catch (e) {
+      // There is no temporary directory for this platform.
     }
   }
 
@@ -515,10 +519,10 @@ class AudioPlayer {
     durationSubscription = durationStream.listen((duration) {
       currentTimer.cancel();
       currentTimer = Timer.periodic(step(), yieldPosition);
-    });
+    }, onError: (Object e, StackTrace stackTrace) {});
     playbackEventSubscription = playbackEventStream.listen((event) {
       controller.add(position);
-    });
+    }, onError: (Object e, StackTrace stackTrace) {});
     return controller.stream.distinct();
   }
 
