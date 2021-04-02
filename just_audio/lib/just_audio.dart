@@ -512,7 +512,9 @@ class AudioPlayer {
         controller.close();
         return;
       }
-      controller.add(position);
+      if (playing) {
+        controller.add(position);
+      }
     }
 
     durationSubscription = durationStream.listen((duration) {
