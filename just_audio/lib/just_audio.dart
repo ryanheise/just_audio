@@ -494,7 +494,7 @@ class AudioPlayer {
       return s;
     }
 
-    Timer currentTimer;
+    Timer? currentTimer;
     StreamSubscription? durationSubscription;
     StreamSubscription? playbackEventSubscription;
     void yieldPosition(Timer timer) {
@@ -515,9 +515,8 @@ class AudioPlayer {
       controller.add(position);
     }
 
-    currentTimer = Timer.periodic(step(), yieldPosition);
     durationSubscription = durationStream.listen((duration) {
-      currentTimer.cancel();
+      currentTimer?.cancel();
       currentTimer = Timer.periodic(step(), yieldPosition);
     }, onError: (Object e, StackTrace stackTrace) {});
     playbackEventSubscription = playbackEventStream.listen((event) {
