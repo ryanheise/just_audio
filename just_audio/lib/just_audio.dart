@@ -1003,7 +1003,8 @@ class AudioPlayer {
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
     final durationCompleter = Completer<Duration?>();
-    _platform = Future<AudioPlayerPlatform>(() async {
+
+    Future<AudioPlayerPlatform> setPlatform() async {
       _playbackEventSubscription?.cancel();
       if (!force) {
         final oldPlatform = await oldPlatformFuture!;
@@ -1097,7 +1098,9 @@ class AudioPlayer {
       }
 
       return platform;
-    });
+    }
+
+    _platform = setPlatform();
     return durationCompleter.future;
   }
 
