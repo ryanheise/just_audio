@@ -1,3 +1,7 @@
+## 0.7.3
+
+* Silence uncaught exceptions in positionStream.
+
 ## 0.7.2
 
 * Propagate play() exceptions (@twogood).
