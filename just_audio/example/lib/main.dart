@@ -71,7 +71,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _init() async {
-    final session = await AudioSession.instance;
+    final session = await AudioSession.isInitialized;
     await session.configure(AudioSessionConfiguration.speech());
     // Listen to errors during playback.
     _player.playbackEventStream.listen((event) {},
