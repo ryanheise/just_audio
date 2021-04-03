@@ -941,6 +941,60 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     await player.dispose();
   });
+
+  test('positionStream emissions: seek while paused', () async {
+    final player = AudioPlayer();
+    await player.setUrl('https://bar.bar/foo.mp3');
+    expectState(
+      player: player,
+      position: Duration.zero,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
+    var completer = Completer<dynamic>();
+    late StreamSubscription subscription;
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, Duration.zero);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    final duration1 = Duration(seconds: 1);
+    final duration2 = Duration(milliseconds: 600);
+    final duration3 = Duration(milliseconds: 750);
+
+    await player.seek(duration1);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    player.play();
+    await Future<dynamic>.delayed(duration2);
+    await player.pause();
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1 + duration2);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.seek(duration1 + duration2 + duration3);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1 + duration2 + duration3);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.dispose();
+  });
 }
 
 class MockJustAudio extends Mock
