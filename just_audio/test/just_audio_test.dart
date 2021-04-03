@@ -995,6 +995,82 @@ void runTests() {
 
     await player.dispose();
   });
+
+  test('positionStream emissions: switch audio sources', () async {
+    final player = AudioPlayer();
+    final playlist = ConcatenatingAudioSource(
+      children: [
+        AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')),
+        AudioSource.uri(Uri.parse('https://bar.bar/bar.mp3')),
+      ],
+    );
+    await player.setAudioSource(playlist);
+    expectState(
+      player: player,
+      position: Duration.zero,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
+    expect(player.currentIndex, 0);
+    var completer = Completer<dynamic>();
+    late StreamSubscription subscription;
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, Duration.zero);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    final duration1 = Duration(seconds: 1);
+    final duration2 = Duration(seconds: 600);
+
+    await player.seek(duration1);
+    expect(player.currentIndex, 0);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.seekToNext();
+    expect(player.currentIndex, 1);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, Duration.zero);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.seek(duration1, index: 1);
+    expect(player.currentIndex, 1);
+    await player.seekToNext();
+    // There is no next
+    expect(player.currentIndex, 1);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      // No position change because there is no next
+      expectDuration(position, duration1);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    // Switch to index 0 and seek position at the same time
+    await player.seek(duration2, index: 0);
+    expect(player.currentIndex, 0);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration2);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.dispose();
+  });
 }
 
 class MockJustAudio extends Mock
