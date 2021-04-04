@@ -48,6 +48,9 @@ class AudioPlayer {
   /// [_idlePlatform] otherwise.
   late Future<AudioPlayerPlatform> _platform;
 
+  /// Reflects the current platform immediately after it is set.
+  AudioPlayerPlatform? _platformValue;
+
   /// The interface to the native portion of the plugin. This will be disposed
   /// and set to `null` when not in use.
   Future<AudioPlayerPlatform>? _nativePlatform;
@@ -177,7 +180,7 @@ class AudioPlayer {
             .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
-    _setPlatformActive(false, force: true);
+    _setPlatformActive(false, force: true)?.catchError((dynamic e) {});
     _sequenceSubject.add(null);
     // Respond to changes to AndroidAudioAttributes configuration.
     if (androidApplyAudioAttributes) {
@@ -700,6 +703,10 @@ class AudioPlayer {
           .then((response) => response.duration);
       final duration = await _durationFuture;
       _durationSubject.add(duration);
+      if (platform != _platformValue) {
+        // the platform has changed since we started loading, so abort.
+        throw PlatformException(code: 'abort', message: 'Loading interrupted');
+      }
       // Wait for loading state to pass.
       await processingStateStream
           .firstWhere((state) => state != ProcessingState.loading);
@@ -724,7 +731,7 @@ class AudioPlayer {
   /// [ProcessingState.idle] state.
   Future<Duration?> setClip({Duration? start, Duration? end}) async {
     if (_disposed) return null;
-    _setPlatformActive(true);
+    _setPlatformActive(true)?.catchError((dynamic e) {});
     final duration = await _load(
         await _platform,
         start == null && end == null
@@ -782,7 +789,8 @@ class AudioPlayer {
         } else {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
-          _setPlatformActive(true, playCompleter: playCompleter);
+          _setPlatformActive(true, playCompleter: playCompleter)
+              ?.catchError((dynamic e) {});
         }
       }
     } else {
@@ -1007,7 +1015,7 @@ class AudioPlayer {
     Future<AudioPlayerPlatform> setPlatform() async {
       _playbackEventSubscription?.cancel();
       if (!force) {
-        final oldPlatform = await oldPlatformFuture!;
+        final oldPlatform = _platformValue!;
         if (oldPlatform != _idlePlatform) {
           await _disposePlatform(oldPlatform);
         }
@@ -1019,6 +1027,7 @@ class AudioPlayer {
           ? await (_nativePlatform =
               JustAudioPlatform.instance.init(InitRequest(id: _id)))
           : _idlePlatform!;
+      _platformValue = platform;
       _playbackEventSubscription =
           platform.playbackEventMessageStream.listen((message) {
         var duration = message.duration;
@@ -1090,7 +1099,7 @@ class AudioPlayer {
                   _InitialSeekValues(position: position, index: currentIndex));
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
-          _audioSource = null;
+          _setPlatformActive(false)?.catchError((dynamic e) {});
           durationCompleter.completeError(e, stackTrace);
         }
       } else {
