@@ -1216,6 +1216,33 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _updatePosition = position;
     _updateTime = DateTime.now();
   }
+
+  @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest request) {
+    // TODO: implement setCanUseNetworkResourcesForLiveStreamingWhilePaused
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<SetPitchResponse> setPitch(SetPitchRequest request) {
+    // TODO: implement setPitch
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) {
+    // TODO: implement setPreferredPeakBitRate
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) {
+    // TODO: implement setSkipSilence
+    throw UnimplementedError();
+  }
 }
 
 final byteRangeData = List.generate(200, (i) => i);
