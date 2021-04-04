@@ -95,8 +95,6 @@ class AudioPlayer {
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
-  bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
-  double? _preferredPeakBitRate;
   bool _playInterrupted = false;
   AndroidAudioAttributes? _androidAudioAttributes;
   final bool _androidApplyAudioAttributes;
@@ -962,8 +960,6 @@ class AudioPlayer {
   Future<void> setCanUseNetworkResourcesForLiveStreamingWhilePaused(
       final bool canUseNetworkResourcesForLiveStreamingWhilePaused) async {
     if (_disposed) return;
-    _canUseNetworkResourcesForLiveStreamingWhilePaused =
-        canUseNetworkResourcesForLiveStreamingWhilePaused;
     await (await _platform)
         .setCanUseNetworkResourcesForLiveStreamingWhilePaused(
             SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest(
@@ -974,7 +970,6 @@ class AudioPlayer {
   Future<void> setPreferredPeakBitRate(
       final double preferredPeakBitRate) async {
     if (_disposed) return;
-    _preferredPeakBitRate = preferredPeakBitRate;
     await (await _platform).setPreferredPeakBitRate(
         SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
   }
