@@ -1006,7 +1006,6 @@ class AudioPlayer {
     // This method updates _active and _platform before yielding to the next
     // task in the event loop.
     _active = active;
-    final oldPlatformFuture = force ? null : _platform;
     final position = this.position;
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
