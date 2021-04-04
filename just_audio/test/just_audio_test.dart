@@ -965,6 +965,12 @@ void runTests() {
     final duration3 = Duration(milliseconds: 750);
 
     await player.seek(duration1);
+    expectState(
+      player: player,
+      position: duration1,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
     completer = Completer<dynamic>();
     subscription = player.positionStream.listen((position) {
       expectDuration(position, duration1);
@@ -975,6 +981,12 @@ void runTests() {
 
     player.play();
     await Future<dynamic>.delayed(duration2);
+    expectState(
+      player: player,
+      position: duration1 + duration2,
+      processingState: ProcessingState.ready,
+      playing: true,
+    );
     await player.pause();
     completer = Completer<dynamic>();
     subscription = player.positionStream.listen((position) {
@@ -985,6 +997,12 @@ void runTests() {
     await completer.future;
 
     await player.seek(duration1 + duration2 + duration3);
+    expectState(
+      player: player,
+      position: duration1 + duration2 + duration3,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
     completer = Completer<dynamic>();
     subscription = player.positionStream.listen((position) {
       expectDuration(position, duration1 + duration2 + duration3);
