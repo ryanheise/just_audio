@@ -494,7 +494,7 @@ class AudioPlayer {
       return s;
     }
 
-    Timer currentTimer;
+    Timer? currentTimer;
     StreamSubscription? durationSubscription;
     StreamSubscription? playbackEventSubscription;
     void yieldPosition(Timer timer) {
@@ -512,12 +512,13 @@ class AudioPlayer {
         controller.close();
         return;
       }
-      controller.add(position);
+      if (playing) {
+        controller.add(position);
+      }
     }
 
-    currentTimer = Timer.periodic(step(), yieldPosition);
     durationSubscription = durationStream.listen((duration) {
-      currentTimer.cancel();
+      currentTimer?.cancel();
       currentTimer = Timer.periodic(step(), yieldPosition);
     }, onError: (Object e, StackTrace stackTrace) {});
     playbackEventSubscription = playbackEventStream.listen((event) {
@@ -1002,7 +1003,8 @@ class AudioPlayer {
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
     final durationCompleter = Completer<Duration?>();
-    _platform = Future<AudioPlayerPlatform>(() async {
+
+    Future<AudioPlayerPlatform> setPlatform() async {
       _playbackEventSubscription?.cancel();
       if (!force) {
         final oldPlatform = await oldPlatformFuture!;
@@ -1096,7 +1098,9 @@ class AudioPlayer {
       }
 
       return platform;
-    });
+    }
+
+    _platform = setPlatform();
     return durationCompleter.future;
   }
 
