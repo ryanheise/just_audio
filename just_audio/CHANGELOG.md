@@ -4,6 +4,11 @@
 * Add buffer options via AudioLoadConfiguration.
 * Add setPitch.
 
+## 0.7.4
+
+* Fix hang after stopping while loading.
+* Fix pending timers error (@minhqdao).
+
 ## 0.7.3
 
 * Silence uncaught exceptions in positionStream.
