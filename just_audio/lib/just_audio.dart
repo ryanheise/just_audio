@@ -50,6 +50,9 @@ class AudioPlayer {
   /// [_idlePlatform] otherwise.
   late Future<AudioPlayerPlatform> _platform;
 
+  /// Reflects the current platform immediately after it is set.
+  AudioPlayerPlatform? _platformValue;
+
   /// The interface to the native portion of the plugin. This will be disposed
   /// and set to `null` when not in use.
   Future<AudioPlayerPlatform>? _nativePlatform;
@@ -101,8 +104,6 @@ class AudioPlayer {
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
-  bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
-  double? _preferredPeakBitRate;
   bool _playInterrupted = false;
   AndroidAudioAttributes? _androidAudioAttributes;
   final bool _androidApplyAudioAttributes;
@@ -198,7 +199,7 @@ class AudioPlayer {
             .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
-    _setPlatformActive(false, force: true);
+    _setPlatformActive(false, force: true)?.catchError((dynamic e) {});
     _sequenceSubject.add(null);
     // Respond to changes to AndroidAudioAttributes configuration.
     if (androidApplyAudioAttributes) {
@@ -264,14 +265,18 @@ class AudioPlayer {
   /// cache directory.
   Future<void> _removeOldAssetCacheDir() async {
     if (kIsWeb) return;
-    final oldAssetCacheDir = Directory(
-        p.join((await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
-    if (oldAssetCacheDir.existsSync()) {
-      try {
-        oldAssetCacheDir.deleteSync(recursive: true);
-      } catch (e) {
-        print("Failed to delete old asset cache dir: $e");
+    try {
+      final oldAssetCacheDir = Directory(p.join(
+          (await getTemporaryDirectory()).path, 'just_audio_asset_cache'));
+      if (oldAssetCacheDir.existsSync()) {
+        try {
+          oldAssetCacheDir.deleteSync(recursive: true);
+        } catch (e) {
+          print("Failed to delete old asset cache dir: $e");
+        }
       }
+    } catch (e) {
+      // There is no temporary directory for this platform.
     }
   }
 
@@ -527,7 +532,7 @@ class AudioPlayer {
       return s;
     }
 
-    Timer currentTimer;
+    Timer? currentTimer;
     StreamSubscription? durationSubscription;
     StreamSubscription? playbackEventSubscription;
     void yieldPosition(Timer timer) {
@@ -545,17 +550,18 @@ class AudioPlayer {
         controller.close();
         return;
       }
-      controller.add(position);
+      if (playing) {
+        controller.add(position);
+      }
     }
 
-    currentTimer = Timer.periodic(step(), yieldPosition);
     durationSubscription = durationStream.listen((duration) {
-      currentTimer.cancel();
+      currentTimer?.cancel();
       currentTimer = Timer.periodic(step(), yieldPosition);
-    });
+    }, onError: (Object e, StackTrace stackTrace) {});
     playbackEventSubscription = playbackEventStream.listen((event) {
       controller.add(position);
-    });
+    }, onError: (Object e, StackTrace stackTrace) {});
     return controller.stream.distinct();
   }
 
@@ -732,6 +738,10 @@ class AudioPlayer {
           .then((response) => response.duration);
       final duration = await _durationFuture;
       _durationSubject.add(duration);
+      if (platform != _platformValue) {
+        // the platform has changed since we started loading, so abort.
+        throw PlatformException(code: 'abort', message: 'Loading interrupted');
+      }
       // Wait for loading state to pass.
       await processingStateStream
           .firstWhere((state) => state != ProcessingState.loading);
@@ -756,7 +766,7 @@ class AudioPlayer {
   /// [ProcessingState.idle] state.
   Future<Duration?> setClip({Duration? start, Duration? end}) async {
     if (_disposed) return null;
-    _setPlatformActive(true);
+    _setPlatformActive(true)?.catchError((dynamic e) {});
     final duration = await _load(
         await _platform,
         start == null && end == null
@@ -814,7 +824,8 @@ class AudioPlayer {
         } else {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
-          _setPlatformActive(true, playCompleter: playCompleter);
+          _setPlatformActive(true, playCompleter: playCompleter)
+              ?.catchError((dynamic e) {});
         }
       }
     } else {
@@ -967,8 +978,6 @@ class AudioPlayer {
   Future<void> setCanUseNetworkResourcesForLiveStreamingWhilePaused(
       final bool canUseNetworkResourcesForLiveStreamingWhilePaused) async {
     if (_disposed) return;
-    _canUseNetworkResourcesForLiveStreamingWhilePaused =
-        canUseNetworkResourcesForLiveStreamingWhilePaused;
     await (await _platform)
         .setCanUseNetworkResourcesForLiveStreamingWhilePaused(
             SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest(
@@ -979,7 +988,6 @@ class AudioPlayer {
   Future<void> setPreferredPeakBitRate(
       final double preferredPeakBitRate) async {
     if (_disposed) return;
-    _preferredPeakBitRate = preferredPeakBitRate;
     await (await _platform).setPreferredPeakBitRate(
         SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
   }
@@ -1081,16 +1089,16 @@ class AudioPlayer {
     // This method updates _active and _platform before yielding to the next
     // task in the event loop.
     _active = active;
-    final oldPlatformFuture = force ? null : _platform;
     final position = this.position;
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
     final durationCompleter = Completer<Duration?>();
-    _platform = Future<AudioPlayerPlatform>(() async {
+
+    Future<AudioPlayerPlatform> setPlatform() async {
       _playbackEventSubscription?.cancel();
       _playerDataSubscription?.cancel();
       if (!force) {
-        final oldPlatform = await oldPlatformFuture!;
+        final oldPlatform = _platformValue!;
         if (oldPlatform != _idlePlatform) {
           await _disposePlatform(oldPlatform);
         }
@@ -1105,6 +1113,7 @@ class AudioPlayer {
                   audioLoadConfiguration:
                       _audioLoadConfiguration?._toMessage())))
           : _idlePlatform!;
+      _platformValue = platform;
       _playerDataSubscription =
           platform.playerDataMessageStream.listen((message) {
         if (message.playing != null && message.playing != playing) {
@@ -1215,7 +1224,7 @@ class AudioPlayer {
                   _InitialSeekValues(position: position, index: currentIndex));
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
-          _audioSource = null;
+          _setPlatformActive(false)?.catchError((dynamic e) {});
           durationCompleter.completeError(e, stackTrace);
         }
       } else {
@@ -1223,7 +1232,9 @@ class AudioPlayer {
       }
 
       return platform;
-    });
+    }
+
+    _platform = setPlatform();
     return durationCompleter.future;
   }
 

@@ -84,12 +84,23 @@ class _MyAppState extends State<MyApp> {
   Future<void> _init() async {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
+    // Listen to errors during playback.
+    _player.playbackEventStream.listen((event) {},
+        onError: (Object e, StackTrace stackTrace) {
+      print('A stream error occurred: $e');
+    });
     try {
       await _player.setAudioSource(_playlist);
+<<<<<<< HEAD
     } catch (e, stackTrace) {
       // catch load errors: 404, invalid url ...
       print("An error occured $e");
       print(stackTrace);
+=======
+    } catch (e) {
+      // Catch load errors: 404, invalid url ...
+      print("Error loading playlist: $e");
+>>>>>>> dev
     }
   }
 
