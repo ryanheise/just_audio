@@ -786,8 +786,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         abortSeek();
         seekPos = position;
         seekResult = result;
-        int windowIndex = index != null ? index : player.getCurrentWindowIndex();
-        player.seekTo(windowIndex, position);
+        try {
+            int windowIndex = index != null ? index : player.getCurrentWindowIndex();
+            player.seekTo(windowIndex, position);
+        } catch (RuntimeException e) {
+            seekResult = null;
+            seekPos = null;
+            throw e;
+        }
     }
 
     public void dispose() {
@@ -817,7 +823,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void abortSeek() {
         if (seekResult != null) {
-            seekResult.success(new HashMap<String, Object>());
+            try {
+                seekResult.success(new HashMap<String, Object>());
+            } catch (RuntimeException e) {
+                // Result already sent
+            }
             seekResult = null;
             seekPos = null;
         }

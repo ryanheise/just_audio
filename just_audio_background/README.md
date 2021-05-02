@@ -1,11 +1,17 @@
 # just_audio_background
 
-This experimental package adds background playback and media notification support to [`just_audio`][1].
+This experimental package adds background playback and media notification support to [`just_audio`][1]. It can be used if your app uses a single `AudioPlayer` instance where notification media controls are to be bound to that instance. If your app requires more flexibility than what this plugin provides, you should use `audio_service` instead of `just_audio_background`.
 
-Just add this dependency alongside just_audio, and then in your app's startup logic, call:
+## Setup
+
+Add the `just_audio_background` dependency to your `pubspec.yaml` alongside `just_audio`, and then add the following initialization code to your app's `main` method:
 
 ```dart
-JustAudioBackground.init();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await JustAudioBackground.init();
+  runApp(MyApp());
+}
 ```
 
 Create your player as normal:
@@ -14,22 +20,65 @@ Create your player as normal:
 player = AudioPlayer();
 ```
 
-But before setting an audio source, check to see if the player is already running in the background:
+Set a `MediaItem` tag on each `IndexedAudioSource` loaded into the player. For example:
 
 ```dart
-if (await JustAudioBackground.running) {
-  // If the player is already running in the background, load its state into
-  // the current isolate.
-  await player.load();
-} else {
-  // If nothing is already running, initialise the player.
-  await player.setAudioSource(...);
-}
+AudioSource.uri(
+  Uri.parse('https://example.com/song1.mp3'),
+  tag: MediaItem(
+    id: '1',
+    album: "Album name",
+    title: "Song name",
+    artUri: Uri.parse('https://example.com/albumart.jpg'),
+  ),
+),
 ```
 
-Caveats:
+## Android setup
 
-* Headers, caching, byte streams, and the HTTP proxy, are not supported. This may be addressed in a future version.
-* Hot reloading does not work. This may be addressed in a future version.
+Make the following changes to your project's `AndroidManifest.xml` file:
+
+```xml
+<manifest ...>
+  <!-- ADD THESE TWO PERMISSIONS -->
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  
+  <application ...>
+    
+    ...
+    
+    <!-- EDIT THE android:name ATTRIBUTE IN YOUR EXISTING "ACTIVITY" ELEMENT -->
+    <activity android:name="com.ryanheise.audioservice.AudioServiceActivity" ...>
+      ...
+    </activity>
+    
+    <!-- ADD THIS "SERVICE" element -->
+    <service android:name="com.ryanheise.audioservice.AudioService">
+      <intent-filter>
+        <action android:name="android.media.browse.MediaBrowserService" />
+      </intent-filter>
+    </service>
+
+    <!-- ADD THIS "RECEIVER" element -->
+    <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver" >
+      <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+      </intent-filter>
+    </receiver> 
+  </application>
+</manifest>
+```
+
+## iOS setup
+
+Insert this in your `Info.plist` file:
+
+```
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+```
 
 [1]: ../just_audio

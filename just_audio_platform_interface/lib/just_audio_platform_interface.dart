@@ -190,30 +190,35 @@ abstract class AudioPlayerPlatform {
 }
 
 /// A data update communicated from the platform implementation to the Flutter
-/// plugin.
+/// plugin. Each field should trigger a state update in the frontend plugin if
+/// and only if it is not null. Normally, the platform implementation will not
+/// need to broadcast new state changes for this state as such state changes
+/// will be initiated from the frontend.
 class PlayerDataMessage {
-  final AudioSourceMessage? audioSource;
+  final bool? playing;
   final double? volume;
   final double? speed;
+  final double? pitch;
   final LoopModeMessage? loopMode;
   final ShuffleModeMessage? shuffleMode;
+  // TODO: Eventually move other state here?
+  // bufferedPosition, androidAudioSessionId, icyMetadata
 
   PlayerDataMessage({
-    this.audioSource,
+    this.playing,
     this.volume,
     this.speed,
+    this.pitch,
     this.loopMode,
     this.shuffleMode,
   });
 
   static PlayerDataMessage fromMap(Map<dynamic, dynamic> map) =>
       PlayerDataMessage(
-        audioSource: map['audioSource'] != null
-            ? AudioSourceMessage.fromMap(
-                map['audioSource'] as Map<dynamic, dynamic>)
-            : null,
+        playing: map['playing'] as bool?,
         volume: map['volume'] as double?,
         speed: map['speed'] as double?,
+        pitch: map['pitch'] as double?,
         loopMode: map['loopMode'] != null
             ? LoopModeMessage.values[map['loopMode'] as int]
             : null,
@@ -235,10 +240,6 @@ class PlaybackEventMessage {
   final int? currentIndex;
   final int? androidAudioSessionId;
 
-  // TODO: Should this be moved to PlayerDataMessage?
-  /// If not null, triggers a state change in the main plugin.
-  final bool? playing;
-
   PlaybackEventMessage({
     required this.processingState,
     required this.updateTime,
@@ -248,7 +249,6 @@ class PlaybackEventMessage {
     required this.icyMetadata,
     required this.currentIndex,
     required this.androidAudioSessionId,
-    this.playing,
   });
 
   static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
@@ -269,7 +269,6 @@ class PlaybackEventMessage {
                 map['icyMetadata'] as Map<dynamic, dynamic>),
         currentIndex: map['currentIndex'] as int?,
         androidAudioSessionId: map['androidAudioSessionId'] as int?,
-        playing: map['playing'] as bool?,
       );
 }
 
@@ -951,62 +950,6 @@ abstract class AudioSourceMessage {
   AudioSourceMessage({required this.id});
 
   Map<dynamic, dynamic> toMap();
-
-  static AudioSourceMessage fromMap(Map<dynamic, dynamic> map) {
-    switch (map['type']!) {
-      case 'progressive':
-        return ProgressiveAudioSourceMessage(
-          id: map['id'] as String,
-          uri: map['uri'] as String,
-          headers: map['headers'] as Map<String, String>?,
-        );
-      case 'dash':
-        return DashAudioSourceMessage(
-          id: map['id'] as String,
-          uri: map['uri'] as String,
-          headers: map['headers'] as Map<String, String>?,
-        );
-      case 'hls':
-        return HlsAudioSourceMessage(
-          id: map['id'] as String,
-          uri: map['uri'] as String,
-          headers: map['headers'] as Map<String, String>?,
-        );
-      case 'concatenating':
-        final children = (map['children'] as List)
-            .cast<Map>()
-            .map<AudioSourceMessage>(AudioSourceMessage.fromMap)
-            .toList();
-        return ConcatenatingAudioSourceMessage(
-          id: map['id'] as String,
-          children: children,
-          useLazyPreparation: map['useLazyPreparation'] as bool,
-          shuffleOrder: (map['shuffleOrder'] as List<dynamic>).cast<int>(),
-        );
-      case 'clipping':
-        return ClippingAudioSourceMessage(
-          id: map['id'] as String,
-          child:
-              AudioSourceMessage.fromMap(map['child'] as Map<dynamic, dynamic>)
-                  as UriAudioSourceMessage,
-          start: map['start'] != null
-              ? Duration(microseconds: map['start'] as int)
-              : null,
-          end: map['end'] != null
-              ? Duration(microseconds: map['end'] as int)
-              : null,
-        );
-      case 'looping':
-        return LoopingAudioSourceMessage(
-          id: map['id'] as String,
-          child:
-              AudioSourceMessage.fromMap(map['child'] as Map<dynamic, dynamic>),
-          count: map['count'] as int,
-        );
-      default:
-        throw Exception('Invalid audio source type: ${map['type']}');
-    }
-  }
 }
 
 /// Information about an indexed audio source to be communicated with the

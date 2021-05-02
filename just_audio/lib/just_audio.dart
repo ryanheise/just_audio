@@ -674,12 +674,7 @@ class AudioPlayer {
   Future<Duration?> load() async {
     if (_disposed) return null;
     if (_audioSource == null) {
-      // Activating the platform gives a chance for the platform to load any
-      // audio source and other state.
-      // TODO: Maybe this should still throw an exception if it does not result
-      // in an audio source being loaded.
-      return await _setPlatformActive(true);
-      //throw Exception('Must set AudioSource before loading');
+      throw Exception('Must set AudioSource before loading');
     }
     if (_active) {
       return await _load(await _platform, _audioSource!,
@@ -1112,15 +1107,17 @@ class AudioPlayer {
           : _idlePlatform!;
       _playerDataSubscription =
           platform.playerDataMessageStream.listen((message) {
-        if (message.audioSource != null) {
-          _audioSource = AudioSource._fromMessage(message.audioSource!);
-          _broadcastSequence();
+        if (message.playing != null && message.playing != playing) {
+          _playingSubject.add(message.playing!);
         }
         if (message.volume != null) {
           _volumeSubject.add(message.volume!);
         }
         if (message.speed != null) {
           _speedSubject.add(message.speed!);
+        }
+        if (message.pitch != null) {
+          _pitchSubject.add(message.pitch!);
         }
         if (message.loopMode != null) {
           _loopModeSubject.add(LoopMode.values[message.loopMode!.index]);
@@ -1160,9 +1157,6 @@ class AudioPlayer {
         }
         final oldPlaybackEvent = _playbackEvent;
         _playbackEventSubject.add(_playbackEvent = playbackEvent);
-        if (message.playing != null && message.playing != playing) {
-          _playingSubject.add(message.playing!);
-        }
         if (_playbackEvent.processingState !=
                 oldPlaybackEvent.processingState &&
             _playbackEvent.processingState == ProcessingState.idle) {
@@ -1860,49 +1854,6 @@ abstract class AudioSource {
 
   @override
   bool operator ==(dynamic other) => other is AudioSource && other._id == _id;
-
-  static AudioSource _fromMessage(AudioSourceMessage message) {
-    if (message is ProgressiveAudioSourceMessage) {
-      return ProgressiveAudioSource(
-        Uri.parse(message.uri),
-        headers: message.headers,
-        tag: message.tag,
-      );
-    } else if (message is DashAudioSourceMessage) {
-      return DashAudioSource(
-        Uri.parse(message.uri),
-        headers: message.headers,
-        tag: message.tag,
-      );
-    } else if (message is HlsAudioSourceMessage) {
-      return HlsAudioSource(
-        Uri.parse(message.uri),
-        headers: message.headers,
-        tag: message.tag,
-      );
-    } else if (message is ConcatenatingAudioSourceMessage) {
-      return ConcatenatingAudioSource._restore(
-        children: message.children.map(AudioSource._fromMessage).toList(),
-        useLazyPreparation: message.useLazyPreparation,
-        shuffleOrder:
-            DefaultShuffleOrder._restore(indices: message.shuffleOrder),
-      );
-    } else if (message is ClippingAudioSourceMessage) {
-      return ClippingAudioSource(
-        child: AudioSource._fromMessage(message.child) as UriAudioSource,
-        start: message.start,
-        end: message.end,
-        tag: message.tag,
-      );
-    } else if (message is LoopingAudioSourceMessage) {
-      return LoopingAudioSource(
-        child: AudioSource._fromMessage(message.child),
-        count: message.count,
-      );
-    } else {
-      throw Exception('Audio source message not understood');
-    }
-  }
 }
 
 /// An [AudioSource] that can appear in a sequence.
@@ -2093,12 +2044,6 @@ class ConcatenatingAudioSource extends AudioSource {
     ShuffleOrder? shuffleOrder,
   }) : _shuffleOrder = shuffleOrder ?? DefaultShuffleOrder()
           ..insert(0, children.length);
-
-  ConcatenatingAudioSource._restore({
-    required this.children,
-    required this.useLazyPreparation,
-    required ShuffleOrder shuffleOrder,
-  }) : _shuffleOrder = shuffleOrder;
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -2831,11 +2776,6 @@ class DefaultShuffleOrder extends ShuffleOrder {
   final indices = <int>[];
 
   DefaultShuffleOrder({Random? random}) : _random = random ?? Random();
-
-  DefaultShuffleOrder._restore({required List<int> indices})
-      : _random = Random() {
-    this.indices.addAll(indices);
-  }
 
   @override
   void shuffle({int? initialIndex}) {
