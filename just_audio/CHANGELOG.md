@@ -4,6 +4,10 @@
 * Add buffer options via AudioLoadConfiguration.
 * Add setPitch.
 
+## 0.7.4+1
+
+* Link to tutorials in README.
+
 ## 0.7.4
 
 * Fix hang after stopping while loading.
