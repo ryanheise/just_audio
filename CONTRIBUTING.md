@@ -14,7 +14,7 @@ We use GitHub as a place and tool for contributors to work together on project d
 
 1. **Is it a bug?** Check first that you're using the API correctly according to the documentation (README and API documentation). If the API crashes when used incorrectly, you should not report a bug.
 2. **Is it a new bug?** Search the GitHub issues page for bugs. If this bug has already been reported, you should not report a new bug.
-3. **How can we reproduce it?** Fork this repository and make the "minimal" changes necessary to the example to reproduce the bug. This step is unnecessary if you choose to fix the bug yourself, or if the example already exhibits the bug without modification. If the only change to the example necessary to reproduce the bug is the audio source URL, it will be sufficient to supply that URL without forking the repository, as long as you clarify in your bug report what we should do with that URL in your bug report.
+3. **How can we reproduce it?** Fork this repository and make the "minimal" changes necessary to the example to reproduce the bug. This step is unnecessary if you choose to fix the bug yourself, or if the example already exhibits the bug without modification. If the only change to the example necessary to reproduce the bug is the audio source URL, it will be sufficient to supply that URL without forking the repository, as long as you clarify in your bug report what we should do with that URL.
 4. **Submit a report!** With all of the information you have collected you can submit a bug report via the "New issue" page on GitHub. It is necessary to fill in all required information provided by the template in the same format as the template to avoid automatic closure of the issue.
 
 Things to AVOID:
@@ -35,7 +35,7 @@ Pull requests are used to contribute bug fixes, new features or documentation im
 
 To start a pull request, you first create a fork of this repository, create a new branch, commit and push your code to it.
 
-You may branch your pull request off the `master` branch or `dev` branch dependening on the nature of your contribution. Generally, bug fixes or other urgent changes should branch off `master` while new features should branch off `dev`.
+You may branch your pull request off the `master` branch or `dev` branch depending on the nature of your contribution. Generally, bug fixes or other urgent changes should branch off `master` while new features should branch off `dev`.
 
 After making your changes, run `flutter analyze` to ensure your code meets the static analysis requirements, and run `flutter test` to ensure all unit tests continue to work. Where appropriate, update any documentation related to your code change.
 
