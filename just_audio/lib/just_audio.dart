@@ -2268,6 +2268,8 @@ class LockCachingAudioSource extends StreamAudioSource {
             contentType: mimeType,
             stream: response,
           ));
+        }, onError: (dynamic e, StackTrace? stackTrace) {
+          request.fail(e, stackTrace);
         });
       }
     }, onDone: () async {
@@ -2278,7 +2280,16 @@ class LockCachingAudioSource extends StreamAudioSource {
       print(stackTrace);
       (await _partialCacheFile).deleteSync();
       httpClient.close();
-    });
+      // Fail all pending requests
+      for (final req in _requests) {
+        req.fail(e, stackTrace);
+      }
+      // Close all in progress requests
+      for (final res in inProgressResponses) {
+        res.controller.addError(e, stackTrace);
+        res.controller.close();
+      }
+    }, cancelOnError: true);
     return response;
   }
 
@@ -2299,7 +2310,14 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
-    _response ??= _fetch();
+    _response ??= _fetch().catchError((dynamic error, StackTrace? stackTrace) {
+      // So that we can restart later
+      _response = null;
+      // Cancel any pending request
+      for (final req in _requests) {
+        req.fail(error, stackTrace);
+      }
+    });
     return byteRangeRequest.future;
   }
 }
@@ -2342,7 +2360,18 @@ class _StreamingByteRangeRequest {
 
   /// Completes this request with the given [response].
   void complete(StreamAudioResponse response) {
+    if (_completer.isCompleted) {
+      return;
+    }
     _completer.complete(response);
+  }
+
+  /// Fails this request with the given [error] and [stackTrace].
+  void fail(dynamic error, [StackTrace? stackTrace]) {
+    if (_completer.isCompleted) {
+      return;
+    }
+    _completer.completeError(error as Object, stackTrace);
   }
 }
 
@@ -2358,8 +2387,21 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     request.response.headers.clear();
     request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
     request.response.statusCode = rangeRequest == null ? 200 : 206;
-    final sourceResponse =
-        await source.request(rangeRequest?.start, rangeRequest?.endEx);
+
+    StreamAudioResponse sourceResponse;
+    try {
+      sourceResponse =
+          await source.request(rangeRequest?.start, rangeRequest?.endEx);
+    } catch (e, stack) {
+      print("Proxy request failed: $e");
+      print(stack);
+
+      request.response.headers.clear();
+      request.response.statusCode = HttpStatus.internalServerError;
+      await request.response.close();
+      return;
+    }
+
     final range = _HttpRange(rangeRequest?.start ?? 0, rangeRequest?.end,
         sourceResponse.sourceLength);
     request.response.contentLength = range.length!;
