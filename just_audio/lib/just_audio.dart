@@ -2366,7 +2366,8 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   /// Used by the player to request a byte range of encoded audio data in small
   /// chunks, from byte position [start] inclusive (or from the beginning of the
   /// audio data if not specified) to [end] exclusive (or the end of the audio
-  /// data if not specified).
+  /// data if not specified). If the returned future completes with an error,
+  /// a 500 response will be sent back to the player.
   Future<StreamAudioResponse> request([int? start, int? end]);
 
   @override
