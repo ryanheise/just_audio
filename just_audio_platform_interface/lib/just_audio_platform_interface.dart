@@ -183,6 +183,34 @@ abstract class AudioPlayerPlatform {
       ConcatenatingMoveRequest request) {
     throw UnimplementedError("concatenatingMove() has not been implemented.");
   }
+
+  /// Changes the enabled status of an audio effect.
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) {
+    throw UnimplementedError(
+        "audioEffectSetEnabled() has not been implemented.");
+  }
+
+  /// Sets the target gain on the loudness enhancer.
+  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
+      LoudnessEnhancerSetTargetGainRequest request) {
+    throw UnimplementedError(
+        "loudnessEnhancerSetTargetGain() has not been implemented.");
+  }
+
+  /// Gets the equalizer parameters.
+  Future<EqualizerGetParametersResponse> equalizerGetParameters(
+      EqualizerGetParametersRequest request) {
+    throw UnimplementedError(
+        "equalizerGetParameters() has not been implemented.");
+  }
+
+  /// Sets the gain for an equalizer band.
+  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
+      EqualizerBandSetGainRequest request) {
+    throw UnimplementedError(
+        "equalizerBandSetGain() has not been implemented.");
+  }
 }
 
 /// A playback event communicated from the platform implementation to the
@@ -308,12 +336,25 @@ class IcyHeadersMessage {
 class InitRequest {
   final String id;
   final AudioLoadConfigurationMessage? audioLoadConfiguration;
+  final List<AudioEffectMessage> androidAudioEffects;
+  final List<AudioEffectMessage> darwinAudioEffects;
 
-  InitRequest({required this.id, this.audioLoadConfiguration});
+  InitRequest({
+    required this.id,
+    this.audioLoadConfiguration,
+    this.androidAudioEffects = const [],
+    this.darwinAudioEffects = const [],
+  });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'audioLoadConfiguration': audioLoadConfiguration?.toMap(),
+        'androidAudioEffects': androidAudioEffects
+            .map((audioEffect) => audioEffect.toMap())
+            .toList(),
+        'darwinAudioEffects': darwinAudioEffects
+            .map((audioEffect) => audioEffect.toMap())
+            .toList(),
       };
 }
 
@@ -1048,5 +1089,210 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
         'id': id,
         'child': child.toMap(),
         'count': count,
+      };
+}
+
+/// Information communicated to the platform implementation when setting the
+/// enabled status of an audio effect.
+class AudioEffectSetEnabledRequest {
+  final String type;
+  final bool enabled;
+
+  AudioEffectSetEnabledRequest({
+    required this.type,
+    required this.enabled,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': type,
+        'enabled': enabled,
+      };
+}
+
+/// Information returned by the platform implementation after setting the
+/// enabled status of an audio effect.
+class AudioEffectSetEnabledResponse {
+  static AudioEffectSetEnabledResponse fromMap(Map<dynamic, dynamic> map) =>
+      AudioEffectSetEnabledResponse();
+}
+
+/// Information communicated to the platform implementation when setting the
+/// target gain on the loudness enhancer audio effect.
+class LoudnessEnhancerSetTargetGainRequest {
+  final double targetGain;
+
+  LoudnessEnhancerSetTargetGainRequest({
+    required this.targetGain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'targetGain': targetGain,
+      };
+}
+
+/// Information returned by the platform implementation after setting the target
+/// gain on the loudness enhancer audio effect.
+class LoudnessEnhancerSetTargetGainResponse {
+  static LoudnessEnhancerSetTargetGainResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      LoudnessEnhancerSetTargetGainResponse();
+}
+
+/// Information communicated to the platform implementation when requesting the
+/// equalizer parameters.
+class EqualizerGetParametersRequest {
+  EqualizerGetParametersRequest();
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
+}
+
+/// Information communicated to the platform implementation after requesting the
+/// equalizer parameters.
+class EqualizerGetParametersResponse {
+  final EqualizerParametersMessage parameters;
+
+  EqualizerGetParametersResponse({required this.parameters});
+
+  static EqualizerGetParametersResponse fromMap(Map<dynamic, dynamic> map) =>
+      EqualizerGetParametersResponse(
+        parameters: EqualizerParametersMessage.fromMap(
+            map['parameters'] as Map<dynamic, dynamic>),
+      );
+}
+
+/// Information communicated to the platform implementation when setting the
+/// gain for an equalizer band.
+class EqualizerBandSetGainRequest {
+  final int bandIndex;
+  final double gain;
+
+  EqualizerBandSetGainRequest({
+    required this.bandIndex,
+    required this.gain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'bandIndex': bandIndex,
+        'gain': gain,
+      };
+}
+
+/// Information returned by the platform implementation after setting the gain
+/// for an equalizer band.
+class EqualizerBandSetGainResponse {
+  EqualizerBandSetGainResponse();
+
+  static EqualizerBandSetGainResponse fromMap(Map<dynamic, dynamic> map) =>
+      EqualizerBandSetGainResponse();
+}
+
+/// Information about an audio effect to be communicated with the platform
+/// implementation.
+abstract class AudioEffectMessage {
+  final bool enabled;
+
+  AudioEffectMessage({required this.enabled});
+
+  Map<dynamic, dynamic> toMap();
+}
+
+/// Information about a loudness enhancer to be communicated with the platform
+/// implementation.
+class LoudnessEnhancerMessage extends AudioEffectMessage {
+  final double targetGain;
+
+  LoudnessEnhancerMessage({
+    required bool enabled,
+    required this.targetGain,
+  }) : super(enabled: enabled);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'LoudnessEnhancer',
+        'enabled': enabled,
+        'targetGain': targetGain,
+      };
+}
+
+/// Information about an equalizer band to be communicated with the platform
+/// implementation.
+class EqualizerBandMessage {
+  final int index;
+  final double lowerFrequency;
+  final double upperFrequency;
+  final double centerFrequency;
+  final double gain;
+
+  EqualizerBandMessage({
+    required this.index,
+    required this.lowerFrequency,
+    required this.upperFrequency,
+    required this.centerFrequency,
+    required this.gain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'index': index,
+        'lowerFrequency': lowerFrequency,
+        'upperFrequency': upperFrequency,
+        'centerFrequency': centerFrequency,
+        'gain': gain,
+      };
+
+  static EqualizerBandMessage fromMap(Map<dynamic, dynamic> map) =>
+      EqualizerBandMessage(
+        index: map['index'] as int,
+        lowerFrequency: map['lowerFrequency'] as double,
+        upperFrequency: map['upperFrequency'] as double,
+        centerFrequency: map['centerFrequency'] as double,
+        gain: map['gain'] as double,
+      );
+}
+
+/// Information about the equalizer parameters to be communicated with the
+/// platform implementation.
+class EqualizerParametersMessage {
+  final double minDecibels;
+  final double maxDecibels;
+  final List<EqualizerBandMessage> bands;
+
+  EqualizerParametersMessage({
+    required this.minDecibels,
+    required this.maxDecibels,
+    required this.bands,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'minDecibels': minDecibels,
+        'maxDecibels': maxDecibels,
+        'bands': bands.map((band) => band.toMap()).toList(),
+      };
+
+  static EqualizerParametersMessage fromMap(Map<dynamic, dynamic> map) =>
+      EqualizerParametersMessage(
+        minDecibels: map['minDecibels'] as double,
+        maxDecibels: map['maxDecibels'] as double,
+        bands: (map['bands'] as List<dynamic>)
+            .map((dynamic bandMap) =>
+                EqualizerBandMessage.fromMap(bandMap as Map<dynamic, dynamic>))
+            .toList(),
+      );
+}
+
+/// Information about the equalizer to be communicated with the platform
+/// implementation.
+class EqualizerMessage extends AudioEffectMessage {
+  final EqualizerParametersMessage? parameters;
+
+  EqualizerMessage({
+    required bool enabled,
+    required this.parameters,
+  }) : super(enabled: enabled);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'Equalizer',
+        'enabled': enabled,
+        'parameters': parameters?.toMap(),
       };
 }

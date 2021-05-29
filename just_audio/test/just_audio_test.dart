@@ -1391,6 +1391,34 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     // TODO: implement setSkipSilence
     throw UnimplementedError();
   }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) {
+    // TODO: implement audioEffectSetEnabled
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
+      LoudnessEnhancerSetTargetGainRequest request) {
+    // TODO: implement loudnessEnhancerSetTargetGain
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<EqualizerGetParametersResponse> equalizerGetParameters(
+      EqualizerGetParametersRequest request) {
+    // TODO: implement equalizerGetParameters
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
+      EqualizerBandSetGainRequest request) {
+    // TODO: implement equalizerBandSetGain
+    throw UnimplementedError();
+  }
 }
 
 final byteRangeData = List.generate(200, (i) => i);
