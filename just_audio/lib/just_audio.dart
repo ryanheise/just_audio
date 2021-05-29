@@ -304,31 +304,31 @@ class AudioPlayer {
       _processingStateSubject.stream;
 
   /// Whether the player is playing.
-  bool get playing => _playingSubject.value!;
+  bool get playing => _playingSubject.nvalue!;
 
   /// A stream of changing [playing] states.
   Stream<bool> get playingStream => _playingSubject.stream;
 
   /// The current volume of the player.
-  double get volume => _volumeSubject.value!;
+  double get volume => _volumeSubject.nvalue!;
 
   /// A stream of [volume] changes.
   Stream<double> get volumeStream => _volumeSubject.stream;
 
   /// The current speed of the player.
-  double get speed => _speedSubject.value!;
+  double get speed => _speedSubject.nvalue!;
 
   /// A stream of current speed values.
   Stream<double> get speedStream => _speedSubject.stream;
 
   /// The current pitch factor of the player.
-  double get pitch => _pitchSubject.value!;
+  double get pitch => _pitchSubject.nvalue!;
 
   /// A stream of current pitch factor values.
   Stream<double> get pitchStream => _pitchSubject.stream;
 
   /// The current skipSilenceEnabled factor of the player.
-  bool get skipSilenceEnabled => _skipSilenceEnabledSubject.value!;
+  bool get skipSilenceEnabled => _skipSilenceEnabledSubject.nvalue!;
 
   /// A stream of current skipSilenceEnabled factor values.
   Stream<bool> get skipSilenceEnabledStream =>
@@ -336,7 +336,7 @@ class AudioPlayer {
 
   /// The position up to which buffered audio is available.
   Duration get bufferedPosition =>
-      _bufferedPositionSubject.value ?? Duration.zero;
+      _bufferedPositionSubject.nvalue ?? Duration.zero;
 
   /// A stream of buffered positions.
   Stream<Duration> get bufferedPositionStream =>
@@ -352,14 +352,14 @@ class AudioPlayer {
   /// The current player state containing only the processing and playing
   /// states.
   PlayerState get playerState =>
-      _playerStateSubject.value ?? PlayerState(false, ProcessingState.idle);
+      _playerStateSubject.nvalue ?? PlayerState(false, ProcessingState.idle);
 
   /// A stream of [PlayerState]s.
   Stream<PlayerState> get playerStateStream => _playerStateSubject.stream;
 
   /// The current sequence of indexed audio sources, or `null` if no audio
   /// source is set.
-  List<IndexedAudioSource>? get sequence => _sequenceSubject.value;
+  List<IndexedAudioSource>? get sequence => _sequenceSubject.nvalue;
 
   /// A stream broadcasting the current sequence of indexed audio sources.
   Stream<List<IndexedAudioSource>?> get sequenceStream =>
@@ -367,7 +367,7 @@ class AudioPlayer {
 
   /// The current shuffled sequence of indexed audio sources, or `null` if no
   /// audio source is set.
-  List<int>? get shuffleIndices => _shuffleIndicesSubject.value;
+  List<int>? get shuffleIndices => _shuffleIndicesSubject.nvalue;
 
   /// A stream broadcasting the current shuffled sequence of indexed audio
   /// sources.
@@ -378,14 +378,14 @@ class AudioPlayer {
 
   /// The index of the current item, or `null` if either no audio source is set,
   /// or the current audio source has an empty sequence.
-  int? get currentIndex => _currentIndexSubject.value;
+  int? get currentIndex => _currentIndexSubject.nvalue;
 
   /// A stream broadcasting the current item.
   Stream<int?> get currentIndexStream => _currentIndexSubject.stream;
 
   /// The current [SequenceState], or `null` if either [sequence]] or
   /// [currentIndex] is `null`.
-  SequenceState? get sequenceState => _sequenceStateSubject.value;
+  SequenceState? get sequenceState => _sequenceStateSubject.nvalue;
 
   /// A stream broadcasting the current [SequenceState].
   Stream<SequenceState?> get sequenceStateStream =>
@@ -443,13 +443,13 @@ class AudioPlayer {
   }
 
   /// The current loop mode.
-  LoopMode get loopMode => _loopModeSubject.value!;
+  LoopMode get loopMode => _loopModeSubject.nvalue!;
 
   /// A stream of [LoopMode]s.
   Stream<LoopMode> get loopModeStream => _loopModeSubject.stream;
 
   /// Whether shuffle mode is currently enabled.
-  bool get shuffleModeEnabled => _shuffleModeEnabledSubject.value!;
+  bool get shuffleModeEnabled => _shuffleModeEnabledSubject.nvalue!;
 
   /// A stream of the shuffle mode status.
   Stream<bool> get shuffleModeEnabledStream =>
@@ -3153,7 +3153,7 @@ class EqualizerBand {
   }
 
   /// The gain for this band in decibels.
-  double get gain => _gainSubject.value!;
+  double get gain => _gainSubject.nvalue!;
 
   /// A stream of the current gain for this band in decibels.
   Stream<double> get gainStream => _gainSubject.stream;
@@ -3255,3 +3255,9 @@ class Equalizer extends AudioEffect with AndroidAudioEffect {
 
 bool _isAndroid() => !kIsWeb && Platform.isAndroid;
 bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+
+/// Backwards compatible extensions on rxdart's ValueStream
+extension _ValueStreamExtension<T> on ValueStream<T> {
+  /// Backwards compatible version of valueOrNull.
+  T? get nvalue => hasValue ? value : null;
+}
