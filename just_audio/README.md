@@ -291,7 +291,13 @@ Note: If your app uses a number of different audio plugins, e.g. for audio recor
 
 ### Android
 
-If you wish to connect to non-HTTPS URLS, add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+To allow your application to access audio files on the Internet, add the following permission to your `AndroidManifest.xml` file:
+
+```xml
+    <uses-permission android:name="android.permission.INTERNET"/>
+```
+
+If you wish to connect to non-HTTPS URLS, also add the following attribute to the `application` element:
 
 ```xml
     <application ... android:usesCleartextTraffic="true">
