@@ -73,6 +73,7 @@ class AudioPlayer {
   final Map<String, AudioSource> _audioSources = {};
   bool _disposed = false;
   _InitialSeekValues? _initialSeekValues;
+  final AudioPipeline _audioPipeline;
 
   PlaybackEvent _playbackEvent = PlaybackEvent();
   final _playbackEventSubject = BehaviorSubject<PlaybackEvent>(sync: true);
@@ -132,11 +133,15 @@ class AudioPlayer {
     bool androidApplyAudioAttributes = true,
     bool handleAudioSessionActivation = true,
     AudioLoadConfiguration? audioLoadConfiguration,
+    AudioPipeline? audioPipeline,
   })  : _id = _uuid.v4(),
         _userAgent = userAgent,
-        _androidApplyAudioAttributes = androidApplyAudioAttributes,
+        _androidApplyAudioAttributes =
+            androidApplyAudioAttributes && _isAndroid(),
         _handleAudioSessionActivation = handleAudioSessionActivation,
-        _audioLoadConfiguration = audioLoadConfiguration {
+        _audioLoadConfiguration = audioLoadConfiguration,
+        _audioPipeline = audioPipeline ?? AudioPipeline() {
+    _audioPipeline._setup(this);
     _idlePlatform = _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream);
     if (_audioLoadConfiguration?.darwinLoadControl != null) {
       _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
@@ -196,7 +201,7 @@ class AudioPlayer {
     _setPlatformActive(false, force: true)?.catchError((dynamic e) {});
     _sequenceSubject.add(null);
     // Respond to changes to AndroidAudioAttributes configuration.
-    if (androidApplyAudioAttributes) {
+    if (androidApplyAudioAttributes && _isAndroid()) {
       AudioSession.instance.then((audioSession) {
         audioSession.configurationStream
             .map((conf) => conf.androidAudioAttributes)
@@ -215,6 +220,7 @@ class AudioPlayer {
           if (event.begin) {
             switch (event.type) {
               case AudioInterruptionType.duck:
+                assert(_isAndroid());
                 if (session.androidAudioAttributes!.usage ==
                     AndroidAudioUsage.game) {
                   setVolume(volume / 2);
@@ -234,6 +240,7 @@ class AudioPlayer {
           } else {
             switch (event.type) {
               case AudioInterruptionType.duck:
+                assert(_isAndroid());
                 setVolume(min(1.0, volume * 2));
                 _playInterrupted = false;
                 break;
@@ -1025,6 +1032,7 @@ class AudioPlayer {
   Future<void> setAndroidAudioAttributes(
       AndroidAudioAttributes audioAttributes) async {
     if (_disposed) return;
+    if (!_isAndroid()) return;
     if (audioAttributes == _androidAudioAttributes) return;
     _androidAudioAttributes = audioAttributes;
     await _internalSetAndroidAudioAttributes(await _platform, audioAttributes);
@@ -1032,6 +1040,7 @@ class AudioPlayer {
 
   Future<void> _internalSetAndroidAudioAttributes(AudioPlayerPlatform platform,
       AndroidAudioAttributes audioAttributes) async {
+    if (!_isAndroid()) return;
     await platform.setAndroidAudioAttributes(SetAndroidAudioAttributesRequest(
         contentType: audioAttributes.contentType.index,
         flags: audioAttributes.flags.value,
@@ -1097,11 +1106,21 @@ class AudioPlayer {
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
       final platform = active
-          ? await (_nativePlatform = JustAudioPlatform.instance.init(
-              InitRequest(
-                  id: _id,
-                  audioLoadConfiguration:
-                      _audioLoadConfiguration?._toMessage())))
+          ? await (_nativePlatform =
+              JustAudioPlatform.instance.init(InitRequest(
+              id: _id,
+              audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
+              androidAudioEffects: _isAndroid()
+                  ? _audioPipeline.androidAudioEffects
+                      .map((audioEffect) => audioEffect._toMessage())
+                      .toList()
+                  : [],
+              darwinAudioEffects: _isDarwin()
+                  ? _audioPipeline.darwinAudioEffects
+                      .map((audioEffect) => audioEffect._toMessage())
+                      .toList()
+                  : [],
+            )))
           : _idlePlatform!;
       _platformValue = platform;
       _playbackEventSubscription =
@@ -1141,14 +1160,16 @@ class AudioPlayer {
         final playing = this.playing;
         // To avoid a glitch in ExoPlayer, ensure that any requested audio
         // attributes are set before loading the audio source.
-        if (_androidApplyAudioAttributes) {
-          final audioSession = await AudioSession.instance;
-          _androidAudioAttributes ??=
-              audioSession.configuration?.androidAudioAttributes;
-        }
-        if (_androidAudioAttributes != null) {
-          await _internalSetAndroidAudioAttributes(
-              platform, _androidAudioAttributes!);
+        if (_isAndroid()) {
+          if (_androidApplyAudioAttributes) {
+            final audioSession = await AudioSession.instance;
+            _androidAudioAttributes ??=
+                audioSession.configuration?.androidAudioAttributes;
+          }
+          if (_androidAudioAttributes != null) {
+            await _internalSetAndroidAudioAttributes(
+                platform, _androidAudioAttributes!);
+          }
         }
         if (!automaticallyWaitsToMinimizeStalling) {
           // Only set if different from default.
@@ -1196,7 +1217,16 @@ class AudioPlayer {
       return platform;
     }
 
+    Future<void> initAudioEffects() async {
+      for (var audioEffect in _audioPipeline._audioEffects) {
+        await audioEffect._activate();
+      }
+    }
+
     _platform = setPlatform();
+    if (_active) {
+      initAudioEffects();
+    }
     return durationCompleter.future;
   }
 
@@ -2958,6 +2988,32 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
       ConcatenatingMoveRequest request) async {
     return ConcatenatingMoveResponse();
   }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) async {
+    return AudioEffectSetEnabledResponse();
+  }
+
+  @override
+  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
+      LoudnessEnhancerSetTargetGainRequest request) async {
+    return LoudnessEnhancerSetTargetGainResponse();
+  }
+
+  @override
+  Future<EqualizerGetParametersResponse> equalizerGetParameters(
+      EqualizerGetParametersRequest request) async {
+    throw UnimplementedError(
+        "equalizerGetParameters() has not been implemented.");
+  }
+
+  @override
+  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
+      EqualizerBandSetGainRequest request) {
+    throw UnimplementedError(
+        "equalizerBandSetGain() has not been implemented.");
+  }
 }
 
 /// Holds the initial requested position and index for a newly loaded audio
@@ -2968,3 +3024,234 @@ class _InitialSeekValues {
 
   _InitialSeekValues({required this.position, required this.index});
 }
+
+class AudioPipeline {
+  final List<AndroidAudioEffect> androidAudioEffects;
+  final List<DarwinAudioEffect> darwinAudioEffects;
+
+  AudioPipeline({
+    List<AndroidAudioEffect>? androidAudioEffects,
+    List<DarwinAudioEffect>? darwinAudioEffects,
+  })  : assert(androidAudioEffects == null ||
+            androidAudioEffects.toSet().length == androidAudioEffects.length),
+        assert(darwinAudioEffects == null ||
+            darwinAudioEffects.toSet().length == darwinAudioEffects.length),
+        androidAudioEffects = androidAudioEffects ?? const [],
+        darwinAudioEffects = darwinAudioEffects ?? const [];
+
+  List<AudioEffect> get _audioEffects =>
+      <AudioEffect>[...androidAudioEffects, ...darwinAudioEffects];
+
+  void _setup(AudioPlayer player) {
+    _audioEffects.forEach((effect) => effect._setup(player));
+  }
+}
+
+/// Subclasses of [AudioEffect] can be inserted into an [AudioPipeline] to
+/// modify the audio signal outputted by an [AudioPlayer]. The same audio effect
+/// instance cannot be set on multiple players at the same time.
+///
+/// An [AudioEffect] is disabled by default. For an [AudioEffect] to take
+/// effect, in addition to being part of an [AudioPipeline] attached to an
+/// [AudioPlayer] you must also enable the effect via [setEnabled].
+abstract class AudioEffect {
+  AudioPlayer? _player;
+  bool _enabled = false;
+
+  AudioEffect();
+
+  /// Called when an [AudioEffect] is attached to an [AudioPlayer].
+  void _setup(AudioPlayer player) {
+    assert(_player == null);
+    _player = player;
+  }
+
+  /// Called when [_player] is connected to the platform.
+  Future<void> _activate() async {}
+
+  /// Whether the the effect is enabled. When `true`, and if the effect is part
+  /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
+  /// the audio player's output. When `false`, the audio pipeline will still
+  /// reserve platform resources for the effect but the effect will be bypassed.
+  bool get enabled => _enabled;
+
+  bool get _active => _player?._active ?? false;
+
+  String get _type;
+
+  /// Set the [enabled] status of this audio effect.
+  Future<void> setEnabled(bool enabled) async {
+    _enabled = enabled;
+    if (_active) {
+      await (await _player!._platform).audioEffectSetEnabled(
+          AudioEffectSetEnabledRequest(type: _type, enabled: enabled));
+    }
+  }
+
+  AudioEffectMessage _toMessage();
+}
+
+/// An [AudioEffect] that supports Android.
+mixin AndroidAudioEffect on AudioEffect {}
+
+/// An [AudioEffect] that supports iOS and macOS.
+mixin DarwinAudioEffect on AudioEffect {}
+
+/// An Android [AudioEffect] that boosts the volume of the audio signal to a
+/// target gain, which defaults to zero.
+class LoudnessEnhancer extends AudioEffect with AndroidAudioEffect {
+  double _targetGain = 0;
+
+  @override
+  String get _type => 'LoudnessEnhancer';
+
+  /// The target gain in decibels.
+  double get targetGain => _targetGain;
+
+  /// Sets the target gain to a value in decibels.
+  Future<void> setTargetGain(double targetGain) async {
+    _targetGain = targetGain;
+    if (_active) {
+      await (await _player!._platform).loudnessEnhancerSetTargetGain(
+          LoudnessEnhancerSetTargetGainRequest(targetGain: targetGain));
+    }
+  }
+
+  @override
+  AudioEffectMessage _toMessage() => LoudnessEnhancerMessage(
+        enabled: enabled,
+        targetGain: _targetGain,
+      );
+}
+
+/// A frequency band within an [Equalizer].
+class EqualizerBand {
+  final AudioPlayer _player;
+
+  /// A zero-based index of the position of this band within its [Equalizer].
+  final int index;
+
+  /// The lower frequency of this band.
+  final double lowerFrequency;
+
+  /// The upper frequency of this band.
+  final double upperFrequency;
+
+  /// The center frequency of this band.
+  final double centerFrequency;
+  final _gainSubject = BehaviorSubject<double>();
+
+  EqualizerBand._({
+    required AudioPlayer player,
+    required this.index,
+    required this.lowerFrequency,
+    required this.upperFrequency,
+    required this.centerFrequency,
+    required double gain,
+  }) : _player = player {
+    _gainSubject.add(gain);
+  }
+
+  /// The gain for this band in decibels.
+  double get gain => _gainSubject.value!;
+
+  /// A stream of the current gain for this band in decibels.
+  Stream<double> get gainStream => _gainSubject.stream;
+
+  /// Sets the gain for this band in decibels.
+  Future<void> setGain(double gain) async {
+    _gainSubject.add(gain);
+    if (_player._active) {
+      await (await _player._platform).equalizerBandSetGain(
+          EqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+    }
+  }
+
+  EqualizerBandMessage _toMessage() => EqualizerBandMessage(
+        index: index,
+        lowerFrequency: lowerFrequency,
+        upperFrequency: upperFrequency,
+        centerFrequency: centerFrequency,
+        gain: gain,
+      );
+
+  static EqualizerBand _fromMessage(
+          AudioPlayer player, EqualizerBandMessage message) =>
+      EqualizerBand._(
+        player: player,
+        index: message.index,
+        lowerFrequency: message.lowerFrequency,
+        upperFrequency: message.upperFrequency,
+        centerFrequency: message.centerFrequency,
+        gain: message.gain,
+      );
+}
+
+/// The parameter values of an [Equalizer].
+class EqualizerParameters {
+  /// The minimum gain value supported by the equalizer.
+  final double minDecibels;
+
+  /// The maximum gain value supported by the equalizer.
+  final double maxDecibels;
+
+  /// The frequency bands of the equalizer.
+  final List<EqualizerBand> bands;
+
+  EqualizerParameters({
+    required this.minDecibels,
+    required this.maxDecibels,
+    required this.bands,
+  });
+
+  EqualizerParametersMessage _toMessage() => EqualizerParametersMessage(
+        minDecibels: minDecibels,
+        maxDecibels: maxDecibels,
+        bands: bands.map((band) => band._toMessage()).toList(),
+      );
+
+  static EqualizerParameters _fromMessage(
+          AudioPlayer player, EqualizerParametersMessage message) =>
+      EqualizerParameters(
+        minDecibels: message.minDecibels,
+        maxDecibels: message.maxDecibels,
+        bands: message.bands
+            .map((bandMessage) =>
+                EqualizerBand._fromMessage(player, bandMessage))
+            .toList(),
+      );
+}
+
+/// An [AudioEffect] for Android that can adjust the gain for different
+/// frequency bands of an [AudioPlayer]'s audio signal.
+class Equalizer extends AudioEffect with AndroidAudioEffect {
+  EqualizerParameters? _parameters;
+  final Completer<EqualizerParameters> _parametersCompleter =
+      Completer<EqualizerParameters>();
+
+  @override
+  String get _type => 'Equalizer';
+
+  @override
+  Future<void> _activate() async {
+    await super._activate();
+    if (_parametersCompleter.isCompleted) return;
+    final response = await (await _player!._platform)
+        .equalizerGetParameters(EqualizerGetParametersRequest());
+    _parameters =
+        EqualizerParameters._fromMessage(_player!, response.parameters);
+    _parametersCompleter.complete(_parameters);
+  }
+
+  /// The parameter values of this equalizer.
+  Future<EqualizerParameters> get parameters => _parametersCompleter.future;
+
+  @override
+  AudioEffectMessage _toMessage() => EqualizerMessage(
+        enabled: enabled,
+        parameters: _parameters?._toMessage(),
+      );
+}
+
+bool _isAndroid() => !kIsWeb && Platform.isAndroid;
+bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);

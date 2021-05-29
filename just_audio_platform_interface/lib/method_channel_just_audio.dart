@@ -175,4 +175,36 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'concatenatingMove', request.toMap()))!);
   }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) async {
+    return AudioEffectSetEnabledResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'audioEffectSetEnabled', request.toMap()))!);
+  }
+
+  @override
+  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
+      LoudnessEnhancerSetTargetGainRequest request) async {
+    return LoudnessEnhancerSetTargetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'loudnessEnhancerSetTargetGain', request.toMap()))!);
+  }
+
+  @override
+  Future<EqualizerGetParametersResponse> equalizerGetParameters(
+      EqualizerGetParametersRequest request) async {
+    return EqualizerGetParametersResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'equalizerGetParameters', request.toMap()))!);
+  }
+
+  @override
+  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
+      EqualizerBandSetGainRequest request) async {
+    return EqualizerBandSetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'equalizerBandSetGain', request.toMap()))!);
+  }
 }
