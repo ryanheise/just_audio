@@ -31,6 +31,7 @@ import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.ShuffleOrder;
 import com.google.android.exoplayer2.source.ShuffleOrder.DefaultShuffleOrder;
+import com.google.android.exoplayer2.source.SilenceMediaSource;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
@@ -544,6 +545,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setMimeType(MimeTypes.APPLICATION_M3U8)
                             .build());
+        case "silence":
+            return new SilenceMediaSource.Factory()
+                    .setDurationUs(getLong(map.get("duration")))
+                    .setTag(id)
+                    .createMediaSource();
         case "concatenating":
             MediaSource[] mediaSources = getAudioSourcesArray(map.get("children"));
             return new ConcatenatingMediaSource(
