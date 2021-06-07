@@ -2023,6 +2023,29 @@ class HlsAudioSource extends UriAudioSource {
       id: _id, uri: _effectiveUri.toString(), headers: headers);
 }
 
+/// An [AudioSource] for a period of silence.
+///
+/// NOTE: This is currently supported on Android only.
+class SilenceAudioSource extends IndexedAudioSource {
+  @override
+  Duration get duration => super.duration!;
+
+  @override
+  set duration(covariant Duration duration) => super.duration = duration;
+
+  SilenceAudioSource({
+    dynamic tag,
+    required Duration duration,
+  }) : super(tag, duration: duration);
+
+  @override
+  bool get _requiresProxy => false;
+
+  @override
+  AudioSourceMessage _toMessage() =>
+      SilenceAudioSourceMessage(id: _id, duration: duration);
+}
+
 /// An [AudioSource] representing a concatenation of multiple audio sources to
 /// be played in succession. This can be used to create playlists. Playback
 /// between items will be gapless on Android, iOS and macOS, while there will

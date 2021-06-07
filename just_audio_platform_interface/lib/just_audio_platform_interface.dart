@@ -1023,6 +1023,24 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
       };
 }
 
+/// Information about a silence audio source to be communicated with the
+/// platform implementation.
+class SilenceAudioSourceMessage extends IndexedAudioSourceMessage {
+  final Duration duration;
+
+  SilenceAudioSourceMessage({
+    required String id,
+    required this.duration,
+  }) : super(id: id);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'silence',
+        'id': id,
+        'duration': duration.inMicroseconds,
+      };
+}
+
 /// Information about a concatenating audio source to be communicated with the
 /// platform implementation.
 class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
