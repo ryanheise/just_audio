@@ -1,6 +1,8 @@
 package com.ryanheise.just_audio;
 
 import android.content.Context;
+import android.media.audiofx.AudioEffect;
+import android.media.audiofx.Equalizer;
 import android.media.audiofx.LoudnessEnhancer;
 import android.net.Uri;
 import android.os.Build;
@@ -29,6 +31,7 @@ import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.ShuffleOrder;
 import com.google.android.exoplayer2.source.ShuffleOrder.DefaultShuffleOrder;
+import com.google.android.exoplayer2.source.SilenceMediaSource;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
@@ -52,9 +55,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import com.google.android.exoplayer2.LoadControl;
 import java.util.Random;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
@@ -86,14 +89,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
     private LivePlaybackSpeedControl livePlaybackSpeedControl;
+    private List<Object> rawAudioEffects;
+    private List<AudioEffect> audioEffects = new ArrayList<AudioEffect>();
+    private Map<String, AudioEffect> audioEffectsMap = new HashMap<String, AudioEffect>();
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
     private MediaSource mediaSource;
     private Integer currentIndex;
-    //private boolean _volumeBoostEnabled = false;
-    //private int _volumeBoostGainMB = 0;
-    //private LoudnessEnhancer loudness;
     private final Handler handler = new Handler();
     private final Runnable bufferWatcher = new Runnable() {
         @Override
@@ -122,8 +125,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
     };
 
-    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration) {
+    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration, List<Object> rawAudioEffects) {
         this.context = applicationContext;
+        this.rawAudioEffects = rawAudioEffects;
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
         eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
@@ -183,10 +187,19 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } else {
             this.audioSessionId = audioSessionId;
         }
+        clearAudioEffects();
+        if (this.audioSessionId != null) {
+            for (Object rawAudioEffect : rawAudioEffects) {
+                Map<?, ?> json = (Map<?, ?>)rawAudioEffect;
+                AudioEffect audioEffect = decodeAudioEffect(rawAudioEffect, this.audioSessionId);
+                if ((Boolean)json.get("enabled")) {
+                    audioEffect.setEnabled(true);
+                }
+                audioEffects.add(audioEffect);
+                audioEffectsMap.put((String)json.get("type"), audioEffect);
+            }
+        }
         broadcastPlaybackEvent();
-        //if (_volumeBoostEnabled) {
-        //    setVolumeBoost(true, _volumeBoostGainMB);
-        //}
     }
 
     @Override
@@ -412,6 +425,21 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 setAudioAttributes(call.argument("contentType"), call.argument("flags"), call.argument("usage"));
                 result.success(new HashMap<String, Object>());
                 break;
+            case "audioEffectSetEnabled":
+                audioEffectSetEnabled(call.argument("type"), call.argument("enabled"));
+                result.success(new HashMap<String, Object>());
+                break;
+            case "loudnessEnhancerSetTargetGain":
+                loudnessEnhancerSetTargetGain(call.argument("targetGain"));
+                result.success(new HashMap<String, Object>());
+                break;
+            case "equalizerGetParameters":
+                result.success(equalizerAudioEffectGetParameters());
+                break;
+            case "equalizerBandSetGain":
+                equalizerBandSetGain(call.argument("bandIndex"), call.argument("gain"));
+                result.success(new HashMap<String, Object>());
+                break;
             default:
                 result.notImplemented();
                 break;
@@ -517,6 +545,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setMimeType(MimeTypes.APPLICATION_M3U8)
                             .build());
+        case "silence":
+            return new SilenceMediaSource.Factory()
+                    .setDurationUs(getLong(map.get("duration")))
+                    .setTag(id)
+                    .createMediaSource();
         case "concatenating":
             MediaSource[] mediaSources = getAudioSourcesArray(map.get("children"));
             return new ConcatenatingMediaSource(
@@ -554,6 +587,43 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             mediaSources.add(getAudioSource(audioSources.get(i)));
         }
         return mediaSources;
+    }
+
+    private AudioEffect decodeAudioEffect(final Object json, int audioSessionId) {
+        Map<?, ?> map = (Map<?, ?>)json;
+        String type = (String)map.get("type");
+        switch (type) {
+        case "LoudnessEnhancer":
+            if (Build.VERSION.SDK_INT < 19)
+                throw new RuntimeException("LoudnessEnhancer requires minSdkVersion >= 19");
+            int targetGain = (int)Math.round((((Double)map.get("targetGain")) * 1000.0));
+            LoudnessEnhancer loudnessEnhancer = new LoudnessEnhancer(audioSessionId);
+            loudnessEnhancer.setTargetGain(targetGain);
+            return loudnessEnhancer;
+        case "Equalizer":
+            Equalizer equalizer = new Equalizer(0, audioSessionId);
+            Map<?, ?> rawEqParams = (Map<?, ?>)map.get("parameters");
+            if (rawEqParams != null) {
+                List<?> rawBands = (List<?>)rawEqParams.get("bands");
+                for (short i = 0; i < rawBands.size(); i++) {
+                    Map<?, ?> rawBand = (Map<?, ?>)rawBands.get(i);
+                    double gain = (Double)rawBand.get("gain");
+                    equalizer.setBandLevel(i, (short)Math.round(gain * 1000.0));
+                }
+            }
+            return equalizer;
+        default:
+            throw new IllegalArgumentException("Unknown AudioEffect type: " + map.get("type"));
+        }
+    }
+
+    private void clearAudioEffects() {
+        for (Iterator<AudioEffect> it = audioEffects.iterator(); it.hasNext();) {
+            AudioEffect audioEffect = it.next();
+            audioEffect.release();
+            it.remove();
+        }
+        audioEffectsMap.clear();
     }
 
     private DataSource.Factory buildDataSourceFactory() {
@@ -623,6 +693,40 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } else {
             player.setAudioAttributes(audioAttributes, false);
         }
+    }
+
+    private void audioEffectSetEnabled(String type, boolean enabled) {
+        audioEffectsMap.get(type).setEnabled(enabled);
+    }
+
+    private void loudnessEnhancerSetTargetGain(double targetGain) {
+        int targetGainMillibels = (int)Math.round(targetGain * 1000.0);
+        ((LoudnessEnhancer)audioEffectsMap.get("LoudnessEnhancer")).setTargetGain(targetGainMillibels);
+    }
+
+    private Map<String, Object> equalizerAudioEffectGetParameters() {
+        Equalizer equalizer = (Equalizer)audioEffectsMap.get("Equalizer");
+        ArrayList<Object> rawBands = new ArrayList<>();
+        for (short i = 0; i < equalizer.getNumberOfBands(); i++) {
+            rawBands.add(mapOf(
+                "index", i,
+                "lowerFrequency", (double)equalizer.getBandFreqRange(i)[0],
+                "upperFrequency", (double)equalizer.getBandFreqRange(i)[1],
+                "centerFrequency", (double)equalizer.getCenterFreq(i),
+                "gain", equalizer.getBandLevel(i) / 1000.0
+            ));
+        }
+        return mapOf(
+            "parameters", mapOf(
+                "minDecibels", equalizer.getBandLevelRange()[0] / 1000.0,
+                "maxDecibels", equalizer.getBandLevelRange()[1] / 1000.0,
+                "bands", rawBands
+            )
+        );
+    }
+
+    private void equalizerBandSetGain(int bandIndex, double gain) {
+        ((Equalizer)audioEffectsMap.get("Equalizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
     }
 
     private void broadcastPlaybackEvent() {
@@ -756,20 +860,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         player.setSkipSilenceEnabled(enabled);
     }
 
-    // TODO: Incorporate this after coming up with a generic API for audio effects.
-    /*
-    public void setVolumeBoost(final boolean enabled, final int gainmB) {
-        if (android.os.Build.VERSION.SDK_INT >= 19 && audioSessionId != null) {
-            _volumeBoostEnabled = enabled;
-            _volumeBoostGainMB = gainmB;
-            Log.e(TAG, "setVolumeBoost in android 2 : " + enabled);
-            loudness = new LoudnessEnhancer(audioSessionId);
-            loudness.setEnabled(enabled);
-            loudness.setTargetGain(gainmB);
-        }
-    }
-    */
-
     public void setLoopMode(final int mode) {
         player.setRepeatMode(mode);
     }
@@ -806,6 +896,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
         mediaSources.clear();
         mediaSource = null;
+        clearAudioEffects();
         if (player != null) {
             player.release();
             player = null;
@@ -852,6 +943,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } else {
             return null;
         }
+    }
+
+    static Map<String, Object> mapOf(Object... args) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < args.length; i += 2) {
+            map.put((String)args[i], args[i + 1]);
+        }
+        return map;
     }
 
     enum ProcessingState {

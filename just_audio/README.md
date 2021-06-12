@@ -73,6 +73,13 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 * Replace `await player.load(source);` by `await player.setAudioSource(source);`
 * Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);`
 
+## Tutorials
+
+* [Create a simple Flutter music player app](https://ishouldgotosleep.com/simple-flutter-music-player-app/) by @mvolpato
+* [Playing short audio clips in Flutter with Just Audio](https://suragch.medium.com/playing-short-audio-clips-in-flutter-with-just-audio-3c80eb7eb6ea?sk=aaf6cc523c2c6fc747b5087277932607) by @suragch
+* [Streaming audio in Flutter with Just Audio](https://suragch.medium.com/steaming-audio-in-flutter-with-just-audio-7435fcf672bf?sk=c7163e8496b914c9e0e5446ec6020f04) by @suragch
+* [Managing playlists in Flutter with Just Audio](https://suragch.medium.com/managing-playlists-in-flutter-with-just-audio-c4b8f2af12eb?sk=1b1ffa2cb0b3ed50a320d8cc32cef342) by @suragch
+
 ## Example
 
 Initialisation:
@@ -287,7 +294,13 @@ Note: If your app uses a number of different audio plugins, e.g. for audio recor
 
 ### Android
 
-If you wish to connect to non-HTTPS URLS, add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+To allow your application to access audio files on the Internet, add the following permission to your `AndroidManifest.xml` file:
+
+```xml
+    <uses-permission android:name="android.permission.INTERNET"/>
+```
+
+If you wish to connect to non-HTTPS URLS, also add the following attribute to the `application` element:
 
 ```xml
     <application ... android:usesCleartextTraffic="true">
