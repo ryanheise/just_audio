@@ -91,16 +91,10 @@ class _MyAppState extends State<MyApp> {
     });
     try {
       await _player.setAudioSource(_playlist);
-<<<<<<< HEAD
     } catch (e, stackTrace) {
-      // catch load errors: 404, invalid url ...
-      print("An error occured $e");
-      print(stackTrace);
-=======
-    } catch (e) {
       // Catch load errors: 404, invalid url ...
       print("Error loading playlist: $e");
->>>>>>> dev
+      print(stackTrace);
     }
   }
 
@@ -138,7 +132,7 @@ class _MyAppState extends State<MyApp> {
                                     Image.network(metadata.artUri.toString())),
                           ),
                         ),
-                        Text(metadata.album,
+                        Text(metadata.album!,
                             style: Theme.of(context).textTheme.headline6),
                         Text(metadata.title),
                       ],
