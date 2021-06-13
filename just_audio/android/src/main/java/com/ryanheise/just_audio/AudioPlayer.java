@@ -72,6 +72,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private EventSink eventSink;
 
     private ProcessingState processingState;
+    private long updatePosition;
+    private long updateTime;
     private long bufferedPosition;
     private Long start;
     private Long end;
@@ -234,8 +236,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
     }
 
+    private void updatePositionIfChanged() {
+        if (getCurrentPosition() == updatePosition) return;
+        updatePosition = getCurrentPosition();
+        updateTime = System.currentTimeMillis();
+    }
+
+    private void updatePosition() {
+        updatePosition = getCurrentPosition();
+        updateTime = System.currentTimeMillis();
+    }
+
     @Override
     public void onPositionDiscontinuity(int reason) {
+        updatePosition();
         switch (reason) {
         case Player.DISCONTINUITY_REASON_PERIOD_TRANSITION:
         case Player.DISCONTINUITY_REASON_SEEK:
@@ -257,16 +271,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void onItemMayHaveChanged() {
         Integer newIndex = player.getCurrentWindowIndex();
-        if (newIndex != currentIndex) {
+        // newIndex is never null.
+        // currentIndex is sometimes null.
+        if (!newIndex.equals(currentIndex)) {
             currentIndex = newIndex;
+            broadcastPlaybackEvent();
         }
-        broadcastPlaybackEvent();
     }
 
     @Override
     public void onPlaybackStateChanged(int playbackState) {
         switch (playbackState) {
         case Player.STATE_READY:
+            if (player.getPlayWhenReady())
+                updatePosition();
             if (prepareResult != null) {
                 transition(ProcessingState.ready);
                 Map<String, Object> response = new HashMap<>();
@@ -285,6 +303,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             }
             break;
         case Player.STATE_BUFFERING:
+            updatePositionIfChanged();
             if (processingState != ProcessingState.buffering && processingState != ProcessingState.loading) {
                 transition(ProcessingState.buffering);
                 startWatchingBuffer();
@@ -292,6 +311,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             break;
         case Player.STATE_ENDED:
             if (processingState != ProcessingState.completed) {
+                updatePosition();
                 transition(ProcessingState.completed);
             }
             if (playResult != null) {
@@ -654,6 +674,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
         errorCount = 0;
         prepareResult = result;
+        updatePosition();
         transition(ProcessingState.loading);
         this.mediaSource = mediaSource;
         // TODO: pass in initial position here.
@@ -731,11 +752,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void broadcastPlaybackEvent() {
         final Map<String, Object> event = new HashMap<String, Object>();
-        long updatePosition = getCurrentPosition();
         Long duration = getDuration() == C.TIME_UNSET ? null : (1000 * getDuration());
         event.put("processingState", processingState.ordinal());
         event.put("updatePosition", 1000 * updatePosition);
-        event.put("updateTime", System.currentTimeMillis());
+        event.put("updateTime", updateTime);
         event.put("bufferedPosition", 1000 * Math.max(updatePosition, bufferedPosition));
         event.put("icyMetadata", collectIcyMetadata());
         event.put("duration", duration);
@@ -823,6 +843,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         playResult = result;
         startWatchingBuffer();
         player.setPlayWhenReady(true);
+        updatePosition();
         if (processingState == ProcessingState.completed && playResult != null) {
             playResult.success(new HashMap<String, Object>());
             playResult = null;
@@ -832,6 +853,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     public void pause() {
         if (!player.getPlayWhenReady()) return;
         player.setPlayWhenReady(false);
+        updatePosition();
         if (playResult != null) {
             playResult.success(new HashMap<String, Object>());
             playResult = null;
@@ -844,15 +866,17 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     public void setSpeed(final float speed) {
         PlaybackParameters params = player.getPlaybackParameters();
-        if (params.speed != speed)
-            player.setPlaybackParameters(new PlaybackParameters(speed, params.pitch));
+        if (params.speed == speed) return;
+        player.setPlaybackParameters(new PlaybackParameters(speed, params.pitch));
+        if (player.getPlayWhenReady())
+            updatePosition();
         broadcastPlaybackEvent();
     }
 
     public void setPitch(final float pitch) {
         PlaybackParameters params = player.getPlaybackParameters();
-        if (params.pitch != pitch)
-            player.setPlaybackParameters(new PlaybackParameters(params.speed, pitch));
+        if (params.pitch == pitch) return;
+        player.setPlaybackParameters(new PlaybackParameters(params.speed, pitch));
         broadcastPlaybackEvent();
     }
 
