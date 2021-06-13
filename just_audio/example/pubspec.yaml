@@ -17,7 +17,7 @@ dependencies:
   audio_service:
     git:
       url: https://github.com/ryanheise/audio_service.git
-      ref: d83855dd6eee
+      ref: f3de6ae914
       path: audio_service
 
 # Uncomment when testing platform interface changes.

@@ -90,7 +90,7 @@ class JustAudioPlayer extends AudioPlayerPlatform {
     });
   }
 
-  PlaybackState get playbackState => _audioHandler.playbackState.value!;
+  PlaybackState get playbackState => _audioHandler.playbackState.nvalue!;
 
   Future<void> release() async {
     eventController.close();
@@ -249,7 +249,7 @@ class PlayerAudioHandler extends BaseAudioHandler
       ? currentQueue![index!]
       : null;
 
-  List<MediaItem>? get currentQueue => queue.value;
+  List<MediaItem>? get currentQueue => queue.nvalue;
 
   PlayerAudioHandler(String playerId) {
     _init(playerId);
@@ -267,7 +267,7 @@ class PlayerAudioHandler extends BaseAudioHandler
         .map((event) => event.icyMetadata)
         .distinct()
         .listen((icyMetadata) {
-      customEventSubject.add({
+      customEvent.add({
         'type': 'icyMetadata',
         'value': icyMetadata,
       });
@@ -276,7 +276,7 @@ class PlayerAudioHandler extends BaseAudioHandler
         .map((event) => event.androidAudioSessionId)
         .distinct()
         .listen((audioSessionId) {
-      customEventSubject.add({
+      customEvent.add({
         'type': 'androidAudioSessionId',
         'value': audioSessionId,
       });
@@ -300,7 +300,7 @@ class PlayerAudioHandler extends BaseAudioHandler
         .map((event) => event.currentIndex)
         .distinct()
         .listen((index) {
-      customEventSubject.add({
+      customEvent.add({
         'type': 'currentIndex',
         'value': index,
       });
@@ -310,7 +310,7 @@ class PlayerAudioHandler extends BaseAudioHandler
   @override
   Future<void> updateQueue(List<MediaItem> queue) async {
     this.queue.add(queue);
-    if (mediaItem.value == null &&
+    if (mediaItem.nvalue == null &&
         index != null &&
         index! >= 0 &&
         index! < queue.length) {
@@ -504,7 +504,7 @@ class PlayerAudioHandler extends BaseAudioHandler
 
   /// Broadcasts the current state to all clients.
   Future<void> _broadcastState() async {
-    playbackState.add(playbackState.value!.copyWith(
+    playbackState.add(playbackState.nvalue!.copyWith(
       controls: [
         MediaControl.skipToPrevious,
         if (_playing) MediaControl.pause else MediaControl.play,
@@ -632,4 +632,10 @@ class TrackInfo {
 
   @override
   String toString() => '($index, $duration)';
+}
+
+/// Backwards compatible extensions on rxdart's ValueStream
+extension _ValueStreamExtension<T> on ValueStream<T> {
+  /// Backwards compatible version of valueOrNull.
+  T? get nvalue => hasValue ? value : null;
 }
