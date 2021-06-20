@@ -1425,7 +1425,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
 final byteRangeData = List.generate(200, (i) => i);
 
 class TestStreamAudioSource extends StreamAudioSource {
-  TestStreamAudioSource({dynamic tag}) : super(tag);
+  TestStreamAudioSource({dynamic tag}) : super(tag: tag);
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {

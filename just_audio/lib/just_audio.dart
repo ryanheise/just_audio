@@ -1864,7 +1864,7 @@ abstract class IndexedAudioSource extends AudioSource {
   final dynamic tag;
   Duration? duration;
 
-  IndexedAudioSource(this.tag, {this.duration});
+  IndexedAudioSource({this.tag, this.duration});
 
   @override
   void _shuffle({int? initialIndex}) {}
@@ -1883,7 +1883,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Uri? _overrideUri;
 
   UriAudioSource(this.uri, {this.headers, dynamic tag, Duration? duration})
-      : super(tag, duration: duration);
+      : super(tag: tag, duration: duration);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
   /// of the copied asset on the filesystem, otherwise it gives us the original
@@ -2036,7 +2036,7 @@ class SilenceAudioSource extends IndexedAudioSource {
   SilenceAudioSource({
     dynamic tag,
     required Duration duration,
-  }) : super(tag, duration: duration);
+  }) : super(tag: tag, duration: duration);
 
   @override
   bool get _requiresProxy => false;
@@ -2286,7 +2286,7 @@ class ClippingAudioSource extends IndexedAudioSource {
     this.end,
     dynamic tag,
     Duration? duration,
-  }) : super(tag, duration: duration);
+  }) : super(tag: tag, duration: duration);
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -2349,7 +2349,7 @@ Uri _encodeDataUrl(String base64Data, String mimeType) =>
 @experimental
 abstract class StreamAudioSource extends IndexedAudioSource {
   Uri? _uri;
-  StreamAudioSource(dynamic tag) : super(tag);
+  StreamAudioSource({dynamic tag}) : super(tag: tag);
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -2428,7 +2428,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     dynamic tag,
   })  : _cacheFile =
             cacheFile != null ? Future.value(cacheFile) : _getCacheFile(uri),
-        super(tag);
+        super(tag: tag);
 
   /// Get file for caching [uri] with proper extension
   static Future<File> _getCacheFile(final Uri uri) async => File(p.joinAll([
