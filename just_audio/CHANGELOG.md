@@ -1,8 +1,11 @@
 ## Next release
 
-* Add setSkipSilenceEnabled (@subhash279).
-* Add buffer options via AudioLoadConfiguration.
-* Add setPitch.
+* Add buffer options via AudioLoadConfiguration for iOS/Android.
+* Add setSkipSilenceEnabled for Android (@subhash279).
+* Add setPitch for Android.
+* Add audio effects:
+  * AndroidLoudnessEnhancer
+  * AndroidEqualizer
 
 ## 0.7.5
 

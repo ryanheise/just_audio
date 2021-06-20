@@ -449,14 +449,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 audioEffectSetEnabled(call.argument("type"), call.argument("enabled"));
                 result.success(new HashMap<String, Object>());
                 break;
-            case "loudnessEnhancerSetTargetGain":
+            case "androidLoudnessEnhancerSetTargetGain":
                 loudnessEnhancerSetTargetGain(call.argument("targetGain"));
                 result.success(new HashMap<String, Object>());
                 break;
-            case "equalizerGetParameters":
+            case "androidEqualizerGetParameters":
                 result.success(equalizerAudioEffectGetParameters());
                 break;
-            case "equalizerBandSetGain":
+            case "androidEqualizerBandSetGain":
                 equalizerBandSetGain(call.argument("bandIndex"), call.argument("gain"));
                 result.success(new HashMap<String, Object>());
                 break;
@@ -613,14 +613,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         Map<?, ?> map = (Map<?, ?>)json;
         String type = (String)map.get("type");
         switch (type) {
-        case "LoudnessEnhancer":
+        case "AndroidLoudnessEnhancer":
             if (Build.VERSION.SDK_INT < 19)
-                throw new RuntimeException("LoudnessEnhancer requires minSdkVersion >= 19");
+                throw new RuntimeException("AndroidLoudnessEnhancer requires minSdkVersion >= 19");
             int targetGain = (int)Math.round((((Double)map.get("targetGain")) * 1000.0));
             LoudnessEnhancer loudnessEnhancer = new LoudnessEnhancer(audioSessionId);
             loudnessEnhancer.setTargetGain(targetGain);
             return loudnessEnhancer;
-        case "Equalizer":
+        case "AndroidEqualizer":
             Equalizer equalizer = new Equalizer(0, audioSessionId);
             Map<?, ?> rawEqParams = (Map<?, ?>)map.get("parameters");
             if (rawEqParams != null) {
@@ -722,18 +722,18 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void loudnessEnhancerSetTargetGain(double targetGain) {
         int targetGainMillibels = (int)Math.round(targetGain * 1000.0);
-        ((LoudnessEnhancer)audioEffectsMap.get("LoudnessEnhancer")).setTargetGain(targetGainMillibels);
+        ((LoudnessEnhancer)audioEffectsMap.get("AndroidLoudnessEnhancer")).setTargetGain(targetGainMillibels);
     }
 
     private Map<String, Object> equalizerAudioEffectGetParameters() {
-        Equalizer equalizer = (Equalizer)audioEffectsMap.get("Equalizer");
+        Equalizer equalizer = (Equalizer)audioEffectsMap.get("AndroidEqualizer");
         ArrayList<Object> rawBands = new ArrayList<>();
         for (short i = 0; i < equalizer.getNumberOfBands(); i++) {
             rawBands.add(mapOf(
                 "index", i,
-                "lowerFrequency", (double)equalizer.getBandFreqRange(i)[0],
-                "upperFrequency", (double)equalizer.getBandFreqRange(i)[1],
-                "centerFrequency", (double)equalizer.getCenterFreq(i),
+                "lowerFrequency", (double)equalizer.getBandFreqRange(i)[0] / 1000.0,
+                "upperFrequency", (double)equalizer.getBandFreqRange(i)[1] / 1000.0,
+                "centerFrequency", (double)equalizer.getCenterFreq(i) / 1000.0,
                 "gain", equalizer.getBandLevel(i) / 1000.0
             ));
         }
@@ -747,7 +747,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private void equalizerBandSetGain(int bandIndex, double gain) {
-        ((Equalizer)audioEffectsMap.get("Equalizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
+        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
     }
 
     private void broadcastPlaybackEvent() {

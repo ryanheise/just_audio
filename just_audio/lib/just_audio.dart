@@ -3019,23 +3019,24 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
-      LoudnessEnhancerSetTargetGainRequest request) async {
-    return LoudnessEnhancerSetTargetGainResponse();
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+    return AndroidLoudnessEnhancerSetTargetGainResponse();
   }
 
   @override
-  Future<EqualizerGetParametersResponse> equalizerGetParameters(
-      EqualizerGetParametersRequest request) async {
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) async {
     throw UnimplementedError(
-        "equalizerGetParameters() has not been implemented.");
+        "androidEqualizerGetParameters() has not been implemented.");
   }
 
   @override
-  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
-      EqualizerBandSetGainRequest request) {
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) {
     throw UnimplementedError(
-        "equalizerBandSetGain() has not been implemented.");
+        "androidEqualizerBandSetGain() has not been implemented.");
   }
 }
 
@@ -3079,7 +3080,7 @@ class AudioPipeline {
 /// [AudioPlayer] you must also enable the effect via [setEnabled].
 abstract class AudioEffect {
   AudioPlayer? _player;
-  bool _enabled = false;
+  final _enabledSubject = BehaviorSubject.seeded(false);
 
   AudioEffect();
 
@@ -3096,7 +3097,10 @@ abstract class AudioEffect {
   /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
   /// the audio player's output. When `false`, the audio pipeline will still
   /// reserve platform resources for the effect but the effect will be bypassed.
-  bool get enabled => _enabled;
+  bool get enabled => _enabledSubject.nvalue!;
+
+  /// A stream of the current [enabled] value.
+  Stream<bool> get enabledStream => _enabledSubject.stream;
 
   bool get _active => _player?._active ?? false;
 
@@ -3104,7 +3108,7 @@ abstract class AudioEffect {
 
   /// Set the [enabled] status of this audio effect.
   Future<void> setEnabled(bool enabled) async {
-    _enabled = enabled;
+    _enabledSubject.add(enabled);
     if (_active) {
       await (await _player!._platform).audioEffectSetEnabled(
           AudioEffectSetEnabledRequest(type: _type, enabled: enabled));
@@ -3122,49 +3126,52 @@ mixin DarwinAudioEffect on AudioEffect {}
 
 /// An Android [AudioEffect] that boosts the volume of the audio signal to a
 /// target gain, which defaults to zero.
-class LoudnessEnhancer extends AudioEffect with AndroidAudioEffect {
-  double _targetGain = 0;
+class AndroidLoudnessEnhancer extends AudioEffect with AndroidAudioEffect {
+  final _targetGainSubject = BehaviorSubject.seeded(0.0);
 
   @override
-  String get _type => 'LoudnessEnhancer';
+  String get _type => 'AndroidLoudnessEnhancer';
 
   /// The target gain in decibels.
-  double get targetGain => _targetGain;
+  double get targetGain => _targetGainSubject.nvalue!;
+
+  /// A stream of the current target gain in decibels.
+  Stream<double> get targetGainStream => _targetGainSubject.stream;
 
   /// Sets the target gain to a value in decibels.
   Future<void> setTargetGain(double targetGain) async {
-    _targetGain = targetGain;
+    _targetGainSubject.add(targetGain);
     if (_active) {
-      await (await _player!._platform).loudnessEnhancerSetTargetGain(
-          LoudnessEnhancerSetTargetGainRequest(targetGain: targetGain));
+      await (await _player!._platform).androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest(targetGain: targetGain));
     }
   }
 
   @override
-  AudioEffectMessage _toMessage() => LoudnessEnhancerMessage(
+  AudioEffectMessage _toMessage() => AndroidLoudnessEnhancerMessage(
         enabled: enabled,
-        targetGain: _targetGain,
+        targetGain: targetGain,
       );
 }
 
-/// A frequency band within an [Equalizer].
-class EqualizerBand {
+/// A frequency band within an [AndroidEqualizer].
+class AndroidEqualizerBand {
   final AudioPlayer _player;
 
-  /// A zero-based index of the position of this band within its [Equalizer].
+  /// A zero-based index of the position of this band within its [AndroidEqualizer].
   final int index;
 
-  /// The lower frequency of this band.
+  /// The lower frequency of this band in hertz.
   final double lowerFrequency;
 
-  /// The upper frequency of this band.
+  /// The upper frequency of this band in hertz.
   final double upperFrequency;
 
-  /// The center frequency of this band.
+  /// The center frequency of this band in hertz.
   final double centerFrequency;
   final _gainSubject = BehaviorSubject<double>();
 
-  EqualizerBand._({
+  AndroidEqualizerBand._({
     required AudioPlayer player,
     required this.index,
     required this.lowerFrequency,
@@ -3185,12 +3192,12 @@ class EqualizerBand {
   Future<void> setGain(double gain) async {
     _gainSubject.add(gain);
     if (_player._active) {
-      await (await _player._platform).equalizerBandSetGain(
-          EqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+      await (await _player._platform).androidEqualizerBandSetGain(
+          AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
     }
   }
 
-  EqualizerBandMessage _toMessage() => EqualizerBandMessage(
+  AndroidEqualizerBandMessage _toMessage() => AndroidEqualizerBandMessage(
         index: index,
         lowerFrequency: lowerFrequency,
         upperFrequency: upperFrequency,
@@ -3198,9 +3205,9 @@ class EqualizerBand {
         gain: gain,
       );
 
-  static EqualizerBand _fromMessage(
-          AudioPlayer player, EqualizerBandMessage message) =>
-      EqualizerBand._(
+  static AndroidEqualizerBand _fromMessage(
+          AudioPlayer player, AndroidEqualizerBandMessage message) =>
+      AndroidEqualizerBand._(
         player: player,
         index: message.index,
         lowerFrequency: message.lowerFrequency,
@@ -3210,8 +3217,8 @@ class EqualizerBand {
       );
 }
 
-/// The parameter values of an [Equalizer].
-class EqualizerParameters {
+/// The parameter values of an [AndroidEqualizer].
+class AndroidEqualizerParameters {
   /// The minimum gain value supported by the equalizer.
   final double minDecibels;
 
@@ -3219,58 +3226,60 @@ class EqualizerParameters {
   final double maxDecibels;
 
   /// The frequency bands of the equalizer.
-  final List<EqualizerBand> bands;
+  final List<AndroidEqualizerBand> bands;
 
-  EqualizerParameters({
+  AndroidEqualizerParameters({
     required this.minDecibels,
     required this.maxDecibels,
     required this.bands,
   });
 
-  EqualizerParametersMessage _toMessage() => EqualizerParametersMessage(
+  AndroidEqualizerParametersMessage _toMessage() =>
+      AndroidEqualizerParametersMessage(
         minDecibels: minDecibels,
         maxDecibels: maxDecibels,
         bands: bands.map((band) => band._toMessage()).toList(),
       );
 
-  static EqualizerParameters _fromMessage(
-          AudioPlayer player, EqualizerParametersMessage message) =>
-      EqualizerParameters(
+  static AndroidEqualizerParameters _fromMessage(
+          AudioPlayer player, AndroidEqualizerParametersMessage message) =>
+      AndroidEqualizerParameters(
         minDecibels: message.minDecibels,
         maxDecibels: message.maxDecibels,
         bands: message.bands
             .map((bandMessage) =>
-                EqualizerBand._fromMessage(player, bandMessage))
+                AndroidEqualizerBand._fromMessage(player, bandMessage))
             .toList(),
       );
 }
 
 /// An [AudioEffect] for Android that can adjust the gain for different
 /// frequency bands of an [AudioPlayer]'s audio signal.
-class Equalizer extends AudioEffect with AndroidAudioEffect {
-  EqualizerParameters? _parameters;
-  final Completer<EqualizerParameters> _parametersCompleter =
-      Completer<EqualizerParameters>();
+class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
+  AndroidEqualizerParameters? _parameters;
+  final Completer<AndroidEqualizerParameters> _parametersCompleter =
+      Completer<AndroidEqualizerParameters>();
 
   @override
-  String get _type => 'Equalizer';
+  String get _type => 'AndroidEqualizer';
 
   @override
   Future<void> _activate() async {
     await super._activate();
     if (_parametersCompleter.isCompleted) return;
     final response = await (await _player!._platform)
-        .equalizerGetParameters(EqualizerGetParametersRequest());
+        .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
     _parameters =
-        EqualizerParameters._fromMessage(_player!, response.parameters);
+        AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
     _parametersCompleter.complete(_parameters);
   }
 
   /// The parameter values of this equalizer.
-  Future<EqualizerParameters> get parameters => _parametersCompleter.future;
+  Future<AndroidEqualizerParameters> get parameters =>
+      _parametersCompleter.future;
 
   @override
-  AudioEffectMessage _toMessage() => EqualizerMessage(
+  AudioEffectMessage _toMessage() => AndroidEqualizerMessage(
         enabled: enabled,
         parameters: _parameters?._toMessage(),
       );
