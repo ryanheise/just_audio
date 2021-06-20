@@ -2412,9 +2412,11 @@ class LockCachingAudioSource extends StreamAudioSource {
   Future<HttpClientResponse>? _response;
   final Uri uri;
   final Map<String, String>? headers;
-  final Future<File> _cacheFile;
+  final Future<File> cacheFile;
   int _progress = 0;
   final _requests = <_StreamingByteRangeRequest>[];
+  final _downloadProgressSubject = BehaviorSubject<double>();
+  bool _downloading = false;
 
   /// Creates a [LockCachingAudioSource] to that provides [uri] to the player
   /// while simultaneously caching it to [cacheFile]. If no cache file is
@@ -2427,9 +2429,37 @@ class LockCachingAudioSource extends StreamAudioSource {
     this.headers,
     File? cacheFile,
     dynamic tag,
-  })  : _cacheFile =
+  })  : cacheFile =
             cacheFile != null ? Future.value(cacheFile) : _getCacheFile(uri),
-        super(tag: tag);
+        super(tag: tag) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    final cacheFile = await this.cacheFile;
+    _downloadProgressSubject.add((await cacheFile.exists()) ? 1.0 : 0.0);
+  }
+
+  /// Emits the current download progress as a double value from 0.0 (nothing
+  /// downloaded) to 1.0 (download complete).
+  Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
+
+  /// Removes the underlying cache files. It is an error to clear the cache
+  /// while a download is in progress.
+  Future<void> clearCache() async {
+    if (_downloading) {
+      throw Exception("Cannot clear cache while download is in progress");
+    }
+    final cacheFile = await this.cacheFile;
+    if (await cacheFile.exists()) {
+      await cacheFile.delete();
+    }
+    final mimeFile = await _mimeFile;
+    if (await mimeFile.exists()) {
+      await mimeFile.delete();
+    }
+    _downloadProgressSubject.add(0.0);
+  }
 
   /// Get file for caching [uri] with proper extension
   static Future<File> _getCacheFile(final Uri uri) async => File(p.joinAll([
@@ -2440,13 +2470,13 @@ class LockCachingAudioSource extends StreamAudioSource {
       ]));
 
   Future<File> get _partialCacheFile async =>
-      File('${(await _cacheFile).path}.part');
+      File('${(await cacheFile).path}.part');
 
   /// We use this to record the original content type of the downloaded audio.
   /// NOTE: We could instead rely on the cache file extension, but the original
   /// URL might not provide a correct extension. As a fallback, we could map the
   /// MIME type to an extension but we will need a complete dictionary.
-  Future<File> get _mimeFile async => File('${(await _cacheFile).path}.mime');
+  Future<File> get _mimeFile async => File('${(await cacheFile).path}.mime');
 
   Future<String> _readCachedMimeType() async {
     final file = await _mimeFile;
@@ -2469,7 +2499,8 @@ class LockCachingAudioSource extends StreamAudioSource {
   /// separate HTTP request is made to fulfill it while the download of the
   /// entire file continues in parallel.
   Future<HttpClientResponse> _fetch() async {
-    final cacheFile = await _cacheFile;
+    _downloading = true;
+    final cacheFile = await this.cacheFile;
     final partialCacheFile = await _partialCacheFile;
     final mimeType = await _readCachedMimeType();
 
@@ -2494,14 +2525,14 @@ class LockCachingAudioSource extends StreamAudioSource {
     var sourceLength = response.contentLength;
     final inProgressResponses = <_InProgressCacheResponse>[];
     late StreamSubscription subscription;
-    //int percentProgress = 0;
+    var percentProgress = 0;
     subscription = response.listen((data) async {
       _progress += data.length;
-      //int newPercentProgress = 100 * _progress ~/ sourceLength;
-      //if (newPercentProgress != percentProgress) {
-      //  percentProgress = newPercentProgress;
-      //  print("### Progress: $percentProgress%");
-      //}
+      final newPercentProgress = 100 * _progress ~/ sourceLength;
+      if (newPercentProgress != percentProgress) {
+        percentProgress = newPercentProgress;
+        _downloadProgressSubject.add(percentProgress / 100);
+      }
       sink.add(data);
       final readyRequests =
           _requests.where((request) => (request.start) < _progress).toList();
@@ -2581,9 +2612,10 @@ class LockCachingAudioSource extends StreamAudioSource {
         });
       }
     }, onDone: () async {
-      (await _partialCacheFile).renameSync((await _cacheFile).path);
+      (await _partialCacheFile).renameSync((await cacheFile).path);
       await subscription.cancel();
       httpClient.close();
+      _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
       print(stackTrace);
       (await _partialCacheFile).deleteSync();
@@ -2592,18 +2624,20 @@ class LockCachingAudioSource extends StreamAudioSource {
       for (final req in _requests) {
         req.fail(e, stackTrace);
       }
+      _requests.clear();
       // Close all in progress requests
       for (final res in inProgressResponses) {
         res.controller.addError(e, stackTrace);
         res.controller.close();
       }
+      _downloading = false;
     }, cancelOnError: true);
     return response;
   }
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final cacheFile = await _cacheFile;
+    final cacheFile = await this.cacheFile;
     start ??= 0;
     if (cacheFile.existsSync()) {
       final sourceLength = cacheFile.lengthSync();
@@ -2700,9 +2734,9 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     try {
       sourceResponse =
           await source.request(rangeRequest?.start, rangeRequest?.endEx);
-    } catch (e, stack) {
+    } catch (e, stackTrace) {
       print("Proxy request failed: $e");
-      print(stack);
+      print(stackTrace);
 
       request.response.headers.clear();
       request.response.statusCode = HttpStatus.internalServerError;
