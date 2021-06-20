@@ -6,6 +6,7 @@
 * Add audio effects:
   * AndroidLoudnessEnhancer
   * AndroidEqualizer
+* Dispose players when hot restarting on Android.
 
 ## 0.7.5
 
