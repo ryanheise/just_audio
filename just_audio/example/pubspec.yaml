@@ -8,7 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audio_session: ^0.1.2
+  audio_session: ^0.1.5
   rxdart: '^0.27.0'
   just_audio:
     path: ../
