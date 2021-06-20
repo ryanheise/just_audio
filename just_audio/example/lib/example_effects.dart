@@ -1,3 +1,11 @@
+// This example demonstrates Android audio effects.
+//
+// To run:
+//
+// flutter run -t lib/example_effects.dart
+
+import 'dart:math';
+
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,55 +22,20 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  late AudioPlayer _player;
-  final _playlist = ConcatenatingAudioSource(children: [
-    ClippingAudioSource(
-      start: Duration(seconds: 60),
-      end: Duration(seconds: 90),
-      child: AudioSource.uri(Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
-      tag: AudioMetadata(
-        album: "Science Friday",
-        title: "A Salute To Head-Scratching Science (30 seconds)",
-        artwork:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-      ),
+  final _equalizer = AndroidEqualizer();
+  final _loudnessEnhancer = AndroidLoudnessEnhancer();
+  late final AudioPlayer _player = AudioPlayer(
+    audioPipeline: AudioPipeline(
+      androidAudioEffects: [
+        _loudnessEnhancer,
+        _equalizer,
+      ],
     ),
-    AudioSource.uri(
-      Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
-      tag: AudioMetadata(
-        album: "Science Friday",
-        title: "A Salute To Head-Scratching Science",
-        artwork:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-      ),
-    ),
-    AudioSource.uri(
-      Uri.parse("https://s3.amazonaws.com/scifri-segments/scifri201711241.mp3"),
-      tag: AudioMetadata(
-        album: "Science Friday",
-        title: "From Cat Rheology To Operatic Incompetence",
-        artwork:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-      ),
-    ),
-    AudioSource.uri(
-      Uri.parse("asset:///audio/nature.mp3"),
-      tag: AudioMetadata(
-        album: "Public Domain",
-        title: "Nature Sounds",
-        artwork:
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-      ),
-    ),
-  ]);
-  int _addedCount = 0;
+  );
 
   @override
   void initState() {
     super.initState();
-    _player = AudioPlayer();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
@@ -72,13 +45,9 @@ class _MyAppState extends State<MyApp> {
   Future<void> _init() async {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
-    // Listen to errors during playback.
-    _player.playbackEventStream.listen((event) {},
-        onError: (Object e, StackTrace stackTrace) {
-      print('A stream error occurred: $e');
-    });
     try {
-      await _player.setAudioSource(_playlist);
+      await _player.setAudioSource(AudioSource.uri(Uri.parse(
+          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
     } catch (e) {
       // Catch load errors: 404, invalid url ...
       print("Error loading playlist: $e");
@@ -109,30 +78,31 @@ class _MyAppState extends State<MyApp> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              StreamBuilder<bool>(
+                stream: _loudnessEnhancer.enabledStream,
+                builder: (context, snapshot) {
+                  final enabled = snapshot.data ?? false;
+                  return SwitchListTile(
+                    title: Text('Loudness Enhancer'),
+                    value: enabled,
+                    onChanged: _loudnessEnhancer.setEnabled,
+                  );
+                },
+              ),
+              LoudnessEnhancerControls(loudnessEnhancer: _loudnessEnhancer),
+              StreamBuilder<bool>(
+                stream: _equalizer.enabledStream,
+                builder: (context, snapshot) {
+                  final enabled = snapshot.data ?? false;
+                  return SwitchListTile(
+                    title: Text('Equalizer'),
+                    value: enabled,
+                    onChanged: _equalizer.setEnabled,
+                  );
+                },
+              ),
               Expanded(
-                child: StreamBuilder<SequenceState?>(
-                  stream: _player.sequenceStateStream,
-                  builder: (context, snapshot) {
-                    final state = snapshot.data;
-                    if (state?.sequence.isEmpty ?? true) return SizedBox();
-                    final metadata = state!.currentSource!.tag as AudioMetadata;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child:
-                                Center(child: Image.network(metadata.artwork)),
-                          ),
-                        ),
-                        Text(metadata.album,
-                            style: Theme.of(context).textTheme.headline6),
-                        Text(metadata.title),
-                      ],
-                    );
-                  },
-                ),
+                child: EqualizerControls(equalizer: _equalizer),
               ),
               ControlButtons(_player),
               StreamBuilder<PositionData>(
@@ -144,9 +114,7 @@ class _MyAppState extends State<MyApp> {
                     position: positionData?.position ?? Duration.zero,
                     bufferedPosition:
                         positionData?.bufferedPosition ?? Duration.zero,
-                    onChangeEnd: (newPosition) {
-                      _player.seek(newPosition);
-                    },
+                    onChangeEnd: _player.seek,
                   );
                 },
               ),
@@ -205,66 +173,117 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ],
               ),
-              Container(
-                height: 240.0,
-                child: StreamBuilder<SequenceState?>(
-                  stream: _player.sequenceStateStream,
-                  builder: (context, snapshot) {
-                    final state = snapshot.data;
-                    final sequence = state?.sequence ?? [];
-                    return ReorderableListView(
-                      onReorder: (int oldIndex, int newIndex) {
-                        if (oldIndex < newIndex) newIndex--;
-                        _playlist.move(oldIndex, newIndex);
-                      },
-                      children: [
-                        for (var i = 0; i < sequence.length; i++)
-                          Dismissible(
-                            key: ValueKey(sequence[i]),
-                            background: Container(
-                              color: Colors.redAccent,
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: Icon(Icons.delete, color: Colors.white),
-                              ),
-                            ),
-                            onDismissed: (dismissDirection) {
-                              _playlist.removeAt(i);
-                            },
-                            child: Material(
-                              color: i == state!.currentIndex
-                                  ? Colors.grey.shade300
-                                  : null,
-                              child: ListTile(
-                                title: Text(sequence[i].tag.title as String),
-                                onTap: () {
-                                  _player.seek(Duration.zero, index: i);
-                                },
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          child: Icon(Icons.add),
-          onPressed: () {
-            _playlist.add(AudioSource.uri(
-              Uri.parse("asset:///audio/nature.mp3"),
-              tag: AudioMetadata(
-                album: "Public Domain",
-                title: "Nature Sounds ${++_addedCount}",
-                artwork:
-                    "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+      ),
+    );
+  }
+}
+
+class LoudnessEnhancerControls extends StatelessWidget {
+  final AndroidLoudnessEnhancer loudnessEnhancer;
+
+  const LoudnessEnhancerControls({
+    Key? key,
+    required this.loudnessEnhancer,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<double>(
+      stream: loudnessEnhancer.targetGainStream,
+      builder: (context, snapshot) {
+        final targetGain = snapshot.data ?? 0.0;
+        return Slider(
+          min: -1.0,
+          max: 1.0,
+          value: targetGain,
+          onChanged: loudnessEnhancer.setTargetGain,
+          label: 'foo',
+        );
+      },
+    );
+  }
+}
+
+class EqualizerControls extends StatelessWidget {
+  final AndroidEqualizer equalizer;
+
+  const EqualizerControls({
+    Key? key,
+    required this.equalizer,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<AndroidEqualizerParameters>(
+      future: equalizer.parameters,
+      builder: (context, snapshot) {
+        final parameters = snapshot.data;
+        if (parameters == null) return SizedBox();
+        return Row(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            for (var band in parameters.bands)
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: StreamBuilder<double>(
+                        stream: band.gainStream,
+                        builder: (context, snapshot) {
+                          return VerticalSlider(
+                            min: parameters.minDecibels,
+                            max: parameters.maxDecibels,
+                            value: band.gain,
+                            onChanged: band.setGain,
+                          );
+                        },
+                      ),
+                    ),
+                    Text('${band.centerFrequency.round()} Hz'),
+                  ],
+                ),
               ),
-            ));
-          },
+          ],
+        );
+      },
+    );
+  }
+}
+
+class VerticalSlider extends StatelessWidget {
+  final double value;
+  final double min;
+  final double max;
+  final ValueChanged<double>? onChanged;
+
+  const VerticalSlider({
+    Key? key,
+    required this.value,
+    this.min = 0.0,
+    this.max = 1.0,
+    this.onChanged,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.fitHeight,
+      alignment: Alignment.bottomCenter,
+      child: Transform.rotate(
+        angle: -pi / 2,
+        child: Container(
+          width: 400.0,
+          height: 400.0,
+          alignment: Alignment.center,
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: onChanged,
+          ),
         ),
       ),
     );
@@ -294,13 +313,6 @@ class ControlButtons extends StatelessWidget {
               onChanged: player.setVolume,
             );
           },
-        ),
-        StreamBuilder<SequenceState?>(
-          stream: player.sequenceStateStream,
-          builder: (context, snapshot) => IconButton(
-            icon: Icon(Icons.skip_previous),
-            onPressed: player.hasPrevious ? player.seekToPrevious : null,
-          ),
         ),
         StreamBuilder<PlayerState>(
           stream: player.playerStateStream,
@@ -338,13 +350,6 @@ class ControlButtons extends StatelessWidget {
             }
           },
         ),
-        StreamBuilder<SequenceState?>(
-          stream: player.sequenceStateStream,
-          builder: (context, snapshot) => IconButton(
-            icon: Icon(Icons.skip_next),
-            onPressed: player.hasNext ? player.seekToNext : null,
-          ),
-        ),
         StreamBuilder<double>(
           stream: player.speedStream,
           builder: (context, snapshot) => IconButton(
@@ -366,16 +371,4 @@ class ControlButtons extends StatelessWidget {
       ],
     );
   }
-}
-
-class AudioMetadata {
-  final String album;
-  final String title;
-  final String artwork;
-
-  AudioMetadata({
-    required this.album,
-    required this.title,
-    required this.artwork,
-  });
 }

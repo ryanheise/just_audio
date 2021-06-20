@@ -1400,23 +1400,24 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   }
 
   @override
-  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
-      LoudnessEnhancerSetTargetGainRequest request) {
-    // TODO: implement loudnessEnhancerSetTargetGain
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) {
+    // TODO: implement androidLoudnessEnhancerSetTargetGain
     throw UnimplementedError();
   }
 
   @override
-  Future<EqualizerGetParametersResponse> equalizerGetParameters(
-      EqualizerGetParametersRequest request) {
-    // TODO: implement equalizerGetParameters
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) {
+    // TODO: implement androidEqualizerGetParameters
     throw UnimplementedError();
   }
 
   @override
-  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
-      EqualizerBandSetGainRequest request) {
-    // TODO: implement equalizerBandSetGain
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) {
+    // TODO: implement androidEqualizerBandSetGain
     throw UnimplementedError();
   }
 }

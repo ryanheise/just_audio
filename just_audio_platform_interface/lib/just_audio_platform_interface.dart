@@ -192,24 +192,25 @@ abstract class AudioPlayerPlatform {
   }
 
   /// Sets the target gain on the loudness enhancer.
-  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
-      LoudnessEnhancerSetTargetGainRequest request) {
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) {
     throw UnimplementedError(
-        "loudnessEnhancerSetTargetGain() has not been implemented.");
+        "androidLoudnessEnhancerSetTargetGain() has not been implemented.");
   }
 
   /// Gets the equalizer parameters.
-  Future<EqualizerGetParametersResponse> equalizerGetParameters(
-      EqualizerGetParametersRequest request) {
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) {
     throw UnimplementedError(
-        "equalizerGetParameters() has not been implemented.");
+        "androidEqualizerGetParameters() has not been implemented.");
   }
 
   /// Sets the gain for an equalizer band.
-  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
-      EqualizerBandSetGainRequest request) {
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) {
     throw UnimplementedError(
-        "equalizerBandSetGain() has not been implemented.");
+        "androidEqualizerBandSetGain() has not been implemented.");
   }
 }
 
@@ -1136,10 +1137,11 @@ class AudioEffectSetEnabledResponse {
 
 /// Information communicated to the platform implementation when setting the
 /// target gain on the loudness enhancer audio effect.
-class LoudnessEnhancerSetTargetGainRequest {
+class AndroidLoudnessEnhancerSetTargetGainRequest {
+  /// The target gain in decibels.
   final double targetGain;
 
-  LoudnessEnhancerSetTargetGainRequest({
+  AndroidLoudnessEnhancerSetTargetGainRequest({
     required this.targetGain,
   });
 
@@ -1150,41 +1152,42 @@ class LoudnessEnhancerSetTargetGainRequest {
 
 /// Information returned by the platform implementation after setting the target
 /// gain on the loudness enhancer audio effect.
-class LoudnessEnhancerSetTargetGainResponse {
-  static LoudnessEnhancerSetTargetGainResponse fromMap(
+class AndroidLoudnessEnhancerSetTargetGainResponse {
+  static AndroidLoudnessEnhancerSetTargetGainResponse fromMap(
           Map<dynamic, dynamic> map) =>
-      LoudnessEnhancerSetTargetGainResponse();
+      AndroidLoudnessEnhancerSetTargetGainResponse();
 }
 
 /// Information communicated to the platform implementation when requesting the
 /// equalizer parameters.
-class EqualizerGetParametersRequest {
-  EqualizerGetParametersRequest();
+class AndroidEqualizerGetParametersRequest {
+  AndroidEqualizerGetParametersRequest();
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
 }
 
 /// Information communicated to the platform implementation after requesting the
 /// equalizer parameters.
-class EqualizerGetParametersResponse {
-  final EqualizerParametersMessage parameters;
+class AndroidEqualizerGetParametersResponse {
+  final AndroidEqualizerParametersMessage parameters;
 
-  EqualizerGetParametersResponse({required this.parameters});
+  AndroidEqualizerGetParametersResponse({required this.parameters});
 
-  static EqualizerGetParametersResponse fromMap(Map<dynamic, dynamic> map) =>
-      EqualizerGetParametersResponse(
-        parameters: EqualizerParametersMessage.fromMap(
+  static AndroidEqualizerGetParametersResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      AndroidEqualizerGetParametersResponse(
+        parameters: AndroidEqualizerParametersMessage.fromMap(
             map['parameters'] as Map<dynamic, dynamic>),
       );
 }
 
 /// Information communicated to the platform implementation when setting the
 /// gain for an equalizer band.
-class EqualizerBandSetGainRequest {
+class AndroidEqualizerBandSetGainRequest {
   final int bandIndex;
   final double gain;
 
-  EqualizerBandSetGainRequest({
+  AndroidEqualizerBandSetGainRequest({
     required this.bandIndex,
     required this.gain,
   });
@@ -1197,11 +1200,12 @@ class EqualizerBandSetGainRequest {
 
 /// Information returned by the platform implementation after setting the gain
 /// for an equalizer band.
-class EqualizerBandSetGainResponse {
-  EqualizerBandSetGainResponse();
+class AndroidEqualizerBandSetGainResponse {
+  AndroidEqualizerBandSetGainResponse();
 
-  static EqualizerBandSetGainResponse fromMap(Map<dynamic, dynamic> map) =>
-      EqualizerBandSetGainResponse();
+  static AndroidEqualizerBandSetGainResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      AndroidEqualizerBandSetGainResponse();
 }
 
 /// Information about an audio effect to be communicated with the platform
@@ -1216,17 +1220,17 @@ abstract class AudioEffectMessage {
 
 /// Information about a loudness enhancer to be communicated with the platform
 /// implementation.
-class LoudnessEnhancerMessage extends AudioEffectMessage {
+class AndroidLoudnessEnhancerMessage extends AudioEffectMessage {
   final double targetGain;
 
-  LoudnessEnhancerMessage({
+  AndroidLoudnessEnhancerMessage({
     required bool enabled,
     required this.targetGain,
   }) : super(enabled: enabled);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'LoudnessEnhancer',
+        'type': 'AndroidLoudnessEnhancer',
         'enabled': enabled,
         'targetGain': targetGain,
       };
@@ -1234,14 +1238,23 @@ class LoudnessEnhancerMessage extends AudioEffectMessage {
 
 /// Information about an equalizer band to be communicated with the platform
 /// implementation.
-class EqualizerBandMessage {
+class AndroidEqualizerBandMessage {
+  /// A zero-based index of the position of this band within its [AndroidEqualizer].
   final int index;
+
+  /// The lower frequency of this band in hertz.
   final double lowerFrequency;
+
+  /// The upper frequency of this band in hertz.
   final double upperFrequency;
+
+  /// The center frequency of this band in hertz.
   final double centerFrequency;
+
+  /// The gain for this band in decibels.
   final double gain;
 
-  EqualizerBandMessage({
+  AndroidEqualizerBandMessage({
     required this.index,
     required this.lowerFrequency,
     required this.upperFrequency,
@@ -1257,8 +1270,8 @@ class EqualizerBandMessage {
         'gain': gain,
       };
 
-  static EqualizerBandMessage fromMap(Map<dynamic, dynamic> map) =>
-      EqualizerBandMessage(
+  static AndroidEqualizerBandMessage fromMap(Map<dynamic, dynamic> map) =>
+      AndroidEqualizerBandMessage(
         index: map['index'] as int,
         lowerFrequency: map['lowerFrequency'] as double,
         upperFrequency: map['upperFrequency'] as double,
@@ -1269,12 +1282,12 @@ class EqualizerBandMessage {
 
 /// Information about the equalizer parameters to be communicated with the
 /// platform implementation.
-class EqualizerParametersMessage {
+class AndroidEqualizerParametersMessage {
   final double minDecibels;
   final double maxDecibels;
-  final List<EqualizerBandMessage> bands;
+  final List<AndroidEqualizerBandMessage> bands;
 
-  EqualizerParametersMessage({
+  AndroidEqualizerParametersMessage({
     required this.minDecibels,
     required this.maxDecibels,
     required this.bands,
@@ -1286,30 +1299,30 @@ class EqualizerParametersMessage {
         'bands': bands.map((band) => band.toMap()).toList(),
       };
 
-  static EqualizerParametersMessage fromMap(Map<dynamic, dynamic> map) =>
-      EqualizerParametersMessage(
+  static AndroidEqualizerParametersMessage fromMap(Map<dynamic, dynamic> map) =>
+      AndroidEqualizerParametersMessage(
         minDecibels: map['minDecibels'] as double,
         maxDecibels: map['maxDecibels'] as double,
         bands: (map['bands'] as List<dynamic>)
-            .map((dynamic bandMap) =>
-                EqualizerBandMessage.fromMap(bandMap as Map<dynamic, dynamic>))
+            .map((dynamic bandMap) => AndroidEqualizerBandMessage.fromMap(
+                bandMap as Map<dynamic, dynamic>))
             .toList(),
       );
 }
 
 /// Information about the equalizer to be communicated with the platform
 /// implementation.
-class EqualizerMessage extends AudioEffectMessage {
-  final EqualizerParametersMessage? parameters;
+class AndroidEqualizerMessage extends AudioEffectMessage {
+  final AndroidEqualizerParametersMessage? parameters;
 
-  EqualizerMessage({
+  AndroidEqualizerMessage({
     required bool enabled,
     required this.parameters,
   }) : super(enabled: enabled);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'Equalizer',
+        'type': 'AndroidEqualizer',
         'enabled': enabled,
         'parameters': parameters?.toMap(),
       };
