@@ -622,15 +622,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             return loudnessEnhancer;
         case "AndroidEqualizer":
             Equalizer equalizer = new Equalizer(0, audioSessionId);
-            Map<?, ?> rawEqParams = (Map<?, ?>)map.get("parameters");
-            if (rawEqParams != null) {
-                List<?> rawBands = (List<?>)rawEqParams.get("bands");
-                for (short i = 0; i < rawBands.size(); i++) {
-                    Map<?, ?> rawBand = (Map<?, ?>)rawBands.get(i);
-                    double gain = (Double)rawBand.get("gain");
-                    equalizer.setBandLevel(i, (short)Math.round(gain * 1000.0));
-                }
-            }
             return equalizer;
         default:
             throw new IllegalArgumentException("Unknown AudioEffect type: " + map.get("type"));
