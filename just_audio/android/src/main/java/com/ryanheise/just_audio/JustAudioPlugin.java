@@ -2,56 +2,43 @@ package com.ryanheise.just_audio;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
+import io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /**
  * JustAudioPlugin
  */
 public class JustAudioPlugin implements FlutterPlugin {
-
     private MethodChannel channel;
     private MainMethodCallHandler methodCallHandler;
 
-    public JustAudioPlugin() {
-    }
-
-    /**
-     * v1 plugin registration.
-     */
-    public static void registerWith(Registrar registrar) {
-        final JustAudioPlugin plugin = new JustAudioPlugin();
-        plugin.startListening(registrar.context(), registrar.messenger());
-        registrar.addViewDestroyListener(
-                view -> {
-                    plugin.stopListening();
-                    return false;
-                });
-    }
-
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
-        startListening(binding.getApplicationContext(), binding.getBinaryMessenger());
-    }
-
-    @Override
-    public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-        stopListening();
-    }
-
-    private void startListening(final Context applicationContext, BinaryMessenger messenger) {
+        Context applicationContext = binding.getApplicationContext();
+        BinaryMessenger messenger = binding.getBinaryMessenger();
         methodCallHandler = new MainMethodCallHandler(applicationContext, messenger);
 
         channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
         channel.setMethodCallHandler(methodCallHandler);
+        binding.getFlutterEngine().addEngineLifecycleListener(new EngineLifecycleListener() {
+            @Override
+            public void onPreEngineRestart() {
+                methodCallHandler.dispose();
+            }
+
+            @Override
+            public void onEngineWillDestroy() {
+            }
+        });
     }
 
-    private void stopListening() {
+    @Override
+    public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         methodCallHandler.dispose();
         methodCallHandler = null;
 

@@ -26,20 +26,20 @@ public class MainMethodCallHandler implements MethodCallHandler {
 
     @Override
     public void onMethodCall(MethodCall call, @NonNull Result result) {
-        final Map<?, ?> request = call.arguments();
         switch (call.method) {
         case "init": {
-            String id = (String)request.get("id");
+            String id = call.argument("id");
             if (players.containsKey(id)) {
                 result.error("Platform player " + id + " already exists", null, null);
                 break;
             }
-            players.put(id, new AudioPlayer(applicationContext, messenger, id));
+            List<Object> rawAudioEffects = call.argument("androidAudioEffects");
+            players.put(id, new AudioPlayer(applicationContext, messenger, id, call.argument("audioLoadConfiguration"), rawAudioEffects));
             result.success(null);
             break;
         }
         case "disposePlayer": {
-            String id = (String)request.get("id");
+            String id = call.argument("id");
             AudioPlayer player = players.get(id);
             if (player != null) {
                 player.dispose();

@@ -1,3 +1,13 @@
+## 0.8.0
+
+* Add buffer options via AudioLoadConfiguration for iOS/Android.
+* Add setSkipSilenceEnabled for Android (@subhash279).
+* Add setPitch for Android.
+* Add audio effects:
+  * AndroidLoudnessEnhancer
+  * AndroidEqualizer
+* Dispose players when hot restarting on Android.
+
 ## 0.7.5
 
 * Support rxdart 0.27.0

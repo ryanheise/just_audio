@@ -69,6 +69,20 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
+  Future<SetPitchResponse> setPitch(SetPitchRequest request) async {
+    return SetPitchResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setPitch', request.toMap()))!);
+  }
+
+  @override
+  Future<SetSkipSilenceResponse> setSkipSilence(
+      SetSkipSilenceRequest request) async {
+    return SetSkipSilenceResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setSkipSilence', request.toMap()))!);
+  }
+
+  @override
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async {
     return SetLoopModeResponse.fromMap((await _channel
         .invokeMethod<Map<dynamic, dynamic>>('setLoopMode', request.toMap()))!);
@@ -97,6 +111,25 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
     return SetAutomaticallyWaitsToMinimizeStallingResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'setAutomaticallyWaitsToMinimizeStalling', request.toMap()))!);
+  }
+
+  @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
+    return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setCanUseNetworkResourcesForLiveStreamingWhilePaused',
+            request.toMap()))!);
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) async {
+    return SetPreferredPeakBitRateResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setPreferredPeakBitRate', request.toMap()))!);
   }
 
   @override
@@ -141,5 +174,38 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
     return ConcatenatingMoveResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'concatenatingMove', request.toMap()))!);
+  }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) async {
+    return AudioEffectSetEnabledResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'audioEffectSetEnabled', request.toMap()))!);
+  }
+
+  @override
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+    return AndroidLoudnessEnhancerSetTargetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidLoudnessEnhancerSetTargetGain', request.toMap()))!);
+  }
+
+  @override
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) async {
+    return AndroidEqualizerGetParametersResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidEqualizerGetParameters', request.toMap()))!);
+  }
+
+  @override
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) async {
+    return AndroidEqualizerBandSetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidEqualizerBandSetGain', request.toMap()))!);
   }
 }

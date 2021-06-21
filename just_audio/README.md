@@ -50,7 +50,12 @@ This project is supported by the amazing open source community of GitHub contrib
 | compose audio                  | ✅        | ✅      | ✅      | ✅      |
 | gapless playback               | ✅        | ✅      | ✅      |         |
 | report player errors           | ✅        | ✅      | ✅      | ✅      |
-| Handle phonecall interruptions | ✅        | ✅      |         |         |
+| handle phonecall interruptions | ✅        | ✅      |         |         |
+| buffering/loading options      | ✅        | ✅      | ✅      |         |
+| set pitch                      | ✅        |         |         |         |
+| skip silence                   | ✅        |         |         |         |
+| equalizer                      | ✅        |         |         |         |
+| volume boost                   | ✅        |         |         |         |
 
 ## Experimental features
 
@@ -59,7 +64,6 @@ This project is supported by the amazing open source community of GitHub contrib
 | Simultaneous downloading+caching                                                   | ✅        | ✅      | ✅      |         |
 | Waveform visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97)) | ✅        | ✅      |         |         |
 | FFT visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97))      | ✅        |         |         |         |
-| Null safety (Via `0.7` prerelease)                                                 | ✅        | ✅      | ✅      | ✅      |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
