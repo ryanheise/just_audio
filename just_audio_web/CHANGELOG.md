@@ -1,3 +1,7 @@
+## 0.3.2
+
+* Upgrade to platform interface 3.1.0
+
 ## 0.3.1
 
 * Propagate play() exceptions (@twogood).
