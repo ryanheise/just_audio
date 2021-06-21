@@ -1,3 +1,14 @@
+## 3.1.0
+
+- Add setPitch.
+- Add setSkipSilence.
+- Add setCanUseNetworkResourcesForLiveStreamingWhilePaused.
+- Add setPreferredPeakBitRate.
+- Add audioEffectSetEnabled.
+- Add androidLoudnessEnhancerSetTargetGain.
+- Add androidEqualizerGetParameters.
+- Add androidEqualizerBandSetGain.
+
 ## 3.0.0
 
 - Null safety.
