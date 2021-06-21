@@ -96,7 +96,7 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError("setPitch() has not been implemented.");
   }
 
-  /// sets skipSilence to true/false.
+  /// Sets skipSilence to true/false.
   Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) {
     throw UnimplementedError("setSkipSilence() has not been implemented.");
   }
@@ -191,7 +191,7 @@ abstract class AudioPlayerPlatform {
         "audioEffectSetEnabled() has not been implemented.");
   }
 
-  /// Sets the target gain on the loudness enhancer.
+  /// Sets the target gain on the Android loudness enhancer.
   Future<AndroidLoudnessEnhancerSetTargetGainResponse>
       androidLoudnessEnhancerSetTargetGain(
           AndroidLoudnessEnhancerSetTargetGainRequest request) {
@@ -199,14 +199,14 @@ abstract class AudioPlayerPlatform {
         "androidLoudnessEnhancerSetTargetGain() has not been implemented.");
   }
 
-  /// Gets the equalizer parameters.
+  /// Gets the Android equalizer parameters.
   Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
       AndroidEqualizerGetParametersRequest request) {
     throw UnimplementedError(
         "androidEqualizerGetParameters() has not been implemented.");
   }
 
-  /// Sets the gain for an equalizer band.
+  /// Sets the gain for an Android equalizer band.
   Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
       AndroidEqualizerBandSetGainRequest request) {
     throw UnimplementedError(

@@ -3287,14 +3287,6 @@ class AndroidEqualizerBand {
     }
   }
 
-  AndroidEqualizerBandMessage _toMessage() => AndroidEqualizerBandMessage(
-        index: index,
-        lowerFrequency: lowerFrequency,
-        upperFrequency: upperFrequency,
-        centerFrequency: centerFrequency,
-        gain: gain,
-      );
-
   static AndroidEqualizerBand _fromMessage(
           AudioPlayer player, AndroidEqualizerBandMessage message) =>
       AndroidEqualizerBand._(
