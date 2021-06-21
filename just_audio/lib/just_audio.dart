@@ -1045,7 +1045,7 @@ class AudioPlayer {
   Future<void> setAndroidAudioAttributes(
       AndroidAudioAttributes audioAttributes) async {
     if (_disposed) return;
-    if (!_isAndroid()) return;
+    if (!_isAndroid() && !_isUnitTest()) return;
     if (audioAttributes == _androidAudioAttributes) return;
     _androidAudioAttributes = audioAttributes;
     await _internalSetAndroidAudioAttributes(await _platform, audioAttributes);
@@ -1053,7 +1053,7 @@ class AudioPlayer {
 
   Future<void> _internalSetAndroidAudioAttributes(AudioPlayerPlatform platform,
       AndroidAudioAttributes audioAttributes) async {
-    if (!_isAndroid()) return;
+    if (!_isAndroid() && !_isUnitTest()) return;
     await platform.setAndroidAudioAttributes(SetAndroidAudioAttributesRequest(
         contentType: audioAttributes.contentType.index,
         flags: audioAttributes.flags.value,
@@ -1123,12 +1123,12 @@ class AudioPlayer {
               JustAudioPlatform.instance.init(InitRequest(
               id: _id,
               audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
-              androidAudioEffects: _isAndroid()
+              androidAudioEffects: (_isAndroid() || _isUnitTest())
                   ? _audioPipeline.androidAudioEffects
                       .map((audioEffect) => audioEffect._toMessage())
                       .toList()
                   : [],
-              darwinAudioEffects: _isDarwin()
+              darwinAudioEffects: (_isDarwin() || _isUnitTest())
                   ? _audioPipeline.darwinAudioEffects
                       .map((audioEffect) => audioEffect._toMessage())
                       .toList()
@@ -1173,7 +1173,7 @@ class AudioPlayer {
         final playing = this.playing;
         // To avoid a glitch in ExoPlayer, ensure that any requested audio
         // attributes are set before loading the audio source.
-        if (_isAndroid()) {
+        if (_isAndroid() || _isUnitTest()) {
           if (_androidApplyAudioAttributes) {
             final audioSession = await AudioSession.instance;
             _androidAudioAttributes ??=
@@ -1195,13 +1195,13 @@ class AudioPlayer {
         try {
           await platform.setPitch(SetPitchRequest(pitch: pitch));
         } catch (e) {
-          print('setPitch not supported on this platform');
+          // setPitch not supported on this platform.
         }
         try {
           await platform.setSkipSilence(
               SetSkipSilenceRequest(enabled: skipSilenceEnabled));
         } catch (e) {
-          print('setSkipSilence not supported on this platform');
+          // setSkipSilence not supported on this platform.
         }
         await platform.setLoopMode(SetLoopModeRequest(
             loopMode: LoopModeMessage.values[loopMode.index]));
@@ -3371,6 +3371,7 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
 
 bool _isAndroid() => !kIsWeb && Platform.isAndroid;
 bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 
 /// Backwards compatible extensions on rxdart's ValueStream
 extension _ValueStreamExtension<T> on ValueStream<T> {
