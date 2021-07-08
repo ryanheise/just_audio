@@ -145,9 +145,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             this.audioSessionId = audioSessionId;
         }
         
-          LoudnessEnhancer enhancer = new LoudnessEnhancer(audioTrack.getAudioSessionId());
-          NoiseSuppressor.create(audioTrack.getAudioSessionId());
-          AcousticEchoCanceler.create(audioTrack.getAudioSessionId());
+          LoudnessEnhancer enhancer = new LoudnessEnhancer(audioSessionId.getAudioSessionId());
+          NoiseSuppressor.create(audioSessionId.getAudioSessionId());
+          AcousticEchoCanceler.create(audioSessionId.getAudioSessionId());
   
           enhancer.setTargetGain(2500);
           enhancer.setEnabled(true);
