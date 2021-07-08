@@ -49,6 +49,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import android.media.audiofx.LoudnessEnhancer;
+import android.media.audiofx.NoiseSuppressor;
+import 	android.media.audiofx.AcousticEchoCanceler;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
 
@@ -141,6 +144,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } else {
             this.audioSessionId = audioSessionId;
         }
+        
+          LoudnessEnhancer enhancer = new LoudnessEnhancer(audioTrack.getAudioSessionId());
+          NoiseSuppressor.create(audioTrack.getAudioSessionId());
+          AcousticEchoCanceler.create(audioTrack.getAudioSessionId());
+  
+          enhancer.setTargetGain(2500);
+          enhancer.setEnabled(true);
         broadcastPlaybackEvent();
     }
 
