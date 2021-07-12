@@ -2419,7 +2419,8 @@ class StreamAudioResponse {
 }
 
 /// This is an experimental audio source that caches the audio while it is being
-/// downloaded and played.
+/// downloaded and played. It is not supported on platforms that do not provide
+/// access to the file system (e.g. web).
 @experimental
 class LockCachingAudioSource extends StreamAudioSource {
   Future<HttpClientResponse>? _response;
