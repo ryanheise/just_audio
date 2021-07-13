@@ -68,8 +68,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private final Context context;
     private final MethodChannel methodChannel;
-    private final EventChannel eventChannel;
-    private EventSink eventSink;
+    private final BetterEventChannel eventChannel;
+    private final BetterEventChannel dataEventChannel;
 
     private ProcessingState processingState;
     private long updatePosition;
@@ -132,18 +132,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         this.rawAudioEffects = rawAudioEffects;
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
-        eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
-        eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
-            @Override
-            public void onListen(final Object arguments, final EventSink eventSink) {
-                AudioPlayer.this.eventSink = eventSink;
-            }
-
-            @Override
-            public void onCancel(final Object arguments) {
-                eventSink = null;
-            }
-        });
+        eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
+        dataEventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.data." + id);
         processingState = ProcessingState.none;
         if (audioLoadConfiguration != null) {
             Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
@@ -753,9 +743,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         event.put("currentIndex", currentIndex);
         event.put("androidAudioSessionId", audioSessionId);
 
-        if (eventSink != null) {
-            eventSink.success(event);
-        }
+        eventChannel.success(event);
     }
 
     private Map<String, Object> collectIcyMetadata() {
@@ -803,9 +791,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             prepareResult = null;
         }
 
-        if (eventSink != null) {
-            eventSink.error(errorCode, errorMsg, null);
-        }
+        eventChannel.error(errorCode, errorMsg, null);
     }
 
     private void transition(final ProcessingState newState) {
@@ -917,14 +903,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             player = null;
             transition(ProcessingState.none);
         }
-        /*
-        if (loudness != null) {
-            loudness.release();
-        }
-        */
-        if (eventSink != null) {
-            eventSink.endOfStream();
-        }
+        eventChannel.endOfStream();
+        dataEventChannel.endOfStream();
     }
 
     private void abortSeek() {
