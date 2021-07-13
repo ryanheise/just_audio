@@ -192,26 +192,27 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
-      LoudnessEnhancerSetTargetGainRequest request) async {
-    return LoudnessEnhancerSetTargetGainResponse.fromMap(
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+    return AndroidLoudnessEnhancerSetTargetGainResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'loudnessEnhancerSetTargetGain', request.toMap()))!);
+            'androidLoudnessEnhancerSetTargetGain', request.toMap()))!);
   }
 
   @override
-  Future<EqualizerGetParametersResponse> equalizerGetParameters(
-      EqualizerGetParametersRequest request) async {
-    return EqualizerGetParametersResponse.fromMap(
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) async {
+    return AndroidEqualizerGetParametersResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'equalizerGetParameters', request.toMap()))!);
+            'androidEqualizerGetParameters', request.toMap()))!);
   }
 
   @override
-  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
-      EqualizerBandSetGainRequest request) async {
-    return EqualizerBandSetGainResponse.fromMap(
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) async {
+    return AndroidEqualizerBandSetGainResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'equalizerBandSetGain', request.toMap()))!);
+            'androidEqualizerBandSetGain', request.toMap()))!);
   }
 }

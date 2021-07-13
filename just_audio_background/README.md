@@ -1,15 +1,29 @@
 # just_audio_background
 
-This experimental package adds background playback and media notification support to [`just_audio`][1]. It can be used if your app uses a single `AudioPlayer` instance where notification media controls are to be bound to that instance. If your app requires more flexibility than what this plugin provides, you should use `audio_service` instead of `just_audio_background`.
+This experimental package adds background playback and media notification support to just_audio by using [audio_service](https://pub.dev/packages/audio_service) under the hood. It can be used if your app uses a single `AudioPlayer` instance where notification media controls are to be bound to that instance. If your app requires more flexibility than what this plugin provides, you should use `audio_service` directly instead of `just_audio_background`.
+
+
 
 ## Setup
 
-Add the `just_audio_background` dependency to your `pubspec.yaml` alongside `just_audio`, and then add the following initialization code to your app's `main` method:
+Add the `just_audio_background` dependency to your `pubspec.yaml` alongside `just_audio`:
+
+```yaml
+dependencies:
+  just_audio: any # substitute version number
+  just_audio_background: any # substitute version number
+
+```
+
+Then add the following initialization code to your app's `main` method:
 
 ```dart
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await JustAudioBackground.init();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+    androidNotificationChannelName: 'Audio playback',
+    androidNotificationOngoing: true,
+  );
   runApp(MyApp());
 }
 ```
@@ -26,7 +40,7 @@ Set a `MediaItem` tag on each `IndexedAudioSource` loaded into the player. For e
 AudioSource.uri(
   Uri.parse('https://example.com/song1.mp3'),
   tag: MediaItem(
-    id: '1',
+    id: '1', // must be unique for each media item.
     album: "Album name",
     title: "Song name",
     artUri: Uri.parse('https://example.com/albumart.jpg'),
@@ -80,5 +94,3 @@ Insert this in your `Info.plist` file:
 		<string>audio</string>
 	</array>
 ```
-
-[1]: ../just_audio

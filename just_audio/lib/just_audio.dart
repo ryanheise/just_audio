@@ -105,6 +105,8 @@ class AudioPlayer {
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
+  bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
+  double _preferredPeakBitRate = 0;
   bool _playInterrupted = false;
   AndroidAudioAttributes? _androidAudioAttributes;
   final bool _androidApplyAudioAttributes;
@@ -475,6 +477,14 @@ class AudioPlayer {
   /// minimize stalling. (iOS 10.0 or later only)
   bool get automaticallyWaitsToMinimizeStalling =>
       _automaticallyWaitsToMinimizeStalling;
+
+  /// Whether the player can use the network for live streaming while paused on
+  /// iOS/macOS.
+  bool get canUseNetworkResourcesForLiveStreamingWhilePaused =>
+      _canUseNetworkResourcesForLiveStreamingWhilePaused;
+
+  /// The preferred peak bit rate (in bits per second) of bandwidth usage on iOS/macOS.
+  double get preferredPeakBitRate => _preferredPeakBitRate;
 
   /// The current position of the player.
   Duration get position {
@@ -985,6 +995,8 @@ class AudioPlayer {
   Future<void> setCanUseNetworkResourcesForLiveStreamingWhilePaused(
       final bool canUseNetworkResourcesForLiveStreamingWhilePaused) async {
     if (_disposed) return;
+    _canUseNetworkResourcesForLiveStreamingWhilePaused =
+        canUseNetworkResourcesForLiveStreamingWhilePaused;
     await (await _platform)
         .setCanUseNetworkResourcesForLiveStreamingWhilePaused(
             SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest(
@@ -995,6 +1007,7 @@ class AudioPlayer {
   Future<void> setPreferredPeakBitRate(
       final double preferredPeakBitRate) async {
     if (_disposed) return;
+    _preferredPeakBitRate = preferredPeakBitRate;
     await (await _platform).setPreferredPeakBitRate(
         SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
   }
@@ -1041,7 +1054,7 @@ class AudioPlayer {
   Future<void> setAndroidAudioAttributes(
       AndroidAudioAttributes audioAttributes) async {
     if (_disposed) return;
-    if (!_isAndroid()) return;
+    if (!_isAndroid() && !_isUnitTest()) return;
     if (audioAttributes == _androidAudioAttributes) return;
     _androidAudioAttributes = audioAttributes;
     await _internalSetAndroidAudioAttributes(await _platform, audioAttributes);
@@ -1049,7 +1062,7 @@ class AudioPlayer {
 
   Future<void> _internalSetAndroidAudioAttributes(AudioPlayerPlatform platform,
       AndroidAudioAttributes audioAttributes) async {
-    if (!_isAndroid()) return;
+    if (!_isAndroid() && !_isUnitTest()) return;
     await platform.setAndroidAudioAttributes(SetAndroidAudioAttributesRequest(
         contentType: audioAttributes.contentType.index,
         flags: audioAttributes.flags.value,
@@ -1120,12 +1133,12 @@ class AudioPlayer {
               JustAudioPlatform.instance.init(InitRequest(
               id: _id,
               audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
-              androidAudioEffects: _isAndroid()
+              androidAudioEffects: (_isAndroid() || _isUnitTest())
                   ? _audioPipeline.androidAudioEffects
                       .map((audioEffect) => audioEffect._toMessage())
                       .toList()
                   : [],
-              darwinAudioEffects: _isDarwin()
+              darwinAudioEffects: (_isDarwin() || _isUnitTest())
                   ? _audioPipeline.darwinAudioEffects
                       .map((audioEffect) => audioEffect._toMessage())
                       .toList()
@@ -1198,7 +1211,7 @@ class AudioPlayer {
         final playing = this.playing;
         // To avoid a glitch in ExoPlayer, ensure that any requested audio
         // attributes are set before loading the audio source.
-        if (_isAndroid()) {
+        if (_isAndroid() || _isUnitTest()) {
           if (_androidApplyAudioAttributes) {
             final audioSession = await AudioSession.instance;
             _androidAudioAttributes ??=
@@ -1220,13 +1233,13 @@ class AudioPlayer {
         try {
           await platform.setPitch(SetPitchRequest(pitch: pitch));
         } catch (e) {
-          print('setPitch not supported on this platform');
+          // setPitch not supported on this platform.
         }
         try {
           await platform.setSkipSilence(
               SetSkipSilenceRequest(enabled: skipSilenceEnabled));
         } catch (e) {
-          print('setSkipSilence not supported on this platform');
+          // setSkipSilence not supported on this platform.
         }
         await platform.setLoopMode(SetLoopModeRequest(
             loopMode: LoopModeMessage.values[loopMode.index]));
@@ -1902,7 +1915,7 @@ abstract class IndexedAudioSource extends AudioSource {
   final dynamic tag;
   Duration? duration;
 
-  IndexedAudioSource(this.tag, {this.duration});
+  IndexedAudioSource({this.tag, this.duration});
 
   @override
   void _shuffle({int? initialIndex}) {}
@@ -1921,7 +1934,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
   Uri? _overrideUri;
 
   UriAudioSource(this.uri, {this.headers, dynamic tag, Duration? duration})
-      : super(tag, duration: duration);
+      : super(tag: tag, duration: duration);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
   /// of the copied asset on the filesystem, otherwise it gives us the original
@@ -2074,7 +2087,7 @@ class SilenceAudioSource extends IndexedAudioSource {
   SilenceAudioSource({
     dynamic tag,
     required Duration duration,
-  }) : super(tag, duration: duration);
+  }) : super(tag: tag, duration: duration);
 
   @override
   bool get _requiresProxy => false;
@@ -2324,7 +2337,7 @@ class ClippingAudioSource extends IndexedAudioSource {
     this.end,
     dynamic tag,
     Duration? duration,
-  }) : super(tag, duration: duration);
+  }) : super(tag: tag, duration: duration);
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -2388,7 +2401,7 @@ Uri _encodeDataUrl(String base64Data, String mimeType) =>
 @experimental
 abstract class StreamAudioSource extends IndexedAudioSource {
   Uri? _uri;
-  StreamAudioSource(dynamic tag) : super(tag);
+  StreamAudioSource({dynamic tag}) : super(tag: tag);
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -2405,7 +2418,8 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   /// Used by the player to request a byte range of encoded audio data in small
   /// chunks, from byte position [start] inclusive (or from the beginning of the
   /// audio data if not specified) to [end] exclusive (or the end of the audio
-  /// data if not specified).
+  /// data if not specified). If the returned future completes with an error,
+  /// a 500 response will be sent back to the player.
   Future<StreamAudioResponse> request([int? start, int? end]);
 
   @override
@@ -2444,15 +2458,18 @@ class StreamAudioResponse {
 }
 
 /// This is an experimental audio source that caches the audio while it is being
-/// downloaded and played.
+/// downloaded and played. It is not supported on platforms that do not provide
+/// access to the file system (e.g. web).
 @experimental
 class LockCachingAudioSource extends StreamAudioSource {
   Future<HttpClientResponse>? _response;
   final Uri uri;
   final Map<String, String>? headers;
-  final Future<File> _cacheFile;
+  final Future<File> cacheFile;
   int _progress = 0;
   final _requests = <_StreamingByteRangeRequest>[];
+  final _downloadProgressSubject = BehaviorSubject<double>();
+  bool _downloading = false;
 
   /// Creates a [LockCachingAudioSource] to that provides [uri] to the player
   /// while simultaneously caching it to [cacheFile]. If no cache file is
@@ -2465,9 +2482,37 @@ class LockCachingAudioSource extends StreamAudioSource {
     this.headers,
     File? cacheFile,
     dynamic tag,
-  })  : _cacheFile =
+  })  : cacheFile =
             cacheFile != null ? Future.value(cacheFile) : _getCacheFile(uri),
-        super(tag);
+        super(tag: tag) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    final cacheFile = await this.cacheFile;
+    _downloadProgressSubject.add((await cacheFile.exists()) ? 1.0 : 0.0);
+  }
+
+  /// Emits the current download progress as a double value from 0.0 (nothing
+  /// downloaded) to 1.0 (download complete).
+  Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
+
+  /// Removes the underlying cache files. It is an error to clear the cache
+  /// while a download is in progress.
+  Future<void> clearCache() async {
+    if (_downloading) {
+      throw Exception("Cannot clear cache while download is in progress");
+    }
+    final cacheFile = await this.cacheFile;
+    if (await cacheFile.exists()) {
+      await cacheFile.delete();
+    }
+    final mimeFile = await _mimeFile;
+    if (await mimeFile.exists()) {
+      await mimeFile.delete();
+    }
+    _downloadProgressSubject.add(0.0);
+  }
 
   /// Get file for caching [uri] with proper extension
   static Future<File> _getCacheFile(final Uri uri) async => File(p.joinAll([
@@ -2478,13 +2523,13 @@ class LockCachingAudioSource extends StreamAudioSource {
       ]));
 
   Future<File> get _partialCacheFile async =>
-      File('${(await _cacheFile).path}.part');
+      File('${(await cacheFile).path}.part');
 
   /// We use this to record the original content type of the downloaded audio.
   /// NOTE: We could instead rely on the cache file extension, but the original
   /// URL might not provide a correct extension. As a fallback, we could map the
   /// MIME type to an extension but we will need a complete dictionary.
-  Future<File> get _mimeFile async => File('${(await _cacheFile).path}.mime');
+  Future<File> get _mimeFile async => File('${(await cacheFile).path}.mime');
 
   Future<String> _readCachedMimeType() async {
     final file = await _mimeFile;
@@ -2507,7 +2552,8 @@ class LockCachingAudioSource extends StreamAudioSource {
   /// separate HTTP request is made to fulfill it while the download of the
   /// entire file continues in parallel.
   Future<HttpClientResponse> _fetch() async {
-    final cacheFile = await _cacheFile;
+    _downloading = true;
+    final cacheFile = await this.cacheFile;
     final partialCacheFile = await _partialCacheFile;
     final mimeType = await _readCachedMimeType();
 
@@ -2532,14 +2578,14 @@ class LockCachingAudioSource extends StreamAudioSource {
     var sourceLength = response.contentLength;
     final inProgressResponses = <_InProgressCacheResponse>[];
     late StreamSubscription subscription;
-    //int percentProgress = 0;
+    var percentProgress = 0;
     subscription = response.listen((data) async {
       _progress += data.length;
-      //int newPercentProgress = 100 * _progress ~/ sourceLength;
-      //if (newPercentProgress != percentProgress) {
-      //  percentProgress = newPercentProgress;
-      //  print("### Progress: $percentProgress%");
-      //}
+      final newPercentProgress = 100 * _progress ~/ sourceLength;
+      if (newPercentProgress != percentProgress) {
+        percentProgress = newPercentProgress;
+        _downloadProgressSubject.add(percentProgress / 100);
+      }
       sink.add(data);
       final readyRequests =
           _requests.where((request) => (request.start) < _progress).toList();
@@ -2614,23 +2660,37 @@ class LockCachingAudioSource extends StreamAudioSource {
             contentType: mimeType,
             stream: response,
           ));
+        }, onError: (dynamic e, StackTrace? stackTrace) {
+          request.fail(e, stackTrace);
         });
       }
     }, onDone: () async {
-      (await _partialCacheFile).renameSync((await _cacheFile).path);
+      (await _partialCacheFile).renameSync((await cacheFile).path);
       await subscription.cancel();
       httpClient.close();
+      _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
       print(stackTrace);
       (await _partialCacheFile).deleteSync();
       httpClient.close();
-    });
+      // Fail all pending requests
+      for (final req in _requests) {
+        req.fail(e, stackTrace);
+      }
+      _requests.clear();
+      // Close all in progress requests
+      for (final res in inProgressResponses) {
+        res.controller.addError(e, stackTrace);
+        res.controller.close();
+      }
+      _downloading = false;
+    }, cancelOnError: true);
     return response;
   }
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final cacheFile = await _cacheFile;
+    final cacheFile = await this.cacheFile;
     start ??= 0;
     if (cacheFile.existsSync()) {
       final sourceLength = cacheFile.lengthSync();
@@ -2645,7 +2705,14 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
-    _response ??= _fetch();
+    _response ??= _fetch().catchError((dynamic error, StackTrace? stackTrace) {
+      // So that we can restart later
+      _response = null;
+      // Cancel any pending request
+      for (final req in _requests) {
+        req.fail(error, stackTrace);
+      }
+    });
     return byteRangeRequest.future;
   }
 }
@@ -2688,7 +2755,18 @@ class _StreamingByteRangeRequest {
 
   /// Completes this request with the given [response].
   void complete(StreamAudioResponse response) {
+    if (_completer.isCompleted) {
+      return;
+    }
     _completer.complete(response);
+  }
+
+  /// Fails this request with the given [error] and [stackTrace].
+  void fail(dynamic error, [StackTrace? stackTrace]) {
+    if (_completer.isCompleted) {
+      return;
+    }
+    _completer.completeError(error as Object, stackTrace);
   }
 }
 
@@ -2704,8 +2782,21 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     request.response.headers.clear();
     request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
     request.response.statusCode = rangeRequest == null ? 200 : 206;
-    final sourceResponse =
-        await source.request(rangeRequest?.start, rangeRequest?.endEx);
+
+    StreamAudioResponse sourceResponse;
+    try {
+      sourceResponse =
+          await source.request(rangeRequest?.start, rangeRequest?.endEx);
+    } catch (e, stackTrace) {
+      print("Proxy request failed: $e");
+      print(stackTrace);
+
+      request.response.headers.clear();
+      request.response.statusCode = HttpStatus.internalServerError;
+      await request.response.close();
+      return;
+    }
+
     final range = _HttpRange(rangeRequest?.start ?? 0, rangeRequest?.end,
         sourceResponse.sourceLength);
     request.response.contentLength = range.length!;
@@ -3058,23 +3149,24 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<LoudnessEnhancerSetTargetGainResponse> loudnessEnhancerSetTargetGain(
-      LoudnessEnhancerSetTargetGainRequest request) async {
-    return LoudnessEnhancerSetTargetGainResponse();
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+    return AndroidLoudnessEnhancerSetTargetGainResponse();
   }
 
   @override
-  Future<EqualizerGetParametersResponse> equalizerGetParameters(
-      EqualizerGetParametersRequest request) async {
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) async {
     throw UnimplementedError(
-        "equalizerGetParameters() has not been implemented.");
+        "androidEqualizerGetParameters() has not been implemented.");
   }
 
   @override
-  Future<EqualizerBandSetGainResponse> equalizerBandSetGain(
-      EqualizerBandSetGainRequest request) {
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) {
     throw UnimplementedError(
-        "equalizerBandSetGain() has not been implemented.");
+        "androidEqualizerBandSetGain() has not been implemented.");
   }
 }
 
@@ -3118,7 +3210,7 @@ class AudioPipeline {
 /// [AudioPlayer] you must also enable the effect via [setEnabled].
 abstract class AudioEffect {
   AudioPlayer? _player;
-  bool _enabled = false;
+  final _enabledSubject = BehaviorSubject.seeded(false);
 
   AudioEffect();
 
@@ -3135,7 +3227,10 @@ abstract class AudioEffect {
   /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
   /// the audio player's output. When `false`, the audio pipeline will still
   /// reserve platform resources for the effect but the effect will be bypassed.
-  bool get enabled => _enabled;
+  bool get enabled => _enabledSubject.nvalue!;
+
+  /// A stream of the current [enabled] value.
+  Stream<bool> get enabledStream => _enabledSubject.stream;
 
   bool get _active => _player?._active ?? false;
 
@@ -3143,7 +3238,7 @@ abstract class AudioEffect {
 
   /// Set the [enabled] status of this audio effect.
   Future<void> setEnabled(bool enabled) async {
-    _enabled = enabled;
+    _enabledSubject.add(enabled);
     if (_active) {
       await (await _player!._platform).audioEffectSetEnabled(
           AudioEffectSetEnabledRequest(type: _type, enabled: enabled));
@@ -3161,49 +3256,52 @@ mixin DarwinAudioEffect on AudioEffect {}
 
 /// An Android [AudioEffect] that boosts the volume of the audio signal to a
 /// target gain, which defaults to zero.
-class LoudnessEnhancer extends AudioEffect with AndroidAudioEffect {
-  double _targetGain = 0;
+class AndroidLoudnessEnhancer extends AudioEffect with AndroidAudioEffect {
+  final _targetGainSubject = BehaviorSubject.seeded(0.0);
 
   @override
-  String get _type => 'LoudnessEnhancer';
+  String get _type => 'AndroidLoudnessEnhancer';
 
   /// The target gain in decibels.
-  double get targetGain => _targetGain;
+  double get targetGain => _targetGainSubject.nvalue!;
+
+  /// A stream of the current target gain in decibels.
+  Stream<double> get targetGainStream => _targetGainSubject.stream;
 
   /// Sets the target gain to a value in decibels.
   Future<void> setTargetGain(double targetGain) async {
-    _targetGain = targetGain;
+    _targetGainSubject.add(targetGain);
     if (_active) {
-      await (await _player!._platform).loudnessEnhancerSetTargetGain(
-          LoudnessEnhancerSetTargetGainRequest(targetGain: targetGain));
+      await (await _player!._platform).androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest(targetGain: targetGain));
     }
   }
 
   @override
-  AudioEffectMessage _toMessage() => LoudnessEnhancerMessage(
+  AudioEffectMessage _toMessage() => AndroidLoudnessEnhancerMessage(
         enabled: enabled,
-        targetGain: _targetGain,
+        targetGain: targetGain,
       );
 }
 
-/// A frequency band within an [Equalizer].
-class EqualizerBand {
+/// A frequency band within an [AndroidEqualizer].
+class AndroidEqualizerBand {
   final AudioPlayer _player;
 
-  /// A zero-based index of the position of this band within its [Equalizer].
+  /// A zero-based index of the position of this band within its [AndroidEqualizer].
   final int index;
 
-  /// The lower frequency of this band.
+  /// The lower frequency of this band in hertz.
   final double lowerFrequency;
 
-  /// The upper frequency of this band.
+  /// The upper frequency of this band in hertz.
   final double upperFrequency;
 
-  /// The center frequency of this band.
+  /// The center frequency of this band in hertz.
   final double centerFrequency;
   final _gainSubject = BehaviorSubject<double>();
 
-  EqualizerBand._({
+  AndroidEqualizerBand._({
     required AudioPlayer player,
     required this.index,
     required this.lowerFrequency,
@@ -3224,22 +3322,14 @@ class EqualizerBand {
   Future<void> setGain(double gain) async {
     _gainSubject.add(gain);
     if (_player._active) {
-      await (await _player._platform).equalizerBandSetGain(
-          EqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+      await (await _player._platform).androidEqualizerBandSetGain(
+          AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
     }
   }
 
-  EqualizerBandMessage _toMessage() => EqualizerBandMessage(
-        index: index,
-        lowerFrequency: lowerFrequency,
-        upperFrequency: upperFrequency,
-        centerFrequency: centerFrequency,
-        gain: gain,
-      );
-
-  static EqualizerBand _fromMessage(
-          AudioPlayer player, EqualizerBandMessage message) =>
-      EqualizerBand._(
+  static AndroidEqualizerBand _fromMessage(
+          AudioPlayer player, AndroidEqualizerBandMessage message) =>
+      AndroidEqualizerBand._(
         player: player,
         index: message.index,
         lowerFrequency: message.lowerFrequency,
@@ -3249,8 +3339,8 @@ class EqualizerBand {
       );
 }
 
-/// The parameter values of an [Equalizer].
-class EqualizerParameters {
+/// The parameter values of an [AndroidEqualizer].
+class AndroidEqualizerParameters {
   /// The minimum gain value supported by the equalizer.
   final double minDecibels;
 
@@ -3258,65 +3348,62 @@ class EqualizerParameters {
   final double maxDecibels;
 
   /// The frequency bands of the equalizer.
-  final List<EqualizerBand> bands;
+  final List<AndroidEqualizerBand> bands;
 
-  EqualizerParameters({
+  AndroidEqualizerParameters({
     required this.minDecibels,
     required this.maxDecibels,
     required this.bands,
   });
 
-  EqualizerParametersMessage _toMessage() => EqualizerParametersMessage(
-        minDecibels: minDecibels,
-        maxDecibels: maxDecibels,
-        bands: bands.map((band) => band._toMessage()).toList(),
-      );
-
-  static EqualizerParameters _fromMessage(
-          AudioPlayer player, EqualizerParametersMessage message) =>
-      EqualizerParameters(
+  static AndroidEqualizerParameters _fromMessage(
+          AudioPlayer player, AndroidEqualizerParametersMessage message) =>
+      AndroidEqualizerParameters(
         minDecibels: message.minDecibels,
         maxDecibels: message.maxDecibels,
         bands: message.bands
             .map((bandMessage) =>
-                EqualizerBand._fromMessage(player, bandMessage))
+                AndroidEqualizerBand._fromMessage(player, bandMessage))
             .toList(),
       );
 }
 
 /// An [AudioEffect] for Android that can adjust the gain for different
 /// frequency bands of an [AudioPlayer]'s audio signal.
-class Equalizer extends AudioEffect with AndroidAudioEffect {
-  EqualizerParameters? _parameters;
-  final Completer<EqualizerParameters> _parametersCompleter =
-      Completer<EqualizerParameters>();
+class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
+  AndroidEqualizerParameters? _parameters;
+  final Completer<AndroidEqualizerParameters> _parametersCompleter =
+      Completer<AndroidEqualizerParameters>();
 
   @override
-  String get _type => 'Equalizer';
+  String get _type => 'AndroidEqualizer';
 
   @override
   Future<void> _activate() async {
     await super._activate();
     if (_parametersCompleter.isCompleted) return;
     final response = await (await _player!._platform)
-        .equalizerGetParameters(EqualizerGetParametersRequest());
+        .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
     _parameters =
-        EqualizerParameters._fromMessage(_player!, response.parameters);
+        AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
     _parametersCompleter.complete(_parameters);
   }
 
   /// The parameter values of this equalizer.
-  Future<EqualizerParameters> get parameters => _parametersCompleter.future;
+  Future<AndroidEqualizerParameters> get parameters =>
+      _parametersCompleter.future;
 
   @override
-  AudioEffectMessage _toMessage() => EqualizerMessage(
+  AudioEffectMessage _toMessage() => AndroidEqualizerMessage(
         enabled: enabled,
-        parameters: _parameters?._toMessage(),
+        // Parameters are only communicated from the platform.
+        parameters: null,
       );
 }
 
 bool _isAndroid() => !kIsWeb && Platform.isAndroid;
 bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 
 /// Backwards compatible extensions on rxdart's ValueStream
 extension _ValueStreamExtension<T> on ValueStream<T> {

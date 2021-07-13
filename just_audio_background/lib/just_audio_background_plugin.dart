@@ -7,25 +7,58 @@ import 'package:flutter/services.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:rxdart/rxdart.dart';
 
+export 'package:audio_service/audio_service.dart' show MediaItem;
+
 late SwitchAudioHandler _audioHandler;
 late JustAudioPlatform _platform;
 
 class JustAudioBackgroundPlugin extends JustAudioPlatform {
-  static Future<void> setup() async {
+  static Future<void> setup({
+    bool androidResumeOnClick = true,
+    String? androidNotificationChannelId,
+    String androidNotificationChannelName = 'Notifications',
+    String? androidNotificationChannelDescription,
+    Color? notificationColor,
+    String androidNotificationIcon = 'mipmap/ic_launcher',
+    bool androidShowNotificationBadge = false,
+    bool androidNotificationClickStartsActivity = true,
+    bool androidNotificationOngoing = false,
+    bool androidStopForegroundOnPause = true,
+    int? artDownscaleWidth,
+    int? artDownscaleHeight,
+    Duration fastForwardInterval = const Duration(seconds: 10),
+    Duration rewindInterval = const Duration(seconds: 10),
+    bool preloadArtwork = false,
+    Map<String, dynamic>? androidBrowsableRootExtras,
+  }) async {
     _platform = JustAudioPlatform.instance;
     JustAudioPlatform.instance = JustAudioBackgroundPlugin();
     _audioHandler = await AudioService.init(
       builder: () => SwitchAudioHandler(BaseAudioHandler()),
       config: AudioServiceConfig(
-        androidNotificationChannelName: 'Just Audio Demo',
-        notificationColor: Color(0xFF2196f3),
-        androidNotificationIcon: 'mipmap/ic_launcher',
-        androidEnableQueue: true,
+        androidResumeOnClick: androidResumeOnClick,
+        androidNotificationChannelId: androidNotificationChannelId,
+        androidNotificationChannelName: androidNotificationChannelName,
+        androidNotificationChannelDescription:
+            androidNotificationChannelDescription,
+        notificationColor: notificationColor,
+        androidNotificationIcon: androidNotificationIcon,
+        androidShowNotificationBadge: androidShowNotificationBadge,
+        androidNotificationClickStartsActivity:
+            androidNotificationClickStartsActivity,
+        androidNotificationOngoing: androidNotificationOngoing,
+        androidStopForegroundOnPause: androidStopForegroundOnPause,
+        artDownscaleWidth: artDownscaleWidth,
+        artDownscaleHeight: artDownscaleHeight,
+        fastForwardInterval: fastForwardInterval,
+        rewindInterval: rewindInterval,
+        preloadArtwork: preloadArtwork,
+        androidBrowsableRootExtras: androidBrowsableRootExtras,
       ),
     );
   }
 
-  JustAudioPlayer? _player;
+  _JustAudioPlayer? _player;
 
   JustAudioBackgroundPlugin();
 
@@ -37,7 +70,7 @@ class JustAudioBackgroundPlugin extends JustAudioPlatform {
           message:
               "just_audio_background supports only a single player instance");
     }
-    _player = JustAudioPlayer(
+    _player = _JustAudioPlayer(
       id: request.id,
     );
     return _player!;
@@ -52,7 +85,7 @@ class JustAudioBackgroundPlugin extends JustAudioPlatform {
   }
 }
 
-class JustAudioPlayer extends AudioPlayerPlatform {
+class _JustAudioPlayer extends AudioPlayerPlatform {
   final eventController = StreamController<PlaybackEventMessage>();
   final playerDataController = StreamController<PlayerDataMessage>();
   bool? _playing;
@@ -60,10 +93,10 @@ class JustAudioPlayer extends AudioPlayerPlatform {
   Duration? _duration;
   IcyMetadataMessage? _icyMetadata;
   int? _androidAudioSessionId;
-  late final PlayerAudioHandler _playerAudioHandler;
+  late final _PlayerAudioHandler _playerAudioHandler;
 
-  JustAudioPlayer({required String id}) : super(id) {
-    _playerAudioHandler = PlayerAudioHandler(id);
+  _JustAudioPlayer({required String id}) : super(id) {
+    _playerAudioHandler = _PlayerAudioHandler(id);
     _audioHandler.inner = _playerAudioHandler;
     _audioHandler.playbackState.listen((playbackState) {
       broadcastPlaybackEvent();
@@ -222,7 +255,7 @@ class JustAudioPlayer extends AudioPlayerPlatform {
   }
 }
 
-class PlayerAudioHandler extends BaseAudioHandler
+class _PlayerAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   Completer<AudioPlayerPlatform> _playerCompleter = Completer();
   PlaybackEventMessage _justAudioEvent = PlaybackEventMessage(
@@ -238,7 +271,7 @@ class PlayerAudioHandler extends BaseAudioHandler
   AudioSourceMessage? _source;
   bool _playing = false;
   double _speed = 1.0;
-  Seeker? _seeker;
+  _Seeker? _seeker;
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
   int? get index => _justAudioEvent.currentIndex;
@@ -251,7 +284,7 @@ class PlayerAudioHandler extends BaseAudioHandler
 
   List<MediaItem>? get currentQueue => queue.nvalue;
 
-  PlayerAudioHandler(String playerId) {
+  _PlayerAudioHandler(String playerId) {
     _init(playerId);
   }
 
@@ -455,13 +488,14 @@ class PlayerAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> stop() async {
-    await pause();
+    _updatePosition();
+    _playing = false;
+    _broadcastState();
     _platform.disposePlayer(DisposePlayerRequest(id: (await _player).id));
     _justAudioEvent = _justAudioEvent.copyWith(
       processingState: ProcessingStateMessage.idle,
     );
     await _broadcastState();
-    // Shut down this task
     await super.stop();
   }
 
@@ -496,7 +530,7 @@ class PlayerAudioHandler extends BaseAudioHandler
   void _seekContinuously(bool begin, int direction) {
     _seeker?.stop();
     if (begin) {
-      _seeker = Seeker(this, Duration(seconds: 10 * direction),
+      _seeker = _Seeker(this, Duration(seconds: 10 * direction),
           Duration(seconds: 1), currentMediaItem!.duration!)
         ..start();
     }
@@ -533,14 +567,14 @@ class PlayerAudioHandler extends BaseAudioHandler
   }
 }
 
-class Seeker {
-  final PlayerAudioHandler handler;
+class _Seeker {
+  final _PlayerAudioHandler handler;
   final Duration positionInterval;
   final Duration stepInterval;
   final Duration duration;
   bool _running = false;
 
-  Seeker(
+  _Seeker(
     this.handler,
     this.positionInterval,
     this.stepInterval,
@@ -563,7 +597,7 @@ class Seeker {
   }
 }
 
-extension PlaybackEventMessageExtension on PlaybackEventMessage {
+extension _PlaybackEventMessageExtension on PlaybackEventMessage {
   PlaybackEventMessage copyWith({
     ProcessingStateMessage? processingState,
     DateTime? updateTime,
@@ -573,7 +607,6 @@ extension PlaybackEventMessageExtension on PlaybackEventMessage {
     IcyMetadataMessage? icyMetadata,
     int? currentIndex,
     int? androidAudioSessionId,
-    bool? playing,
   }) =>
       PlaybackEventMessage(
         processingState: processingState ?? this.processingState,

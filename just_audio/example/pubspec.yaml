@@ -8,17 +8,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audio_session: ^0.1.2
+  audio_session: ^0.1.5
   rxdart: '^0.27.0'
   just_audio:
     path: ../
   just_audio_background:
     path: ../../just_audio_background
-  audio_service:
-    git:
-      url: https://github.com/ryanheise/audio_service.git
-      ref: f3de6ae914
-      path: audio_service
+  audio_service: ^0.18.0-beta.0
 
 # Uncomment when testing platform interface changes.
 # dependency_overrides:

@@ -1,6 +1,9 @@
-// This is a minimal example demonstrating a play/pause button and a seek bar.
-// More advanced examples demonstrating other features can be found in the same
-// directory as this example in the GitHub repository.
+// This example demonstrates simultaneous playback and caching of downloaded
+// audio.
+//
+// To run:
+//
+// flutter run -t lib/example_caching.dart
 
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +20,9 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final AudioPlayer _player = AudioPlayer();
+  final _player = AudioPlayer();
+  final _audioSource = LockCachingAudioSource(Uri.parse(
+      "https://dovetail.prxu.org/70/66673fd4-6851-4b90-a762-7c0538c76626/CoryCombs_2021T_VO_Intro.mp3"));
 
   @override
   void initState() {
@@ -29,19 +34,15 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _init() async {
-    // Inform the operating system of our app's audio attributes etc.
-    // We pick a reasonable default for an app that plays speech.
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
-    // Listen to errors during playback.
     _player.playbackEventStream.listen((event) {},
         onError: (Object e, StackTrace stackTrace) {
       print('A stream error occurred: $e');
     });
-    // Try to load audio from a source and catch any errors.
     try {
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
+      //await _audioSource.clearCache();
+      await _player.setAudioSource(_audioSource);
     } catch (e) {
       print("Error loading audio source: $e");
     }
@@ -58,12 +59,15 @@ class _MyAppState extends State<MyApp> {
   /// Collects the data useful for displaying in a seek bar, using a handy
   /// feature of rx_dart to combine the 3 streams of interest into one.
   Stream<PositionData> get _positionDataStream =>
-      Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
+      Rx.combineLatest3<Duration, double, Duration?, PositionData>(
           _player.positionStream,
-          _player.bufferedPositionStream,
+          _audioSource.downloadProgressStream,
           _player.durationStream,
-          (position, bufferedPosition, duration) => PositionData(
-              position, bufferedPosition, duration ?? Duration.zero));
+          (position, downloadProgress, reportedDuration) {
+        final duration = reportedDuration ?? Duration.zero;
+        final bufferedPosition = duration * downloadProgress;
+        return PositionData(position, bufferedPosition, duration);
+      });
 
   @override
   Widget build(BuildContext context) {
