@@ -67,6 +67,12 @@ class AudioPlayer {
   /// subscribe to the new platform's events.
   StreamSubscription? _playbackEventSubscription;
 
+  /// The subscription to the data event channel of the current platform
+  /// implementation. When switching between active and inactive modes, this is
+  /// used to cancel the subscription to the previous platform's events and
+  /// subscribe to the new platform's events.
+  StreamSubscription? _playerDataSubscription;
+
   final String _id;
   _ProxyHttpServer? _proxy;
   AudioSource? _audioSource;
@@ -282,6 +288,9 @@ class AudioPlayer {
       // There is no temporary directory for this platform.
     }
   }
+
+  /// The previously set [AudioSource], if any.
+  AudioSource? get audioSource => _audioSource;
 
   /// The latest [PlaybackEvent].
   PlaybackEvent get playbackEvent => _playbackEvent;
@@ -1109,6 +1118,7 @@ class AudioPlayer {
 
     Future<AudioPlayerPlatform> setPlatform() async {
       _playbackEventSubscription?.cancel();
+      _playerDataSubscription?.cancel();
       if (!force) {
         final oldPlatform = _platformValue!;
         if (oldPlatform != _idlePlatform) {
@@ -1136,6 +1146,28 @@ class AudioPlayer {
             )))
           : _idlePlatform!;
       _platformValue = platform;
+      _playerDataSubscription =
+          platform.playerDataMessageStream.listen((message) {
+        if (message.playing != null && message.playing != playing) {
+          _playingSubject.add(message.playing!);
+        }
+        if (message.volume != null) {
+          _volumeSubject.add(message.volume!);
+        }
+        if (message.speed != null) {
+          _speedSubject.add(message.speed!);
+        }
+        if (message.pitch != null) {
+          _pitchSubject.add(message.pitch!);
+        }
+        if (message.loopMode != null) {
+          _loopModeSubject.add(LoopMode.values[message.loopMode!.index]);
+        }
+        if (message.shuffleMode != null) {
+          _shuffleModeEnabledSubject
+              .add(message.shuffleMode != ShuffleModeMessage.none);
+        }
+      });
       _playbackEventSubscription =
           platform.playbackEventMessageStream.listen((message) {
         var duration = message.duration;
@@ -1164,7 +1196,13 @@ class AudioPlayer {
         if (playbackEvent.duration != _playbackEvent.duration) {
           _durationSubject.add(playbackEvent.duration);
         }
+        final oldPlaybackEvent = _playbackEvent;
         _playbackEventSubject.add(_playbackEvent = playbackEvent);
+        if (_playbackEvent.processingState !=
+                oldPlaybackEvent.processingState &&
+            _playbackEvent.processingState == ProcessingState.idle) {
+          _setPlatformActive(false);
+        }
       }, onError: _playbackEventSubject.addError);
 
       if (active) {
@@ -1986,7 +2024,7 @@ class ProgressiveAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers);
+      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
@@ -2010,7 +2048,7 @@ class DashAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers);
+      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
 /// An [AudioSource] representing an HLS stream. The following URI schemes are
@@ -2033,7 +2071,7 @@ class HlsAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers);
+      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
 /// An [AudioSource] for a period of silence.
@@ -2315,7 +2353,8 @@ class ClippingAudioSource extends IndexedAudioSource {
       id: _id,
       child: child._toMessage() as UriAudioSourceMessage,
       start: start,
-      end: end);
+      end: end,
+      tag: tag);
 }
 
 // An [AudioSource] that loops a nested [AudioSource] a finite number of times.
@@ -2388,7 +2427,7 @@ abstract class StreamAudioSource extends IndexedAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _uri.toString(), headers: null);
+      id: _id, uri: _uri.toString(), headers: null, tag: tag);
 }
 
 /// The response for a [StreamAudioSource]. This API is experimental.

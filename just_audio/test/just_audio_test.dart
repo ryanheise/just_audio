@@ -1296,6 +1296,10 @@ class MockAudioPlayer implements AudioPlayerPlatform {
         audioLoadConfiguration = request.audioLoadConfiguration;
 
   @override
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      StreamController<PlayerDataMessage>().stream;
+
+  @override
   String get id => _id;
 
   @override

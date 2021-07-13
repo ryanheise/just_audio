@@ -66,6 +66,10 @@ abstract class AudioPlayerPlatform {
         'playbackEventMessageStream has not been implemented.');
   }
 
+  /// A stream of data updates.
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      Stream<PlayerDataMessage>.empty();
+
   /// Loads an audio source.
   Future<LoadResponse> load(LoadRequest request) {
     throw UnimplementedError("load() has not been implemented.");
@@ -212,6 +216,45 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError(
         "androidEqualizerBandSetGain() has not been implemented.");
   }
+}
+
+/// A data update communicated from the platform implementation to the Flutter
+/// plugin. Each field should trigger a state update in the frontend plugin if
+/// and only if it is not null. Normally, the platform implementation will not
+/// need to broadcast new state changes for this state as such state changes
+/// will be initiated from the frontend.
+class PlayerDataMessage {
+  final bool? playing;
+  final double? volume;
+  final double? speed;
+  final double? pitch;
+  final LoopModeMessage? loopMode;
+  final ShuffleModeMessage? shuffleMode;
+  // TODO: Eventually move other state here?
+  // bufferedPosition, androidAudioSessionId, icyMetadata
+
+  PlayerDataMessage({
+    this.playing,
+    this.volume,
+    this.speed,
+    this.pitch,
+    this.loopMode,
+    this.shuffleMode,
+  });
+
+  static PlayerDataMessage fromMap(Map<dynamic, dynamic> map) =>
+      PlayerDataMessage(
+        playing: map['playing'] as bool?,
+        volume: map['volume'] as double?,
+        speed: map['speed'] as double?,
+        pitch: map['pitch'] as double?,
+        loopMode: map['loopMode'] != null
+            ? LoopModeMessage.values[map['loopMode'] as int]
+            : null,
+        shuffleMode: map['shuffleMode'] != null
+            ? ShuffleModeMessage.values[map['shuffleMode'] as int]
+            : null,
+      );
 }
 
 /// A playback event communicated from the platform implementation to the
@@ -954,20 +997,24 @@ abstract class AudioSourceMessage {
 /// Information about an indexed audio source to be communicated with the
 /// platform implementation.
 abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
-  IndexedAudioSourceMessage({required String id}) : super(id: id);
+  /// Since the tag type is unknown, this can only be used by platform
+  /// implementations that pass by value.
+  final dynamic tag;
+  IndexedAudioSourceMessage({required String id, this.tag}) : super(id: id);
 }
 
 /// Information about a URI audio source to be communicated with the platform
 /// implementation.
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
-  final Map<dynamic, dynamic>? headers;
+  final Map<String, String>? headers;
 
   UriAudioSourceMessage({
     required String id,
     required this.uri,
     this.headers,
-  }) : super(id: id);
+    dynamic tag,
+  }) : super(id: id, tag: tag);
 }
 
 /// Information about a progressive audio source to be communicated with the
@@ -976,8 +1023,9 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
   ProgressiveAudioSourceMessage({
     required String id,
     required String uri,
-    Map<dynamic, dynamic>? headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    Map<String, String>? headers,
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -994,8 +1042,9 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
   DashAudioSourceMessage({
     required String id,
     required String uri,
-    Map<dynamic, dynamic>? headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    Map<String, String>? headers,
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1012,8 +1061,9 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
   HlsAudioSourceMessage({
     required String id,
     required String uri,
-    Map<dynamic, dynamic>? headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    Map<String, String>? headers,
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1078,7 +1128,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
     required this.child,
     this.start,
     this.end,
-  }) : super(id: id);
+    dynamic tag,
+  }) : super(id: id, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
