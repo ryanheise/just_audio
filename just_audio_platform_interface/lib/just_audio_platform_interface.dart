@@ -998,7 +998,7 @@ abstract class AudioSourceMessage {
 /// platform implementation.
 abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
   /// Since the tag type is unknown, this can only be used by platform
-  /// implementations that pass by value.
+  /// implementations that pass by reference.
   final dynamic tag;
   IndexedAudioSourceMessage({required String id, this.tag}) : super(id: id);
 }
