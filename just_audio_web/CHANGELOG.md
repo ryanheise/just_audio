@@ -1,3 +1,7 @@
+## 0.4.0
+
+* Upgrade to platform interface 4.0.0
+
 ## 0.3.2
 
 * Upgrade to platform interface 3.1.0
