@@ -39,8 +39,8 @@ class JustAudioPlugin extends JustAudioPlatform {
 
 /// The web impluementation of [AudioPlayerPlatform].
 abstract class JustAudioPlayer extends AudioPlayerPlatform {
-  final _eventController = StreamController<PlaybackEventMessage>();
-  final _dataEventController = StreamController<PlayerDataMessage>();
+  final _eventController = StreamController<PlaybackEventMessage>.broadcast();
+  final _dataEventController = StreamController<PlayerDataMessage>.broadcast();
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   bool _playing = false;
   int? _index;

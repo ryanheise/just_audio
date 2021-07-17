@@ -147,8 +147,8 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
 }
 
 class _JustAudioPlayer extends AudioPlayerPlatform {
-  final eventController = StreamController<PlaybackEventMessage>();
-  final playerDataController = StreamController<PlayerDataMessage>();
+  final eventController = StreamController<PlaybackEventMessage>.broadcast();
+  final playerDataController = StreamController<PlayerDataMessage>.broadcast();
   bool? _playing;
   int? _index;
   Duration? _duration;

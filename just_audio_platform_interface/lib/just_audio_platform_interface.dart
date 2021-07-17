@@ -60,13 +60,13 @@ abstract class AudioPlayerPlatform {
 
   AudioPlayerPlatform(this.id);
 
-  /// A stream of playback events.
+  /// A broadcast stream of playback events.
   Stream<PlaybackEventMessage> get playbackEventMessageStream {
     throw UnimplementedError(
         'playbackEventMessageStream has not been implemented.');
   }
 
-  /// A stream of data updates.
+  /// A broadcast stream of data updates.
   Stream<PlayerDataMessage> get playerDataMessageStream =>
       Stream<PlayerDataMessage>.empty();
 
