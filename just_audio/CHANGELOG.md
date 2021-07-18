@@ -1,3 +1,7 @@
+## 0.9.0
+
+* Update to support just_audio_background.
+
 ## 0.8.1
 
 * Fix update position bug on Android.
