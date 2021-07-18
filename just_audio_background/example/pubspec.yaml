@@ -14,7 +14,6 @@ dependencies:
     path: ../../just_audio
   just_audio_background:
     path: ..
-  audio_service: ^0.18.0-beta.0
 
 # Uncomment when testing platform interface changes.
 # dependency_overrides:
