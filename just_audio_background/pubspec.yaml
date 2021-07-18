@@ -1,7 +1,7 @@
 name: just_audio_background
 description: Background implementation of just_audio
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_background
-version: 0.0.1
+version: 0.0.1-beta.0
 
 dependencies:
   just_audio_platform_interface: ^4.0.0
