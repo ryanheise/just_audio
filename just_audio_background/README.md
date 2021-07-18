@@ -2,7 +2,7 @@
 
 This package plugs into [just_audio](https://pub.dev/packages/just_audio) to add background playback support and remote controls (notification, lock screen, headset buttons, smart watches, Android Auto and CarPlay). It supports the simple use case where an app has a single `AudioPlayer` instance.
 
-If your app has more complex requirements, it is recommended that you instead use the [audio_service](https://pub.dev/packages/audio_service) package directly. under the hood.
+If your app has more complex requirements, it is recommended that you instead use the [audio_service](https://pub.dev/packages/audio_service) package directly.
 
 ## Setup
 
