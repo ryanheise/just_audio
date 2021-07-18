@@ -311,11 +311,30 @@ If you need access to the player's AudioSession ID, you can listen to `AudioPlay
 
 ### iOS
 
-Regardless of whether your app uses the microphone, Apple will require you to add the following key to your `Info.plist` file. The message will simply be ignored if your app doesn't use the microphone:
+Using the default configuration, the App Store will detect that your app uses the AVAudioSession API which includes a microphone API, and for privacy reasons it will ask you to describe your app's usage of the microphone. If your app does indeed use the microphone, you can describe your usage by editing the `Info.plist` file as follows:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>... explain why you use (or don't use) the microphone ...</string>
+<string>... explain why the app uses the microphone here ...</string>
+```
+
+But if your app does not use the microphone, you can pass a build option to "compile out" any microphone code so that the App Store won't ask for the above usage description. To do so, edit your `ios/Podfile` as follows:
+
+```ruby
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    
+    # ADD THE NEXT SECTION
+    target.build_configurations.each do |config|
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'AUDIO_SESSION_MICROPHONE=0'
+      ]
+    end
+    
+  end
+end
 ```
 
 If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:

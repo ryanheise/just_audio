@@ -1161,6 +1161,9 @@ class AudioPlayer {
           androidAudioSessionId: message.androidAudioSessionId,
         );
         _durationFuture = Future.value(playbackEvent.duration);
+        if (playbackEvent == _playbackEvent) {
+          return;
+        }
         if (playbackEvent.duration != _playbackEvent.duration) {
           _durationSubject.add(playbackEvent.duration);
         }
@@ -1362,8 +1365,33 @@ class PlaybackEvent {
       );
 
   @override
+  int get hashCode => hashValues(
+        processingState,
+        updateTime,
+        updatePosition,
+        bufferedPosition,
+        duration,
+        icyMetadata,
+        currentIndex,
+        androidAudioSessionId,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is PlaybackEvent &&
+      processingState == other.processingState &&
+      updateTime == other.updateTime &&
+      updatePosition == other.updatePosition &&
+      bufferedPosition == other.bufferedPosition &&
+      duration == other.duration &&
+      icyMetadata == other.icyMetadata &&
+      currentIndex == other.currentIndex &&
+      androidAudioSessionId == other.androidAudioSessionId;
+
+  @override
   String toString() =>
-      "{processingState=$processingState, updateTime=$updateTime, updatePosition=$updatePosition}";
+      "{processingState=$processingState, updateTime=$updateTime, updatePosition=$updatePosition, bufferedPosition=$bufferedPosition, duration=$duration, currentIndex=$currentIndex}";
 }
 
 /// Enumerates the different processing states of a player.
