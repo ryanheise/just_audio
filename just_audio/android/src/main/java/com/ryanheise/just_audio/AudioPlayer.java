@@ -109,7 +109,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
             long newBufferedPosition = player.getBufferedPosition();
             if (newBufferedPosition != bufferedPosition) {
-                bufferedPosition = newBufferedPosition;
+                // This method updates bufferedPosition.
                 broadcastPlaybackEvent();
             }
             switch (processingState) {
@@ -236,10 +236,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
     }
 
-    private void updatePositionIfChanged() {
-        if (getCurrentPosition() == updatePosition) return;
+    private boolean updatePositionIfChanged() {
+        if (getCurrentPosition() == updatePosition) return false;
         updatePosition = getCurrentPosition();
         updateTime = System.currentTimeMillis();
+        return true;
     }
 
     private void updatePosition() {
@@ -253,9 +254,10 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         switch (reason) {
         case Player.DISCONTINUITY_REASON_PERIOD_TRANSITION:
         case Player.DISCONTINUITY_REASON_SEEK:
-            onItemMayHaveChanged();
+            updateCurrentIndex();
             break;
         }
+        broadcastPlaybackEvent();
     }
 
     @Override
@@ -266,17 +268,20 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             initialIndex = null;
             initialPos = C.TIME_UNSET;
         }
-        onItemMayHaveChanged();
+        if (updateCurrentIndex()) {
+            broadcastPlaybackEvent();
+        }
     }
 
-    private void onItemMayHaveChanged() {
+    private boolean updateCurrentIndex() {
         Integer newIndex = player.getCurrentWindowIndex();
         // newIndex is never null.
         // currentIndex is sometimes null.
         if (!newIndex.equals(currentIndex)) {
             currentIndex = newIndex;
-            broadcastPlaybackEvent();
+            return true;
         }
+        return false;
     }
 
     @Override
@@ -744,6 +749,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void broadcastPlaybackEvent() {
         final Map<String, Object> event = new HashMap<String, Object>();
         Long duration = getDuration() == C.TIME_UNSET ? null : (1000 * getDuration());
+        bufferedPosition = player.getBufferedPosition();
         event.put("processingState", processingState.ordinal());
         event.put("updatePosition", 1000 * updatePosition);
         event.put("updateTime", updateTime);
