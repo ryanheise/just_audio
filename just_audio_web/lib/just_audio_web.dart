@@ -39,7 +39,8 @@ class JustAudioPlugin extends JustAudioPlatform {
 
 /// The web impluementation of [AudioPlayerPlatform].
 abstract class JustAudioPlayer extends AudioPlayerPlatform {
-  final _eventController = StreamController<PlaybackEventMessage>();
+  final _eventController = StreamController<PlaybackEventMessage>.broadcast();
+  final _dataEventController = StreamController<PlayerDataMessage>.broadcast();
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   bool _playing = false;
   int? _index;
@@ -50,6 +51,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
   @mustCallSuper
   Future<void> release() async {
     _eventController.close();
+    _dataEventController.close();
   }
 
   /// Returns the current position of the player.
@@ -193,6 +195,10 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
       _eventController.stream;
+
+  @override
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      _dataEventController.stream;
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {

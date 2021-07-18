@@ -1,3 +1,8 @@
+## 4.0.0
+
+- Add playerDataMessageStream.
+- Add tag to IndexedAudioSourceMessage.
+
 ## 3.1.0
 
 - Add setPitch.

@@ -2,7 +2,7 @@
 
 just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
-![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/109920560-92bff580-7d0e-11eb-82fe-bbaaba50d87d.png)
+![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/125459608-e89cd6d4-9f09-426c-abcc-ed7513d9acfc.png)
 
 ### Mixing and matching audio plugins
 
@@ -10,7 +10,8 @@ The flutter plugin ecosystem contains a wide variety of useful audio plugins. In
 
 Other common audio capabilities are optionally provided by separate plugins:
 
-* [audio_service](https://pub.dev/packages/audio_service): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [just_audio_background](https://pub.dev/packages/just_audio_background): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [audio_service](https://pub.dev/packages/audio_service): Use this if your app has more advanced background audio requirements than can be supported by `just_audio_background`.
 * [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
 
 ## Vote on upcoming features
@@ -64,6 +65,7 @@ This project is supported by the amazing open source community of GitHub contrib
 | Simultaneous downloading+caching                                                   | ✅        | ✅      | ✅      |         |
 | Waveform visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97)) | ✅        | ✅      |         |         |
 | FFT visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97))      | ✅        |         |         |         |
+| Background                                                                         | ✅        | ✅      | ✅      | ✅      |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 

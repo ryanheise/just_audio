@@ -1,3 +1,4 @@
+#import "BetterEventChannel.h"
 #import "AudioPlayer.h"
 #import "AudioSource.h"
 #import "IndexedAudioSource.h"
@@ -15,8 +16,8 @@
 @implementation AudioPlayer {
     NSObject<FlutterPluginRegistrar>* _registrar;
     FlutterMethodChannel *_methodChannel;
-    FlutterEventChannel *_eventChannel;
-    FlutterEventSink _eventSink;
+    BetterEventChannel *_eventChannel;
+    BetterEventChannel *_dataEventChannel;
     NSString *_playerId;
     AVQueuePlayer *_player;
     AudioSource *_audioSource;
@@ -54,10 +55,12 @@
     _methodChannel =
         [FlutterMethodChannel methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
                                     binaryMessenger:[registrar messenger]];
-    _eventChannel =
-        [FlutterEventChannel eventChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
-                                  binaryMessenger:[registrar messenger]];
-    [_eventChannel setStreamHandler:self];
+    _eventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
+           messenger:[registrar messenger]];
+    _dataEventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.data.%@", _playerId]
+           messenger:[registrar messenger]];
     _index = 0;
     _processingState = none;
     _loopMode = loopOff;
@@ -277,18 +280,7 @@
     [self broadcastPlaybackEvent];
 }
 
-- (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
-    _eventSink = eventSink;
-    return nil;
-}
-
-- (FlutterError*)onCancelWithArguments:(id)arguments {
-    _eventSink = nil;
-    return nil;
-}
-
 - (void)checkForDiscontinuity {
-    if (!_eventSink) return;
     if (!_playing || CMTIME_IS_VALID(_seekPos) || _processingState == completed) return;
     int position = [self getCurrentPosition];
     if (_processingState == buffering) {
@@ -327,8 +319,7 @@
 }
 
 - (void)broadcastPlaybackEvent {
-    if (!_eventSink) return;
-    _eventSink(@{
+    [_eventChannel sendEvent:@{
             @"processingState": @(_processingState),
             @"updatePosition": @((long long)1000 * _updatePosition),
             @"updateTime": @(_updateTime),
@@ -336,7 +327,7 @@
             @"icyMetadata": _icyMetadata,
             @"duration": @([self getDurationMicroseconds]),
             @"currentIndex": @(_index),
-    });
+    }];
 }
 
 - (int)getCurrentPosition {
@@ -987,10 +978,8 @@
         _loadResult(flutterError);
         _loadResult = nil;
     }
-    if (_eventSink) {
-        // Broadcast all errors even if they aren't on the current item.
-        _eventSink(flutterError);
-    }
+    // Broadcast all errors even if they aren't on the current item.
+    [_eventChannel sendEvent:flutterError];
 }
 
 - (void)abortExistingConnection {
@@ -1336,7 +1325,8 @@
         _player = nil;
     }
     // Untested:
-    [_eventChannel setStreamHandler:nil];
+    [_eventChannel dispose];
+    [_dataEventChannel dispose];
     [_methodChannel setMethodCallHandler:nil];
 }
 
