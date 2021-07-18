@@ -65,6 +65,7 @@ This project is supported by the amazing open source community of GitHub contrib
 | Simultaneous downloading+caching                                                   | ✅        | ✅      | ✅      |         |
 | Waveform visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97)) | ✅        | ✅      |         |         |
 | FFT visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97))      | ✅        |         |         |         |
+| Background                                                                         | ✅        | ✅      | ✅      | ✅      |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 

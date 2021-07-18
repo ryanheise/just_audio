@@ -1,10 +1,3 @@
-// This example demonstrates how to play a playlist with a mix of URI and asset
-// audio sources, and the ability to add/remove/reorder playlist items.
-//
-// To run:
-//
-// flutter run -t lib/example_playlist.dart
-
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

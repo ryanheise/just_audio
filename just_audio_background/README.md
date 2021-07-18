@@ -1,8 +1,8 @@
 # just_audio_background
 
-This experimental package adds background playback and media notification support to just_audio by using [audio_service](https://pub.dev/packages/audio_service) under the hood. It can be used if your app uses a single `AudioPlayer` instance where notification media controls are to be bound to that instance. If your app requires more flexibility than what this plugin provides, you should use `audio_service` directly instead of `just_audio_background`.
+This package plugs into [just_audio](https://pub.dev/packages/just_audio) to add background playback support and remote controls (notification, lock screen, headset buttons, smart watches, Android Auto and CarPlay). It supports the simple use case where an app has a single `AudioPlayer` instance.
 
-
+If your app has more complex requirements, it is recommended that you instead use the [audio_service](https://pub.dev/packages/audio_service) package directly.
 
 ## Setup
 
@@ -40,7 +40,9 @@ Set a `MediaItem` tag on each `IndexedAudioSource` loaded into the player. For e
 AudioSource.uri(
   Uri.parse('https://example.com/song1.mp3'),
   tag: MediaItem(
-    id: '1', // must be unique for each media item.
+    // Specify a unique ID for each media item:
+    id: '1',
+    // Metadata to display in the notification:
     album: "Album name",
     title: "Song name",
     artUri: Uri.parse('https://example.com/albumart.jpg'),
