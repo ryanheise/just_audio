@@ -1,3 +1,8 @@
+## 0.8.1
+
+* Fix update position bug on Android.
+* Compile-time option to include/exclude microphone API.
+
 ## 0.8.0
 
 * Add buffer options via AudioLoadConfiguration for iOS/Android.
