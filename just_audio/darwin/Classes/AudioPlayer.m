@@ -43,6 +43,7 @@
     LoadControl *_loadControl;
     BOOL _playing;
     float _speed;
+    float _volume;
     BOOL _justAdvanced;
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
@@ -100,6 +101,7 @@
         _loadControl.preferredPeakBitRate = (NSNumber *)[NSNull null];
     }
     _speed = 1.0f;
+    _volume = 1.0f;
     _justAdvanced = NO;
     _icyMetadata = @{};
     __weak __typeof__(self) weakSelf = self;
@@ -681,6 +683,7 @@
     if (_playing) {
         _player.rate = _speed;
     }
+    [_player setVolume:_volume];
     [self broadcastPlaybackEvent];
     /* NSLog(@"load:"); */
     /* for (int i = 0; i < [_indexedAudioSources count]; i++) { */
@@ -1053,7 +1056,10 @@
 }
 
 - (void)setVolume:(float)volume {
-    [_player setVolume:volume];
+    _volume = volume;
+    if (_player) {
+        [_player setVolume:volume];
+    }
 }
 
 - (void)setSpeed:(float)speed {
@@ -1084,7 +1090,7 @@
     // There is no way to reliably query whether the requested speed is
     // supported.
     _speed = speed;
-    if (_playing) {
+    if (_playing && _player) {
         _player.rate = speed;
     }
     [self updatePosition];
