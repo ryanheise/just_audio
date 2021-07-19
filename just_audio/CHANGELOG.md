@@ -1,3 +1,8 @@
+## 0.9.2
+
+* Fix Android bug when loading empty playlist.
+* Fix Android NullPointerException on stop().
+
 ## 0.9.1
 
 * Fix iOS/macOS bug when setting volume before load.
