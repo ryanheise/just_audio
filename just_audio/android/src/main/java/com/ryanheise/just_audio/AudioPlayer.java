@@ -83,7 +83,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private Result prepareResult;
     private Result playResult;
     private Result seekResult;
-    private boolean playing;
     private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
     private IcyInfo icyInfo;
     private IcyHeaders icyHeaders;
@@ -94,6 +93,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private List<Object> rawAudioEffects;
     private List<AudioEffect> audioEffects = new ArrayList<AudioEffect>();
     private Map<String, AudioEffect> audioEffectsMap = new HashMap<String, AudioEffect>();
+    private int lastPlaylistLength = 0;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
@@ -117,7 +117,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 handler.postDelayed(this, 200);
                 break;
             case ready:
-                if (playing) {
+                if (player.getPlayWhenReady()) {
                     handler.postDelayed(this, 500);
                 } else {
                     handler.postDelayed(this, 1000);
@@ -261,6 +261,24 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         if (updateCurrentIndex()) {
             broadcastPlaybackEvent();
         }
+        if (player.getPlaybackState() == Player.STATE_ENDED) {
+            try {
+                if (player.getPlayWhenReady()) {
+                    if (player.hasNext()) {
+                        player.next();
+                    } else if (lastPlaylistLength == 0 && player.getMediaItemCount() > 0) {
+                        player.seekTo(0, 0L);
+                    }
+                } else {
+                    if (player.getCurrentWindowIndex() < player.getMediaItemCount()) {
+                        player.seekTo(player.getCurrentWindowIndex(), 0L);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        lastPlaylistLength = player.getMediaItemCount();
     }
 
     private boolean updateCurrentIndex() {
@@ -280,8 +298,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         case Player.STATE_READY:
             if (player.getPlayWhenReady())
                 updatePosition();
+            transition(ProcessingState.ready);
             if (prepareResult != null) {
-                transition(ProcessingState.ready);
                 Map<String, Object> response = new HashMap<>();
                 response.put("duration", getDuration() == C.TIME_UNSET ? null : (1000 * getDuration()));
                 prepareResult.success(response);
@@ -290,8 +308,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                     player.setAudioAttributes(pendingAudioAttributes, false);
                     pendingAudioAttributes = null;
                 }
-            } else {
-                transition(ProcessingState.ready);
             }
             if (seekResult != null) {
                 completeSeek();
@@ -308,6 +324,15 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             if (processingState != ProcessingState.completed) {
                 updatePosition();
                 transition(ProcessingState.completed);
+            }
+            if (prepareResult != null) {
+                Map<String, Object> response = new HashMap<>();
+                prepareResult.success(response);
+                prepareResult = null;
+                if (pendingAudioAttributes != null) {
+                    player.setAudioAttributes(pendingAudioAttributes, false);
+                    pendingAudioAttributes = null;
+                }
             }
             if (playResult != null) {
                 playResult.success(new HashMap<String, Object>());
@@ -739,7 +764,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void broadcastPlaybackEvent() {
         final Map<String, Object> event = new HashMap<String, Object>();
         Long duration = getDuration() == C.TIME_UNSET ? null : (1000 * getDuration());
-        bufferedPosition = player.getBufferedPosition();
+        bufferedPosition = player != null ? player.getBufferedPosition() : 0L;
         event.put("processingState", processingState.ordinal());
         event.put("updatePosition", 1000 * updatePosition);
         event.put("updateTime", updateTime);
