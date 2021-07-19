@@ -796,11 +796,12 @@ class AudioPlayer {
     return duration;
   }
 
-  /// Tells the player to play audio as soon as an audio source is loaded and
-  /// ready to play. If an audio source has been set but not preloaded, this
-  /// method will also initiate the loading. The [Future] returned by this
-  /// method completes when the playback completes or is paused or stopped. If
-  /// the player is already playing, this method completes immediately.
+  /// Tells the player to play audio at the current [speed] and [volume] as soon
+  /// as an audio source is loaded and ready to play. If an audio source has
+  /// been set but not preloaded, this method will also initiate the loading.
+  /// The [Future] returned by this method completes when the playback completes
+  /// or is paused or stopped. If the player is already playing, this method
+  /// completes immediately.
   ///
   /// This method causes [playing] to become true, and it will remain true
   /// until [pause] or [stop] is called. This means that if playback completes,
