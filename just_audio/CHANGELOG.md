@@ -1,3 +1,7 @@
+## 0.9.1
+
+* Fix iOS/macOS bug when setting volume before load.
+
 ## 0.9.0
 
 * Update to support just_audio_background.
