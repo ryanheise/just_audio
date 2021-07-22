@@ -1,3 +1,7 @@
+## 0.9.3
+
+* Fix bug when updating playlist before loading.
+
 ## 0.9.2
 
 * Fix Android bug when loading empty playlist.

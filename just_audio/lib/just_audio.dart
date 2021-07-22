@@ -745,7 +745,7 @@ class AudioPlayer {
       }
       await source._setup(this);
       source._shuffle(initialIndex: initialSeekValues?.index ?? 0);
-      _updateShuffleIndices();
+      _broadcastSequence();
       _durationFuture = platform
           .load(LoadRequest(
             audioSourceMessage: source._toMessage(),
