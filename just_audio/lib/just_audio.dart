@@ -1210,6 +1210,19 @@ class AudioPlayer {
         }
       }, onError: _playbackEventSubject.addError);
 
+      if (audioSource != null) {
+        try {
+          final duration = await _load(platform, _audioSource!,
+              initialSeekValues: _initialSeekValues ??
+                  _InitialSeekValues(position: position, index: currentIndex));
+          durationCompleter.complete(duration);
+        } catch (e, stackTrace) {
+          _setPlatformActive(false)?.catchError((dynamic e) {});
+          durationCompleter.completeError(e, stackTrace);
+        }
+      } else {
+        durationCompleter.complete(null);
+      }
       if (active) {
         final automaticallyWaitsToMinimizeStalling =
             this.automaticallyWaitsToMinimizeStalling;
@@ -1255,19 +1268,6 @@ class AudioPlayer {
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
         }
-      }
-      if (audioSource != null) {
-        try {
-          final duration = await _load(platform, _audioSource!,
-              initialSeekValues: _initialSeekValues ??
-                  _InitialSeekValues(position: position, index: currentIndex));
-          durationCompleter.complete(duration);
-        } catch (e, stackTrace) {
-          _setPlatformActive(false)?.catchError((dynamic e) {});
-          durationCompleter.completeError(e, stackTrace);
-        }
-      } else {
-        durationCompleter.complete(null);
       }
 
       return platform;

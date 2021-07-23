@@ -94,6 +94,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private List<AudioEffect> audioEffects = new ArrayList<AudioEffect>();
     private Map<String, AudioEffect> audioEffectsMap = new HashMap<String, AudioEffect>();
     private int lastPlaylistLength = 0;
+    private Map<String, Object> pendingPlaybackEvent;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
@@ -110,7 +111,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             long newBufferedPosition = player.getBufferedPosition();
             if (newBufferedPosition != bufferedPosition) {
                 // This method updates bufferedPosition.
-                broadcastPlaybackEvent();
+                broadcastImmediatePlaybackEvent();
             }
             switch (processingState) {
             case buffering:
@@ -172,8 +173,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         handler.post(bufferWatcher);
     }
 
-    @Override
-    public void onAudioSessionIdChanged(int audioSessionId) {
+    private void setAudioSessionId(int audioSessionId) {
         if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) {
             this.audioSessionId = null;
         } else {
@@ -191,7 +191,13 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 audioEffectsMap.put((String)json.get("type"), audioEffect);
             }
         }
-        broadcastPlaybackEvent();
+        enqueuePlaybackEvent();
+    }
+
+    @Override
+    public void onAudioSessionIdChanged(int audioSessionId) {
+        setAudioSessionId(audioSessionId);
+        broadcastPendingPlaybackEvent();
     }
 
     @Override
@@ -200,7 +206,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             final Metadata.Entry entry = metadata.get(i);
             if (entry instanceof IcyInfo) {
                 icyInfo = (IcyInfo) entry;
-                broadcastPlaybackEvent();
+                broadcastImmediatePlaybackEvent();
             }
         }
     }
@@ -218,7 +224,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                         final Metadata.Entry entry = metadata.get(k);
                         if (entry instanceof IcyHeaders) {
                             icyHeaders = (IcyHeaders) entry;
-                            broadcastPlaybackEvent();
+                            broadcastImmediatePlaybackEvent();
                         }
                     }
                 }
@@ -247,7 +253,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             updateCurrentIndex();
             break;
         }
-        broadcastPlaybackEvent();
+        broadcastImmediatePlaybackEvent();
     }
 
     @Override
@@ -259,7 +265,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             initialPos = C.TIME_UNSET;
         }
         if (updateCurrentIndex()) {
-            broadcastPlaybackEvent();
+            broadcastImmediatePlaybackEvent();
         }
         if (player.getPlaybackState() == Player.STATE_ENDED) {
             try {
@@ -298,7 +304,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         case Player.STATE_READY:
             if (player.getPlayWhenReady())
                 updatePosition();
-            transition(ProcessingState.ready);
+            processingState = ProcessingState.ready;
+            broadcastImmediatePlaybackEvent();
             if (prepareResult != null) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("duration", getDuration() == C.TIME_UNSET ? null : (1000 * getDuration()));
@@ -316,14 +323,16 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         case Player.STATE_BUFFERING:
             updatePositionIfChanged();
             if (processingState != ProcessingState.buffering && processingState != ProcessingState.loading) {
-                transition(ProcessingState.buffering);
+                processingState = ProcessingState.buffering;
+                broadcastImmediatePlaybackEvent();
                 startWatchingBuffer();
             }
             break;
         case Player.STATE_ENDED:
             if (processingState != ProcessingState.completed) {
                 updatePosition();
-                transition(ProcessingState.completed);
+                processingState = ProcessingState.completed;
+                broadcastImmediatePlaybackEvent();
             }
             if (prepareResult != null) {
                 Map<String, Object> response = new HashMap<>();
@@ -490,6 +499,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } catch (Exception e) {
             e.printStackTrace();
             result.error("Error: " + e, null, null);
+        } finally {
+            broadcastPendingPlaybackEvent();
         }
     }
 
@@ -686,7 +697,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         errorCount = 0;
         prepareResult = result;
         updatePosition();
-        transition(ProcessingState.loading);
+        processingState = ProcessingState.loading;
+        enqueuePlaybackEvent();
         this.mediaSource = mediaSource;
         // TODO: pass in initial position here.
         player.setMediaSource(mediaSource);
@@ -703,7 +715,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
             }
             player = builder.build();
-            onAudioSessionIdChanged(player.getAudioSessionId());
+            setAudioSessionId(player.getAudioSessionId());
             player.addMetadataOutput(this);
             player.addListener(this);
             player.addAudioListener(this);
@@ -711,7 +723,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private void setAudioAttributes(int contentType, int flags, int usage) {
-        ensurePlayerInitialized();
         AudioAttributes.Builder builder = new AudioAttributes.Builder();
         builder.setContentType(contentType);
         builder.setFlags(flags);
@@ -761,7 +772,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
     }
 
-    private void broadcastPlaybackEvent() {
+    /// Creates an event based on the current state.
+    private Map<String, Object> createPlaybackEvent() {
         final Map<String, Object> event = new HashMap<String, Object>();
         Long duration = getDuration() == C.TIME_UNSET ? null : (1000 * getDuration());
         bufferedPosition = player != null ? player.getBufferedPosition() : 0L;
@@ -773,8 +785,36 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         event.put("duration", duration);
         event.put("currentIndex", currentIndex);
         event.put("androidAudioSessionId", audioSessionId);
+        return event;
+    }
 
-        eventChannel.success(event);
+    // Broadcast the pending playback event if it was set.
+    private void broadcastPendingPlaybackEvent() {
+        if (pendingPlaybackEvent != null) {
+            eventChannel.success(pendingPlaybackEvent);
+            pendingPlaybackEvent = null;
+        }
+    }
+
+    // Set a pending playback event that should be broadcast at
+    // a later time. If we're in a Flutter method call, it will
+    // be broadcast just before that method call returns. If
+    // we're in an asynchronous callback, it is up to the caller
+    // to eventually broadcast that event via
+    // broadcastPendingPlaybackEvent.
+    //
+    // If this is called multiple times before
+    // broadcastPendingPlaybackEvent, only the last event is
+    // broadcast.
+    private void enqueuePlaybackEvent() {
+        final Map<String, Object> event = new HashMap<String, Object>();
+        pendingPlaybackEvent = createPlaybackEvent();
+    }
+
+    // Broadcasts a new event immediately.
+    private void broadcastImmediatePlaybackEvent() {
+        enqueuePlaybackEvent();
+        broadcastPendingPlaybackEvent();
     }
 
     private Map<String, Object> collectIcyMetadata() {
@@ -799,8 +839,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private long getCurrentPosition() {
-        if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
-            return 0;
+        if (initialPos != C.TIME_UNSET) {
+            return initialPos;
+        } else if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
+            long pos = player.getCurrentPosition();
+            if (pos < 0) pos = 0;
+            return pos;
         } else if (seekPos != null && seekPos != C.TIME_UNSET) {
             return seekPos;
         } else {
@@ -823,11 +867,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         }
 
         eventChannel.error(errorCode, errorMsg, null);
-    }
-
-    private void transition(final ProcessingState newState) {
-        processingState = newState;
-        broadcastPlaybackEvent();
     }
 
     private String getLowerCaseExtension(Uri uri) {
@@ -878,14 +917,14 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         player.setPlaybackParameters(new PlaybackParameters(speed, params.pitch));
         if (player.getPlayWhenReady())
             updatePosition();
-        broadcastPlaybackEvent();
+        enqueuePlaybackEvent();
     }
 
     public void setPitch(final float pitch) {
         PlaybackParameters params = player.getPlaybackParameters();
         if (params.pitch == pitch) return;
         player.setPlaybackParameters(new PlaybackParameters(params.speed, pitch));
-        broadcastPlaybackEvent();
+        enqueuePlaybackEvent();
     }
 
     public void setSkipSilenceEnabled(final boolean enabled) {
@@ -932,7 +971,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         if (player != null) {
             player.release();
             player = null;
-            transition(ProcessingState.none);
+            processingState = ProcessingState.none;
+            broadcastImmediatePlaybackEvent();
         }
         eventChannel.endOfStream();
         dataEventChannel.endOfStream();
