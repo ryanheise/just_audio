@@ -113,17 +113,19 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 // This method updates bufferedPosition.
                 broadcastImmediatePlaybackEvent();
             }
-            switch (processingState) {
-            case buffering:
+            switch (player.getPlaybackState()) {
+            case Player.STATE_BUFFERING:
                 handler.postDelayed(this, 200);
                 break;
-            case ready:
+            case Player.STATE_READY:
                 if (player.getPlayWhenReady()) {
                     handler.postDelayed(this, 500);
                 } else {
                     handler.postDelayed(this, 1000);
                 }
                 break;
+            default:
+                // Stop watching buffer
             }
         }
     };
@@ -325,8 +327,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             if (processingState != ProcessingState.buffering && processingState != ProcessingState.loading) {
                 processingState = ProcessingState.buffering;
                 broadcastImmediatePlaybackEvent();
-                startWatchingBuffer();
             }
+            startWatchingBuffer();
             break;
         case Player.STATE_ENDED:
             if (processingState != ProcessingState.completed) {
@@ -888,7 +890,6 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             playResult.success(new HashMap<String, Object>());
         }
         playResult = result;
-        startWatchingBuffer();
         player.setPlayWhenReady(true);
         updatePosition();
         if (processingState == ProcessingState.completed && playResult != null) {
