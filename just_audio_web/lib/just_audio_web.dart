@@ -205,7 +205,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _currentAudioSourcePlayer?.pause();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = request.initialIndex ?? 0;
-    final duration = await _currentAudioSourcePlayer!.load();
+    final duration = await _currentAudioSourcePlayer!
+        .load(request.initialPosition?.inMilliseconds);
     if (request.initialPosition != null) {
       await _currentAudioSourcePlayer!
           .seek(request.initialPosition!.inMilliseconds);
@@ -218,7 +219,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   /// Loads audio from [uri] and returns the duration of the loaded audio if
   /// known.
-  Future<Duration?> loadUri(final Uri uri) async {
+  Future<Duration?> loadUri(
+      final Uri uri, final Duration? initialPosition) async {
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
     if (src != _audioElement.src) {
@@ -226,6 +228,9 @@ class Html5AudioPlayer extends JustAudioPlayer {
       _audioElement.src = src;
       _audioElement.preload = 'auto';
       _audioElement.load();
+      if (initialPosition != null) {
+        _audioElement.currentTime = initialPosition.inMilliseconds / 1000.0;
+      }
       try {
         await _durationCompleter!.future;
       } on MediaError catch (e) {
@@ -319,8 +324,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     if (index != _index) {
       _currentAudioSourcePlayer!.pause();
       _index = index;
-      await _currentAudioSourcePlayer!.load();
-      await _currentAudioSourcePlayer!.seek(position);
+      await _currentAudioSourcePlayer!.load(position);
       if (_playing) {
         _currentAudioSourcePlayer!.play();
       }
@@ -521,7 +525,7 @@ abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
       : super(html5AudioPlayer, id);
 
   /// Loads the audio for the underlying audio source.
-  Future<Duration?> load();
+  Future<Duration?> load([int? initialPosition]);
 
   /// Plays the underlying audio source.
   Future<void> play();
@@ -564,6 +568,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   double? _resumePos;
   Duration? _duration;
   Completer? _completer;
+  int? _initialPos;
 
   UriAudioSourcePlayer(
       Html5AudioPlayer html5AudioPlayer, String id, this.uri, this.headers)
@@ -576,9 +581,16 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   List<int> get shuffleIndices => [0];
 
   @override
-  Future<Duration?> load() async {
-    _resumePos = 0.0;
-    return _duration = await html5AudioPlayer.loadUri(uri);
+  Future<Duration?> load([int? initialPosition]) async {
+    _initialPos = initialPosition;
+    _resumePos = (initialPosition ?? 0) / 1000.0;
+    _duration = await html5AudioPlayer.loadUri(
+        uri,
+        initialPosition != null
+            ? Duration(milliseconds: initialPosition)
+            : null);
+    _initialPos = null;
+    return _duration;
   }
 
   @override
@@ -625,6 +637,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
   @override
   Duration get position {
+    if (_initialPos != null) return Duration(milliseconds: _initialPos!);
     final seconds = _audioElement.currentTime as double;
     return Duration(milliseconds: (seconds * 1000).toInt());
   }
@@ -738,6 +751,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Completer<ClipInterruptReason>? _completer;
   double? _resumePos;
   Duration? _duration;
+  int? _initialPos;
 
   ClippingAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id,
       this.audioSourcePlayer, this.start, this.end)
@@ -749,16 +763,22 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   List<int> get shuffleIndices => [0];
 
+  Duration get effectiveStart => start ?? Duration.zero;
+
   @override
-  Future<Duration?> load() async {
-    _resumePos = (start ?? Duration.zero).inMilliseconds / 1000.0;
-    final fullDuration =
-        (await html5AudioPlayer.loadUri(audioSourcePlayer.uri))!;
-    _audioElement.currentTime = _resumePos!;
+  Future<Duration?> load([int? initialPosition]) async {
+    initialPosition ??= 0;
+    _initialPos = initialPosition;
+    final absoluteInitialPosition =
+        effectiveStart.inMilliseconds + initialPosition;
+    _resumePos = absoluteInitialPosition / 1000.0;
+    final fullDuration = (await html5AudioPlayer.loadUri(audioSourcePlayer.uri,
+        Duration(milliseconds: absoluteInitialPosition)))!;
+    _initialPos = null;
     _duration = Duration(
         milliseconds: min((end ?? fullDuration).inMilliseconds,
                 fullDuration.inMilliseconds) -
-            (start ?? Duration.zero).inMilliseconds);
+            effectiveStart.inMilliseconds);
     return _duration;
   }
 
@@ -792,7 +812,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Future<void> seek(int position) async {
     _interruptPlay(ClipInterruptReason.seek);
     _audioElement.currentTime =
-        _resumePos = start!.inMilliseconds / 1000.0 + position / 1000.0;
+        _resumePos = effectiveStart.inMilliseconds / 1000.0 + position / 1000.0;
   }
 
   @override
@@ -816,11 +836,10 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
   @override
   Duration get position {
+    if (_initialPos != null) return Duration(milliseconds: _initialPos!);
     final seconds = _audioElement.currentTime as double;
     var position = Duration(milliseconds: (seconds * 1000).toInt());
-    if (start != null) {
-      position -= start!;
-    }
+    position -= effectiveStart;
     if (position < Duration.zero) {
       position = Duration.zero;
     }
@@ -833,9 +852,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
       var seconds =
           _audioElement.buffered.end(_audioElement.buffered.length - 1);
       var position = Duration(milliseconds: (seconds * 1000).toInt());
-      if (start != null) {
-        position -= start!;
-      }
+      position -= effectiveStart;
       if (position < Duration.zero) {
         position = Duration.zero;
       }

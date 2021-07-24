@@ -150,7 +150,6 @@ class AudioPlayer {
         _audioLoadConfiguration = audioLoadConfiguration,
         _audioPipeline = audioPipeline ?? AudioPipeline() {
     _audioPipeline._setup(this);
-    _idlePlatform = _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream);
     if (_audioLoadConfiguration?.darwinLoadControl != null) {
       _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
           .darwinLoadControl!.automaticallyWaitsToMinimizeStalling;
@@ -700,8 +699,10 @@ class AudioPlayer {
       throw Exception('Must set AudioSource before loading');
     }
     if (_active) {
+      final initialSeekValues = _initialSeekValues;
+      _initialSeekValues = null;
       return await _load(await _platform, _audioSource!,
-          initialSeekValues: _initialSeekValues);
+          initialSeekValues: initialSeekValues);
     } else {
       // This will implicitly load the current audio source.
       return await _setPlatformActive(true);
@@ -1118,36 +1119,7 @@ class AudioPlayer {
     final audioSource = _audioSource;
     final durationCompleter = Completer<Duration?>();
 
-    Future<AudioPlayerPlatform> setPlatform() async {
-      _playbackEventSubscription?.cancel();
-      _playerDataSubscription?.cancel();
-      if (!force) {
-        final oldPlatform = _platformValue!;
-        if (oldPlatform != _idlePlatform) {
-          await _disposePlatform(oldPlatform);
-        }
-      }
-      if (_disposed) return _platform;
-      // During initialisation, we must only use this platform reference in case
-      // _platform is updated again during initialisation.
-      final platform = active
-          ? await (_nativePlatform =
-              JustAudioPlatform.instance.init(InitRequest(
-              id: _id,
-              audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
-              androidAudioEffects: (_isAndroid() || _isUnitTest())
-                  ? _audioPipeline.androidAudioEffects
-                      .map((audioEffect) => audioEffect._toMessage())
-                      .toList()
-                  : [],
-              darwinAudioEffects: (_isDarwin() || _isUnitTest())
-                  ? _audioPipeline.darwinAudioEffects
-                      .map((audioEffect) => audioEffect._toMessage())
-                      .toList()
-                  : [],
-            )))
-          : _idlePlatform!;
-      _platformValue = platform;
+    void subscribeToEvents(AudioPlayerPlatform platform) {
       _playerDataSubscription =
           platform.playerDataMessageStream.listen((message) {
         if (message.playing != null && message.playing != playing) {
@@ -1209,20 +1181,48 @@ class AudioPlayer {
           _setPlatformActive(false);
         }
       }, onError: _playbackEventSubject.addError);
+    }
+
+    Future<AudioPlayerPlatform> setPlatform() async {
+      _playbackEventSubscription?.cancel();
+      _playerDataSubscription?.cancel();
+      if (!force) {
+        final oldPlatform = _platformValue!;
+        if (!(oldPlatform is _IdleAudioPlayer)) {
+          await _disposePlatform(oldPlatform);
+        }
+      }
+      if (_disposed) return _platform;
+      // During initialisation, we must only use this platform reference in case
+      // _platform is updated again during initialisation.
+      final platform = active
+          ? await (_nativePlatform =
+              JustAudioPlatform.instance.init(InitRequest(
+              id: _id,
+              audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
+              androidAudioEffects: (_isAndroid() || _isUnitTest())
+                  ? _audioPipeline.androidAudioEffects
+                      .map((audioEffect) => audioEffect._toMessage())
+                      .toList()
+                  : [],
+              darwinAudioEffects: (_isDarwin() || _isUnitTest())
+                  ? _audioPipeline.darwinAudioEffects
+                      .map((audioEffect) => audioEffect._toMessage())
+                      .toList()
+                  : [],
+            )))
+          : (_idlePlatform =
+              _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream));
+
+      _platformValue = platform;
 
       if (audioSource != null) {
-        try {
-          final duration = await _load(platform, _audioSource!,
-              initialSeekValues: _initialSeekValues ??
-                  _InitialSeekValues(position: position, index: currentIndex));
-          durationCompleter.complete(duration);
-        } catch (e, stackTrace) {
-          _setPlatformActive(false)?.catchError((dynamic e) {});
-          durationCompleter.completeError(e, stackTrace);
-        }
-      } else {
-        durationCompleter.complete(null);
+        _playbackEventSubject.add(_playbackEvent = _playbackEvent.copyWith(
+          updatePosition: position,
+          processingState: ProcessingState.loading,
+        ));
       }
+
       if (active) {
         final automaticallyWaitsToMinimizeStalling =
             this.automaticallyWaitsToMinimizeStalling;
@@ -1268,6 +1268,24 @@ class AudioPlayer {
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
         }
+      }
+
+      subscribeToEvents(platform);
+
+      if (audioSource != null) {
+        try {
+          final initialSeekValues = _initialSeekValues ??
+              _InitialSeekValues(position: position, index: currentIndex);
+          _initialSeekValues = null;
+          final duration = await _load(platform, _audioSource!,
+              initialSeekValues: initialSeekValues);
+          durationCompleter.complete(duration);
+        } catch (e, stackTrace) {
+          _setPlatformActive(false)?.catchError((dynamic e) {});
+          durationCompleter.completeError(e, stackTrace);
+        }
+      } else {
+        durationCompleter.complete(null);
       }
 
       return platform;
