@@ -35,7 +35,6 @@
     // Set when the current item hasn't been played yet so we aren't sure whether sufficient audio has been buffered.
     BOOL _bufferUnconfirmed;
     CMTime _seekPos;
-    CMTime _initialPos;
     FlutterResult _loadResult;
     FlutterResult _playResult;
     id _timeObserver;
@@ -72,7 +71,6 @@
     _order = nil;
     _orderInv = nil;
     _seekPos = kCMTimeInvalid;
-    _initialPos = kCMTimeZero;
     _timeObserver = 0;
     _updatePosition = 0;
     _updateTime = 0;
@@ -115,7 +113,7 @@
     @try {
         NSDictionary *request = (NSDictionary *)call.arguments;
         if ([@"load" isEqualToString:call.method]) {
-            CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeZero : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
+            CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeInvalid : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
             [self load:request[@"audioSource"] initialPosition:initialPosition initialIndex:request[@"initialIndex"] result:result];
         } else if ([@"play" isEqualToString:call.method]) {
             [self play:result];
@@ -219,7 +217,7 @@
     // Notify each new IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         if (!_indexedAudioSources[i].isAttached) {
-            [_indexedAudioSources[i] attach:_player];
+            [_indexedAudioSources[i] attach:_player initialPos:kCMTimeInvalid];
         }
     }
     [self broadcastPlaybackEvent];
@@ -333,9 +331,7 @@
 }
 
 - (int)getCurrentPosition {
-    if (_processingState == none || _processingState == loading) {
-        return (int)(1000 * CMTimeGetSeconds(_initialPos));
-    } else if (CMTIME_IS_VALID(_seekPos)) {
+    if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
     } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
         int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].position));
@@ -582,12 +578,10 @@
     if (_processingState == loading) {
         [self abortExistingConnection];
     }
-    _initialPos = initialPosition;
     _loadResult = result;
     _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     _processingState = loading;
     [self updatePosition];
-    [self broadcastPlaybackEvent];
     // Remove previous observers
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -670,7 +664,7 @@
     [self enqueueFrom:_index];
     // Notify each IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
-        [_indexedAudioSources[i] attach:_player];
+        [_indexedAudioSources[i] attach:_player initialPos:(i == _index ? initialPosition : kCMTimeInvalid)];
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
@@ -799,14 +793,6 @@
                 if (_loadResult) {
                     _loadResult(@{@"duration": @([self getDurationMicroseconds])});
                     _loadResult = nil;
-                }
-                if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {
-                    __weak __typeof__(self) weakSelf = self;
-                    [playerItem.audioSource seek:_initialPos completionHandler:^(BOOL finished) {
-                        [weakSelf updatePosition];
-                        [weakSelf broadcastPlaybackEvent];
-                    }];
-                    _initialPos = kCMTimeZero;
                 }
                 break;
             }

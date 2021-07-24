@@ -28,11 +28,14 @@
     [_audioSource findById:sourceId matches:matches];
 }
 
-- (void)attach:(AVQueuePlayer *)player {
-    [super attach:player];
+- (void)attach:(AVQueuePlayer *)player initialPos:(CMTime)initialPos {
+    // Force super.attach to correct for the initial position.
+    if (CMTIME_IS_INVALID(initialPos)) {
+        initialPos = kCMTimeZero;
+    }
     // Prepare clip to start/end at the right timestamps.
     _audioSource.playerItem.forwardPlaybackEndTime = _end;
-    [self seek:kCMTimeZero];
+    [super attach:player initialPos:initialPos];
 }
 
 - (IndexedPlayerItem *)playerItem {
