@@ -1,3 +1,7 @@
+## 0.9.4
+
+* Remember position after stop().
+
 ## 0.9.3
 
 * Fix bug when updating playlist before loading.
