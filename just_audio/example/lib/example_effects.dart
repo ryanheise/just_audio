@@ -254,6 +254,7 @@ class ControlButtons extends StatelessWidget {
               divisions: 10,
               min: 0.0,
               max: 1.0,
+              value: player.volume,
               stream: player.volumeStream,
               onChanged: player.setVolume,
             );
@@ -306,6 +307,7 @@ class ControlButtons extends StatelessWidget {
                 divisions: 10,
                 min: 0.5,
                 max: 1.5,
+                value: player.speed,
                 stream: player.speedStream,
                 onChanged: player.setSpeed,
               );

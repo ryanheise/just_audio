@@ -145,6 +145,8 @@ void showSliderDialog({
   required double min,
   required double max,
   String valueSuffix = '',
+  // TODO: Replace these two by ValueStream.
+  required double value,
   required Stream<double> stream,
   required ValueChanged<double> onChanged,
 }) {
@@ -167,7 +169,7 @@ void showSliderDialog({
                 divisions: divisions,
                 min: min,
                 max: max,
-                value: snapshot.data ?? 1.0,
+                value: snapshot.data ?? value,
                 onChanged: onChanged,
               ),
             ],

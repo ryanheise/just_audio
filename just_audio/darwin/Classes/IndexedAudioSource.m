@@ -46,8 +46,11 @@
     return treeIndex + 1;
 }
 
-- (void)attach:(AVQueuePlayer *)player {
+- (void)attach:(AVQueuePlayer *)player initialPos:(CMTime)initialPos {
     _isAttached = YES;
+    if (CMTIME_IS_VALID(initialPos)) {
+        [self seek:initialPos];
+    }
 }
 
 - (void)play:(AVQueuePlayer *)player {
