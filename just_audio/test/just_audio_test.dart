@@ -1309,6 +1309,8 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     final audioSource = request.audioSourceMessage;
+    _processingState = ProcessingStateMessage.loading;
+    _broadcastPlaybackEvent();
     if (audioSource is UriAudioSourceMessage) {
       if (audioSource.uri.contains('abort')) {
         throw PlatformException(code: 'abort', message: 'Failed to load URL');
@@ -1347,7 +1349,6 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       _startTimer();
     }
     _playCompleter = Completer<dynamic>();
-    _broadcastPlaybackEvent();
     await _playCompleter!.future;
     return PlayResponse();
   }
