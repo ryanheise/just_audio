@@ -1,3 +1,7 @@
+## 0.4.1
+
+* Remember position after stopping.
+
 ## 0.4.0
 
 * Upgrade to platform interface 4.0.0

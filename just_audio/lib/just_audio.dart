@@ -112,6 +112,9 @@ class AudioPlayer {
   final bool _androidApplyAudioAttributes;
   final bool _handleAudioSessionActivation;
 
+  /// Counts how many times [_setPlatformActive] is called.
+  int _activationCount = 0;
+
   /// Creates an [AudioPlayer].
   ///
   /// If [userAgent] is specified, it will be included in the header of all HTTP
@@ -150,7 +153,6 @@ class AudioPlayer {
         _audioLoadConfiguration = audioLoadConfiguration,
         _audioPipeline = audioPipeline ?? AudioPipeline() {
     _audioPipeline._setup(this);
-    _idlePlatform = _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream);
     if (_audioLoadConfiguration?.darwinLoadControl != null) {
       _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
           .darwinLoadControl!.automaticallyWaitsToMinimizeStalling;
@@ -679,7 +681,7 @@ class AudioPlayer {
     if (preload) {
       duration = await load();
     } else {
-      await _setPlatformActive(false);
+      await _setPlatformActive(false)?.catchError((dynamic e) {});
     }
     return duration;
   }
@@ -700,8 +702,10 @@ class AudioPlayer {
       throw Exception('Must set AudioSource before loading');
     }
     if (_active) {
+      final initialSeekValues = _initialSeekValues;
+      _initialSeekValues = null;
       return await _load(await _platform, _audioSource!,
-          initialSeekValues: _initialSeekValues);
+          initialSeekValues: initialSeekValues);
     } else {
       // This will implicitly load the current audio source.
       return await _setPlatformActive(true);
@@ -736,14 +740,24 @@ class AudioPlayer {
 
   Future<Duration?> _load(AudioPlayerPlatform platform, AudioSource source,
       {_InitialSeekValues? initialSeekValues}) async {
+    final activationNumber = _activationCount;
+    void checkInterruption() {
+      if (_activationCount != activationNumber) {
+        // the platform has changed since we started loading, so abort.
+        throw PlatformException(code: 'abort', message: 'Loading interrupted');
+      }
+    }
+
     try {
       if (!kIsWeb && (source._requiresProxy || _userAgent != null)) {
         if (_proxy == null) {
           _proxy = _ProxyHttpServer();
           await _proxy!.start();
+          checkInterruption();
         }
       }
       await source._setup(this);
+      checkInterruption();
       source._shuffle(initialIndex: initialSeekValues?.index ?? 0);
       _broadcastSequence();
       _durationFuture = platform
@@ -754,6 +768,7 @@ class AudioPlayer {
           ))
           .then((response) => response.duration);
       final duration = await _durationFuture;
+      checkInterruption();
       _durationSubject.add(duration);
       if (platform != _platformValue) {
         // the platform has changed since we started loading, so abort.
@@ -762,6 +777,7 @@ class AudioPlayer {
       // Wait for loading state to pass.
       await processingStateStream
           .firstWhere((state) => state != ProcessingState.loading);
+      checkInterruption();
       return duration;
     } on PlatformException catch (e) {
       try {
@@ -892,7 +908,7 @@ class AudioPlayer {
   /// decoders alive so that the app can quickly resume audio playback.
   Future<void> stop() async {
     if (_disposed) return;
-    final future = _setPlatformActive(false);
+    final future = _setPlatformActive(false)?.catchError((dynamic e) {});
 
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
@@ -1110,44 +1126,52 @@ class AudioPlayer {
       {Completer<void>? playCompleter, bool force = false}) {
     if (_disposed) return null;
     if (!force && (active == _active)) return _durationFuture;
+
+    // Warning! Tricky async code lies ahead.
+    // (This should definitely be made less tricky)
+    // This method itself is not asynchronous, and guarantees that _platform
+    // will be set in this cycle to a Future. The platform returned by that
+    // future takes time to initialise and so we need to handle the case where
+    // that initialisation was interrupted by another call to
+    // _setPlatformActive.
+
+    // Store the current activation sequence number. activationNumber should
+    // equal _activationCount for the duration of this call, unless it is
+    // interrupted by another simultaneous call.
+    final activationNumber = ++_activationCount;
+
+    /// Tells whether we've been interrupted.
+    bool wasInterrupted() => _activationCount != activationNumber;
+
+    final durationCompleter = Completer<Duration?>();
+
+    // Checks if we were interrupted and aborts the current activation. If we
+    // are interrupted, there are two cases:
+    // 1. If we were activating the native platform, abort with an exception.
+    // 2. If we were activating the idle dummy, abort silently.
+    //
+    // We should call this after each awaited call since those are opportunities
+    // for other coroutines to run and interrupt this one.
+    bool checkInterruption() {
+      // No interruption.
+      if (!wasInterrupted()) return false;
+      // An interruption that we can ignore
+      if (!active) return true;
+      // An interruption that should throw
+      final e =
+          PlatformException(code: 'abort', message: 'Loading interrupted');
+      durationCompleter.completeError(e);
+      throw e;
+    }
+
     // This method updates _active and _platform before yielding to the next
     // task in the event loop.
     _active = active;
     final position = this.position;
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
-    final durationCompleter = Completer<Duration?>();
 
-    Future<AudioPlayerPlatform> setPlatform() async {
-      _playbackEventSubscription?.cancel();
-      _playerDataSubscription?.cancel();
-      if (!force) {
-        final oldPlatform = _platformValue!;
-        if (oldPlatform != _idlePlatform) {
-          await _disposePlatform(oldPlatform);
-        }
-      }
-      if (_disposed) return _platform;
-      // During initialisation, we must only use this platform reference in case
-      // _platform is updated again during initialisation.
-      final platform = active
-          ? await (_nativePlatform =
-              JustAudioPlatform.instance.init(InitRequest(
-              id: _id,
-              audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
-              androidAudioEffects: (_isAndroid() || _isUnitTest())
-                  ? _audioPipeline.androidAudioEffects
-                      .map((audioEffect) => audioEffect._toMessage())
-                      .toList()
-                  : [],
-              darwinAudioEffects: (_isDarwin() || _isUnitTest())
-                  ? _audioPipeline.darwinAudioEffects
-                      .map((audioEffect) => audioEffect._toMessage())
-                      .toList()
-                  : [],
-            )))
-          : _idlePlatform!;
-      _platformValue = platform;
+    void subscribeToEvents(AudioPlayerPlatform platform) {
       _playerDataSubscription =
           platform.playerDataMessageStream.listen((message) {
         if (message.playing != null && message.playing != playing) {
@@ -1206,9 +1230,51 @@ class AudioPlayer {
         if (_playbackEvent.processingState !=
                 oldPlaybackEvent.processingState &&
             _playbackEvent.processingState == ProcessingState.idle) {
-          _setPlatformActive(false);
+          _setPlatformActive(false)?.catchError((dynamic e) {});
         }
       }, onError: _playbackEventSubject.addError);
+    }
+
+    Future<AudioPlayerPlatform> setPlatform() async {
+      _playbackEventSubscription?.cancel();
+      _playerDataSubscription?.cancel();
+      if (!force) {
+        final oldPlatform = _platformValue!;
+        if (!(oldPlatform is _IdleAudioPlayer)) {
+          await _disposePlatform(oldPlatform);
+        }
+      }
+      if (_disposed) return _platform;
+      // During initialisation, we must only use this platform reference in case
+      // _platform is updated again during initialisation.
+      final platform = active
+          ? await (_nativePlatform =
+              JustAudioPlatform.instance.init(InitRequest(
+              id: _id,
+              audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
+              androidAudioEffects: (_isAndroid() || _isUnitTest())
+                  ? _audioPipeline.androidAudioEffects
+                      .map((audioEffect) => audioEffect._toMessage())
+                      .toList()
+                  : [],
+              darwinAudioEffects: (_isDarwin() || _isUnitTest())
+                  ? _audioPipeline.darwinAudioEffects
+                      .map((audioEffect) => audioEffect._toMessage())
+                      .toList()
+                  : [],
+            )))
+          : (_idlePlatform =
+              _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream));
+      if (checkInterruption()) return platform;
+
+      _platformValue = platform;
+
+      if (audioSource != null) {
+        _playbackEventSubject.add(_playbackEvent = _playbackEvent.copyWith(
+          updatePosition: position,
+          processingState: ProcessingState.loading,
+        ));
+      }
 
       if (active) {
         final automaticallyWaitsToMinimizeStalling =
@@ -1219,12 +1285,14 @@ class AudioPlayer {
         if (_isAndroid() || _isUnitTest()) {
           if (_androidApplyAudioAttributes) {
             final audioSession = await AudioSession.instance;
+            if (checkInterruption()) return platform;
             _androidAudioAttributes ??=
                 audioSession.configuration?.androidAudioAttributes;
           }
           if (_androidAudioAttributes != null) {
             await _internalSetAndroidAudioAttributes(
                 platform, _androidAudioAttributes!);
+            if (checkInterruption()) return platform;
           }
         }
         if (!automaticallyWaitsToMinimizeStalling) {
@@ -1232,38 +1300,51 @@ class AudioPlayer {
           await platform.setAutomaticallyWaitsToMinimizeStalling(
               SetAutomaticallyWaitsToMinimizeStallingRequest(
                   enabled: automaticallyWaitsToMinimizeStalling));
+          if (checkInterruption()) return platform;
         }
         await platform.setVolume(SetVolumeRequest(volume: volume));
+        if (checkInterruption()) return platform;
         await platform.setSpeed(SetSpeedRequest(speed: speed));
+        if (checkInterruption()) return platform;
         try {
           await platform.setPitch(SetPitchRequest(pitch: pitch));
         } catch (e) {
           // setPitch not supported on this platform.
         }
+        if (checkInterruption()) return platform;
         try {
           await platform.setSkipSilence(
               SetSkipSilenceRequest(enabled: skipSilenceEnabled));
         } catch (e) {
           // setSkipSilence not supported on this platform.
         }
+        if (checkInterruption()) return platform;
         await platform.setLoopMode(SetLoopModeRequest(
             loopMode: LoopModeMessage.values[loopMode.index]));
+        if (checkInterruption()) return platform;
         await platform.setShuffleMode(SetShuffleModeRequest(
             shuffleMode: shuffleModeEnabled
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
+        if (checkInterruption()) return platform;
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
         }
       }
+
+      subscribeToEvents(platform);
+
       if (audioSource != null) {
         try {
+          final initialSeekValues = _initialSeekValues ??
+              _InitialSeekValues(position: position, index: currentIndex);
+          _initialSeekValues = null;
           final duration = await _load(platform, _audioSource!,
-              initialSeekValues: _initialSeekValues ??
-                  _InitialSeekValues(position: position, index: currentIndex));
+              initialSeekValues: initialSeekValues);
+          if (checkInterruption()) return platform;
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
-          _setPlatformActive(false)?.catchError((dynamic e) {});
+          await _setPlatformActive(false)?.catchError((dynamic e) {});
           durationCompleter.completeError(e, stackTrace);
         }
       } else {
@@ -1276,12 +1357,13 @@ class AudioPlayer {
     Future<void> initAudioEffects() async {
       for (var audioEffect in _audioPipeline._audioEffects) {
         await audioEffect._activate();
+        if (checkInterruption()) return;
       }
     }
 
     _platform = setPlatform();
     if (_active) {
-      initAudioEffects();
+      initAudioEffects().catchError((dynamic e) {});
     }
     return durationCompleter.future;
   }
