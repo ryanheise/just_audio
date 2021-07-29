@@ -1,3 +1,7 @@
+## next
+
+* Fix iOS12.4 `LockCachingAudioSource` fetch data exception
+
 ## 0.9.4
 
 * Remember position after stop().
