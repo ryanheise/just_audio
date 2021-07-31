@@ -653,19 +653,22 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   /// Broadcasts the current state to all clients.
   Future<void> _broadcastState() async {
+    final controls = [
+      if (hasPrevious) MediaControl.skipToPrevious,
+      if (_playing) MediaControl.pause else MediaControl.play,
+      MediaControl.stop,
+      if (hasNext) MediaControl.skipToNext,
+    ];
     playbackState.add(playbackState.nvalue!.copyWith(
-      controls: [
-        MediaControl.skipToPrevious,
-        if (_playing) MediaControl.pause else MediaControl.play,
-        MediaControl.stop,
-        MediaControl.skipToNext,
-      ],
+      controls: controls,
       systemActions: {
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
       },
-      androidCompactActionIndices: [0, 1, 3],
+      androidCompactActionIndices: List.generate(controls.length, (i) => i)
+          .where((i) => controls[i].action != MediaAction.stop)
+          .toList(),
       processingState: {
         ProcessingStateMessage.idle: AudioProcessingState.idle,
         ProcessingStateMessage.loading: AudioProcessingState.loading,
