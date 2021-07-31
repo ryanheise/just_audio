@@ -433,6 +433,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<SetShuffleOrderResponse> customSetShuffleOrder(
       SetShuffleOrderRequest request) async {
     _source = request.audioSourceMessage;
+    _broadcastStateIfActive();
     return await (await _player).setShuffleOrder(SetShuffleOrderRequest(
       audioSourceMessage: _source!,
     ));
@@ -479,8 +480,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
     queue.add(sequence.map((source) => source.tag as MediaItem).toList());
   }
 
-  List<IndexedAudioSourceMessage> get sequence => _source!.sequence;
-  List<int> get shuffleIndices => _source!.shuffleIndices;
+  List<IndexedAudioSourceMessage> get sequence => _source?.sequence ?? [];
+  List<int> get shuffleIndices => _source?.shuffleIndices ?? [];
   List<int> get effectiveIndices => _shuffleMode != AudioServiceShuffleMode.none
       ? shuffleIndices
       : List.generate(sequence.length, (i) => i);
@@ -588,6 +589,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
     _repeatMode = repeatMode;
+    _broadcastStateIfActive();
     (await _player).setLoopMode(SetLoopModeRequest(
         loopMode: LoopModeMessage
             .values[min(LoopModeMessage.values.length - 1, repeatMode.index)]));
@@ -596,6 +598,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     _shuffleMode = shuffleMode;
+    _broadcastStateIfActive();
     (await _player).setShuffleMode(SetShuffleModeRequest(
         shuffleMode: ShuffleModeMessage.values[
             min(ShuffleModeMessage.values.length - 1, shuffleMode.index)]));
@@ -648,6 +651,12 @@ class _PlayerAudioHandler extends BaseAudioHandler
       _seeker = _Seeker(this, Duration(seconds: 10 * direction),
           Duration(seconds: 1), currentMediaItem!.duration!)
         ..start();
+    }
+  }
+
+  Future<void> _broadcastStateIfActive() async {
+    if (_justAudioEvent.processingState != ProcessingStateMessage.idle) {
+      _broadcastState();
     }
   }
 
