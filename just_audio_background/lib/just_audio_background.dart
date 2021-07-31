@@ -174,13 +174,15 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
           break;
         case 'currentIndex':
           _index = event['value'];
-          broadcastPlaybackEvent();
+          // The event is broadcast in response to the next mediaItem update
+          // which happens immediately after this.
           break;
       }
     });
     _audioHandler.mediaItem.listen((mediaItem) {
       if (mediaItem == null) return;
       _duration = mediaItem.duration;
+      broadcastPlaybackEvent();
     });
   }
 
@@ -333,6 +335,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
   bool _playing = false;
   double _speed = 1.0;
   _Seeker? _seeker;
+  AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
+  AudioServiceShuffleMode _shuffleMode = AudioServiceShuffleMode.none;
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
   int? get index => _justAudioEvent.currentIndex;
@@ -387,17 +391,12 @@ class _PlayerAudioHandler extends BaseAudioHandler
               .copyWith(duration: _justAudioEvent.duration);
           queue.add(currentQueue!);
         }
+        customEvent.add({
+          'type': 'currentIndex',
+          'value': track.index,
+        });
         mediaItem.add(this.currentMediaItem!);
       }
-    });
-    playbackEventMessageStream
-        .map((event) => event.currentIndex)
-        .distinct()
-        .listen((index) {
-      customEvent.add({
-        'type': 'currentIndex',
-        'value': index,
-      });
     });
   }
 
@@ -481,10 +480,63 @@ class _PlayerAudioHandler extends BaseAudioHandler
   }
 
   List<IndexedAudioSourceMessage> get sequence => _source!.sequence;
+  List<int> get shuffleIndices => _source!.shuffleIndices;
+  List<int> get effectiveIndices => _shuffleMode != AudioServiceShuffleMode.none
+      ? shuffleIndices
+      : List.generate(sequence.length, (i) => i);
+  List<int> get shuffleIndicesInv {
+    final inv = List.filled(effectiveIndices.length, 0);
+    for (var i = 0; i < effectiveIndices.length; i++) {
+      inv[effectiveIndices[i]] = i;
+    }
+    return inv;
+  }
+
+  List<int> get effectiveIndicesInv =>
+      _shuffleMode != AudioServiceShuffleMode.none
+          ? shuffleIndicesInv
+          : List.generate(sequence.length, (i) => i);
+  int get nextIndex => getRelativeIndex(1);
+  int get previousIndex => getRelativeIndex(-1);
+  bool get hasNext => nextIndex != -1;
+  bool get hasPrevious => previousIndex != -1;
+
+  int getRelativeIndex(int offset) {
+    if (_repeatMode == AudioServiceRepeatMode.one) return index!;
+    final effectiveIndices = this.effectiveIndices;
+    if (effectiveIndices.isEmpty) return -1;
+    final effectiveIndicesInv = this.effectiveIndicesInv;
+    if (index! >= effectiveIndicesInv.length) return -1;
+    final invPos = effectiveIndicesInv[index!];
+    var newInvPos = invPos + offset;
+    if (newInvPos >= effectiveIndices.length || newInvPos < 0) {
+      if (_repeatMode == AudioServiceRepeatMode.all) {
+        newInvPos %= effectiveIndices.length;
+      } else {
+        return -1;
+      }
+    }
+    final result = effectiveIndices[newInvPos];
+    return result;
+  }
 
   @override
   Future<void> skipToQueueItem(int index) async {
     (await _player).seek(SeekRequest(position: Duration.zero, index: index));
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    if (hasNext) {
+      await skipToQueueItem(nextIndex);
+    }
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    if (hasPrevious) {
+      await skipToQueueItem(previousIndex);
+    }
   }
 
   @override
@@ -535,6 +587,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    _repeatMode = repeatMode;
     (await _player).setLoopMode(SetLoopModeRequest(
         loopMode: LoopModeMessage
             .values[min(LoopModeMessage.values.length - 1, repeatMode.index)]));
@@ -542,6 +595,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    _shuffleMode = shuffleMode;
     (await _player).setShuffleMode(SetShuffleModeRequest(
         shuffleMode: ShuffleModeMessage.values[
             min(ShuffleModeMessage.values.length - 1, shuffleMode.index)]));
@@ -707,6 +761,31 @@ extension AudioSourceExtension on AudioSourceMessage {
           .toList();
     } else {
       return [self as IndexedAudioSourceMessage];
+    }
+  }
+
+  List<int> get shuffleIndices {
+    final self = this;
+    if (self is ConcatenatingAudioSourceMessage) {
+      var offset = 0;
+      final childIndicesList = <List<int>>[];
+      for (var child in self.children) {
+        final childIndices =
+            child.shuffleIndices.map((i) => i + offset).toList();
+        childIndicesList.add(childIndices);
+        offset += childIndices.length;
+      }
+      final indices = <int>[];
+      for (var index in self.shuffleOrder) {
+        indices.addAll(childIndicesList[index]);
+      }
+      return indices;
+    } else if (self is LoopingAudioSourceMessage) {
+      // TODO: This should combine indices of the children, like ConcatenatingAudioSource.
+      // Also should be fixed in the plugin frontend.
+      return List.generate(self.count, (i) => i);
+    } else {
+      return [0];
     }
   }
 }
