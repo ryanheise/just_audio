@@ -1,3 +1,8 @@
+## 0.9.5
+
+* Fix iOS/macOS bug updating shuffle order.
+* Fix iOS/macOS bug advancing to next in shuffle order.
+
 ## 0.9.4
 
 * Remember position after stop().
