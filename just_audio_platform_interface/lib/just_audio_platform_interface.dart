@@ -1008,24 +1008,27 @@ abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
   final Map<String, String>? headers;
+  final Map<String, String>? drm;
 
-  UriAudioSourceMessage({
-    required String id,
-    required this.uri,
-    this.headers,
-    dynamic tag,
-  }) : super(id: id, tag: tag);
+  UriAudioSourceMessage(
+      {required String id,
+      required this.uri,
+      this.headers,
+      dynamic tag,
+      this.drm})
+      : super(id: id, tag: tag);
 }
 
 /// Information about a progressive audio source to be communicated with the
 /// platform implementation.
 class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
-  ProgressiveAudioSourceMessage({
-    required String id,
-    required String uri,
-    Map<String, String>? headers,
-    dynamic tag,
-  }) : super(id: id, uri: uri, headers: headers, tag: tag);
+  ProgressiveAudioSourceMessage(
+      {required String id,
+      required String uri,
+      Map<String, String>? headers,
+      dynamic tag,
+      Map<String, String>? drm})
+      : super(id: id, uri: uri, headers: headers, tag: tag, drm: drm);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1033,18 +1036,20 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'drm': drm,
       };
 }
 
 /// Information about a DASH audio source to be communicated with the platform
 /// implementation.
 class DashAudioSourceMessage extends UriAudioSourceMessage {
-  DashAudioSourceMessage({
-    required String id,
-    required String uri,
-    Map<String, String>? headers,
-    dynamic tag,
-  }) : super(id: id, uri: uri, headers: headers, tag: tag);
+  DashAudioSourceMessage(
+      {required String id,
+      required String uri,
+      Map<String, String>? headers,
+      dynamic tag,
+      Map<String, String>? drm})
+      : super(id: id, uri: uri, headers: headers, tag: tag, drm: drm);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1052,18 +1057,20 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'drm': drm,
       };
 }
 
 /// Information about a HLS audio source to be communicated with the platform
 /// implementation.
 class HlsAudioSourceMessage extends UriAudioSourceMessage {
-  HlsAudioSourceMessage({
-    required String id,
-    required String uri,
-    Map<String, String>? headers,
-    dynamic tag,
-  }) : super(id: id, uri: uri, headers: headers, tag: tag);
+  HlsAudioSourceMessage(
+      {required String id,
+      required String uri,
+      Map<String, String>? headers,
+      dynamic tag,
+      Map<String, String>? drm})
+      : super(id: id, uri: uri, headers: headers, tag: tag, drm: drm);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1071,6 +1078,7 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'drm': drm,
       };
 }
 
