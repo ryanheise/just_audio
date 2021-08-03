@@ -730,7 +730,7 @@
         _justAdvanced = YES;
     } else if ([_orderInv[_index] intValue] + 1 < [_order count]) {
         [endedSource seek:kCMTimeZero];
-        _index++;
+        _index = [_order[([_orderInv[_index] intValue] + 1)] intValue];
         [self updateEndAction];
         [self broadcastPlaybackEvent];
         _justAdvanced = YES;
@@ -1114,8 +1114,13 @@
 }
 
 - (void)setShuffleOrder:(NSDictionary *)dict {
-    // TODO: update order and enqueue.
+    if (!_audioSource) return;
+
     [_audioSource decodeShuffleOrder:dict];
+
+    [self updateOrder];
+
+    [self enqueueFrom:_index];
 }
 
 - (void)dumpQueue {
