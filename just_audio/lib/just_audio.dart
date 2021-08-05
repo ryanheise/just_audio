@@ -1981,7 +1981,7 @@ abstract class AudioSource {
   ///
   /// The DRM parameter is used to specify the optional DRM configuration properties.
   static UriAudioSource uri(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Map<String, String>? drm}) {
+      {Map<String, String>? headers, dynamic tag, Map<String, String>? drm,}) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
@@ -2140,12 +2140,13 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
-  ProgressiveAudioSource(Uri uri,
-      {Map<String, String>? headers,
-      dynamic tag,
-      Duration? duration,
-      Map<String, String>? drm})
-      : super(uri, headers: headers, tag: tag, duration: duration, drm: drm);
+  ProgressiveAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    dynamic tag,
+    Duration? duration,
+    Map<String, String>? drm,
+  }) : super(uri, headers: headers, tag: tag, duration: duration, drm: drm);
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
@@ -2214,11 +2215,12 @@ class HlsAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
-      id: _id,
-      uri: _effectiveUri.toString(),
-      headers: headers,
-      tag: tag,
-      drm: drm);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        drm: drm,
+      );
 }
 
 /// An [AudioSource] for a period of silence.
