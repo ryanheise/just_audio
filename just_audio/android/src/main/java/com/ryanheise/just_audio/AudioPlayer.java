@@ -20,6 +20,10 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.audio.AudioListener;
+import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
+import com.google.android.exoplayer2.drm.DrmSessionManager;
+import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
+import com.google.android.exoplayer2.drm.LocalMediaDrmCallback;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
@@ -576,52 +580,63 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     }
 
     private MediaSource decodeAudioSource(final Object json) {
-        Map<?, ?> map = (Map<?, ?>)json;
-        String id = (String)map.get("id");
-        switch ((String)map.get("type")) {
-        case "progressive":
-            return new ProgressiveMediaSource.Factory(buildDataSourceFactory())
-                    .createMediaSource(new MediaItem.Builder()
-                            .setUri(Uri.parse((String)map.get("uri")))
-                            .setTag(id)
-                            .build());
-        case "dash":
-            return new DashMediaSource.Factory(buildDataSourceFactory())
-                    .createMediaSource(new MediaItem.Builder()
-                            .setUri(Uri.parse((String)map.get("uri")))
-                            .setMimeType(MimeTypes.APPLICATION_MPD)
-                            .setTag(id)
-                            .build());
-        case "hls":
-            return new HlsMediaSource.Factory(buildDataSourceFactory())
-                    .createMediaSource(new MediaItem.Builder()
-                            .setUri(Uri.parse((String)map.get("uri")))
-                            .setMimeType(MimeTypes.APPLICATION_M3U8)
-                            .build());
-        case "silence":
-            return new SilenceMediaSource.Factory()
-                    .setDurationUs(getLong(map.get("duration")))
-                    .setTag(id)
-                    .createMediaSource();
-        case "concatenating":
-            MediaSource[] mediaSources = getAudioSourcesArray(map.get("children"));
-            return new ConcatenatingMediaSource(
-                    false, // isAtomic
-                    (Boolean)map.get("useLazyPreparation"),
-                    decodeShuffleOrder(mapGet(map, "shuffleOrder")),
-                    mediaSources);
-        case "clipping":
-            Long start = getLong(map.get("start"));
-            Long end = getLong(map.get("end"));
-            return new ClippingMediaSource(getAudioSource(map.get("child")),
-                    start != null ? start : 0,
-                    end != null ? end : C.TIME_END_OF_SOURCE);
-        case "looping":
-            Integer count = (Integer)map.get("count");
-            MediaSource looperChild = getAudioSource(map.get("child"));
-            return new LoopingMediaSource(looperChild, count);
-        default:
-            throw new IllegalArgumentException("Unknown AudioSource type: " + map.get("type"));
+        Map<?, ?> map = (Map<?, ?>) json;
+        String id = (String) map.get("id");
+
+        DrmSessionManager drmSessionManager = null;
+        if (map.get("drm") != null) {
+            Map<?, ?> drm = (Map<?, ?>) map.get("drm");
+            if (drm.get("clearKey") != null) {
+                drmSessionManager = new DefaultDrmSessionManager.Builder()
+                        .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER).
+                                build(new LocalMediaDrmCallback(((String) drm.get("clearKey")).getBytes()));
+            }
+        }
+
+        switch ((String) map.get("type")) {
+            case "progressive":
+                return new ProgressiveMediaSource.Factory(buildDataSourceFactory()).setDrmSessionManager(drmSessionManager)
+                        .createMediaSource(new MediaItem.Builder()
+                                .setUri(Uri.parse((String) map.get("uri")))
+                                .setTag(id)
+                                .build());
+            case "dash":
+                return new DashMediaSource.Factory(buildDataSourceFactory()).setDrmSessionManager(drmSessionManager)
+                        .createMediaSource(new MediaItem.Builder()
+                                .setUri(Uri.parse((String) map.get("uri")))
+                                .setMimeType(MimeTypes.APPLICATION_MPD)
+                                .setTag(id)
+                                .build());
+            case "hls":
+                return new HlsMediaSource.Factory(buildDataSourceFactory()).setDrmSessionManager(drmSessionManager)
+                        .createMediaSource(new MediaItem.Builder()
+                                .setUri(Uri.parse((String) map.get("uri")))
+                                .setMimeType(MimeTypes.APPLICATION_M3U8)
+                                .build());
+            case "silence":
+                return new SilenceMediaSource.Factory()
+                        .setDurationUs(getLong(map.get("duration")))
+                        .setTag(id)
+                        .createMediaSource();
+            case "concatenating":
+                MediaSource[] mediaSources = getAudioSourcesArray(map.get("children"));
+                return new ConcatenatingMediaSource(
+                        false, // isAtomic
+                        (Boolean) map.get("useLazyPreparation"),
+                        decodeShuffleOrder(mapGet(map, "shuffleOrder")),
+                        mediaSources);
+            case "clipping":
+                Long start = getLong(map.get("start"));
+                Long end = getLong(map.get("end"));
+                return new ClippingMediaSource(getAudioSource(map.get("child")),
+                        start != null ? start : 0,
+                        end != null ? end : C.TIME_END_OF_SOURCE);
+            case "looping":
+                Integer count = (Integer) map.get("count");
+                MediaSource looperChild = getAudioSource(map.get("child"));
+                return new LoopingMediaSource(looperChild, count);
+            default:
+                throw new IllegalArgumentException("Unknown AudioSource type: " + map.get("type"));
         }
     }
 

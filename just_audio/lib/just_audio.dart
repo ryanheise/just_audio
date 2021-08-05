@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:crypto/crypto.dart';
@@ -1977,17 +1978,19 @@ abstract class AudioSource {
   ///
   /// If headers are set, just_audio will create a cleartext local HTTP proxy on
   /// your device to forward HTTP requests with headers included.
+  ///
+  /// The DRM parameter is used to specify the optional DRM configuration properties.
   static UriAudioSource uri(Uri uri,
-      {Map<String, String>? headers, dynamic tag}) {
+      {Map<String, String>? headers, dynamic tag, Map<String, String>? drm}) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
     if (hasExtension(uri, 'mpd')) {
-      return DashAudioSource(uri, headers: headers, tag: tag);
+      return DashAudioSource(uri, headers: headers, tag: tag, drm: drm);
     } else if (hasExtension(uri, 'm3u8')) {
-      return HlsAudioSource(uri, headers: headers, tag: tag);
+      return HlsAudioSource(uri, headers: headers, tag: tag, drm: drm);
     } else {
-      return ProgressiveAudioSource(uri, headers: headers, tag: tag);
+      return ProgressiveAudioSource(uri, headers: headers, tag: tag, drm: drm);
     }
   }
 
@@ -2040,13 +2043,20 @@ abstract class IndexedAudioSource extends AudioSource {
 }
 
 /// An abstract class representing audio sources that are loaded from a URI.
+/// The DRM parameter is used to specify the optional DRM configuration properties.
 abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
   final Map<String, String>? headers;
+  final Map<String, String>? drm;
   Uri? _overrideUri;
 
-  UriAudioSource(this.uri, {this.headers, dynamic tag, Duration? duration})
-      : super(tag: tag, duration: duration);
+  UriAudioSource(
+    this.uri, {
+    this.headers,
+    dynamic tag,
+    Duration? duration,
+    this.drm,
+  }) : super(tag: tag, duration: duration);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
   /// of the copied asset on the filesystem, otherwise it gives us the original
@@ -2131,12 +2141,20 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
   ProgressiveAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+      {Map<String, String>? headers,
+      dynamic tag,
+      Duration? duration,
+      Map<String, String>? drm})
+      : super(uri, headers: headers, tag: tag, duration: duration, drm: drm);
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        drm: drm,
+      );
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
@@ -2154,13 +2172,22 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class DashAudioSource extends UriAudioSource {
-  DashAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+  DashAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    dynamic tag,
+    Duration? duration,
+    Map<String, String>? drm,
+  }) : super(uri, headers: headers, tag: tag, duration: duration, drm: drm);
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        drm: drm,
+      );
 }
 
 /// An [AudioSource] representing an HLS stream. The following URI schemes are
@@ -2177,13 +2204,21 @@ class DashAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class HlsAudioSource extends UriAudioSource {
-  HlsAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+  HlsAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    dynamic tag,
+    Duration? duration,
+    Map<String, String>? drm,
+  }) : super(uri, headers: headers, tag: tag, duration: duration, drm: drm);
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+      id: _id,
+      uri: _effectiveUri.toString(),
+      headers: headers,
+      tag: tag,
+      drm: drm);
 }
 
 /// An [AudioSource] for a period of silence.
@@ -2826,6 +2861,47 @@ class LockCachingAudioSource extends StreamAudioSource {
       }
     });
     return byteRangeRequest.future;
+  }
+}
+
+/// A helper class to generate the DRM configuration [Map<String, String>?]. DRM is supported in [UriAudioSource].
+/// Current support for DRM implemented is for Android using ClearKey.
+class DRMHelper {
+  DRMHelper._();
+
+  static Map<String, String> clearKey(
+      {String? clearKey, Map<String, String>? keys}) {
+    if (keys != null) clearKey = _generate(keys);
+    return {'clearKey': clearKey!};
+  }
+
+  static String _generate(Map<String, String> keys,
+      {String type = 'temporary'}) {
+    Map keyMap = <String, dynamic>{'type': type};
+    keyMap['keys'] = <Map<String, String>>[];
+    keys.forEach((key, value) => keyMap['keys']
+        .add({'kty': 'oct', 'kid': _base64(key), 'k': _base64(value)}));
+    return jsonEncode(keyMap);
+  }
+
+  static String _base64(String source) {
+    return base64
+        .encode(_encodeBigInt(BigInt.parse(source, radix: 16)))
+        .replaceAll('=', '');
+  }
+
+  static final _byteMask = BigInt.from(0xff);
+
+  static Uint8List _encodeBigInt(BigInt number) {
+    var size = (number.bitLength + 7) >> 3;
+
+    var result = Uint8List(size);
+    var pos = size - 1;
+    for (var i = 0; i < size; i++) {
+      result[pos--] = (number & _byteMask).toInt();
+      number = number >> 8;
+    }
+    return result;
   }
 }
 
