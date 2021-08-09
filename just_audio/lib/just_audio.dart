@@ -1555,7 +1555,7 @@ class PlayerState {
   int get hashCode => toString().hashCode;
 
   @override
-  bool operator ==(dynamic other) =>
+  bool operator ==(Object other) =>
       other is PlayerState &&
       other.playing == playing &&
       other.processingState == processingState;
@@ -1579,7 +1579,7 @@ class IcyInfo {
   int get hashCode => toString().hashCode;
 
   @override
-  bool operator ==(dynamic other) =>
+  bool operator ==(Object other) =>
       other is IcyInfo && other.toString() == toString();
 }
 
@@ -1617,7 +1617,7 @@ class IcyHeaders {
   int get hashCode => toString().hashCode;
 
   @override
-  bool operator ==(dynamic other) =>
+  bool operator ==(Object other) =>
       other is IcyHeaders && other.toString() == toString();
 }
 
@@ -1638,7 +1638,7 @@ class IcyMetadata {
   int get hashCode => info.hashCode ^ headers.hashCode;
 
   @override
-  bool operator ==(dynamic other) =>
+  bool operator ==(Object other) =>
       other is IcyMetadata && other.info == info && other.headers == headers;
 }
 
@@ -2019,7 +2019,7 @@ abstract class AudioSource {
   int get hashCode => _id.hashCode;
 
   @override
-  bool operator ==(dynamic other) => other is AudioSource && other._id == _id;
+  bool operator ==(Object other) => other is AudioSource && other._id == _id;
 }
 
 /// An [AudioSource] that can appear in a sequence.
