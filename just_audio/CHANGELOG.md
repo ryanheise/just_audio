@@ -1,6 +1,6 @@
-## next
+## 0.9.6
 
-* Fix iOS12.4 `LockCachingAudioSource` fetch data exception
+* Fix iOS 12.4 `LockCachingAudioSource` fetch exception (@akindone).
 
 ## 0.9.5
 

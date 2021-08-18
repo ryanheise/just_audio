@@ -2707,8 +2707,8 @@ class LockCachingAudioSource extends StreamAudioSource {
       for (var cacheResponse in inProgressResponses) {
         if (_progress >= cacheResponse.end) {
           // We've received enough data to fulfill the byte range request.
-          var subEnd = (data.length - (_progress - cacheResponse.end));
-          subEnd = min(max(0, subEnd), data.length);
+          final subEnd = min(data.length,
+              max(0, data.length - (_progress - cacheResponse.end)));
           cacheResponse.controller.add(data.sublist(0, subEnd));
           cacheResponse.controller.close();
         } else {
