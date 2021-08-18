@@ -44,4 +44,6 @@ dependencies {
     implementation 'com.google.android.exoplayer:exoplayer-dash:2.13.1'
     implementation 'com.google.android.exoplayer:exoplayer-hls:2.13.1'
     implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.13.1'
+    implementation 'com.google.android.exoplayer:extension-cronet:2.13.1'
+    implementation 'com.google.android.gms:play-services-cronet:17.0.0'
 }
