@@ -1552,10 +1552,11 @@ class PlayerState {
   String toString() => 'playing=$playing,processingState=$processingState';
 
   @override
-  int get hashCode => toString().hashCode;
+  int get hashCode => hashValues(playing, processingState);
 
   @override
-  bool operator ==(dynamic other) =>
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
       other is PlayerState &&
       other.playing == playing &&
       other.processingState == processingState;
@@ -1576,11 +1577,14 @@ class IcyInfo {
   String toString() => 'title=$title,url=$url';
 
   @override
-  int get hashCode => toString().hashCode;
+  int get hashCode => hashValues(title, url);
 
   @override
-  bool operator ==(dynamic other) =>
-      other is IcyInfo && other.toString() == toString();
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is IcyInfo &&
+      other.title == title &&
+      other.url == url;
 }
 
 class IcyHeaders {
@@ -1617,8 +1621,15 @@ class IcyHeaders {
   int get hashCode => toString().hashCode;
 
   @override
-  bool operator ==(dynamic other) =>
-      other is IcyHeaders && other.toString() == toString();
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is IcyHeaders &&
+      other.bitrate == bitrate &&
+      other.genre == genre &&
+      other.name == name &&
+      other.metadataInterval == metadataInterval &&
+      other.url == url &&
+      other.isPublic == isPublic;
 }
 
 class IcyMetadata {
@@ -1635,11 +1646,14 @@ class IcyMetadata {
   IcyMetadata({required this.info, required this.headers});
 
   @override
-  int get hashCode => info.hashCode ^ headers.hashCode;
+  int get hashCode => hashValues(info, headers);
 
   @override
-  bool operator ==(dynamic other) =>
-      other is IcyMetadata && other.info == info && other.headers == headers;
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is IcyMetadata &&
+      other.info == info &&
+      other.headers == headers;
 }
 
 /// Encapsulates the [sequence] and [currentIndex] state and ensures
@@ -2019,7 +2033,10 @@ abstract class AudioSource {
   int get hashCode => _id.hashCode;
 
   @override
-  bool operator ==(dynamic other) => other is AudioSource && other._id == _id;
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is AudioSource &&
+      other._id == _id;
 }
 
 /// An [AudioSource] that can appear in a sequence.
