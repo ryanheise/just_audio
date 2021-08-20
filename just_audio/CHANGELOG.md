@@ -1,8 +1,8 @@
-## Next version
+## 0.9.7
 
+* Update Gradle version.
 * Change == parameter from dynamic to Object (@cedvdb).
 * Check runtimeType in all == operators.
-* Update Gradle version.
 * Fix Android compiler warnings.
 
 ## 0.9.6
