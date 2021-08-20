@@ -1,3 +1,10 @@
+## Next version
+
+* Change == parameter from dynamic to Object (@cedvdb).
+* Check runtimeType in all == operators.
+* Update Gradle version.
+* Fix Android compiler warnings.
+
 ## 0.9.6
 
 * Fix iOS 12.4 `LockCachingAudioSource` fetch exception (@akindone).
