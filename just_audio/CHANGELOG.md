@@ -1,5 +1,6 @@
 ## Next version
 
+* Fix bug restoring AndroidEqualizer state after stop.
 * Make exceptions implement Exception.
 * Upgrade to ExoPlayer 2.13.3.
 

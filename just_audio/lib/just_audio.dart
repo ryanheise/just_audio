@@ -3458,6 +3458,12 @@ class AndroidEqualizerBand {
     }
   }
 
+  /// Restores the gain after reactivating.
+  Future<void> _restore() async {
+    await (await _player._platform).androidEqualizerBandSetGain(
+        AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+  }
+
   static AndroidEqualizerBand _fromMessage(
           AudioPlayer player, AndroidEqualizerBandMessage message) =>
       AndroidEqualizerBand._(
@@ -3487,6 +3493,13 @@ class AndroidEqualizerParameters {
     required this.bands,
   });
 
+  /// Restore platform state after reactivating.
+  Future<void> _restore() async {
+    for (var band in bands) {
+      await band._restore();
+    }
+  }
+
   static AndroidEqualizerParameters _fromMessage(
           AudioPlayer player, AndroidEqualizerParametersMessage message) =>
       AndroidEqualizerParameters(
@@ -3512,7 +3525,10 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
   @override
   Future<void> _activate() async {
     await super._activate();
-    if (_parametersCompleter.isCompleted) return;
+    if (_parametersCompleter.isCompleted) {
+      await (await parameters)._restore();
+      return;
+    }
     final response = await (await _player!._platform)
         .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
     _parameters =
