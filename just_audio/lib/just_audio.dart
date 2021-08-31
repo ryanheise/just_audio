@@ -1398,7 +1398,7 @@ class AudioPlayer {
 /// Captures the details of any error accessing, loading or playing an audio
 /// source, including an invalid or inaccessible URL, or an audio encoding that
 /// could not be understood.
-class PlayerException {
+class PlayerException implements Exception {
   /// On iOS and macOS, maps to `NSError.code`. On Android, maps to
   /// `ExoPlaybackException.type`. On Web, maps to `MediaError.code`.
   final int code;
@@ -1416,7 +1416,7 @@ class PlayerException {
 
 /// An error that occurs when one operation on the player has been interrupted
 /// (e.g. by another simultaneous operation).
-class PlayerInterruptedException {
+class PlayerInterruptedException implements Exception {
   final String? message;
 
   PlayerInterruptedException(this.message);

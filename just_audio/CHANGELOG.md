@@ -1,3 +1,8 @@
+## Next version
+
+* Make exceptions implement Exception.
+* Upgrade to ExoPlayer 2.13.3.
+
 ## 0.9.7
 
 * Update Gradle version.
