@@ -1,3 +1,9 @@
+## 0.9.8
+
+* Fix bug restoring AndroidEqualizer state after stop.
+* Make exceptions implement Exception.
+* Upgrade to ExoPlayer 2.13.3.
+
 ## 0.9.7
 
 * Update Gradle version.
