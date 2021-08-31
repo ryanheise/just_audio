@@ -1,4 +1,4 @@
-## Next version
+## 0.9.8
 
 * Fix bug restoring AndroidEqualizer state after stop.
 * Make exceptions implement Exception.
