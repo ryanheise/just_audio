@@ -45,8 +45,8 @@ android {
 }
 
 dependencies {
-    implementation 'com.google.android.exoplayer:exoplayer-core:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-dash:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-hls:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.13.1'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.13.3'
+    implementation 'com.google.android.exoplayer:exoplayer-dash:2.13.3'
+    implementation 'com.google.android.exoplayer:exoplayer-hls:2.13.3'
+    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.13.3'
 }
