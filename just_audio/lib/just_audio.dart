@@ -108,6 +108,7 @@ class AudioPlayer {
   bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
   double _preferredPeakBitRate = 0;
   bool _playInterrupted = false;
+  bool _platformLoading = false;
   AndroidAudioAttributes? _androidAudioAttributes;
   final bool _androidApplyAudioAttributes;
   final bool _handleAudioSessionActivation;
@@ -1126,6 +1127,7 @@ class AudioPlayer {
       {Completer<void>? playCompleter, bool force = false}) {
     if (_disposed) return null;
     if (!force && (active == _active)) return _durationFuture;
+    _platformLoading = active;
 
     // Warning! Tricky async code lies ahead.
     // (This should definitely be made less tricky)
@@ -1205,9 +1207,16 @@ class AudioPlayer {
             sequence![index].duration = duration;
           }
         }
+        if (_platformLoading &&
+            message.processingState != ProcessingStateMessage.idle) {
+          _platformLoading = false;
+        }
         final playbackEvent = PlaybackEvent(
-          processingState:
-              ProcessingState.values[message.processingState.index],
+          // The platform may emit an idle state while it's starting up which we
+          // override here.
+          processingState: _platformLoading
+              ? ProcessingState.loading
+              : ProcessingState.values[message.processingState.index],
           updateTime: message.updateTime,
           updatePosition: message.updatePosition,
           bufferedPosition: message.bufferedPosition,
@@ -1269,14 +1278,14 @@ class AudioPlayer {
 
       _platformValue = platform;
 
-      if (audioSource != null) {
-        _playbackEventSubject.add(_playbackEvent = _playbackEvent.copyWith(
-          updatePosition: position,
-          processingState: ProcessingState.loading,
-        ));
-      }
-
       if (active) {
+        if (audioSource != null) {
+          _playbackEventSubject.add(_playbackEvent = _playbackEvent.copyWith(
+            updatePosition: position,
+            processingState: ProcessingState.loading,
+          ));
+        }
+
         final automaticallyWaitsToMinimizeStalling =
             this.automaticallyWaitsToMinimizeStalling;
         final playing = this.playing;

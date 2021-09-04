@@ -1,3 +1,11 @@
+## 0.9.10
+
+* Fix Android bug playing after stopping.
+
+## 0.9.9
+
+* Fix web bug adding/removing items while paused.
+
 ## 0.9.8
 
 * Fix bug restoring AndroidEqualizer state after stop.
