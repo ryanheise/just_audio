@@ -1,3 +1,28 @@
+## 0.9.10
+
+* Fix Android bug playing after stopping.
+
+## 0.9.9
+
+* Fix web bug adding/removing items while paused.
+
+## 0.9.8
+
+* Fix bug restoring AndroidEqualizer state after stop.
+* Make exceptions implement Exception.
+* Upgrade to ExoPlayer 2.13.3.
+
+## 0.9.7
+
+* Update Gradle version.
+* Change == parameter from dynamic to Object (@cedvdb).
+* Check runtimeType in all == operators.
+* Fix Android compiler warnings.
+
+## 0.9.6
+
+* Fix iOS 12.4 `LockCachingAudioSource` fetch exception (@akindone).
+
 ## 0.9.5
 
 * Fix iOS/macOS bug updating shuffle order.

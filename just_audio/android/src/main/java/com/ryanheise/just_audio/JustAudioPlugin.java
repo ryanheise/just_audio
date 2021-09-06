@@ -2,6 +2,7 @@ package com.ryanheise.just_audio;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
+import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.BinaryMessenger;
@@ -25,7 +26,9 @@ public class JustAudioPlugin implements FlutterPlugin {
 
         channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
         channel.setMethodCallHandler(methodCallHandler);
-        binding.getFlutterEngine().addEngineLifecycleListener(new EngineLifecycleListener() {
+        @SuppressWarnings("deprecation")
+        FlutterEngine engine = binding.getFlutterEngine();
+        engine.addEngineLifecycleListener(new EngineLifecycleListener() {
             @Override
             public void onPreEngineRestart() {
                 methodCallHandler.dispose();

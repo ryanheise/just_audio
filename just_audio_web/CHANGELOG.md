@@ -1,3 +1,7 @@
+## 0.4.2
+
+* Fix bug loading audio after concat delete/insert.
+
 ## 0.4.1
 
 * Remember position after stopping.

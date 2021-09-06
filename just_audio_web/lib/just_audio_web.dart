@@ -339,12 +339,14 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
       ConcatenatingInsertAllRequest request) async {
+    final wasNotEmpty = _audioSourcePlayer?.sequence.isNotEmpty ?? false;
     _concatenating(request.id)!.setShuffleOrder(request.shuffleOrder);
     _concatenating(request.id)!
         .insertAll(request.index, getAudioSources(request.children));
-    if (_index != null && request.index <= _index!) {
+    if (_index != null && wasNotEmpty && request.index <= _index!) {
       _index = _index! + request.children.length;
     }
+    await _currentAudioSourcePlayer!.load();
     broadcastPlaybackEvent();
     return ConcatenatingInsertAllResponse();
   }
@@ -372,9 +374,11 @@ class Html5AudioPlayer extends JustAudioPlayer {
           _index = request.startIndex;
         }
         // Resume playback at the new item (if it exists)
-        if (_playing && _currentAudioSourcePlayer != null) {
+        if (_currentAudioSourcePlayer != null) {
           await _currentAudioSourcePlayer!.load();
-          _currentAudioSourcePlayer!.play();
+          if (_playing) {
+            _currentAudioSourcePlayer!.play();
+          }
         }
       } else if (request.endIndex <= _index!) {
         // Reflect that the current item has shifted its position
