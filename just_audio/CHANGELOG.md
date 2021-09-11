@@ -1,3 +1,7 @@
+## 0.9.11
+
+* Upgrade Android to ExoPlayer 2.15.0.
+
 ## 0.9.10
 
 * Fix Android bug playing after stopping.
