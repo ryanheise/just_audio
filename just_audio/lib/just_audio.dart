@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
-import 'package:just_audio_libwinmedia/just_audio_libwinmedia.dart';
 import 'package:meta/meta.dart' show experimental;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -3561,7 +3560,6 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
 
 bool _isAndroid() => !kIsWeb && Platform.isAndroid;
 bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
-bool _isLibWinMedia() => !kIsWeb && (Platform.isWindows || Platform.isLinux);
 bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 
 /// Backwards compatible extensions on rxdart's ValueStream
