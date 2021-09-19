@@ -30,33 +30,35 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 
 This project is supported by the amazing open source community of GitHub contributors and sponsors. Thank you!
 
+- [libwinmedia](https://github.com/harmonoid/libwinmedia) for backing the Windows and Linux implementation.
+
 ## Features
 
-| Feature                        | Android   | iOS     | macOS   | Web     |
-| -------                        | :-------: | :-----: | :-----: | :-----: |
-| read from URL                  | ✅        | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      | ✅      |
-| read from asset                | ✅        | ✅      | ✅      | ✅      |
-| read from byte stream          | ✅        | ✅      | ✅      | ✅      |
-| request headers                | ✅        | ✅      | ✅      |         |
-| DASH                           | ✅        |         |         |         |
-| HLS                            | ✅        | ✅      | ✅      |         |
-| ICY metadata                   | ✅        | ✅      | ✅      |         |
-| buffer status/position         | ✅        | ✅      | ✅      | ✅      |
-| play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
-| set volume/speed               | ✅        | ✅      | ✅      | ✅      |
-| clip audio                     | ✅        | ✅      | ✅      | ✅      |
-| playlists                      | ✅        | ✅      | ✅      | ✅      |
-| looping/shuffling              | ✅        | ✅      | ✅      | ✅      |
-| compose audio                  | ✅        | ✅      | ✅      | ✅      |
-| gapless playback               | ✅        | ✅      | ✅      |         |
-| report player errors           | ✅        | ✅      | ✅      | ✅      |
-| handle phonecall interruptions | ✅        | ✅      |         |         |
-| buffering/loading options      | ✅        | ✅      | ✅      |         |
-| set pitch                      | ✅        |         |         |         |
-| skip silence                   | ✅        |         |         |         |
-| equalizer                      | ✅        |         |         |         |
-| volume boost                   | ✅        |         |         |         |
+| Feature                        | Android   | iOS     | macOS   | Web     | Windows |
+| -------                        | :-------: | :-----: | :-----: | :-----: | :-----: |
+| read from URL                  | ✅        | ✅      | ✅      | ✅      | ✅    |
+| read from file                 | ✅        | ✅      | ✅      | ✅      | ✅    |
+| read from asset                | ✅        | ✅      | ✅      | ✅      | ✅    |
+| read from byte stream          | ✅        | ✅      | ✅      | ✅      |       |
+| request headers                | ✅        | ✅      | ✅      |         |        |
+| DASH                           | ✅        |          |         |         |        |
+| HLS                            | ✅        | ✅      | ✅      |         |        |
+| ICY metadata                   | ✅        | ✅      | ✅      |         |        |
+| buffer status/position         | ✅        | ✅      | ✅      | ✅      | ✅    |
+| play/pause/seek                | ✅        | ✅      | ✅      | ✅      | ✅    |
+| set volume/speed               | ✅        | ✅      | ✅      | ✅      | ✅    |
+| clip audio                     | ✅        | ✅      | ✅      | ✅      |       |
+| playlists                      | ✅        | ✅      | ✅      | ✅      | ✅    |
+| looping/shuffling              | ✅        | ✅      | ✅      | ✅      |       |
+| compose audio                  | ✅        | ✅      | ✅      | ✅      |       |
+| gapless playback               | ✅        | ✅      | ✅      |         | ✅    |
+| report player errors           | ✅        | ✅      | ✅      | ✅      |       |
+| handle phonecall interruptions | ✅        | ✅      |         |         |        |
+| buffering/loading options      | ✅        | ✅      | ✅      |         |        |
+| set pitch                      | ✅        |         |         |         |         |
+| skip silence                   | ✅        |         |         |         |         |
+| equalizer                      | ✅        |         |         |         |         |
+| volume boost                   | ✅        |         |         |         |         |
 
 ## Experimental features
 
