@@ -45,3 +45,7 @@ flutter:
         pluginClass: JustAudioPlugin
       web:
         default_package: just_audio_web
+      windows:
+        default_package: just_audio_libwinmedia
+      linux:
+        default_package: just_audio_libwinmedia
