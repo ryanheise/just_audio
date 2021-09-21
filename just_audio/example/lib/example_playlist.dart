@@ -25,7 +25,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _playlist = ConcatenatingAudioSource(children: [
     // Remove this audio source from the Windows and Linux version because it's not supported yet
     if (kIsWeb ||
-        [TargetPlatform.windows, TargetPlatform.linux]
+        ![TargetPlatform.windows, TargetPlatform.linux]
             .contains(defaultTargetPlatform))
       ClippingAudioSource(
         start: Duration(seconds: 60),
