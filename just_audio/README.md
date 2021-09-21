@@ -44,7 +44,7 @@ This project is supported by the amazing open source community of GitHub contrib
 | DASH                           | ✅        |          |         |         |        |
 | HLS                            | ✅        | ✅      | ✅      |         |        |
 | ICY metadata                   | ✅        | ✅      | ✅      |         |        |
-| buffer status/position         | ✅        | ✅      | ✅      | ✅      | ✅    |
+| buffer status/position         | ✅        | ✅      | ✅      | ✅      |       |
 | play/pause/seek                | ✅        | ✅      | ✅      | ✅      | ✅    |
 | set volume/speed               | ✅        | ✅      | ✅      | ✅      | ✅    |
 | clip audio                     | ✅        | ✅      | ✅      | ✅      |       |
