@@ -41,15 +41,15 @@ This project is supported by the amazing open source community of GitHub contrib
 | read from asset                | ✅        | ✅      | ✅      | ✅      | ✅    |
 | read from byte stream          | ✅        | ✅      | ✅      | ✅      |       |
 | request headers                | ✅        | ✅      | ✅      |         |        |
-| DASH                           | ✅        |          |         |         |        |
-| HLS                            | ✅        | ✅      | ✅      |         |        |
+| DASH                           | ✅        |          |         |         |   ✅   |
+| HLS                            | ✅        | ✅      | ✅      |         |  ✅   |
 | ICY metadata                   | ✅        | ✅      | ✅      |         |        |
 | buffer status/position         | ✅        | ✅      | ✅      | ✅      |       |
 | play/pause/seek                | ✅        | ✅      | ✅      | ✅      | ✅    |
 | set volume/speed               | ✅        | ✅      | ✅      | ✅      | ✅    |
 | clip audio                     | ✅        | ✅      | ✅      | ✅      |       |
 | playlists                      | ✅        | ✅      | ✅      | ✅      | ✅    |
-| looping/shuffling              | ✅        | ✅      | ✅      | ✅      |       |
+| looping/shuffling              | ✅        | ✅      | ✅      | ✅      | ✅  |
 | compose audio                  | ✅        | ✅      | ✅      | ✅      |       |
 | gapless playback               | ✅        | ✅      | ✅      |         | ✅    |
 | report player errors           | ✅        | ✅      | ✅      | ✅      |       |
