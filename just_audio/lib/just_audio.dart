@@ -1254,7 +1254,6 @@ class AudioPlayer {
         }
       }
       if (_disposed) return _platform;
-
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
       final platform = active
