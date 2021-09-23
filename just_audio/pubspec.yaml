@@ -14,6 +14,8 @@ dependencies:
   just_audio_web: ^0.4.2
   # just_audio_web:
   #   path: ../just_audio_web
+  just_audio_libwinmedia: ^0.0.2
+  #  path: ../../just_audio_libwinmedia
   audio_session: ^0.1.6
   rxdart: '>=0.26.0 <0.28.0'
   path: ^1.8.0
@@ -44,3 +46,7 @@ flutter:
         pluginClass: JustAudioPlugin
       web:
         default_package: just_audio_web
+      windows:
+        default_package: just_audio_libwinmedia
+      linux:
+        default_package: just_audio_libwinmedia
