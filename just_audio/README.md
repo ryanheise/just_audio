@@ -36,25 +36,25 @@ This project is supported by the amazing open source community of GitHub contrib
 
 | Feature                        | Android   | iOS     | macOS   | Web     | Windows |
 | -------                        | :-------: | :-----: | :-----: | :-----: | :-----: |
-| read from URL                  | ✅        | ✅      | ✅      | ✅      | ✅    |
-| read from file                 | ✅        | ✅      | ✅      | ✅      | ✅    |
-| read from asset                | ✅        | ✅      | ✅      | ✅      | ✅    |
-| read from byte stream          | ✅        | ✅      | ✅      | ✅      |       |
-| request headers                | ✅        | ✅      | ✅      |         |        |
-| DASH                           | ✅        |          |         |         |   ✅   |
-| HLS                            | ✅        | ✅      | ✅      |         |  ✅   |
-| ICY metadata                   | ✅        | ✅      | ✅      |         |        |
-| buffer status/position         | ✅        | ✅      | ✅      | ✅      |       |
-| play/pause/seek                | ✅        | ✅      | ✅      | ✅      | ✅    |
-| set volume/speed               | ✅        | ✅      | ✅      | ✅      | ✅    |
-| clip audio                     | ✅        | ✅      | ✅      | ✅      |       |
-| playlists                      | ✅        | ✅      | ✅      | ✅      | ✅    |
-| looping/shuffling              | ✅        | ✅      | ✅      | ✅      | ✅  |
-| compose audio                  | ✅        | ✅      | ✅      | ✅      |       |
-| gapless playback               | ✅        | ✅      | ✅      |         | ✅    |
-| report player errors           | ✅        | ✅      | ✅      | ✅      |       |
-| handle phonecall interruptions | ✅        | ✅      |         |         |        |
-| buffering/loading options      | ✅        | ✅      | ✅      |         |        |
+| read from URL                  | ✅        | ✅      | ✅      | ✅      | ✅      |
+| read from file                 | ✅        | ✅      | ✅      | ✅      | ✅      |
+| read from asset                | ✅        | ✅      | ✅      | ✅      | ✅      |
+| read from byte stream          | ✅        | ✅      | ✅      | ✅      |         |
+| request headers                | ✅        | ✅      | ✅      |         |         |
+| DASH                           | ✅        |         |         |         | ✅      |
+| HLS                            | ✅        | ✅      | ✅      |         | ✅      |
+| ICY metadata                   | ✅        | ✅      | ✅      |         |         |
+| buffer status/position         | ✅        | ✅      | ✅      | ✅      |         |
+| play/pause/seek                | ✅        | ✅      | ✅      | ✅      | ✅      |
+| set volume/speed               | ✅        | ✅      | ✅      | ✅      | ✅      |
+| clip audio                     | ✅        | ✅      | ✅      | ✅      |         |
+| playlists                      | ✅        | ✅      | ✅      | ✅      | ✅      |
+| looping/shuffling              | ✅        | ✅      | ✅      | ✅      | ✅      |
+| compose audio                  | ✅        | ✅      | ✅      | ✅      |         |
+| gapless playback               | ✅        | ✅      | ✅      |         | ✅      |
+| report player errors           | ✅        | ✅      | ✅      | ✅      |         |
+| handle phonecall interruptions | ✅        | ✅      |         |         |         |
+| buffering/loading options      | ✅        | ✅      | ✅      |         |         |
 | set pitch                      | ✅        |         |         |         |         |
 | skip silence                   | ✅        |         |         |         |         |
 | equalizer                      | ✅        |         |         |         |         |
@@ -377,6 +377,26 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 ```
 
 The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length` and [byte range requests](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/CreatingVideoforSafarioniPhone/CreatingVideoforSafarioniPhone.html#//apple_ref/doc/uid/TP40006514-SW6)) to know how to decode the file and where applicable to report its duration. In the case of files, macOS relies on the file extension.
+
+### Windows
+
+Add the [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) dependency to your `pubspec.yaml` alongside `just_audio`:
+
+```yaml
+dependencies:
+  just_audio: any # substitute version number
+  just_audio_libwinmedia: any # substitute version number
+```
+
+### Linux (untested)
+
+Add the [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) dependency to your `pubspec.yaml` alongside `just_audio`:
+
+```yaml
+dependencies:
+  just_audio: any # substitute version number
+  just_audio_libwinmedia: any # substitute version number
+```
 
 ## Related plugins
 
