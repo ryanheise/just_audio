@@ -1,4 +1,4 @@
-## Next version
+## 0.9.12
 
 * Windows/Linux support (@bdlukaa, credit to @alexmercerind for libwinmedia).
 
