@@ -1,3 +1,7 @@
+## 0.9.12
+
+* Windows/Linux support (@bdlukaa, credit to @alexmercerind for libwinmedia).
+
 ## 0.9.11
 
 * Upgrade Android to ExoPlayer 2.15.0.
