@@ -406,23 +406,20 @@
 }
 
 - (void)metadataOutput:(AVPlayerItemMetadataOutput *)output didOutputTimedMetadataGroups:(NSArray<AVTimedMetadataGroup *> *)groups fromPlayerItemTrack:(AVPlayerItemTrack *)track {
+    // ICY headers aren't available here. Maybe do this in the proxy.
     BOOL hasIcyData = NO;
     NSString *title = (NSString *)[NSNull null];
+    NSString *url = (NSString *)[NSNull null];
     for (int i = 0; i < groups.count; i++) {
-        //NSLog(@"group %d", i);
         AVTimedMetadataGroup *group = groups[i];
         for (int j = 0; j < group.items.count; j++) {
-            //NSLog(@"item %d", j);
-            AVMetadataItem *item = group.items[i];
-            //NSLog(@"key: %@", item.key);
-            //NSLog(@"keySpace: %@", item.keySpace);
-            //NSLog(@"commonKey: %@", item.commonKey);
-            //NSLog(@"value: %@", item.value);
-            //NSLog(@"identifier: %@", item.identifier);
-            // TODO: Detect more metadata
+            AVMetadataItem *item = group.items[j];
             if ([@"icy/StreamTitle" isEqualToString:item.identifier]) {
                 hasIcyData = YES;
                 title = (NSString *)item.value;
+            } else if ([@"icy/StreamUrl" isEqualToString:item.identifier]) {
+                hasIcyData = YES;
+                url = (NSString *)item.value;
             }
         }
     }
@@ -430,6 +427,7 @@
         _icyMetadata = @{
             @"info": @{
                 @"title": title,
+                @"url": url,
             },
         };
         [self broadcastPlaybackEvent];
