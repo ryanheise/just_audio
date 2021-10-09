@@ -34,31 +34,31 @@ This project is supported by the amazing open source community of GitHub contrib
 
 ## Features
 
-| Feature                        | Android   | iOS     | macOS   | Web     | Windows |
-| -------                        | :-------: | :-----: | :-----: | :-----: | :-----: |
-| read from URL                  | ✅        | ✅      | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      | ✅      | ✅      |
-| read from asset                | ✅        | ✅      | ✅      | ✅      | ✅      |
-| read from byte stream          | ✅        | ✅      | ✅      | ✅      |         |
-| request headers                | ✅        | ✅      | ✅      |         |         |
-| DASH                           | ✅        |         |         |         | ✅      |
-| HLS                            | ✅        | ✅      | ✅      |         | ✅      |
-| ICY metadata                   | ✅        | ✅      | ✅      |         |         |
-| buffer status/position         | ✅        | ✅      | ✅      | ✅      | ✅      |
-| play/pause/seek                | ✅        | ✅      | ✅      | ✅      | ✅      |
-| set volume/speed               | ✅        | ✅      | ✅      | ✅      | ✅      |
-| clip audio                     | ✅        | ✅      | ✅      | ✅      |         |
-| playlists                      | ✅        | ✅      | ✅      | ✅      | ✅      |
-| looping/shuffling              | ✅        | ✅      | ✅      | ✅      | ✅      |
-| compose audio                  | ✅        | ✅      | ✅      | ✅      |         |
-| gapless playback               | ✅        | ✅      | ✅      |         | ✅      |
-| report player errors           | ✅        | ✅      | ✅      | ✅      |         |
-| handle phonecall interruptions | ✅        | ✅      |         |         |         |
-| buffering/loading options      | ✅        | ✅      | ✅      |         |         |
-| set pitch                      | ✅        |         |         |         |         |
-| skip silence                   | ✅        |         |         |         |         |
-| equalizer                      | ✅        |         |         |         |         |
-| volume boost                   | ✅        |         |         |         |         |
+| Feature                        | Android | iOS | macOS | Web | Windows | Linux |
+| ------------------------------ | :-----: | :-: | :---: | :-: | :-----: | :---: |
+| read from URL                  |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| read from file                 |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| read from asset                |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| read from byte stream          |   ✅    | ✅  |  ✅   | ✅  |         |       |
+| request headers                |   ✅    | ✅  |  ✅   |     |         |       |
+| DASH                           |   ✅    |     |       |     |   ✅    |       |
+| HLS                            |   ✅    | ✅  |  ✅   |     |   ✅    |       |
+| ICY metadata                   |   ✅    | ✅  |  ✅   |     |         |       |
+| buffer status/position         |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| play/pause/seek                |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| set volume/speed               |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| clip audio                     |   ✅    | ✅  |  ✅   | ✅  |         |
+| playlists                      |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| looping/shuffling              |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| compose audio                  |   ✅    | ✅  |  ✅   | ✅  |         |
+| gapless playback               |   ✅    | ✅  |  ✅   |     |   ✅    |       |
+| report player errors           |   ✅    | ✅  |  ✅   | ✅  |   ✅    | ✅    |
+| handle phonecall interruptions |   ✅    | ✅  |       |     |         |       |
+| buffering/loading options      |   ✅    | ✅  |  ✅   |     |         |       |
+| set pitch                      |   ✅    |     |       |     |         |       |
+| skip silence                   |   ✅    |     |       |     |         |       |
+| equalizer                      |   ✅    |     |       |     |         |       |
+| volume boost                   |   ✅    |     |       |     |         |       |
 
 ## Experimental features
 
@@ -219,10 +219,12 @@ try {
   // iOS/macOS: maps to NSError.code
   // Android: maps to ExoPlayerException.type
   // Web: maps to MediaError.code
+  // Linux/Windows: maps to PlayerErrorCode.index
   print("Error code: ${e.code}");
   // iOS/macOS: maps to NSError.localizedDescription
   // Android: maps to ExoPlaybackException.getMessage()
-  // Web: a generic message
+  // Web/Linux: a generic message
+  // Windows: MediaPlayerError.message
   print("Error message: ${e.message}");
 } on PlayerInterruptedException catch (e) {
   // This call was interrupted since another audio source was loaded or the
