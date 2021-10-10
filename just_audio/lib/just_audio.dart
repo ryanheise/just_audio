@@ -2693,7 +2693,6 @@ class LockCachingAudioSource extends StreamAudioSource {
     _downloading = true;
     final cacheFile = await this.cacheFile;
     final partialCacheFile = await _partialCacheFile;
-    final mimeType = await _readCachedMimeType();
 
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
@@ -2714,6 +2713,9 @@ class LockCachingAudioSource extends StreamAudioSource {
     // ignore: close_sinks
     final sink = (await _partialCacheFile).openWrite();
     var sourceLength = response.contentLength;
+    final mimeType = response.headers.contentType.toString();
+    final mimeFile = await _mimeFile;
+    await mimeFile.writeAsString(mimeType);
     final inProgressResponses = <_InProgressCacheResponse>[];
     late StreamSubscription subscription;
     var percentProgress = 0;
