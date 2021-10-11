@@ -7,7 +7,7 @@ dependencies:
   just_audio_platform_interface: ^4.0.0
   # just_audio_platform_interface:
   #   path: ../just_audio_platform_interface
-  audio_service: ^0.18.0-beta.0
+  audio_service: ^0.18.0
   audio_session: ^0.1.5
   flutter:
     sdk: flutter
