@@ -390,9 +390,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
         })
         .distinct()
         .listen((track) {
-          final currentMediaItem = this.currentMediaItem;
           if (currentMediaItem != null) {
-            if (track.duration != currentMediaItem.duration &&
+            if (track.duration != currentMediaItem!.duration &&
                 (index! < queue.nvalue!.length && track.duration != null)) {
               currentQueue![index!] =
                   currentQueue![index!].copyWith(duration: track.duration);
@@ -402,7 +401,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
               'type': 'currentIndex',
               'value': track.index,
             });
-            mediaItem.add(currentMediaItem);
+            mediaItem.add(currentMediaItem!);
           }
         });
   }
