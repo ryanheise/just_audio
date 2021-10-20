@@ -998,6 +998,16 @@ void runTests() {
     await player.dispose();
   });
 
+  test('play-pause', () async {
+    final player = AudioPlayer();
+    await player.setUrl('https://bar.bar/foo.mp3');
+    player.play();
+    await player.pause();
+    await Future<void>.delayed(Duration(milliseconds: 200));
+    expect(mock.mostRecentPlayer?._playing, false);
+    await player.dispose();
+  });
+
   test('positionStream emissions: seek while paused', () async {
     final player = AudioPlayer();
     await player.setUrl('https://bar.bar/foo.mp3');

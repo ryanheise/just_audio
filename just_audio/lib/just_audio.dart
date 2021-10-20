@@ -846,6 +846,7 @@ class AudioPlayer {
     final playCompleter = Completer<dynamic>();
     final audioSession = await AudioSession.instance;
     if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
+      if (!playing) return;
       // TODO: rewrite this to more cleanly handle simultaneous load/play
       // requests which each may result in platform play requests.
       final requireActive = _audioSource != null;
@@ -892,6 +893,7 @@ class AudioPlayer {
   Future<void> _sendPlayRequest(
       AudioPlayerPlatform platform, Completer<void>? playCompleter) async {
     try {
+      if (!playing) return; // defensive
       await platform.play(PlayRequest());
       playCompleter?.complete();
     } catch (e, stackTrace) {
