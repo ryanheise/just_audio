@@ -1,3 +1,7 @@
+## 0.9.14
+
+* Fix bug when pausing/stopping quickly after play.
+
 ## 0.9.13
 
 * Fix MIME type in LockCachingAudioSource.
