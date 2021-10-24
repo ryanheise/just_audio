@@ -1917,7 +1917,7 @@ class _ProxyHttpServer {
   
   /// Adds a handler for a subsequent uri (such as in the case of HLS stream
   /// fragments) to the handler map.
-  Uri subsequentUri(Uri uri) {
+  Uri addSubsequentUri(Uri uri) {
     var newUri = uri.replace(
       scheme: scheme,
       host: host,
