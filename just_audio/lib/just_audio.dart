@@ -1871,6 +1871,10 @@ class AndroidLivePlaybackSpeedControl {
 /// A local proxy HTTP server for making remote GET requests with headers.
 class _ProxyHttpServer {
   late HttpServer _server;
+  late String host;
+  late String scheme;
+  late Map<String, String> headers;
+
 
   /// Maps request keys to [_ProxyHandler]s.
   final Map<String, _ProxyHandler> _handlerMap = {};
@@ -1883,7 +1887,10 @@ class _ProxyHttpServer {
   /// called only after [start] has completed.
   Uri addUriAudioSource(UriAudioSource source) {
     final uri = source.uri;
-    final headers = <String, String>{};
+    host = uri.host;
+    scheme = uri.scheme;
+    headers = <String, String>{};
+
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
@@ -1907,6 +1914,22 @@ class _ProxyHttpServer {
     _handlerMap[path] = _proxyHandlerForSource(source);
     return uri;
   }
+  
+  /// Adds a handler for a subsequent uri (such as in the case of HLS stream
+  /// fragments) to the handler map.
+  Uri subsequentUri(Uri uri) {
+    var newUri = uri.replace(
+      scheme: scheme,
+      host: host,
+    );
+    final path = _requestKey(uri);
+    _handlerMap[path] = _proxyHandlerForUri(newUri, headers);
+    return uri.replace(
+      scheme: 'http',
+      host: InternetAddress.loopbackIPv4.address,
+      port: port,
+    );
+  }
 
   Uri _sourceUri(StreamAudioSource source) => Uri.http(
       '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}');
@@ -1923,6 +1946,9 @@ class _ProxyHttpServer {
     _server.listen((request) async {
       if (request.method == 'GET') {
         final uriPath = _requestKey(request.uri);
+        if (!_handlerMap.containsKey(uriPath)) {
+          addSubsequentUri(request.uri);
+        }
         final handler = _handlerMap[uriPath]!;
         handler(request);
       }
