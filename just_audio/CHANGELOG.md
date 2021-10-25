@@ -1,3 +1,6 @@
+## 0.9.15
+* Add header capability for HLS audio sources.
+
 ## 0.9.14
 
 * Fix bug when pausing/stopping quickly after play.
