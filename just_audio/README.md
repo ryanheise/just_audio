@@ -2,7 +2,7 @@
 
 just_audio is a feature-rich audio player for Android, iOS, macOS and web.
 
-![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/109920560-92bff580-7d0e-11eb-82fe-bbaaba50d87d.png)
+![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/125459608-e89cd6d4-9f09-426c-abcc-ed7513d9acfc.png)
 
 ### Mixing and matching audio plugins
 
@@ -10,7 +10,8 @@ The flutter plugin ecosystem contains a wide variety of useful audio plugins. In
 
 Other common audio capabilities are optionally provided by separate plugins:
 
-* [audio_service](https://pub.dev/packages/audio_service): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [just_audio_background](https://pub.dev/packages/just_audio_background): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
+* [audio_service](https://pub.dev/packages/audio_service): Use this if your app has more advanced background audio requirements than can be supported by `just_audio_background`.
 * [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
 
 ## Vote on upcoming features
@@ -29,28 +30,35 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 
 This project is supported by the amazing open source community of GitHub contributors and sponsors. Thank you!
 
+- [libwinmedia](https://github.com/harmonoid/libwinmedia) for backing the Windows and Linux implementation.
+
 ## Features
 
-| Feature                        | Android   | iOS     | macOS   | Web     |
-| -------                        | :-------: | :-----: | :-----: | :-----: |
-| read from URL                  | ✅        | ✅      | ✅      | ✅      |
-| read from file                 | ✅        | ✅      | ✅      | ✅      |
-| read from asset                | ✅        | ✅      | ✅      | ✅      |
-| read from byte stream          | ✅        | ✅      | ✅      | ✅      |
-| request headers                | ✅        | ✅      | ✅      |         |
-| DASH                           | ✅        |         |         |         |
-| HLS                            | ✅        | ✅      | ✅      |         |
-| ICY metadata                   | ✅        | ✅      | ✅      |         |
-| buffer status/position         | ✅        | ✅      | ✅      | ✅      |
-| play/pause/seek                | ✅        | ✅      | ✅      | ✅      |
-| set volume/speed               | ✅        | ✅      | ✅      | ✅      |
-| clip audio                     | ✅        | ✅      | ✅      | ✅      |
-| playlists                      | ✅        | ✅      | ✅      | ✅      |
-| looping/shuffling              | ✅        | ✅      | ✅      | ✅      |
-| compose audio                  | ✅        | ✅      | ✅      | ✅      |
-| gapless playback               | ✅        | ✅      | ✅      |         |
-| report player errors           | ✅        | ✅      | ✅      | ✅      |
-| Handle phonecall interruptions | ✅        | ✅      |         |         |
+| Feature                        | Android | iOS | macOS | Web | Windows | Linux |
+| ------------------------------ | :-----: | :-: | :---: | :-: | :-----: | :---: |
+| read from URL                  | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| read from file                 | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| read from asset                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| read from byte stream          | ✅      | ✅  | ✅    | ✅  |         |       |
+| request headers                | ✅      | ✅  | ✅    |     |         |       |
+| DASH                           | ✅      |     |       |     | ✅      |       |
+| HLS                            | ✅      | ✅  | ✅    |     | ✅      |       |
+| ICY metadata                   | ✅      | ✅  | ✅    |     |         |       |
+| buffer status/position         | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| play/pause/seek                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| set volume/speed               | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| clip audio                     | ✅      | ✅  | ✅    | ✅  |         |       |
+| playlists                      | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| looping/shuffling              | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| compose audio                  | ✅      | ✅  | ✅    | ✅  |         |       |
+| gapless playback               | ✅      | ✅  | ✅    |     | ✅      |       |
+| report player errors           | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| handle phonecall interruptions | ✅      | ✅  |       |     |         |       |
+| buffering/loading options      | ✅      | ✅  | ✅    |     |         |       |
+| set pitch                      | ✅      |     |       |     |         |       |
+| skip silence                   | ✅      |     |       |     |         |       |
+| equalizer                      | ✅      |     |       |     |         |       |
+| volume boost                   | ✅      |     |       |     |         |       |
 
 ## Experimental features
 
@@ -59,7 +67,7 @@ This project is supported by the amazing open source community of GitHub contrib
 | Simultaneous downloading+caching                                                   | ✅        | ✅      | ✅      |         |
 | Waveform visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97)) | ✅        | ✅      |         |         |
 | FFT visualizer (See [#97](https://github.com/ryanheise/just_audio/issues/97))      | ✅        |         |         |         |
-| Null safety (Via `0.7` prerelease)                                                 | ✅        | ✅      | ✅      | ✅      |
+| Background                                                                         | ✅        | ✅      | ✅      | ✅      |
 
 Please consider reporting any bugs you encounter [here](https://github.com/ryanheise/just_audio/issues) or submitting pull requests [here](https://github.com/ryanheise/just_audio/pulls).
 
@@ -69,6 +77,13 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 
 * Replace `await player.load(source);` by `await player.setAudioSource(source);`
 * Replace `await stop();` by `await player.pause(); await player.seek(Duration.zero);`
+
+## Tutorials
+
+* [Create a simple Flutter music player app](https://ishouldgotosleep.com/simple-flutter-music-player-app/) by @mvolpato
+* [Playing short audio clips in Flutter with Just Audio](https://suragch.medium.com/playing-short-audio-clips-in-flutter-with-just-audio-3c80eb7eb6ea?sk=aaf6cc523c2c6fc747b5087277932607) by @suragch
+* [Streaming audio in Flutter with Just Audio](https://suragch.medium.com/steaming-audio-in-flutter-with-just-audio-7435fcf672bf?sk=c7163e8496b914c9e0e5446ec6020f04) by @suragch
+* [Managing playlists in Flutter with Just Audio](https://suragch.medium.com/managing-playlists-in-flutter-with-just-audio-c4b8f2af12eb?sk=1b1ffa2cb0b3ed50a320d8cc32cef342) by @suragch
 
 ## Example
 
@@ -204,10 +219,12 @@ try {
   // iOS/macOS: maps to NSError.code
   // Android: maps to ExoPlayerException.type
   // Web: maps to MediaError.code
+  // Linux/Windows: maps to PlayerErrorCode.index
   print("Error code: ${e.code}");
   // iOS/macOS: maps to NSError.localizedDescription
   // Android: maps to ExoPlaybackException.getMessage()
-  // Web: a generic message
+  // Web/Linux: a generic message
+  // Windows: MediaPlayerError.message
   print("Error message: ${e.message}");
 } on PlayerInterruptedException catch (e) {
   // This call was interrupted since another audio source was loaded or the
@@ -284,7 +301,13 @@ Note: If your app uses a number of different audio plugins, e.g. for audio recor
 
 ### Android
 
-If you wish to connect to non-HTTPS URLS, add the following attribute to the `application` element of your `AndroidManifest.xml` file:
+To allow your application to access audio files on the Internet, add the following permission to your `AndroidManifest.xml` file:
+
+```xml
+    <uses-permission android:name="android.permission.INTERNET"/>
+```
+
+If you wish to connect to non-HTTPS URLS, also add the following attribute to the `application` element:
 
 ```xml
     <application ... android:usesCleartextTraffic="true">
@@ -294,11 +317,30 @@ If you need access to the player's AudioSession ID, you can listen to `AudioPlay
 
 ### iOS
 
-Regardless of whether your app uses the microphone, Apple will require you to add the following key to your `Info.plist` file. The message will simply be ignored if your app doesn't use the microphone:
+Using the default configuration, the App Store will detect that your app uses the AVAudioSession API which includes a microphone API, and for privacy reasons it will ask you to describe your app's usage of the microphone. If your app does indeed use the microphone, you can describe your usage by editing the `Info.plist` file as follows:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>... explain why you use (or don't use) the microphone ...</string>
+<string>... explain why the app uses the microphone here ...</string>
+```
+
+But if your app does not use the microphone, you can pass a build option to "compile out" any microphone code so that the App Store won't ask for the above usage description. To do so, edit your `ios/Podfile` as follows:
+
+```ruby
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    
+    # ADD THE NEXT SECTION
+    target.build_configurations.each do |config|
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'AUDIO_SESSION_MICROPHONE=0'
+      ]
+    end
+    
+  end
+end
 ```
 
 If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
@@ -337,6 +379,26 @@ If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist`
 ```
 
 The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length` and [byte range requests](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/CreatingVideoforSafarioniPhone/CreatingVideoforSafarioniPhone.html#//apple_ref/doc/uid/TP40006514-SW6)) to know how to decode the file and where applicable to report its duration. In the case of files, macOS relies on the file extension.
+
+### Windows
+
+Add the [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) dependency to your `pubspec.yaml` alongside `just_audio`:
+
+```yaml
+dependencies:
+  just_audio: any # substitute version number
+  just_audio_libwinmedia: any # substitute version number
+```
+
+### Linux (untested)
+
+Add the [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) dependency to your `pubspec.yaml` alongside `just_audio`:
+
+```yaml
+dependencies:
+  just_audio: any # substitute version number
+  just_audio_libwinmedia: any # substitute version number
+```
 
 ## Related plugins
 

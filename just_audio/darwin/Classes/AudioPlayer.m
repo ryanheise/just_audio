@@ -1,6 +1,8 @@
+#import "BetterEventChannel.h"
 #import "AudioPlayer.h"
 #import "AudioSource.h"
 #import "IndexedAudioSource.h"
+#import "LoadControl.h"
 #import "UriAudioSource.h"
 #import "ConcatenatingAudioSource.h"
 #import "LoopingAudioSource.h"
@@ -14,8 +16,8 @@
 @implementation AudioPlayer {
     NSObject<FlutterPluginRegistrar>* _registrar;
     FlutterMethodChannel *_methodChannel;
-    FlutterEventChannel *_eventChannel;
-    FlutterEventSink _eventSink;
+    BetterEventChannel *_eventChannel;
+    BetterEventChannel *_dataEventChannel;
     NSString *_playerId;
     AVQueuePlayer *_player;
     AudioSource *_audioSource;
@@ -33,18 +35,19 @@
     // Set when the current item hasn't been played yet so we aren't sure whether sufficient audio has been buffered.
     BOOL _bufferUnconfirmed;
     CMTime _seekPos;
-    CMTime _initialPos;
     FlutterResult _loadResult;
     FlutterResult _playResult;
     id _timeObserver;
     BOOL _automaticallyWaitsToMinimizeStalling;
+    LoadControl *_loadControl;
     BOOL _playing;
     float _speed;
+    float _volume;
     BOOL _justAdvanced;
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
 
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam {
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _registrar = registrar;
@@ -52,10 +55,12 @@
     _methodChannel =
         [FlutterMethodChannel methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
                                     binaryMessenger:[registrar messenger]];
-    _eventChannel =
-        [FlutterEventChannel eventChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
-                                  binaryMessenger:[registrar messenger]];
-    [_eventChannel setStreamHandler:self];
+    _eventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
+           messenger:[registrar messenger]];
+    _dataEventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.data.%@", _playerId]
+           messenger:[registrar messenger]];
     _index = 0;
     _processingState = none;
     _loopMode = loopOff;
@@ -66,7 +71,6 @@
     _order = nil;
     _orderInv = nil;
     _seekPos = kCMTimeInvalid;
-    _initialPos = kCMTimeZero;
     _timeObserver = 0;
     _updatePosition = 0;
     _updateTime = 0;
@@ -77,7 +81,25 @@
     _loadResult = nil;
     _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
+    _loadControl = nil;
+    if (loadConfiguration != (id)[NSNull null]) {
+        NSDictionary *map = loadConfiguration[@"darwinLoadControl"];
+        if (map != (id)[NSNull null]) {
+            _loadControl = [[LoadControl alloc] init];
+            _loadControl.preferredForwardBufferDuration = (NSNumber *)map[@"preferredForwardBufferDuration"];
+            _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused = (BOOL)[map[@"canUseNetworkResourcesForLiveStreamingWhilePaused"] boolValue];
+            _loadControl.preferredPeakBitRate = (NSNumber *)map[@"preferredPeakBitRate"];
+            _automaticallyWaitsToMinimizeStalling = (BOOL)[map[@"automaticallyWaitsToMinimizeStalling"] boolValue];
+        }
+    }
+    if (!_loadControl) {
+        _loadControl = [[LoadControl alloc] init];
+        _loadControl.preferredForwardBufferDuration = (NSNumber *)[NSNull null];
+        _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused = NO;
+        _loadControl.preferredPeakBitRate = (NSNumber *)[NSNull null];
+    }
     _speed = 1.0f;
+    _volume = 1.0f;
     _justAdvanced = NO;
     _icyMetadata = @{};
     __weak __typeof__(self) weakSelf = self;
@@ -91,7 +113,7 @@
     @try {
         NSDictionary *request = (NSDictionary *)call.arguments;
         if ([@"load" isEqualToString:call.method]) {
-            CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeZero : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
+            CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeInvalid : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
             [self load:request[@"audioSource"] initialPosition:initialPosition initialIndex:request[@"initialIndex"] result:result];
         } else if ([@"play" isEqualToString:call.method]) {
             [self play:result];
@@ -100,6 +122,9 @@
             result(@{});
         } else if ([@"setVolume" isEqualToString:call.method]) {
             [self setVolume:(float)[request[@"volume"] doubleValue]];
+            result(@{});
+        } else if ([@"setSkipSilence" isEqualToString:call.method]) {
+            /// TODO on iOS side; Seems more involved, so someone with ObjectiveC experience might look at it.
             result(@{});
         } else if ([@"setSpeed" isEqualToString:call.method]) {
             [self setSpeed:(float)[request[@"speed"] doubleValue]];
@@ -115,6 +140,12 @@
             result(@{});
         } else if ([@"setAutomaticallyWaitsToMinimizeStalling" isEqualToString:call.method]) {
             [self setAutomaticallyWaitsToMinimizeStalling:(BOOL)[request[@"enabled"] boolValue]];
+            result(@{});
+        } else if ([@"setCanUseNetworkResourcesForLiveStreamingWhilePaused" isEqualToString:call.method]) {
+            [self setCanUseNetworkResourcesForLiveStreamingWhilePaused:(BOOL)[request[@"enabled"] boolValue]];
+            result(@{});
+        } else if ([@"setPreferredPeakBitRate" isEqualToString:call.method]) {
+            [self setPreferredPeakBitRate:(NSNumber *)request[@"bitRate"]];
             result(@{});
         } else if ([@"seek" isEqualToString:call.method]) {
             CMTime position = request[@"position"] == (id)[NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
@@ -186,7 +217,7 @@
     // Notify each new IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         if (!_indexedAudioSources[i].isAttached) {
-            [_indexedAudioSources[i] attach:_player];
+            [_indexedAudioSources[i] attach:_player initialPos:kCMTimeInvalid];
         }
     }
     [self broadcastPlaybackEvent];
@@ -249,18 +280,7 @@
     [self broadcastPlaybackEvent];
 }
 
-- (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
-    _eventSink = eventSink;
-    return nil;
-}
-
-- (FlutterError*)onCancelWithArguments:(id)arguments {
-    _eventSink = nil;
-    return nil;
-}
-
 - (void)checkForDiscontinuity {
-    if (!_eventSink) return;
     if (!_playing || CMTIME_IS_VALID(_seekPos) || _processingState == completed) return;
     int position = [self getCurrentPosition];
     if (_processingState == buffering) {
@@ -299,8 +319,7 @@
 }
 
 - (void)broadcastPlaybackEvent {
-    if (!_eventSink) return;
-    _eventSink(@{
+    [_eventChannel sendEvent:@{
             @"processingState": @(_processingState),
             @"updatePosition": @((long long)1000 * _updatePosition),
             @"updateTime": @(_updateTime),
@@ -308,13 +327,11 @@
             @"icyMetadata": _icyMetadata,
             @"duration": @([self getDurationMicroseconds]),
             @"currentIndex": @(_index),
-    });
+    }];
 }
 
 - (int)getCurrentPosition {
-    if (_processingState == none || _processingState == loading) {
-        return (int)(1000 * CMTimeGetSeconds(_initialPos));
-    } else if (CMTIME_IS_VALID(_seekPos)) {
+    if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
     } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
         int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].position));
@@ -389,23 +406,20 @@
 }
 
 - (void)metadataOutput:(AVPlayerItemMetadataOutput *)output didOutputTimedMetadataGroups:(NSArray<AVTimedMetadataGroup *> *)groups fromPlayerItemTrack:(AVPlayerItemTrack *)track {
+    // ICY headers aren't available here. Maybe do this in the proxy.
     BOOL hasIcyData = NO;
     NSString *title = (NSString *)[NSNull null];
+    NSString *url = (NSString *)[NSNull null];
     for (int i = 0; i < groups.count; i++) {
-        //NSLog(@"group %d", i);
         AVTimedMetadataGroup *group = groups[i];
         for (int j = 0; j < group.items.count; j++) {
-            //NSLog(@"item %d", j);
-            AVMetadataItem *item = group.items[i];
-            //NSLog(@"key: %@", item.key);
-            //NSLog(@"keySpace: %@", item.keySpace);
-            //NSLog(@"commonKey: %@", item.commonKey);
-            //NSLog(@"value: %@", item.value);
-            //NSLog(@"identifier: %@", item.identifier);
-            // TODO: Detect more metadata
+            AVMetadataItem *item = group.items[j];
             if ([@"icy/StreamTitle" isEqualToString:item.identifier]) {
                 hasIcyData = YES;
                 title = (NSString *)item.value;
+            } else if ([@"icy/StreamUrl" isEqualToString:item.identifier]) {
+                hasIcyData = YES;
+                url = (NSString *)item.value;
             }
         }
     }
@@ -413,6 +427,7 @@
         _icyMetadata = @{
             @"info": @{
                 @"title": title,
+                @"url": url,
             },
         };
         [self broadcastPlaybackEvent];
@@ -431,11 +446,11 @@
 - (AudioSource *)decodeAudioSource:(NSDictionary *)data {
     NSString *type = data[@"type"];
     if ([@"progressive" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
+        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"dash" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
+        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"hls" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"]];
+        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"concatenating" isEqualToString:type]) {
         return [[ConcatenatingAudioSource alloc] initWithId:data[@"id"]
                                                audioSources:[self decodeAudioSources:data[@"children"]]
@@ -561,12 +576,10 @@
     if (_processingState == loading) {
         [self abortExistingConnection];
     }
-    _initialPos = initialPosition;
     _loadResult = result;
     _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     _processingState = loading;
     [self updatePosition];
-    [self broadcastPlaybackEvent];
     // Remove previous observers
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -649,7 +662,7 @@
     [self enqueueFrom:_index];
     // Notify each IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
-        [_indexedAudioSources[i] attach:_player];
+        [_indexedAudioSources[i] attach:_player initialPos:(i == _index ? initialPosition : kCMTimeInvalid)];
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
@@ -662,6 +675,7 @@
     if (_playing) {
         _player.rate = _speed;
     }
+    [_player setVolume:_volume];
     [self broadcastPlaybackEvent];
     /* NSLog(@"load:"); */
     /* for (int i = 0; i < [_indexedAudioSources count]; i++) { */
@@ -714,7 +728,7 @@
         _justAdvanced = YES;
     } else if ([_orderInv[_index] intValue] + 1 < [_order count]) {
         [endedSource seek:kCMTimeZero];
-        _index++;
+        _index = [_order[([_orderInv[_index] intValue] + 1)] intValue];
         [self updateEndAction];
         [self broadcastPlaybackEvent];
         _justAdvanced = YES;
@@ -777,14 +791,6 @@
                 if (_loadResult) {
                     _loadResult(@{@"duration": @([self getDurationMicroseconds])});
                     _loadResult = nil;
-                }
-                if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {
-                    __weak __typeof__(self) weakSelf = self;
-                    [playerItem.audioSource seek:_initialPos completionHandler:^(BOOL finished) {
-                        [weakSelf updatePosition];
-                        [weakSelf broadcastPlaybackEvent];
-                    }];
-                    _initialPos = kCMTimeZero;
                 }
                 break;
             }
@@ -959,10 +965,8 @@
         _loadResult(flutterError);
         _loadResult = nil;
     }
-    if (_eventSink) {
-        // Broadcast all errors even if they aren't on the current item.
-        _eventSink(flutterError);
-    }
+    // Broadcast all errors even if they aren't on the current item.
+    [_eventChannel sendEvent:flutterError];
 }
 
 - (void)abortExistingConnection {
@@ -1036,7 +1040,10 @@
 }
 
 - (void)setVolume:(float)volume {
-    [_player setVolume:volume];
+    _volume = volume;
+    if (_player) {
+        [_player setVolume:volume];
+    }
 }
 
 - (void)setSpeed:(float)speed {
@@ -1067,7 +1074,7 @@
     // There is no way to reliably query whether the requested speed is
     // supported.
     _speed = speed;
-    if (_playing) {
+    if (_playing && _player) {
         _player.rate = speed;
     }
     [self updatePosition];
@@ -1105,8 +1112,13 @@
 }
 
 - (void)setShuffleOrder:(NSDictionary *)dict {
-    // TODO: update order and enqueue.
+    if (!_audioSource) return;
+
     [_audioSource decodeShuffleOrder:dict];
+
+    [self updateOrder];
+
+    [self enqueueFrom:_index];
 }
 
 - (void)dumpQueue {
@@ -1123,6 +1135,22 @@
         if(_player) {
             _player.automaticallyWaitsToMinimizeStalling = automaticallyWaitsToMinimizeStalling;
         }
+    }
+}
+
+- (void)setCanUseNetworkResourcesForLiveStreamingWhilePaused:(BOOL)enabled {
+    _loadControl.canUseNetworkResourcesForLiveStreamingWhilePaused = enabled;
+    if (!_indexedAudioSources) return;
+    for (int i = 0; i < [_indexedAudioSources count]; i++) {
+        [_indexedAudioSources[i] applyCanUseNetworkResourcesForLiveStreamingWhilePaused];
+    }
+}
+
+- (void)setPreferredPeakBitRate:(NSNumber *)preferredPeakBitRate {
+    _loadControl.preferredPeakBitRate = preferredPeakBitRate;
+    if (!_indexedAudioSources) return;
+    for (int i = 0; i < [_indexedAudioSources count]; i++) {
+        [_indexedAudioSources[i] applyPreferredPeakBitRate];
     }
 }
 
@@ -1292,7 +1320,8 @@
         _player = nil;
     }
     // Untested:
-    [_eventChannel setStreamHandler:nil];
+    [_eventChannel dispose];
+    [_dataEventChannel dispose];
     [_methodChannel setMethodCallHandler:nil];
 }
 
