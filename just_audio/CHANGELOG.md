@@ -1,3 +1,7 @@
+## 0.9.15
+
+* Fix bug initialising proxy on ConcatenatingAudioSource.add.
+
 ## 0.9.14
 
 * Fix bug when pausing/stopping quickly after play.
