@@ -74,7 +74,7 @@ class AudioPlayer {
   StreamSubscription? _playerDataSubscription;
 
   final String _id;
-  _ProxyHttpServer? _proxy;
+  final _proxy = _ProxyHttpServer();
   AudioSource? _audioSource;
   final Map<String, AudioSource> _audioSources = {};
   bool _disposed = false;
@@ -750,13 +750,6 @@ class AudioPlayer {
     }
 
     try {
-      if (!kIsWeb && (source._requiresProxy || _userAgent != null)) {
-        if (_proxy == null) {
-          _proxy = _ProxyHttpServer();
-          await _proxy!.start();
-          checkInterruption();
-        }
-      }
       await source._setup(this);
       checkInterruption();
       source._shuffle(initialIndex: initialSeekValues?.index ?? 0);
@@ -1106,7 +1099,7 @@ class AudioPlayer {
     _audioSource = null;
     _audioSources.values.forEach((s) => s._dispose());
     _audioSources.clear();
-    _proxy?.stop();
+    _proxy.stop();
     await _durationSubject.close();
     await _loopModeSubject.close();
     await _shuffleModeEnabledSubject.close();
@@ -1871,6 +1864,7 @@ class AndroidLivePlaybackSpeedControl {
 /// A local proxy HTTP server for making remote GET requests with headers.
 class _ProxyHttpServer {
   late HttpServer _server;
+  bool _running = false;
 
   /// Maps request keys to [_ProxyHandler]s.
   final Map<String, _ProxyHandler> _handlerMap = {};
@@ -1917,8 +1911,15 @@ class _ProxyHttpServer {
   /// but differ in other respects such as the port or headers.
   String _requestKey(Uri uri) => '${uri.path}?${uri.query}';
 
+  /// Start the server if it is not already running.
+  Future ensureRunning() async {
+    if (_running) return;
+    return await start();
+  }
+
   /// Starts the server.
   Future start() async {
+    _running = true;
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
       if (request.method == 'GET') {
@@ -1930,7 +1931,11 @@ class _ProxyHttpServer {
   }
 
   /// Stops the server
-  Future stop() => _server.close();
+  Future stop() async {
+    if (!_running) return;
+    _running = false;
+    return await _server.close();
+  }
 }
 
 /// Encapsulates the start and end of an HTTP range request.
@@ -2034,8 +2039,6 @@ abstract class AudioSource {
 
   AudioSourceMessage _toMessage();
 
-  bool get _requiresProxy;
-
   List<IndexedAudioSource> get sequence;
 
   List<int> get shuffleIndices;
@@ -2089,7 +2092,8 @@ abstract class UriAudioSource extends IndexedAudioSource {
     } else if (uri.scheme != 'file' &&
         !kIsWeb &&
         (headers != null || player._userAgent != null)) {
-      _overrideUri = player._proxy!.addUriAudioSource(this);
+      await player._proxy.ensureRunning();
+      _overrideUri = player._proxy.addUriAudioSource(this);
     }
   }
 
@@ -2139,9 +2143,6 @@ abstract class UriAudioSource extends IndexedAudioSource {
         'assets',
         ...Uri.parse(assetPath).pathSegments,
       ]));
-
-  @override
-  bool get _requiresProxy => uri.scheme != 'file' && headers != null && !kIsWeb;
 }
 
 /// An [AudioSource] representing a regular media file such as an MP3 or M4A
@@ -2228,9 +2229,6 @@ class SilenceAudioSource extends IndexedAudioSource {
     dynamic tag,
     required Duration duration,
   }) : super(tag: tag, duration: duration);
-
-  @override
-  bool get _requiresProxy => false;
 
   @override
   AudioSourceMessage _toMessage() =>
@@ -2451,9 +2449,6 @@ class ConcatenatingAudioSource extends AudioSource {
   }
 
   @override
-  bool get _requiresProxy => children.any((source) => source._requiresProxy);
-
-  @override
   AudioSourceMessage _toMessage() => ConcatenatingAudioSourceMessage(
       id: _id,
       children: children.map((child) => child._toMessage()).toList(),
@@ -2484,9 +2479,6 @@ class ClippingAudioSource extends IndexedAudioSource {
     await super._setup(player);
     await child._setup(player);
   }
-
-  @override
-  bool get _requiresProxy => child._requiresProxy;
 
   @override
   AudioSourceMessage _toMessage() => ClippingAudioSourceMessage(
@@ -2526,9 +2518,6 @@ class LoopingAudioSource extends AudioSource {
   List<int> get shuffleIndices => List.generate(count, (i) => i);
 
   @override
-  bool get _requiresProxy => child._requiresProxy;
-
-  @override
   AudioSourceMessage _toMessage() => LoopingAudioSourceMessage(
       id: _id, child: child._toMessage(), count: count);
 }
@@ -2551,7 +2540,8 @@ abstract class StreamAudioSource extends IndexedAudioSource {
       _uri = _encodeDataUrl(await base64.encoder.bind(response.stream).join(),
           response.contentType);
     } else {
-      _uri = player._proxy!.addStreamAudioSource(this);
+      await player._proxy.ensureRunning();
+      _uri = player._proxy.addStreamAudioSource(this);
     }
   }
 
@@ -2561,9 +2551,6 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   /// data if not specified). If the returned future completes with an error,
   /// a 500 response will be sent back to the player.
   Future<StreamAudioResponse> request([int? start, int? end]);
-
-  @override
-  bool get _requiresProxy => !kIsWeb;
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
