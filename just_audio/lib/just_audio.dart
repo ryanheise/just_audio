@@ -1952,7 +1952,10 @@ class _HttpRangeRequest {
 
   _HttpRangeRequest(this.start, this.end);
 
-  /// Creates an [_HttpRange] from [header].
+  String get header =>
+      'bytes=$start-${end != null ? (end! - 1).toString() : ""}';
+
+  /// Creates an [_HttpRangeRequest] from [header].
   static _HttpRangeRequest? parse(List<String>? header) {
     if (header == null || header.isEmpty) return null;
     final match = RegExp(r'^bytes=(\d+)(-(\d+)?)?').firstMatch(header.first);
@@ -1963,28 +1966,26 @@ class _HttpRangeRequest {
 }
 
 /// Encapsulates the range information in an HTTP range response.
-class _HttpRange {
+class _HttpRangeResponse {
   /// The starting byte position of the range.
   final int start;
 
-  /// The last byte position of the range, or `null` if until the end of the
-  /// media.
-  final int? end;
+  /// The last byte position of the range.
+  final int end;
 
   /// The total number of bytes in the entire media.
   final int? fullLength;
 
-  _HttpRange(this.start, this.end, this.fullLength);
+  _HttpRangeResponse(this.start, this.end, this.fullLength);
 
-  /// The end byte position (exclusive), defaulting to [fullLength].
-  int? get endEx => end == null ? fullLength : end! + 1;
+  /// The end byte position (exclusive).
+  int? get endEx => end + 1;
 
   /// The number of bytes requested.
   int? get length => endEx == null ? null : endEx! - start;
 
   /// The content-range header value to use in HTTP responses.
-  String get contentRangeHeader =>
-      'bytes $start-${end?.toString() ?? ""}/$fullLength';
+  String get header => 'bytes $start-$end/${fullLength?.toString() ?? "*"}';
 }
 
 /// Specifies a source of audio to be played. Audio sources are composable
@@ -2560,14 +2561,24 @@ abstract class StreamAudioSource extends IndexedAudioSource {
 /// The response for a [StreamAudioSource]. This API is experimental.
 @experimental
 class StreamAudioResponse {
-  /// The total number of bytes available.
-  final int sourceLength;
+  /// Indicates to the client whether or not range requests are supported for
+  /// the requested media. If `true`, the client may make further requests
+  /// specifying the `start` and possibly also the `end` parameters of the range
+  /// request, otherwise these will both be null.
+  final bool rangeRequestsSupported;
 
-  /// The number of bytes returned in this response.
-  final int contentLength;
+  /// When responding to a range request, this holds the byte length of the
+  /// entire media, otherwise it holds `null`.
+  final int? sourceLength;
 
-  /// The starting byte position of the response data.
-  final int offset;
+  /// The number of bytes returned in this response, or `null` if unknown. Note:
+  /// this may be different from the length of the entire media for a range
+  /// request.
+  final int? contentLength;
+
+  /// The starting byte position of the response data if responding to a range
+  /// request.
+  final int? offset;
 
   /// The MIME type of the audio.
   final String contentType;
@@ -2576,6 +2587,7 @@ class StreamAudioResponse {
   final Stream<List<int>> stream;
 
   StreamAudioResponse({
+    this.rangeRequestsSupported = true,
     required this.sourceLength,
     required this.contentLength,
     required this.offset,
@@ -2630,6 +2642,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     if (_downloading) {
       throw Exception("Cannot clear cache while download is in progress");
     }
+    _response = null;
     final cacheFile = await this.cacheFile;
     if (await cacheFile.exists()) {
       await cacheFile.delete();
@@ -2638,6 +2651,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     if (await mimeFile.exists()) {
       await mimeFile.delete();
     }
+    _progress = 0;
     _downloadProgressSubject.add(0.0);
   }
 
@@ -2687,12 +2701,15 @@ class LockCachingAudioSource extends StreamAudioSource {
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
     final httpClient = HttpClient();
+    print('### GET $uri');
     final httpRequest = await httpClient.getUrl(uri);
     if (headers != null) {
       httpRequest.headers.clear();
       headers!.forEach((name, value) => httpRequest.headers.set(name, value));
     }
+    print('### send request');
     final response = await httpRequest.close();
+    print('### response status: ${response.statusCode}');
     if (response.statusCode != 200) {
       httpClient.close();
       throw Exception('HTTP Status Error: ${response.statusCode}');
@@ -2701,31 +2718,49 @@ class LockCachingAudioSource extends StreamAudioSource {
     // TODO: Should close sink after done, but it throws an error.
     // ignore: close_sinks
     final sink = (await _partialCacheFile).openWrite();
-    var sourceLength = response.contentLength;
+    final sourceLength =
+        response.contentLength == -1 ? null : response.contentLength;
     final mimeType = response.headers.contentType.toString();
+    final acceptRanges = response.headers.value(HttpHeaders.acceptRangesHeader);
+    final originSupportsRangeRequests =
+        acceptRanges != null && acceptRanges != 'none';
     final mimeFile = await _mimeFile;
     await mimeFile.writeAsString(mimeType);
     final inProgressResponses = <_InProgressCacheResponse>[];
     late StreamSubscription subscription;
     var percentProgress = 0;
-    subscription = response.listen((data) async {
-      _progress += data.length;
-      final newPercentProgress = 100 * _progress ~/ sourceLength;
+    void updateProgress(int newPercentProgress) {
       if (newPercentProgress != percentProgress) {
         percentProgress = newPercentProgress;
         _downloadProgressSubject.add(percentProgress / 100);
       }
+    }
+
+    _progress = 0;
+    subscription = response.listen((data) async {
+      _progress += data.length;
+      final newPercentProgress = (sourceLength == null)
+          ? 0
+          : (sourceLength == 0)
+              ? 100
+              : (100 * _progress ~/ sourceLength);
+      updateProgress(newPercentProgress);
       sink.add(data);
-      final readyRequests =
-          _requests.where((request) => (request.start) < _progress).toList();
-      final notReadyRequests =
-          _requests.where((request) => (request.start) >= _progress).toList();
+      final readyRequests = _requests
+          .where((request) =>
+              request.start == null || (request.start!) < _progress)
+          .toList();
+      final notReadyRequests = _requests
+          .where((request) =>
+              request.start != null && (request.start!) >= _progress)
+          .toList();
       // Add this live data to any responses in progress.
       for (var cacheResponse in inProgressResponses) {
-        if (_progress >= cacheResponse.end) {
+        final end = cacheResponse.end;
+        if (end != null && _progress >= end) {
           // We've received enough data to fulfill the byte range request.
-          final subEnd = min(data.length,
-              max(0, data.length - (_progress - cacheResponse.end)));
+          final subEnd =
+              min(data.length, max(0, data.length - (_progress - end)));
           cacheResponse.controller.add(data.sublist(0, subEnd));
           cacheResponse.controller.close();
         } else {
@@ -2744,7 +2779,7 @@ class LockCachingAudioSource extends StreamAudioSource {
         final start = request.start;
         final end = request.end ?? sourceLength;
         Stream<List<int>> responseStream;
-        if (end <= _progress) {
+        if (end != null && end <= _progress) {
           responseStream = getEffectiveCacheFile().openRead(start, end);
         } else {
           final cacheResponse = _InProgressCacheResponse(end: end);
@@ -2757,9 +2792,11 @@ class LockCachingAudioSource extends StreamAudioSource {
             cacheResponse.controller.stream,
           ]);
         }
+        print('### completing ready response');
         request.complete(StreamAudioResponse(
+          rangeRequestsSupported: originSupportsRangeRequests,
           sourceLength: sourceLength,
-          contentLength: end - start,
+          contentLength: end != null ? end - (start ?? 0) : null,
           offset: start,
           contentType: mimeType,
           stream: responseStream,
@@ -2769,7 +2806,7 @@ class LockCachingAudioSource extends StreamAudioSource {
       // Process any requests that start beyond the cache.
       for (var request in notReadyRequests) {
         _requests.remove(request);
-        final start = request.start;
+        final start = request.start!;
         final end = request.end ?? sourceLength;
         httpClient.getUrl(uri).then((httpRequest) async {
           if (headers != null) {
@@ -2777,25 +2814,41 @@ class LockCachingAudioSource extends StreamAudioSource {
             headers!
                 .forEach((name, value) => httpRequest.headers.set(name, value));
           }
-          httpRequest.headers
-              .set(HttpHeaders.rangeHeader, 'bytes=$start-${end - 1}');
-          final response = await httpRequest.close();
-          if (response.statusCode != 206) {
-            httpClient.close();
-            throw Exception('HTTP Status Error: ${response.statusCode}');
+          if (originSupportsRangeRequests) {
+            final rangeRequest = _HttpRangeRequest(start, end);
+            httpRequest.headers
+                .set(HttpHeaders.rangeHeader, rangeRequest.header);
+            final response = await httpRequest.close();
+            if (response.statusCode != 206) {
+              httpClient.close();
+              throw Exception('HTTP Status Error: ${response.statusCode}');
+            }
+            print('### completing not ready response');
+            request.complete(StreamAudioResponse(
+              rangeRequestsSupported: originSupportsRangeRequests,
+              sourceLength: sourceLength,
+              contentLength: end != null ? end - start : null,
+              offset: start,
+              contentType: mimeType,
+              stream: response,
+            ));
+          } else {
+            print('### range request not supported');
+            throw Exception('Range request not supported: $start-$end');
           }
-          request.complete(StreamAudioResponse(
-            sourceLength: sourceLength,
-            contentLength: end - start,
-            offset: start,
-            contentType: mimeType,
-            stream: response,
-          ));
         }, onError: (dynamic e, StackTrace? stackTrace) {
           request.fail(e, stackTrace);
         });
       }
     }, onDone: () async {
+      if (sourceLength == null) {
+        updateProgress(100);
+      }
+      for (var cacheResponse in inProgressResponses) {
+        if (!cacheResponse.controller.isClosed) {
+          cacheResponse.controller.close();
+        }
+      }
       (await _partialCacheFile).renameSync((await cacheFile).path);
       await subscription.cancel();
       httpClient.close();
@@ -2821,18 +2874,24 @@ class LockCachingAudioSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
+    print('### REQUEST $start-$end');
     final cacheFile = await this.cacheFile;
-    start ??= 0;
     if (cacheFile.existsSync()) {
+      print('### CACHE HIT');
       final sourceLength = cacheFile.lengthSync();
-      end ??= sourceLength;
       return StreamAudioResponse(
-        sourceLength: sourceLength,
-        contentLength: end - start,
+        rangeRequestsSupported: true,
+        sourceLength: start != null ? sourceLength : null,
+        contentLength: (end ?? sourceLength) - (start ?? 0),
         offset: start,
         contentType: await _readCachedMimeType(),
         stream: cacheFile.openRead(start, end),
       );
+    }
+    if (_response == null) {
+      print('### FETCH NEW');
+    } else {
+      print('### FETCH RANGE');
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
@@ -2862,7 +2921,7 @@ class _InProgressCacheResponse {
   // TODO: Improve this code.
   // ignore: close_sinks
   final controller = ReplaySubject<List<int>>();
-  final int end;
+  final int? end;
   _InProgressCacheResponse({
     required this.end,
   });
@@ -2871,7 +2930,7 @@ class _InProgressCacheResponse {
 /// Request parameters for a [StreamingAudioSource].
 class _StreamingByteRangeRequest {
   /// The start of the range request.
-  final int start;
+  final int? start;
 
   /// The end of the range request.
   final int? end;
@@ -2911,8 +2970,6 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
         _HttpRangeRequest.parse(request.headers[HttpHeaders.rangeHeader]);
 
     request.response.headers.clear();
-    request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
-    request.response.statusCode = rangeRequest == null ? 200 : 206;
 
     StreamAudioResponse sourceResponse;
     try {
@@ -2928,18 +2985,31 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
       return;
     }
 
-    final range = _HttpRange(rangeRequest?.start ?? 0, rangeRequest?.end,
-        sourceResponse.sourceLength);
-    request.response.contentLength = range.length!;
     request.response.headers
         .set(HttpHeaders.contentTypeHeader, sourceResponse.contentType);
-    if (rangeRequest != null) {
+
+    if (sourceResponse.rangeRequestsSupported) {
+      request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+    }
+
+    if (rangeRequest != null && sourceResponse.offset != null) {
+      final range = _HttpRangeResponse(
+          sourceResponse.offset!,
+          sourceResponse.offset! + sourceResponse.contentLength! - 1,
+          sourceResponse.sourceLength);
+      request.response.contentLength = range.length ?? -1;
       request.response.headers
-          .set(HttpHeaders.contentRangeHeader, range.contentRangeHeader);
+          .set(HttpHeaders.contentRangeHeader, range.header);
+      request.response.statusCode = 206;
+    } else {
+      request.response.contentLength = sourceResponse.sourceLength ?? -1;
+      request.response.statusCode = 200;
     }
 
     // Pipe response
+    print('### proxy piping stream response');
     await sourceResponse.stream.pipe(request.response);
+    print('### proxy closing response');
     await request.response.close();
   }
 
