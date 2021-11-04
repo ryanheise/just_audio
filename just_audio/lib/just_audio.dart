@@ -2360,7 +2360,7 @@ class ConcatenatingAudioSource extends AudioSource {
     }
   }
 
-  /// (Untested) Dynmaically remove an [AudioSource] at [index] after this
+  /// (Untested) Dynamically remove an [AudioSource] at [index] after this
   /// [ConcatenatingAudioSource] has already been loaded.
   Future<void> removeAt(int index) async {
     children.removeAt(index);
@@ -3354,7 +3354,7 @@ abstract class AudioEffect {
   /// Called when [_player] is connected to the platform.
   Future<void> _activate() async {}
 
-  /// Whether the the effect is enabled. When `true`, and if the effect is part
+  /// Whether the effect is enabled. When `true`, and if the effect is part
   /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
   /// the audio player's output. When `false`, the audio pipeline will still
   /// reserve platform resources for the effect but the effect will be bypassed.
