@@ -90,7 +90,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       print('A stream error occurred: $e');
     });
     try {
-      await _player.setAudioSource(_playlist);
+      // Preloading audio is not currently supported on Linux.
+      await _player.setAudioSource(_playlist,
+          preload: kIsWeb || defaultTargetPlatform != TargetPlatform.linux);
     } catch (e) {
       // Catch load errors: 404, invalid url...
       print("Error loading audio source: $e");
