@@ -1,3 +1,7 @@
+## 0.9.16
+
+* Fix pubspec declaration for Linux/Windows implementation.
+
 ## 0.9.15
 
 * Fix bug initialising proxy on ConcatenatingAudioSource.add.
