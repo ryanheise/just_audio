@@ -22,7 +22,11 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _player = AudioPlayer();
   final _audioSource = LockCachingAudioSource(Uri.parse(
-      "https://dovetail.prxu.org/70/66673fd4-6851-4b90-a762-7c0538c76626/CoryCombs_2021T_VO_Intro.mp3"));
+    // Supports range requests:
+    "https://dovetail.prxu.org/70/66673fd4-6851-4b90-a762-7c0538c76626/CoryCombs_2021T_VO_Intro.mp3",
+    // Doesn't support range requests:
+    //"https://filesamples.com/samples/audio/mp3/sample4.mp3",
+  ));
 
   @override
   void initState() {
@@ -107,6 +111,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     onChangeEnd: _player.seek,
                   );
                 },
+              ),
+              ElevatedButton(
+                child: Text('Clear cache'),
+                onPressed: _audioSource.clearCache,
               ),
             ],
           ),

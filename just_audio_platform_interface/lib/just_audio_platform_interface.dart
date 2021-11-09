@@ -161,7 +161,7 @@ abstract class AudioPlayerPlatform {
         "setAndroidAudioAttributes() has not been implemented.");
   }
 
-  /// This method has been superceded by [JustAudioPlatform.disposePlayer].
+  /// This method has been superseded by [JustAudioPlatform.disposePlayer].
   /// For backward compatibility, this method will still be called as a
   /// fallback if [JustAudioPlatform.disposePlayer] is not implemented.
   Future<DisposeResponse> dispose(DisposeRequest request) {
