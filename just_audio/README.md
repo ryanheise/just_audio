@@ -13,6 +13,7 @@ Other common audio capabilities are optionally provided by separate plugins:
 * [just_audio_background](https://pub.dev/packages/just_audio_background): Use this to allow your app to play audio in the background and respond to controls on the lockscreen, media notification, headset, AndroidAuto/CarPlay or smart watch.
 * [audio_service](https://pub.dev/packages/audio_service): Use this if your app has more advanced background audio requirements than can be supported by `just_audio_background`.
 * [audio_session](https://pub.dev/packages/audio_session): Use this to configure and manage how your app interacts with other audio apps (e.g. phone call or navigator interruptions).
+* [just_waveform](https://pub.dev/packages/just_waveform): Use this to extract an audio file's waveform suitable for visual rendering.
 
 ## Vote on upcoming features
 

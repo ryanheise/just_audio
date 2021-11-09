@@ -445,7 +445,7 @@ void runTests() {
         expect(response.statusCode, equals(HttpStatus.partialContent));
       } else if (start != null) {
         expect(response.headers.value(HttpHeaders.contentRangeHeader),
-            'bytes $start-/${byteRangeData.length}');
+            'bytes $start-${byteRangeData.length - 1}/${byteRangeData.length}');
         expect(response.statusCode, equals(HttpStatus.partialContent));
       } else {
         expect(response.headers.value(HttpHeaders.contentRangeHeader), null);
@@ -1396,7 +1396,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
     _setPosition(request.position ?? Duration.zero);
-    _index = request.index;
+    _index = request.index ?? 0;
     _broadcastPlaybackEvent();
     return SeekResponse();
   }
