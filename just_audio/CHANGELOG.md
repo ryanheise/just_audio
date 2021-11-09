@@ -1,3 +1,9 @@
+## 0.9.17
+
+* LockCachingAudioSource works with servers not supporting range requests.
+* Add StreamAudioResponse.rangeRequestsSupported.
+* Fix doc typos (@robert-j-webb)
+
 ## 0.9.16
 
 * Fix pubspec declaration for Linux/Windows implementation.
