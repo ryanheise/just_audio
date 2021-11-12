@@ -1,3 +1,17 @@
+## 0.9.17
+
+* LockCachingAudioSource works with servers not supporting range requests.
+* Add StreamAudioResponse.rangeRequestsSupported.
+* Fix doc typos (@robert-j-webb)
+
+## 0.9.16
+
+* Fix pubspec declaration for Linux/Windows implementation.
+
+## 0.9.15
+
+* Fix bug initialising proxy on ConcatenatingAudioSource.add.
+
 ## 0.9.14
 
 * Fix bug when pausing/stopping quickly after play.
