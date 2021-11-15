@@ -1,3 +1,5 @@
+import AudioKit
+
 enum ProcessingState: Int {
     case none, loading, buffering, ready, completed
 }
@@ -12,6 +14,7 @@ public class AudioPlayer: NSObject {
     let eventChannel: BetterEventChannel
     let dataChannel: BetterEventChannel
     
+    var engine: AudioEngine? = nil
     var playing = false
     var processingState: ProcessingState = .none
     var loopMode: LoopMode = .loopOff
@@ -108,7 +111,11 @@ public class AudioPlayer: NSObject {
         index = initialIndex
         processingState = .loading
         // TODO: update position
-        
+        // TODO: decode audio source
+        // TODO: update order
+        if engine != nil {
+            engine = AudioEngine()
+        }
     }
     
     func dispose() {

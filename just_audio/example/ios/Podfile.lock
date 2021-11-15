@@ -1,8 +1,25 @@
 PODS:
   - audio_session (0.0.1):
     - Flutter
+  - AudioKit (5.1.0):
+    - AudioKit/C (= 5.1.0)
+    - AudioKit/Core (= 5.1.0)
+    - AudioKit/Soundpipe (= 5.1.0)
+    - AudioKit/Sporth (= 5.1.0)
+    - AudioKit/STK (= 5.1.0)
+  - AudioKit/C (5.1.0):
+    - AudioKit/Soundpipe
+    - AudioKit/Sporth
+    - AudioKit/STK
+  - AudioKit/Core (5.1.0):
+    - AudioKit/C
+  - AudioKit/Soundpipe (5.1.0)
+  - AudioKit/Sporth (5.1.0):
+    - AudioKit/Soundpipe
+  - AudioKit/STK (5.1.0)
   - Flutter (1.0.0)
   - just_audio (0.0.1):
+    - AudioKit (~> 5.1)
     - Flutter
   - path_provider (0.0.1):
     - Flutter
@@ -12,6 +29,10 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - just_audio (from `.symlinks/plugins/just_audio/ios`)
   - path_provider (from `.symlinks/plugins/path_provider/ios`)
+
+SPEC REPOS:
+  trunk:
+    - AudioKit
 
 EXTERNAL SOURCES:
   audio_session:
@@ -25,10 +46,11 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   audio_session: 4f3e461722055d21515cf3261b64c973c062f345
+  AudioKit: 81246a4ccdd7ca3c6e0076f913070e90987b4369
   Flutter: 50d75fe2f02b26cc09d224853bb45737f8b3214a
-  just_audio: c649315c5051cae39ecd06d55cc456ec44447507
+  just_audio: 5296c2f17d90967e89a2db0bd7702776a0ab6ce3
   path_provider: d1e9807085df1f9cc9318206cd649dc0b76be3de
 
-PODFILE CHECKSUM: 8e679eca47255a8ca8067c4c67aab20e64cb974d
+PODFILE CHECKSUM: e5ee00144d04e7b168ba7ea28a9753540e444f3d
 
 COCOAPODS: 1.11.2
