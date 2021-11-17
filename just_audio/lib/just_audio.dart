@@ -2926,7 +2926,7 @@ class _InProgressCacheResponse {
   });
 }
 
-/// Request parameters for a [StreamingAudioSource].
+/// Request parameters for a [StreamAudioSource].
 class _StreamingByteRangeRequest {
   /// The start of the range request.
   final int? start;
@@ -3001,7 +3001,7 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
           .set(HttpHeaders.contentRangeHeader, range.header);
       request.response.statusCode = 206;
     } else {
-      request.response.contentLength = sourceResponse.sourceLength ?? -1;
+      request.response.contentLength = sourceResponse.contentLength ?? -1;
       request.response.statusCode = 200;
     }
 

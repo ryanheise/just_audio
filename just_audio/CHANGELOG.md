@@ -1,3 +1,7 @@
+## 0.9.18
+
+* Fix null duration bug on LockCachingAudioSource.
+
 ## 0.9.17
 
 * LockCachingAudioSource works with servers not supporting range requests.
