@@ -2,7 +2,7 @@ import Flutter
 import UIKit
 
 public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
-    var players: [String: AudioPlayer] = [:]
+    var players: [String: JustAudioPlayer] = [:]
     let registrar: FlutterPluginRegistrar
     
     init(registrar: FlutterPluginRegistrar) {
@@ -25,7 +25,7 @@ public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
                 let flutterError = FlutterError(code: "error", message: "Platform player already exists", details: nil)
                 result(flutterError)
             } else {
-                let player = AudioPlayer(registrar: self.registrar, playerId: playerId, loadConfiguration: loadConfiguration)
+                let player = JustAudioPlayer(registrar: self.registrar, playerId: playerId, loadConfiguration: loadConfiguration)
                 players[playerId] = player
                 result(nil)
             }
