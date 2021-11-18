@@ -140,26 +140,25 @@ public class JustAudioPlayer: NSObject {
         }
         
         updateOrder()
-//
-//        engine.output = player
-//        try engine.start()
-//
-//        if let uri = audioSource?.uri {
-//            try player.load(url: URL(fileURLWithPath: String(uri[uri.index(uri.startIndex, offsetBy: 7)...])))
-//        }
-//
-//        processingState = .ready
-//
-//        broadcastPlaybackEvent()
-//
-//        loadResult?(["duration": Int(1000000 * player.duration)]);
-//        loadResult = nil;
+//      TODO:  if (_player.currentItem) {
+//            _index = [self indexForItem:(IndexedPlayerItem *)_player.currentItem];
+//        } else:
+        index = 0
+
+        
     }
     
     func updateOrder() {
         orderInv = Array(repeating: 0, count: indexedAudioSources.count)
         if shuffleModeEnabled {
             order = audioSource.getShuffleIndices()
+        } else {
+            order = indexedAudioSources.enumerated().map({ (index, _) in
+                return index
+            })
+        }
+        for i in 0..<indexedAudioSources.count {
+            orderInv[order[i]] = i
         }
     }
     
