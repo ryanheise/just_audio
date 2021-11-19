@@ -72,45 +72,59 @@ public class JustAudioPlayer: NSObject {
                 result([:])
                 break
             case "setVolume":
+                print("TODO: setVolume")
                 result([:])
                 break
             case "setSkipSilence":
+                print("TODO: setSkipSilence")
                 result([:])
                 break
             case "setSpeed":
+                print("TODO: setSpeed")
                 result([:])
                 break
             case "setLoopMode":
+                print("TODO: setLoopMode")
                 result([:])
                 break
             case "setShuffleMode":
+                print("TODO: setShuffleMode")
                 result([:])
                 break
             case "setShuffleOrder":
+                print("TODO: setShuffleOrder")
                 result([:])
                 break
             case "setAutomaticallyWaitsToMinimizeStalling":
+                print("TODO: setAutomaticallyWaitsToMinimizeStalling")
                 result([:])
                 break
             case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
+                print("TODO: setCanUseNetworkResourcesForLiveStreamingWhilePaused")
                 result([:])
                 break
             case "setPreferredPeakBitRate":
+                print("TODO: setPreferredPeakBitRate")
                 result([:])
                 break
             case "seek":
+                print("TODO: seek")
                 result([:])
                 break
             case "concatenatingInsertAll":
+                print("TODO: concatenatingInsertAll")
                 result([:])
                 break
             case "concatenatingRemoveRange":
+                print("TODO: concatenatingRemoveRange")
                 result([:])
                 break
             case "concatenatingMove":
+                print("TODO: concatenatingMove")
                 result([:])
                 break
             case "setAndroidAudioAttributes":
+                print("TODO: setAndroidAudioAttributes")
                 result([:])
                 break
             default:
