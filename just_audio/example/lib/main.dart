@@ -43,6 +43,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     try {
       await _player.setAudioSource(ConcatenatingAudioSource(children: [
         AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
+         AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
         AudioSource.uri(
             Uri.parse("asset:///audio/assets_mp3_dua_lipa_dont_start_now.mp3"))
       ]));
