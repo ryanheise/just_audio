@@ -1,13 +1,12 @@
 import AVFAudio
-import AudioKit
 
 class IndexedAudioSource: AudioSource {
-    var duration: CMTime = .invalid
-    var position: CMTime = .invalid
-    var isAttached = false
-    
-    func load(player: AudioPlayer) throws {
+    func load(engine: AVAudioEngine, player: AVAudioPlayerNode, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
         throw PluginError.runtimeError("no buffer")
+    }
+    
+    func getDuration() -> TimeInterval {
+        return 0
     }
 
     override func buildSequence(sequence: inout [IndexedAudioSource], treeIndex: Int) -> Int {
