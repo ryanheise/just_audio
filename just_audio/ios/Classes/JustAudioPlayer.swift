@@ -1,4 +1,3 @@
-import AudioKit
 import AVFAudio
 
 enum PluginError: Error {
@@ -19,8 +18,8 @@ public class JustAudioPlayer: NSObject {
     let eventChannel: BetterEventChannel
     let dataChannel: BetterEventChannel
     
-    var player: AudioPlayer!
-    var engine: AudioEngine!
+    var engine: AVAudioEngine!
+    var player: AVAudioPlayerNode!
     var playing = false
     var processingState: ProcessingState = .none
     var shuffleModeEnabled = false
@@ -30,9 +29,12 @@ public class JustAudioPlayer: NSObject {
     var audioSource: AudioSource!
     var indexedAudioSources: [IndexedAudioSource] = []
     
+    var currentSource: IndexedAudioSource? = nil
+    
+    var offeset: Double = 0
     var currentPosition: Int = 0
     var updateTime: Int64 = 0
-    var savedCurrentTime: TimeInterval = 0
+    var savedCurrentTime: AVAudioTime? = nil
     var order: [Int] = []
     var orderInv: [Int] = []
     
@@ -59,13 +61,12 @@ public class JustAudioPlayer: NSObject {
                 try load(source: request["audioSource"] as! Dictionary<String, Any>, initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
                 break
             case "play":
-                player.play(from: savedCurrentTime)
+                player.play()
                 updatePosition()
                 broadcastPlaybackEvent()
                 result([:])
                 break
             case "pause":
-                savedCurrentTime = player.getCurrentTime()
                 updatePosition()
                 player.pause()
                 broadcastPlaybackEvent()
@@ -137,12 +138,8 @@ public class JustAudioPlayer: NSObject {
     }
     
     func load(source: Dictionary<String, Any>, initialPosition: CMTime, initialIndex: Int, result: @escaping FlutterResult) throws {
-        if player != nil && player.isPaused {
+        if player != nil {
             player.pause()
-        }
-        
-        if processingState == .loading {
-            // TODO: abort existing connection
         }
         
         loadResult = result
@@ -155,55 +152,38 @@ public class JustAudioPlayer: NSObject {
         indexedAudioSources = []
         _ = audioSource.buildSequence(sequence: &indexedAudioSources, treeIndex: 0)
         
-        for source in indexedAudioSources {
-            if !source.isAttached {
-                // TODO: audioSource.playerItem.audioSource = audioSource;
-                // TODO: [self addItemObservers:audioSource.playerItem];
-            }
-        }
-        
         updateOrder()
-        //      TODO:  if (_player.currentItem) {
-        //            _index = [self indexForItem:(IndexedPlayerItem *)_player.currentItem];
-        //        } else:
         index = 0
         
         if engine == nil {
-            engine = AudioEngine()
-            player = AudioPlayer()
-            engine.output = player
-            player.completionHandler = self.playNext
+            engine = AVAudioEngine()
+            player = AVAudioPlayerNode()
             
-            try! engine.start()
+            engine.attach(player)
         }
         
         try! enqueueFrom(index)
         
+        if !engine.isRunning {
+            try! engine.start()
+        }
+        
         processingState = .ready
         
-        loadResult?(["duration": UInt64(1000 * player.duration)])
+        loadResult?(["duration": getDurationMicroseconds()])
         loadResult = nil
         
         broadcastPlaybackEvent()
     }
     
     func playNext() {
-        if player.isPaused {
-            return
-        }
-        
         DispatchQueue.main.async {
             let newIndex = self.index + 1
             if newIndex >= self.indexedAudioSources.count {
                 self.complete()
             } else {
-                self.player.reset()
-
                 try! self.enqueueFrom(newIndex)
-                self.player.editEndTime = 0
-                self.savedCurrentTime = 0
                 self.updatePosition()
-                
                 self.player.play()
                 self.broadcastPlaybackEvent()
             }
@@ -249,7 +229,12 @@ public class JustAudioPlayer: NSObject {
     
     func getCurrentPosition() -> Int {
         if (indexedAudioSources.count > 0) {
-            let ms = Int(player.getCurrentTime() * 1000);
+            guard let lastRenderTime = player.lastRenderTime else { return 0 }
+            guard let playerTime = player.playerTime(forNodeTime: lastRenderTime) else { return 0 }
+            let sampleRate = playerTime.sampleRate
+            let sampleTime = playerTime.sampleTime
+            let currentTime = Double(sampleTime) / sampleRate
+            let ms = Int(currentTime * 1000);
             return ms < 0 ? 0 : ms
         } else {
             return 0
@@ -260,7 +245,7 @@ public class JustAudioPlayer: NSObject {
         if processingState == .none || processingState == .loading {
             return -1
         }else if indexedAudioSources.count > 0 {
-            return Int(1000 * player.duration)
+            return Int(1000 * currentSource!.getDuration())
         }else {
             return 0
         }
@@ -274,8 +259,10 @@ public class JustAudioPlayer: NSObject {
     func enqueueFrom(_ index: Int) throws {
         self.index = index
         
-        let source = indexedAudioSources[index]
-        try! source.load(player: player)
+        currentSource = indexedAudioSources[index]
+        try! currentSource!.load(engine: engine, player: player, completionHandler: { _ in
+            self.playNext()
+        })
     }
     
     func decodeAudioSources(data: [Dictionary<String, Any>]) -> [AudioSource] {
