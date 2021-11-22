@@ -19,7 +19,9 @@ public class JustAudioPlayer: NSObject {
     let dataChannel: BetterEventChannel
     
     var engine: AVAudioEngine!
-    var player: AVAudioPlayerNode!
+    var playerNode: AVAudioPlayerNode!
+    var speedControl: AVAudioUnitVarispeed!
+
     var playing = false
     var processingState: ProcessingState = .none
     var shuffleModeEnabled = false
@@ -37,6 +39,9 @@ public class JustAudioPlayer: NSObject {
     var savedCurrentTime: AVAudioTime? = nil
     var order: [Int] = []
     var orderInv: [Int] = []
+    
+    var volume: Float = 1
+    var rate: Float = 1
     
     init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: Dictionary<String, Any>) {
         self.playerId = playerId
@@ -61,73 +66,83 @@ public class JustAudioPlayer: NSObject {
                 try load(source: request["audioSource"] as! Dictionary<String, Any>, initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
                 break
             case "play":
-                player.play()
+                playerNode.play()
                 updatePosition()
                 broadcastPlaybackEvent()
                 result([:])
                 break
             case "pause":
                 updatePosition()
-                player.pause()
+                playerNode.pause()
                 broadcastPlaybackEvent()
                 result([:])
                 break
             case "setVolume":
-                print("TODO: setVolume")
+                volume = Float(request["volume"] as? Double ?? 1)
+                if playerNode != nil {
+                    playerNode.volume = volume
+                }
+                broadcastPlaybackEvent()
                 result([:])
                 break
             case "setSkipSilence":
-                print("TODO: setSkipSilence")
+                print("TODO: setSkipSilence", request)
                 result([:])
                 break
             case "setSpeed":
-                print("TODO: setSpeed")
+                rate = Float(request["speed"] as? Double ?? 1)
+                if speedControl != nil {
+                    speedControl.rate = rate
+                }
+                updatePosition()
                 result([:])
                 break
             case "setLoopMode":
-                print("TODO: setLoopMode")
+                print("TODO: setLoopMode", request)
                 result([:])
                 break
             case "setShuffleMode":
-                print("TODO: setShuffleMode")
+                print("TODO: setShuffleMode", request)
                 result([:])
                 break
             case "setShuffleOrder":
-                print("TODO: setShuffleOrder")
+                print("TODO: setShuffleOrder", request)
                 result([:])
                 break
             case "setAutomaticallyWaitsToMinimizeStalling":
-                print("TODO: setAutomaticallyWaitsToMinimizeStalling")
+                print("TODO: setAutomaticallyWaitsToMinimizeStalling", request)
                 result([:])
                 break
             case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
-                print("TODO: setCanUseNetworkResourcesForLiveStreamingWhilePaused")
+                print("TODO: setCanUseNetworkResourcesForLiveStreamingWhilePaused", request)
                 result([:])
                 break
             case "setPreferredPeakBitRate":
-                print("TODO: setPreferredPeakBitRate")
+                print("TODO: setPreferredPeakBitRate", request)
                 result([:])
                 break
             case "seek":
-                print("TODO: seek")
                 result([:])
                 break
             case "concatenatingInsertAll":
-                print("TODO: concatenatingInsertAll")
+                print("TODO: concatenatingInsertAll", request)
                 result([:])
                 break
             case "concatenatingRemoveRange":
-                print("TODO: concatenatingRemoveRange")
+                print("TODO: concatenatingRemoveRange", request)
                 result([:])
                 break
             case "concatenatingMove":
-                print("TODO: concatenatingMove")
+                print("TODO: concatenatingMove", request)
                 result([:])
                 break
             case "setAndroidAudioAttributes":
-                print("TODO: setAndroidAudioAttributes")
+                print("TODO: setAndroidAudioAttributes", request)
                 result([:])
                 break
+            case "audioEffectSetEnabled":
+                print("TODO: audioEffectSetEnabled", request)
+                result([:])
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -138,8 +153,8 @@ public class JustAudioPlayer: NSObject {
     }
     
     func load(source: Dictionary<String, Any>, initialPosition: CMTime, initialIndex: Int, result: @escaping FlutterResult) throws {
-        if player != nil {
-            player.pause()
+        if playerNode != nil {
+            playerNode.pause()
         }
         
         loadResult = result
@@ -157,9 +172,17 @@ public class JustAudioPlayer: NSObject {
         
         if engine == nil {
             engine = AVAudioEngine()
-            player = AVAudioPlayerNode()
+            playerNode = AVAudioPlayerNode()
+            speedControl = AVAudioUnitVarispeed()
             
-            engine.attach(player)
+            playerNode.volume = volume
+            speedControl.rate = rate
+            
+            engine.attach(playerNode)
+            engine.attach(speedControl)
+            
+            engine.connect(playerNode, to:speedControl, format: nil)
+            engine.connect(speedControl, to:engine.mainMixerNode, format: nil)
         }
         
         try! enqueueFrom(index)
@@ -184,7 +207,7 @@ public class JustAudioPlayer: NSObject {
             } else {
                 try! self.enqueueFrom(newIndex)
                 self.updatePosition()
-                self.player.play()
+                self.playerNode.play()
                 self.broadcastPlaybackEvent()
             }
         }
@@ -229,8 +252,8 @@ public class JustAudioPlayer: NSObject {
     
     func getCurrentPosition() -> Int {
         if (indexedAudioSources.count > 0) {
-            guard let lastRenderTime = player.lastRenderTime else { return 0 }
-            guard let playerTime = player.playerTime(forNodeTime: lastRenderTime) else { return 0 }
+            guard let lastRenderTime = playerNode.lastRenderTime else { return 0 }
+            guard let playerTime = playerNode.playerTime(forNodeTime: lastRenderTime) else { return 0 }
             let sampleRate = playerTime.sampleRate
             let sampleTime = playerTime.sampleTime
             let currentTime = Double(sampleTime) / sampleRate
@@ -260,7 +283,7 @@ public class JustAudioPlayer: NSObject {
         self.index = index
         
         currentSource = indexedAudioSources[index]
-        try! currentSource!.load(engine: engine, player: player, completionHandler: { _ in
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, completionHandler: { _ in
             self.playNext()
         })
     }

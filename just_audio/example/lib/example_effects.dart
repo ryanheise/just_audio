@@ -48,7 +48,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     await session.configure(AudioSessionConfiguration.speech());
     try {
       await _player.setAudioSource(AudioSource.uri(Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
+          "asset:///audio/assets_mp3_dua_lipa_dont_start_now.mp3")));
     } catch (e) {
       print("Error loading audio source: $e");
     }
