@@ -4,14 +4,14 @@ PODS:
   - Flutter (1.0.0)
   - just_audio (0.0.1):
     - Flutter
-  - path_provider_ios (0.0.1):
+  - path_provider (0.0.1):
     - Flutter
 
 DEPENDENCIES:
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - Flutter (from `Flutter`)
   - just_audio (from `.symlinks/plugins/just_audio/ios`)
-  - path_provider_ios (from `.symlinks/plugins/path_provider_ios/ios`)
+  - path_provider (from `.symlinks/plugins/path_provider/ios`)
 
 EXTERNAL SOURCES:
   audio_session:
@@ -20,14 +20,14 @@ EXTERNAL SOURCES:
     :path: Flutter
   just_audio:
     :path: ".symlinks/plugins/just_audio/ios"
-  path_provider_ios:
-    :path: ".symlinks/plugins/path_provider_ios/ios"
+  path_provider:
+    :path: ".symlinks/plugins/path_provider/ios"
 
 SPEC CHECKSUMS:
   audio_session: 4f3e461722055d21515cf3261b64c973c062f345
   Flutter: 50d75fe2f02b26cc09d224853bb45737f8b3214a
   just_audio: c649315c5051cae39ecd06d55cc456ec44447507
-  path_provider_ios: 7d7ce634493af4477d156294792024ec3485acd5
+  path_provider: d1e9807085df1f9cc9318206cd649dc0b76be3de
 
 PODFILE CHECKSUM: e5ee00144d04e7b168ba7ea28a9753540e444f3d
 
