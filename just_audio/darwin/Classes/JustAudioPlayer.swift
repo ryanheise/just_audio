@@ -1,4 +1,4 @@
-import AVFAudio
+import AVFoundation
 
 enum PluginError: Error {
     case runtimeError(String)

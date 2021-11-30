@@ -8,6 +8,8 @@
 #import "just_audio-Swift.h"
 #endif
 
+#import <AVFoundation/AVFoundation.h>
+
 @implementation JustAudioPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   [SwiftJustAudioPlugin registerWithRegistrar:registrar];

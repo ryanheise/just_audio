@@ -1,3 +1,5 @@
+import AVFoundation
+
 class ConcatenatingAudioSource: AudioSource {
     let audioSources: [AudioSource]
     let shuffleOrder: [Int]

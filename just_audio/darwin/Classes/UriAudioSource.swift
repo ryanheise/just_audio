@@ -1,4 +1,4 @@
-import AVFAudio
+import AVFoundation
 
 class UriAudioSource: IndexedAudioSource {
     var uri: String

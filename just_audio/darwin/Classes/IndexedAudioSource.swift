@@ -1,4 +1,4 @@
-import AVFAudio
+import AVFoundation
 
 class IndexedAudioSource: AudioSource {
     func load(engine: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl: AVAudioUnitVarispeed, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {

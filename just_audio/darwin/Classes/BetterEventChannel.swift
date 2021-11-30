@@ -1,3 +1,4 @@
+import Flutter
 
 class BetterEventChannel: NSObject, FlutterStreamHandler {
     let eventChannel: FlutterEventChannel
