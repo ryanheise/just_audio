@@ -4,7 +4,12 @@ homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_backgro
 version: 0.0.1-beta.1
 
 dependencies:
-  just_audio_platform_interface: ^4.0.0
+  just_audio_platform_interface:
+    git:
+      url: git@github.com:wavy-assistant/just_audio.git
+      ref: feature/new_ios_implementation
+      path: just_audio_platform_interface
+  # just_audio_platform_interface: ^4.0.0
   # just_audio_platform_interface:
   #   path: ../just_audio_platform_interface
   audio_service: ^0.18.0-beta.0
