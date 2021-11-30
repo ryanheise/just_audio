@@ -20,12 +20,16 @@ public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
         case "init":
             let request = call.arguments as! Dictionary<String, Any>
             let playerId = request["id"] as! String
+            
+            print("init: ",request)
+            
             let loadConfiguration = request["audioLoadConfiguration"] as? Dictionary<String, Any> ?? [:]
+            let audioEffects = request["darwinAudioEffects"] as? [Dictionary<String, Any>] ?? []
             if players[playerId] != nil {
                 let flutterError = FlutterError(code: "error", message: "Platform player already exists", details: nil)
                 result(flutterError)
             } else {
-                let player = JustAudioPlayer(registrar: self.registrar, playerId: playerId, loadConfiguration: loadConfiguration)
+                let player = JustAudioPlayer(registrar: self.registrar, playerId: playerId, loadConfiguration: loadConfiguration, audioEffects: audioEffects)
                 players[playerId] = player
                 result(nil)
             }

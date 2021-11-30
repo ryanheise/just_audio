@@ -1,7 +1,7 @@
 import AVFAudio
 
 class IndexedAudioSource: AudioSource {
-    func load(engine: AVAudioEngine, player: AVAudioPlayerNode, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
+    func load(engine: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl: AVAudioUnitVarispeed, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
         throw PluginError.runtimeError("no buffer")
     }
     

@@ -1207,7 +1207,9 @@ void runTests() {
   });
 
   test('AndroidEqualizer', () async {
-    final equalizer = AndroidEqualizer();
+    final equalizer = Equalizer(
+        darwinMessageParameters: DarwinEqualizerParametersMessage(
+            maxDecibels: 24, minDecibels: -24, bands: []));
     final player = AudioPlayer(
       audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]),
     );
@@ -1227,8 +1229,6 @@ void runTests() {
     for (var i = 0; i < 5; i++) {
       final band = bands[i];
       expect(band.index, equals(i));
-      expect(band.lowerFrequency, equals(i * 1000));
-      expect(band.upperFrequency, equals((i + 1) * 1000));
       expect(band.centerFrequency, equals((i + 0.5) * 1000));
       expect(band.gain, equals(i * 0.1));
     }
@@ -1582,6 +1582,12 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
       AndroidEqualizerBandSetGainRequest request) async {
     return AndroidEqualizerBandSetGainResponse();
+  }
+
+  @override
+  Future<DarwinEqualizerBandSetGainResponse> darwinEqualizerBandSetGain(
+      DarwinEqualizerBandSetGainRequest request) async {
+    return DarwinEqualizerBandSetGainResponse();
   }
 }
 

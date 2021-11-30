@@ -41,14 +41,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
     // Try to load audio from a source and catch any errors.
     try {
-      await _player.setAudioSource(ConcatenatingAudioSource(children: [
-        AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
-        AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
-        AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
-        AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
-        // AudioSource.uri(
-        //     Uri.parse("asset:///audio/assets_mp3_dua_lipa_dont_start_now.mp3"))
-      ]));
+      await _player.setAudioSource(
+        ConcatenatingAudioSource(
+          children: [AudioSource.uri(Uri.parse("asset:///audio/nature.mp3"))],
+        ),
+      );
     } catch (e) {
       print("Error loading audio source: $e");
     }

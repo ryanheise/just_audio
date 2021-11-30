@@ -215,4 +215,12 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'androidEqualizerBandSetGain', request.toMap()))!);
   }
+
+  @override
+  Future<DarwinEqualizerBandSetGainResponse> darwinEqualizerBandSetGain(
+      DarwinEqualizerBandSetGainRequest request) async {
+    return DarwinEqualizerBandSetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'darwinEqualizerBandSetGain', request.toMap()))!);
+  }
 }

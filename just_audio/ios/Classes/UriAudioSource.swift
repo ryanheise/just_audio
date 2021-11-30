@@ -14,19 +14,13 @@ class UriAudioSource: IndexedAudioSource {
         super.init(sid: sid)
     }
     
-    override func load(engine: AVAudioEngine, player: AVAudioPlayerNode, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
+    override func load(engine: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl: AVAudioUnitVarispeed, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
         let audioFile = try! AVAudioFile(forReading: URL(fileURLWithPath: uri))
-        let audioFormat = audioFile.processingFormat
-        let audioFrameCount = UInt32(audioFile.length)
+        let audioFormat = audioFile.fileFormat
+    
+        duration = TimeInterval(Double(audioFile.length) / audioFormat.sampleRate)
         
-        let audioFileBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: audioFrameCount)!
-        try! audioFile.read(into: audioFileBuffer)
-        
-        duration = TimeInterval(Double(audioFileBuffer.frameLength) / audioFileBuffer.format.sampleRate)
-        
-        engine.connect(player, to:engine.mainMixerNode, format: audioFileBuffer.format)
-        
-        player.scheduleBuffer(audioFileBuffer, completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
+        playerNode.scheduleFile(audioFile, at: nil, completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
     }
     
     override func getDuration() -> TimeInterval {

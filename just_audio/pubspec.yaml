@@ -32,6 +32,13 @@ dev_dependencies:
   plugin_platform_interface: ^2.0.0
   pedantic: ^1.10.0
 
+# Uncomment when testing platform interface changes.
+dependency_overrides:
+  just_audio_platform_interface:
+    path: ../just_audio_platform_interface
+#   just_audio_web:
+#     path: ../../just_audio_web
+
 flutter:
   plugin:
     platforms:
