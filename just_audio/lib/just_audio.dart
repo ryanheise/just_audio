@@ -15,6 +15,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 
+// export just_audio_platform
+export 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
+
 final _uuid = Uuid();
 
 /// An object to manage playing audio from a URL, a locale file or an asset.
