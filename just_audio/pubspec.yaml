@@ -14,7 +14,11 @@ dependencies:
       url: git@github.com:wavy-assistant/just_audio.git
       ref: feature/new_ios_implementation
       path: just_audio_platform_interface
-  just_audio_web: ^0.4.2
+  just_audio_web:
+    git:
+      url: git@github.com:wavy-assistant/just_audio.git
+      ref: feature/new_ios_implementation
+      path: just_audio_web
   # just_audio_web:
   #   path: ../just_audio_web
   audio_session: ^0.1.6+1
