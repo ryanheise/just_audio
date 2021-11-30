@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:just_audio_example/common.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -22,15 +23,28 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  final _equalizer = AndroidEqualizer();
-  final _loudnessEnhancer = AndroidLoudnessEnhancer();
-  late final AudioPlayer _player = AudioPlayer(
-    audioPipeline: AudioPipeline(
-      androidAudioEffects: [
-        _loudnessEnhancer,
-        _equalizer,
+  final _equalizer = Equalizer(
+    darwinMessageParameters: DarwinEqualizerParametersMessage(
+      minDecibels: -26.0,
+      maxDecibels: 24.0,
+      bands: [
+        DarwinEqualizerBandMessage(index: 0, centerFrequency: 60, gain: 0),
+        DarwinEqualizerBandMessage(index: 1, centerFrequency: 230, gain: 0),
+        DarwinEqualizerBandMessage(index: 2, centerFrequency: 910, gain: 0),
+        DarwinEqualizerBandMessage(index: 3, centerFrequency: 3600, gain: 0),
+        DarwinEqualizerBandMessage(index: 4, centerFrequency: 14000, gain: 0),
       ],
     ),
+  );
+
+  final _loudnessEnhancer = AndroidLoudnessEnhancer();
+  late final AudioPlayer _player = AudioPlayer(
+    audioPipeline: AudioPipeline(androidAudioEffects: [
+      _loudnessEnhancer,
+      _equalizer,
+    ], darwinAudioEffects: [
+      _equalizer
+    ]),
   );
 
   @override
@@ -47,8 +61,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.speech());
     try {
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(
-          "asset:///audio/assets_mp3_dua_lipa_dont_start_now.mp3")));
+      await _player.setAudioSource(
+          AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")));
     } catch (e) {
       print("Error loading audio source: $e");
     }
@@ -164,7 +178,7 @@ class LoudnessEnhancerControls extends StatelessWidget {
 }
 
 class EqualizerControls extends StatelessWidget {
-  final AndroidEqualizer equalizer;
+  final Equalizer equalizer;
 
   const EqualizerControls({
     Key? key,
@@ -173,7 +187,7 @@ class EqualizerControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AndroidEqualizerParameters>(
+    return FutureBuilder<EqualizerParameters>(
       future: equalizer.parameters,
       builder: (context, snapshot) {
         final parameters = snapshot.data;

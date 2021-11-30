@@ -216,6 +216,13 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError(
         "androidEqualizerBandSetGain() has not been implemented.");
   }
+
+  /// Sets the gain for an Darwin equalizer band.
+  Future<DarwinEqualizerBandSetGainResponse> darwinEqualizerBandSetGain(
+      DarwinEqualizerBandSetGainRequest request) {
+    throw UnimplementedError(
+        "darwinEqualizerBandSetGain() has not been implemented.");
+  }
 }
 
 /// A data update communicated from the platform implementation to the Flutter
@@ -1259,6 +1266,33 @@ class AndroidEqualizerBandSetGainResponse {
       AndroidEqualizerBandSetGainResponse();
 }
 
+/// Information communicated to the platform implementation when setting the
+/// gain for an equalizer band.
+class DarwinEqualizerBandSetGainRequest {
+  final int bandIndex;
+  final double gain;
+
+  DarwinEqualizerBandSetGainRequest({
+    required this.bandIndex,
+    required this.gain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'bandIndex': bandIndex,
+        'gain': gain,
+      };
+}
+
+/// Information returned by the platform implementation after setting the gain
+/// for an equalizer band.
+class DarwinEqualizerBandSetGainResponse {
+  DarwinEqualizerBandSetGainResponse();
+
+  static DarwinEqualizerBandSetGainResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      DarwinEqualizerBandSetGainResponse();
+}
+
 /// Information about an audio effect to be communicated with the platform
 /// implementation.
 abstract class AudioEffectMessage {
@@ -1377,4 +1411,84 @@ class AndroidEqualizerMessage extends AudioEffectMessage {
         'enabled': enabled,
         'parameters': parameters?.toMap(),
       };
+}
+
+/// Information about the equalizer parameters to be communicated with the
+/// platform implementation.
+class DarwinEqualizerParametersMessage {
+  final double minDecibels;
+  final double maxDecibels;
+  final List<DarwinEqualizerBandMessage> bands;
+
+  DarwinEqualizerParametersMessage({
+    required this.minDecibels,
+    required this.maxDecibels,
+    required this.bands,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'minDecibels': minDecibels,
+        'maxDecibels': maxDecibels,
+        'bands': bands.map((band) => band.toMap()).toList(),
+      };
+
+  static DarwinEqualizerParametersMessage fromMap(Map<dynamic, dynamic> map) =>
+      DarwinEqualizerParametersMessage(
+        minDecibels: map['minDecibels'] as double,
+        maxDecibels: map['maxDecibels'] as double,
+        bands: (map['bands'] as List<dynamic>)
+            .map((dynamic bandMap) => DarwinEqualizerBandMessage.fromMap(
+                bandMap as Map<dynamic, dynamic>))
+            .toList(),
+      );
+}
+
+/// Information about the equalizer to be communicated with the platform
+/// implementation.
+class DarwinEqualizerMessage extends AudioEffectMessage {
+  final DarwinEqualizerParametersMessage parameters;
+
+  DarwinEqualizerMessage({
+    required bool enabled,
+    required this.parameters,
+  }) : super(enabled: enabled);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'DarwinEqualizer',
+        'enabled': enabled,
+        'parameters': parameters.toMap(),
+      };
+}
+
+/// Information about an equalizer band to be communicated with the platform
+/// implementation.
+class DarwinEqualizerBandMessage {
+  /// A zero-based index of the position of this band within its [DarwinEqualizer].
+  final int index;
+
+  /// The center frequency of this band in hertz.
+  final double centerFrequency;
+
+  /// The gain for this band in decibels.
+  final double gain;
+
+  DarwinEqualizerBandMessage({
+    required this.index,
+    required this.centerFrequency,
+    required this.gain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'index': index,
+        'centerFrequency': centerFrequency,
+        'gain': gain,
+      };
+
+  static DarwinEqualizerBandMessage fromMap(Map<dynamic, dynamic> map) =>
+      DarwinEqualizerBandMessage(
+        index: map['index'] as int,
+        centerFrequency: map['centerFrequency'] as double,
+        gain: map['gain'] as double,
+      );
 }

@@ -18,9 +18,12 @@ public class JustAudioPlayer: NSObject {
     let eventChannel: BetterEventChannel
     let dataChannel: BetterEventChannel
     
+    let audioEffects: [Dictionary<String, Any>]
+    
     var engine: AVAudioEngine!
     var playerNode: AVAudioPlayerNode!
     var speedControl: AVAudioUnitVarispeed!
+    var audioUnitEQ: AVAudioUnitEQ?
 
     var playing = false
     var processingState: ProcessingState = .none
@@ -43,13 +46,14 @@ public class JustAudioPlayer: NSObject {
     var volume: Float = 1
     var rate: Float = 1
     
-    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: Dictionary<String, Any>) {
+    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: Dictionary<String, Any>, audioEffects: [Dictionary<String, Any>]) {
         self.playerId = playerId
+        self.audioEffects = audioEffects
         methodChannel = FlutterMethodChannel(name: String(format: "com.ryanheise.just_audio.methods.%@", playerId), binaryMessenger: registrar.messenger())
         eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
         dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
         
-        print(loadConfiguration)
+        print("TODO: loadConfiguration", loadConfiguration)
         
         super.init()
         methodChannel.setMethodCallHandler { call, result in
@@ -62,6 +66,7 @@ public class JustAudioPlayer: NSObject {
             let request = call.arguments as! Dictionary<String, Any>
             switch call.method {
             case "load":
+                print("load:", request)
                 let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1000000)
                 try load(source: request["audioSource"] as! Dictionary<String, Any>, initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
                 break
@@ -122,7 +127,10 @@ public class JustAudioPlayer: NSObject {
                 result([:])
                 break
             case "seek":
-                result([:])
+                let position = request["position"] == nil ? CMTime.invalid : CMTimeMake(value: request["position"] as! Int64, timescale: 1000000)
+                seek(position: position, index: request["index"] as? Int ?? 0) {
+                    result([:])
+                }
                 break
             case "concatenatingInsertAll":
                 print("TODO: concatenatingInsertAll", request)
@@ -141,10 +149,16 @@ public class JustAudioPlayer: NSObject {
                 result([:])
                 break
             case "audioEffectSetEnabled":
-                print("TODO: audioEffectSetEnabled", request)
+                try! enableEffect(type: request["type"] as! String, enabled: request["enabled"] as! Bool)
                 result([:])
+                break
+            case "darwinEqualizerBandSetGain":
+                setEqualizerBandGain(bandIndex: request["bandIndex"] as! Int, gain: Float(request["gain"] as! Double))
+                result([:])
+                break
             default:
                 result(FlutterMethodNotImplemented)
+                break
             }
         } catch {
             let flutterError = FlutterError(code: "error", message: "Error in handleMethodCall", details: nil)
@@ -175,14 +189,29 @@ public class JustAudioPlayer: NSObject {
             playerNode = AVAudioPlayerNode()
             speedControl = AVAudioUnitVarispeed()
             
+            try! createAudioEffects()
+            
             playerNode.volume = volume
             speedControl.rate = rate
             
-            engine.attach(playerNode)
-            engine.attach(speedControl)
+            var nodes = [playerNode, speedControl]
+
+            // add equalizer node
+            if audioUnitEQ != nil {
+                nodes.append(audioUnitEQ!)
+            }
             
-            engine.connect(playerNode, to:speedControl, format: nil)
-            engine.connect(speedControl, to:engine.mainMixerNode, format: nil)
+            // attach all nodes to engine
+            for node in nodes {
+                engine.attach(node!)
+            }
+            
+            // add mainMixerNode
+            nodes.append(engine.mainMixerNode)
+            
+            for i in 1..<nodes.count {
+                engine.connect(nodes[i-1]!, to:nodes[i]!, format: nil)
+            }
         }
         
         try! enqueueFrom(index)
@@ -197,6 +226,15 @@ public class JustAudioPlayer: NSObject {
         loadResult = nil
         
         broadcastPlaybackEvent()
+    }
+    
+    func seek(position: CMTime, index: Int, completionHandler: () -> Void){
+        try! enqueueFrom(index)
+        self.updatePosition()
+        self.processingState = .ready
+        self.playerNode.play()
+        self.broadcastPlaybackEvent()
+        completionHandler()
     }
     
     func playNext() {
@@ -247,6 +285,7 @@ public class JustAudioPlayer: NSObject {
     func complete() {
         updatePosition()
         processingState = .completed
+        self.playerNode.stop()
         broadcastPlaybackEvent()
     }
     
@@ -304,6 +343,46 @@ public class JustAudioPlayer: NSObject {
         default:
             throw PluginError.runtimeError("data source not supported")
         }
+    }
+    
+    func createAudioEffects() throws {
+        for effect in audioEffects {
+            let parameters = effect["parameters"] as! Dictionary<String, Any>
+            switch effect["type"] as? String {
+            case "DarwinEqualizer":
+                let bands = parameters["bands"] as! [Dictionary<String, Any>]
+                audioUnitEQ = AVAudioUnitEQ(numberOfBands: bands.count)
+                for (i, band) in bands.enumerated() {
+                    audioUnitEQ!.bands[i].filterType = .parametric
+                    audioUnitEQ!.bands[i].frequency = band["centerFrequency"] as! Float
+                    audioUnitEQ!.bands[i].bandwidth = 0.5 // half an octave
+                    audioUnitEQ!.bands[i].gain = Float(band["gain"] as? Double ?? 0)
+                    audioUnitEQ!.bands[i].bypass = false
+                }
+                if let enabled = effect["enabled"] as? Bool {
+                    audioUnitEQ!.bypass = !enabled
+                }else {
+                    audioUnitEQ!.bypass = true
+                }
+                break;
+            default:
+                throw PluginError.runtimeError("effect type not supported")
+            }
+        }
+    }
+    
+    func enableEffect(type: String, enabled: Bool) throws {
+        switch type {
+        case "DarwinEqualizer":
+            audioUnitEQ!.bypass = !enabled
+            break;
+        default:
+            throw PluginError.runtimeError("effect type not supported")
+        }
+    }
+    
+    func setEqualizerBandGain(bandIndex: Int, gain: Float) {
+        audioUnitEQ?.bands[bandIndex].gain = gain
     }
     
     func dispose() {
