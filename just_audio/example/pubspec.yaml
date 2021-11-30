@@ -10,16 +10,16 @@ dependencies:
     sdk: flutter
   audio_session: ^0.1.5
   rxdart: '^0.27.0'
-  just_audio_libwinmedia: ^0.0.4
+  # just_audio_libwinmedia: ^0.0.4
   # just_audio_libwinmedia:
   #   path: ../../../just_audio_libwinmedia
   just_audio:
     path: ../
 
 # Uncomment when testing platform interface changes.
-dependency_overrides:
-  just_audio_platform_interface:
-    path: ../../just_audio_platform_interface
+# dependency_overrides:
+#   just_audio_platform_interface:
+#     path: ../../just_audio_platform_interface
 #   just_audio_web:
 #     path: ../../just_audio_web
 
