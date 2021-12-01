@@ -285,7 +285,9 @@ public class JustAudioPlayer: NSObject {
     func complete() {
         updatePosition()
         processingState = .completed
-        self.playerNode.stop()
+        if playerNode != nil {
+            playerNode.stop()
+        }
         broadcastPlaybackEvent()
     }
     
@@ -386,6 +388,25 @@ public class JustAudioPlayer: NSObject {
     }
     
     func dispose() {
-        print("dispose player")
+        if(playerNode == nil) {
+            return
+        }
+        if processingState != .none {
+            playerNode.pause()
+            processingState = .none
+        }
+        audioSource = nil
+        indexedAudioSources = []
+        if (playerNode != nil) {
+            playerNode.stop()
+            playerNode = nil
+        }
+        if (engine != nil) {
+            engine.stop()
+            engine = nil
+        }
+        eventChannel.dispose()
+        dataChannel.dispose()
+        methodChannel.setMethodCallHandler(nil)
     }
 }

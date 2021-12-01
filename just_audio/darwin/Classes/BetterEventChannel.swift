@@ -23,4 +23,8 @@ class BetterEventChannel: NSObject, FlutterStreamHandler {
     func sendEvent(_ event: Any) {
         eventSink?(event)
     }
+    
+    func dispose() {
+        eventChannel.setStreamHandler(nil)
+    }
 }
