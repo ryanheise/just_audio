@@ -243,6 +243,7 @@ public class JustAudioPlayer: NSObject {
             if newIndex >= self.indexedAudioSources.count {
                 self.complete()
             } else {
+                self.playerNode.stop()
                 try! self.enqueueFrom(newIndex)
                 self.updatePosition()
                 self.playerNode.play()
