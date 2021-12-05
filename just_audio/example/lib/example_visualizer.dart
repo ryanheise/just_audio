@@ -1,8 +1,11 @@
-// This is a minimal example demonstrating a play/pause button and a seek bar.
-// More advanced examples demonstrating other features can be found in the same
-// directory as this example in the GitHub repository.
+// This example demonstrates the visualizer.
+//
+// To run:
+//
+// flutter run -t lib/example_visualizer.dart
 
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
@@ -22,6 +25,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    if (!kIsWeb) {
+      _player.playerStateStream.listen((state) {
+        if (state.playing &&
+            state.processingState != ProcessingState.idle &&
+            state.processingState != ProcessingState.completed) {
+          _player.startVisualizer(
+              enableWaveform: true, enableFft: false, captureRate: 25000);
+        } else {
+          _player.stopVisualizer();
+        }
+      });
+    }
     WidgetsBinding.instance?.addObserver(this);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.black,
@@ -87,6 +102,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Display the visualizer widget
+              if (!kIsWeb)
+                Container(
+                  height: 50.0,
+                  width: double.maxFinite,
+                  child: StreamBuilder<VisualizerWaveformCapture>(
+                    stream: _player.visualizerWaveformStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.data == null) return SizedBox();
+                      return AudioVisualizerWidget(snapshot.data!);
+                    },
+                  ),
+                ),
               // Display play/pause button and volume/speed sliders.
               ControlButtons(_player),
               // Display seek bar. Using StreamBuilder, this widget rebuilds
@@ -109,6 +137,59 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+}
+
+class AudioVisualizerWidget extends StatelessWidget {
+  final VisualizerWaveformCapture capture;
+
+  AudioVisualizerWidget(this.capture);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: CustomPaint(
+        painter: AudioVisualizerPainter(capture),
+      ),
+    );
+  }
+}
+
+class AudioVisualizerPainter extends CustomPainter {
+  final VisualizerWaveformCapture capture;
+  final Paint barPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0
+    ..color = Colors.blue;
+
+  AudioVisualizerPainter(this.capture);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    int getSample(double d) {
+      final i = d.toInt();
+      if (i >= 0 && i < capture.data.length) {
+        return capture.data[i] - 128;
+      } else {
+        return 0;
+      }
+    }
+
+    const barCount = 120;
+    final barWidth = size.width / barCount;
+    final midY = size.height / 2;
+    for (var barX = 0.0; barX < size.width; barX += barWidth) {
+      final sample = getSample(barX);
+      canvas.drawLine(
+          Offset(barX.toDouble(), midY),
+          Offset(barX.toDouble(), midY - sample * size.height / 2 / 128),
+          barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant AudioVisualizerPainter oldDelegate) {
+    return true;
   }
 }
 
