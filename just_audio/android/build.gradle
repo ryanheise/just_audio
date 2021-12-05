@@ -1,28 +1,33 @@
 group 'com.ryanheise.just_audio'
 version '1.0'
+def args = ["-Xlint:deprecation","-Xlint:unchecked","-Werror"]
 
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.0'
+        classpath 'com.android.tools.build:gradle:4.1.0'
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
+}
+
+project.getTasks().withType(JavaCompile) {
+    options.compilerArgs.addAll(args)
 }
 
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion 30
 
     defaultConfig {
         minSdkVersion 16
@@ -40,8 +45,8 @@ android {
 }
 
 dependencies {
-    implementation 'com.google.android.exoplayer:exoplayer-core:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-dash:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-hls:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.13.1'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.15.0'
+    implementation 'com.google.android.exoplayer:exoplayer-dash:2.15.0'
+    implementation 'com.google.android.exoplayer:exoplayer-hls:2.15.0'
+    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.15.0'
 }

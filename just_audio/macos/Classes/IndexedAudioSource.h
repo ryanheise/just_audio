@@ -13,7 +13,7 @@
 @property (readonly, nonatomic) BOOL isAttached;
 
 - (void)onStatusChanged:(AVPlayerItemStatus)status;
-- (void)attach:(AVQueuePlayer *)player;
+- (void)attach:(AVQueuePlayer *)player initialPos:(CMTime)initialPos;
 - (void)play:(AVQueuePlayer *)player;
 - (void)pause:(AVQueuePlayer *)player;
 - (void)stop:(AVQueuePlayer *)player;

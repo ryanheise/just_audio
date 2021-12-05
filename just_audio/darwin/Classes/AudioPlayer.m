@@ -24,6 +24,7 @@ typedef struct JATapStorage {
     NSObject<FlutterPluginRegistrar>* _registrar;
     FlutterMethodChannel *_methodChannel;
     BetterEventChannel *_eventChannel;
+    BetterEventChannel *_dataEventChannel;
     BetterEventChannel *_waveformEventChannel;
     BetterEventChannel *_fftEventChannel;
     NSString *_playerId;
@@ -44,7 +45,6 @@ typedef struct JATapStorage {
     // Set when the current item hasn't been played yet so we aren't sure whether sufficient audio has been buffered.
     BOOL _bufferUnconfirmed;
     CMTime _seekPos;
-    CMTime _initialPos;
     FlutterResult _loadResult;
     FlutterResult _playResult;
     id _timeObserver;
@@ -52,6 +52,7 @@ typedef struct JATapStorage {
     LoadControl *_loadControl;
     BOOL _playing;
     float _speed;
+    float _volume;
     BOOL _justAdvanced;
     BOOL _visualizerEnableWaveform;
     BOOL _visualizerEnableFft;
@@ -72,6 +73,9 @@ typedef struct JATapStorage {
     _eventChannel = [[BetterEventChannel alloc]
         initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.events.%@", _playerId]
            messenger:[registrar messenger]];
+    _dataEventChannel = [[BetterEventChannel alloc]
+        initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.data.%@", _playerId]
+           messenger:[registrar messenger]];
     _waveformEventChannel = [[BetterEventChannel alloc]
         initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.waveform_events.%@", _playerId]
            messenger:[registrar messenger]];
@@ -88,7 +92,6 @@ typedef struct JATapStorage {
     _order = nil;
     _orderInv = nil;
     _seekPos = kCMTimeInvalid;
-    _initialPos = kCMTimeZero;
     _timeObserver = 0;
     _updatePosition = 0;
     _updateTime = 0;
@@ -117,6 +120,7 @@ typedef struct JATapStorage {
         _loadControl.preferredPeakBitRate = (NSNumber *)[NSNull null];
     }
     _speed = 1.0f;
+    _volume = 1.0f;
     _justAdvanced = NO;
     _visualizerEnableWaveform = NO;
     _visualizerEnableFft = NO;
@@ -145,7 +149,7 @@ typedef struct JATapStorage {
             [self stopVisualizer];
             result(@{});
         } else if ([@"load" isEqualToString:call.method]) {
-            CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeZero : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
+            CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeInvalid : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
             [self load:request[@"audioSource"] initialPosition:initialPosition initialIndex:request[@"initialIndex"] result:result];
         } else if ([@"play" isEqualToString:call.method]) {
             [self play:result];
@@ -249,7 +253,7 @@ typedef struct JATapStorage {
     // Notify each new IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         if (!_indexedAudioSources[i].isAttached) {
-            [_indexedAudioSources[i] attach:_player];
+            [_indexedAudioSources[i] attach:_player initialPos:kCMTimeInvalid];
         }
     }
     [self broadcastPlaybackEvent];
@@ -510,9 +514,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
 }
 
 - (int)getCurrentPosition {
-    if (_processingState == none || _processingState == loading) {
-        return (int)(1000 * CMTimeGetSeconds(_initialPos));
-    } else if (CMTIME_IS_VALID(_seekPos)) {
+    if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
     } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
         int ms = (int)(1000 * CMTimeGetSeconds(_indexedAudioSources[_index].position));
@@ -587,23 +589,20 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
 }
 
 - (void)metadataOutput:(AVPlayerItemMetadataOutput *)output didOutputTimedMetadataGroups:(NSArray<AVTimedMetadataGroup *> *)groups fromPlayerItemTrack:(AVPlayerItemTrack *)track {
+    // ICY headers aren't available here. Maybe do this in the proxy.
     BOOL hasIcyData = NO;
     NSString *title = (NSString *)[NSNull null];
+    NSString *url = (NSString *)[NSNull null];
     for (int i = 0; i < groups.count; i++) {
-        //NSLog(@"group %d", i);
         AVTimedMetadataGroup *group = groups[i];
         for (int j = 0; j < group.items.count; j++) {
-            //NSLog(@"item %d", j);
-            AVMetadataItem *item = group.items[i];
-            //NSLog(@"key: %@", item.key);
-            //NSLog(@"keySpace: %@", item.keySpace);
-            //NSLog(@"commonKey: %@", item.commonKey);
-            //NSLog(@"value: %@", item.value);
-            //NSLog(@"identifier: %@", item.identifier);
-            // TODO: Detect more metadata
+            AVMetadataItem *item = group.items[j];
             if ([@"icy/StreamTitle" isEqualToString:item.identifier]) {
                 hasIcyData = YES;
                 title = (NSString *)item.value;
+            } else if ([@"icy/StreamUrl" isEqualToString:item.identifier]) {
+                hasIcyData = YES;
+                url = (NSString *)item.value;
             }
         }
     }
@@ -611,6 +610,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
         _icyMetadata = @{
             @"info": @{
                 @"title": title,
+                @"url": url,
             },
         };
         [self broadcastPlaybackEvent];
@@ -759,12 +759,10 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     if (_processingState == loading) {
         [self abortExistingConnection];
     }
-    _initialPos = initialPosition;
     _loadResult = result;
     _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     _processingState = loading;
     [self updatePosition];
-    [self broadcastPlaybackEvent];
     // Remove previous observers
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -847,7 +845,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     [self enqueueFrom:_index];
     // Notify each IndexedAudioSource that it's been attached to the player.
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
-        [_indexedAudioSources[i] attach:_player];
+        [_indexedAudioSources[i] attach:_player initialPos:(i == _index ? initialPosition : kCMTimeInvalid)];
     }
 
     if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
@@ -860,6 +858,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     if (_playing) {
         _player.rate = _speed;
     }
+    [_player setVolume:_volume];
     [self broadcastPlaybackEvent];
     /* NSLog(@"load:"); */
     /* for (int i = 0; i < [_indexedAudioSources count]; i++) { */
@@ -912,7 +911,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
         _justAdvanced = YES;
     } else if ([_orderInv[_index] intValue] + 1 < [_order count]) {
         [endedSource seek:kCMTimeZero];
-        _index++;
+        _index = [_order[([_orderInv[_index] intValue] + 1)] intValue];
         [self updateEndAction];
         [self broadcastPlaybackEvent];
         _justAdvanced = YES;
@@ -977,14 +976,6 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
                 if (_loadResult) {
                     _loadResult(@{@"duration": @([self getDurationMicroseconds])});
                     _loadResult = nil;
-                }
-                if (CMTIME_IS_VALID(_initialPos) && CMTIME_COMPARE_INLINE(_initialPos, >, kCMTimeZero)) {
-                    __weak __typeof__(self) weakSelf = self;
-                    [playerItem.audioSource seek:_initialPos completionHandler:^(BOOL finished) {
-                        [weakSelf updatePosition];
-                        [weakSelf broadcastPlaybackEvent];
-                    }];
-                    _initialPos = kCMTimeZero;
                 }
                 break;
             }
@@ -1235,7 +1226,10 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
 }
 
 - (void)setVolume:(float)volume {
-    [_player setVolume:volume];
+    _volume = volume;
+    if (_player) {
+        [_player setVolume:volume];
+    }
 }
 
 - (void)setSpeed:(float)speed {
@@ -1266,7 +1260,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     // There is no way to reliably query whether the requested speed is
     // supported.
     _speed = speed;
-    if (_playing) {
+    if (_playing && _player) {
         _player.rate = speed;
     }
     [self updatePosition];
@@ -1304,8 +1298,13 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
 }
 
 - (void)setShuffleOrder:(NSDictionary *)dict {
-    // TODO: update order and enqueue.
+    if (!_audioSource) return;
+
     [_audioSource decodeShuffleOrder:dict];
+
+    [self updateOrder];
+
+    [self enqueueFrom:_index];
 }
 
 - (void)dumpQueue {
@@ -1508,6 +1507,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     }
     // Untested:
     [_eventChannel dispose];
+    [_dataEventChannel dispose];
     [_waveformEventChannel dispose];
     [_fftEventChannel dispose];
     [_methodChannel setMethodCallHandler:nil];

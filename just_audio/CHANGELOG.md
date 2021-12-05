@@ -1,8 +1,127 @@
-## Next release
+## 0.9.18
 
-* Add setSkipSilenceEnabled (@subhash279).
-* Add buffer options via AudioLoadConfiguration.
-* Add setPitch.
+* Fix null duration bug on LockCachingAudioSource.
+
+## 0.9.17
+
+* LockCachingAudioSource works with servers not supporting range requests.
+* Add StreamAudioResponse.rangeRequestsSupported.
+* Fix doc typos (@robert-j-webb)
+
+## 0.9.16
+
+* Fix pubspec declaration for Linux/Windows implementation.
+
+## 0.9.15
+
+* Fix bug initialising proxy on ConcatenatingAudioSource.add.
+
+## 0.9.14
+
+* Fix bug when pausing/stopping quickly after play.
+
+## 0.9.13
+
+* Fix MIME type in LockCachingAudioSource.
+* Add radio/livestream example.
+* Report URL from ICY metadata on iOS/macOS.
+* Update example to just_audio_libwinmedia 0.0.4 (@bdlukaa)
+
+## 0.9.12
+
+* Windows/Linux support (@bdlukaa, credit to @alexmercerind for libwinmedia).
+
+## 0.9.11
+
+* Upgrade Android to ExoPlayer 2.15.0.
+
+## 0.9.10
+
+* Fix Android bug playing after stopping.
+
+## 0.9.9
+
+* Fix web bug adding/removing items while paused.
+
+## 0.9.8
+
+* Fix bug restoring AndroidEqualizer state after stop.
+* Make exceptions implement Exception.
+* Upgrade to ExoPlayer 2.13.3.
+
+## 0.9.7
+
+* Update Gradle version.
+* Change == parameter from dynamic to Object (@cedvdb).
+* Check runtimeType in all == operators.
+* Fix Android compiler warnings.
+
+## 0.9.6
+
+* Fix iOS 12.4 `LockCachingAudioSource` fetch exception (@akindone).
+
+## 0.9.5
+
+* Fix iOS/macOS bug updating shuffle order.
+* Fix iOS/macOS bug advancing to next in shuffle order.
+
+## 0.9.4
+
+* Remember position after stop().
+
+## 0.9.3
+
+* Fix bug when updating playlist before loading.
+
+## 0.9.2
+
+* Fix Android bug when loading empty playlist.
+* Fix Android NullPointerException on stop().
+
+## 0.9.1
+
+* Fix iOS/macOS bug when setting volume before load.
+
+## 0.9.0
+
+* Update to support just_audio_background.
+
+## 0.8.1
+
+* Fix update position bug on Android.
+* Compile-time option to include/exclude microphone API.
+
+## 0.8.0
+
+* Add buffer options via AudioLoadConfiguration for iOS/Android.
+* Add setSkipSilenceEnabled for Android (@subhash279).
+* Add setPitch for Android.
+* Add audio effects:
+  * AndroidLoudnessEnhancer
+  * AndroidEqualizer
+* Dispose players when hot restarting on Android.
+
+## 0.7.5
+
+* Support rxdart 0.27.0
+* Mention INTERNET Android permission in README (@nt4f04uNd).
+
+## 0.7.4+1
+
+* Link to tutorials in README.
+
+## 0.7.4
+
+* Fix hang after stopping while loading.
+* Fix pending timers error (@minhqdao).
+
+## 0.7.3
+
+* Silence uncaught exceptions in positionStream.
+
+## 0.7.2
+
+* Propagate play() exceptions (@twogood).
 
 ## 0.7.1
 

@@ -57,6 +57,12 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
               samplingRate: event['samplingRate'] as int,
               data: event['data'] as Uint8List));
 
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      EventChannel('com.ryanheise.just_audio.data.$id')
+          .receiveBroadcastStream()
+          .map((dynamic map) =>
+              PlayerDataMessage.fromMap(map as Map<dynamic, dynamic>));
+
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     return LoadResponse.fromMap((await _channel
@@ -208,5 +214,38 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       StopVisualizerRequest request) async {
     return StopVisualizerResponse.fromMap(
         (await _channel.invokeMethod('stopVisualizer', request.toMap()))!);
+  }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) async {
+    return AudioEffectSetEnabledResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'audioEffectSetEnabled', request.toMap()))!);
+  }
+
+  @override
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+    return AndroidLoudnessEnhancerSetTargetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidLoudnessEnhancerSetTargetGain', request.toMap()))!);
+  }
+
+  @override
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) async {
+    return AndroidEqualizerGetParametersResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidEqualizerGetParameters', request.toMap()))!);
+  }
+
+  @override
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) async {
+    return AndroidEqualizerBandSetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidEqualizerBandSetGain', request.toMap()))!);
   }
 }

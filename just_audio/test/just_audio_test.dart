@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -251,6 +252,61 @@ void runTests() {
     await player.dispose();
   });
 
+  test('skipSilence', () async {
+    final player = AudioPlayer();
+    expect(player.skipSilenceEnabled, equals(false));
+    await player.setSkipSilenceEnabled(true);
+    expect(player.skipSilenceEnabled, equals(true));
+    await player.setSkipSilenceEnabled(false);
+    expect(player.skipSilenceEnabled, equals(false));
+    await player.dispose();
+  });
+
+  test('pitch', () async {
+    final player = AudioPlayer();
+    expect(player.pitch, equals(1.0));
+    await player.setPitch(1.5);
+    expect(player.pitch, equals(1.5));
+    await player.dispose();
+  });
+
+  test('setAutomaticallyWaitsToMinimizeStalling', () async {
+    final player = AudioPlayer();
+    expect(player.automaticallyWaitsToMinimizeStalling, equals(true));
+    await player.setAutomaticallyWaitsToMinimizeStalling(false);
+    expect(player.automaticallyWaitsToMinimizeStalling, equals(false));
+    await player.setAutomaticallyWaitsToMinimizeStalling(true);
+    expect(player.automaticallyWaitsToMinimizeStalling, equals(true));
+    await player.dispose();
+  });
+
+  test('setCanUseNetworkResourcesForLiveStreamingWhilePaused', () async {
+    final player = AudioPlayer();
+    expect(player.canUseNetworkResourcesForLiveStreamingWhilePaused,
+        equals(false));
+    await player.setCanUseNetworkResourcesForLiveStreamingWhilePaused(true);
+    expect(
+        player.canUseNetworkResourcesForLiveStreamingWhilePaused, equals(true));
+    await player.setCanUseNetworkResourcesForLiveStreamingWhilePaused(false);
+    expect(player.canUseNetworkResourcesForLiveStreamingWhilePaused,
+        equals(false));
+    await player.dispose();
+  });
+
+  test('setPreferredPeakBitRate', () async {
+    final player = AudioPlayer();
+    expect(player.preferredPeakBitRate, equals(0.0));
+    await player.setPreferredPeakBitRate(1000.0);
+    expect(player.preferredPeakBitRate, equals(1000.0));
+    await player.dispose();
+  });
+
+  test('setAndroidAudioAttributes', () async {
+    final player = AudioPlayer();
+    await player.setAndroidAudioAttributes(AndroidAudioAttributes());
+    await player.dispose();
+  });
+
   test('positionStream', () async {
     final player = AudioPlayer();
     /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
@@ -389,7 +445,7 @@ void runTests() {
         expect(response.statusCode, equals(HttpStatus.partialContent));
       } else if (start != null) {
         expect(response.headers.value(HttpHeaders.contentRangeHeader),
-            'bytes $start-/${byteRangeData.length}');
+            'bytes $start-${byteRangeData.length - 1}/${byteRangeData.length}');
         expect(response.statusCode, equals(HttpStatus.partialContent));
       } else {
         expect(response.headers.value(HttpHeaders.contentRangeHeader), null);
@@ -941,11 +997,248 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     await player.dispose();
   });
+
+  test('play-pause', () async {
+    final player = AudioPlayer();
+    await player.setUrl('https://bar.bar/foo.mp3');
+    player.play();
+    await player.pause();
+    await Future<void>.delayed(Duration(milliseconds: 200));
+    expect(mock.mostRecentPlayer?._playing, false);
+    await player.dispose();
+  });
+
+  test('play-stop', () async {
+    final player = AudioPlayer();
+    await player.setUrl('https://bar.bar/foo.mp3');
+    player.play();
+    await player.stop();
+    await Future<void>.delayed(Duration(milliseconds: 200));
+    expect(mock.mostRecentPlayer?._playing, false);
+    await player.dispose();
+  });
+
+  test('positionStream emissions: seek while paused', () async {
+    final player = AudioPlayer();
+    await player.setUrl('https://bar.bar/foo.mp3');
+    expectState(
+      player: player,
+      position: Duration.zero,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
+    var completer = Completer<dynamic>();
+    late StreamSubscription subscription;
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, Duration.zero);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    final duration1 = Duration(seconds: 1);
+    final duration2 = Duration(milliseconds: 600);
+    final duration3 = Duration(milliseconds: 750);
+
+    await player.seek(duration1);
+    expectState(
+      player: player,
+      position: duration1,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    player.play();
+    await Future<dynamic>.delayed(duration2);
+    expectState(
+      player: player,
+      position: duration1 + duration2,
+      processingState: ProcessingState.ready,
+      playing: true,
+    );
+    await player.pause();
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1 + duration2);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.seek(duration1 + duration2 + duration3);
+    expectState(
+      player: player,
+      position: duration1 + duration2 + duration3,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1 + duration2 + duration3);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.dispose();
+  });
+
+  test('positionStream emissions: switch audio sources', () async {
+    final player = AudioPlayer();
+    final playlist = ConcatenatingAudioSource(
+      children: [
+        AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')),
+        AudioSource.uri(Uri.parse('https://bar.bar/bar.mp3')),
+      ],
+    );
+    await player.setAudioSource(playlist);
+    expectState(
+      player: player,
+      position: Duration.zero,
+      processingState: ProcessingState.ready,
+      playing: false,
+    );
+    expect(player.currentIndex, 0);
+    var completer = Completer<dynamic>();
+    late StreamSubscription subscription;
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, Duration.zero);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    final duration1 = Duration(seconds: 1);
+    final duration2 = Duration(seconds: 600);
+
+    await player.seek(duration1);
+    expect(player.currentIndex, 0);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration1);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.seekToNext();
+    expect(player.currentIndex, 1);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, Duration.zero);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.seek(duration1, index: 1);
+    expect(player.currentIndex, 1);
+    await player.seekToNext();
+    // There is no next
+    expect(player.currentIndex, 1);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      // No position change because there is no next
+      expectDuration(position, duration1);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    // Switch to index 0 and seek position at the same time
+    await player.seek(duration2, index: 0);
+    expect(player.currentIndex, 0);
+    completer = Completer<dynamic>();
+    subscription = player.positionStream.listen((position) {
+      expectDuration(position, duration2);
+      subscription.cancel();
+      completer.complete();
+    });
+    await completer.future;
+
+    await player.dispose();
+  });
+
+  test('loadConfiguration', () async {
+    final audioLoadConfiguration = AudioLoadConfiguration(
+      darwinLoadControl: DarwinLoadControl(),
+      androidLoadControl: AndroidLoadControl(),
+      androidLivePlaybackSpeedControl: AndroidLivePlaybackSpeedControl(),
+    );
+    final player = AudioPlayer(
+      audioLoadConfiguration: audioLoadConfiguration,
+    );
+    await player.setUrl('https://foo.foo/foo.mp3');
+    final platformPlayer = mock.mostRecentPlayer!;
+    expect(
+        platformPlayer.audioLoadConfiguration?.darwinLoadControl
+            ?.automaticallyWaitsToMinimizeStalling,
+        equals(audioLoadConfiguration
+            .darwinLoadControl?.automaticallyWaitsToMinimizeStalling));
+    // TODO: check other fields.
+    await player.dispose();
+  });
+
+  test('AndroidLoudnessEnhancer', () async {
+    final loudnessEnhancer = AndroidLoudnessEnhancer();
+    final player = AudioPlayer(
+      audioPipeline: AudioPipeline(androidAudioEffects: [loudnessEnhancer]),
+    );
+    expect(loudnessEnhancer.targetGain, equals(0.0));
+    expect(await loudnessEnhancer.targetGainStream.first, equals(0.0));
+    await player.setUrl('https://foo.foo/foo.mp3');
+    expect(loudnessEnhancer.targetGain, equals(0.0));
+    expect(await loudnessEnhancer.targetGainStream.first, equals(0.0));
+    await loudnessEnhancer.setTargetGain(1.5);
+    expect(loudnessEnhancer.targetGain, equals(1.5));
+    expect(await loudnessEnhancer.targetGainStream.first, equals(1.5));
+    expect(loudnessEnhancer.enabled, equals(false));
+    expect(await loudnessEnhancer.enabledStream.first, equals(false));
+    await loudnessEnhancer.setEnabled(true);
+    expect(loudnessEnhancer.enabled, equals(true));
+    expect(await loudnessEnhancer.enabledStream.first, equals(true));
+  });
+
+  test('AndroidEqualizer', () async {
+    final equalizer = AndroidEqualizer();
+    final player = AudioPlayer(
+      audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]),
+    );
+    expect(equalizer.enabled, equals(false));
+    expect(await equalizer.enabledStream.first, equals(false));
+    await player.setUrl('https://foo.foo/foo.mp3');
+    expect(equalizer.enabled, equals(false));
+    expect(await equalizer.enabledStream.first, equals(false));
+    await equalizer.setEnabled(true);
+    expect(equalizer.enabled, equals(true));
+    expect(await equalizer.enabledStream.first, equals(true));
+    final parameters = await equalizer.parameters;
+    expect(parameters.minDecibels, equals(0.0));
+    expect(parameters.maxDecibels, equals(10.0));
+    final bands = parameters.bands;
+    expect(bands.length, equals(5));
+    for (var i = 0; i < 5; i++) {
+      final band = bands[i];
+      expect(band.index, equals(i));
+      expect(band.lowerFrequency, equals(i * 1000));
+      expect(band.upperFrequency, equals((i + 1) * 1000));
+      expect(band.centerFrequency, equals((i + 0.5) * 1000));
+      expect(band.gain, equals(i * 0.1));
+    }
+  });
 }
 
 class MockJustAudio extends Mock
     with MockPlatformInterfaceMixin
     implements JustAudioPlatform {
+  MockAudioPlayer? mostRecentPlayer;
   final _players = <String, MockAudioPlayer>{};
 
   @override
@@ -955,8 +1248,9 @@ class MockJustAudio extends Mock
           code: "error",
           message: "Platform player ${request.id} already exists");
     }
-    final player = MockAudioPlayer(request.id);
+    final player = MockAudioPlayer(request);
     _players[request.id] = player;
+    mostRecentPlayer = player;
     return player;
   }
 
@@ -1004,6 +1298,7 @@ final icyMetadataMessage = IcyMetadataMessage(
 class MockAudioPlayer implements AudioPlayerPlatform {
   final String _id;
   final eventController = StreamController<PlaybackEventMessage>();
+  final AudioLoadConfigurationMessage? audioLoadConfiguration;
   AudioSourceMessage? _audioSource;
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   Duration _updatePosition = Duration.zero;
@@ -1016,7 +1311,13 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   Completer<dynamic>? _playCompleter;
   Timer? _playTimer;
 
-  MockAudioPlayer(String id) : _id = id;
+  MockAudioPlayer(InitRequest request)
+      : _id = request.id,
+        audioLoadConfiguration = request.audioLoadConfiguration;
+
+  @override
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      StreamController<PlayerDataMessage>().stream;
 
   @override
   String get id => _id;
@@ -1028,6 +1329,8 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     final audioSource = request.audioSourceMessage;
+    _processingState = ProcessingStateMessage.loading;
+    _broadcastPlaybackEvent();
     if (audioSource is UriAudioSourceMessage) {
       if (audioSource.uri.contains('abort')) {
         throw PlatformException(code: 'abort', message: 'Failed to load URL');
@@ -1066,7 +1369,6 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       _startTimer();
     }
     _playCompleter = Completer<dynamic>();
-    _broadcastPlaybackEvent();
     await _playCompleter!.future;
     return PlayResponse();
   }
@@ -1094,7 +1396,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
     _setPosition(request.position ?? Duration.zero);
-    _index = request.index;
+    _index = request.index ?? 0;
     _broadcastPlaybackEvent();
     return SeekResponse();
   }
@@ -1134,6 +1436,17 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _speed = request.speed;
     _setPosition(_position);
     return SetSpeedResponse();
+  }
+
+  @override
+  Future<SetPitchResponse> setPitch(SetPitchRequest request) async {
+    return SetPitchResponse();
+  }
+
+  @override
+  Future<SetSkipSilenceResponse> setSkipSilence(
+      SetSkipSilenceRequest request) async {
+    return SetSkipSilenceResponse();
   }
 
   @override
@@ -1239,12 +1552,66 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _updatePosition = position;
     _updateTime = DateTime.now();
   }
+
+  @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
+    return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse();
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) async {
+    return SetPreferredPeakBitRateResponse();
+  }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) async {
+    return AudioEffectSetEnabledResponse();
+  }
+
+  @override
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+    return AndroidLoudnessEnhancerSetTargetGainResponse();
+  }
+
+  @override
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) async {
+    return AndroidEqualizerGetParametersResponse(
+      parameters: AndroidEqualizerParametersMessage(
+        minDecibels: 0.0,
+        maxDecibels: 10.0,
+        bands: [
+          for (var i = 0; i < 5; i++)
+            AndroidEqualizerBandMessage(
+              index: i,
+              lowerFrequency: i * 1000,
+              upperFrequency: (i + 1) * 1000,
+              centerFrequency: (i + 0.5) * 1000,
+              gain: i * 0.1,
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) async {
+    return AndroidEqualizerBandSetGainResponse();
+  }
 }
 
 final byteRangeData = List.generate(200, (i) => i);
 
 class TestStreamAudioSource extends StreamAudioSource {
-  TestStreamAudioSource({dynamic tag}) : super(tag);
+  TestStreamAudioSource({dynamic tag}) : super(tag: tag);
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {

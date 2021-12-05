@@ -1,3 +1,23 @@
+## 0.4.2
+
+* Fix bug loading audio after concat delete/insert.
+
+## 0.4.1
+
+* Remember position after stopping.
+
+## 0.4.0
+
+* Upgrade to platform interface 4.0.0
+
+## 0.3.2
+
+* Upgrade to platform interface 3.1.0
+
+## 0.3.1
+
+* Propagate play() exceptions (@twogood).
+
 ## 0.3.0
 
 * Null safety.

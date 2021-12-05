@@ -2,45 +2,43 @@ package com.ryanheise.just_audio;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
+import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
+import io.flutter.plugin.common.MethodChannel.Result;
 
 /**
  * JustAudioPlugin
  */
 public class JustAudioPlugin implements FlutterPlugin, ActivityAware {
-
     private MethodChannel channel;
     private MainMethodCallHandler methodCallHandler;
 
-    public JustAudioPlugin() {
-    }
-
-    /**
-     * v1 plugin registration.
-     */
-    public static void registerWith(Registrar registrar) {
-        final JustAudioPlugin plugin = new JustAudioPlugin();
-        plugin.startListening(registrar.context(), registrar.messenger());
-        registrar.addViewDestroyListener(
-                view -> {
-                    plugin.stopListening();
-                    return false;
-                });
-    }
-
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
-        startListening(binding.getApplicationContext(), binding.getBinaryMessenger());
-    }
+        Context applicationContext = binding.getApplicationContext();
+        BinaryMessenger messenger = binding.getBinaryMessenger();
+        methodCallHandler = new MainMethodCallHandler(applicationContext, messenger);
 
-    @Override
-    public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-        stopListening();
+        channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
+        channel.setMethodCallHandler(methodCallHandler);
+        @SuppressWarnings("deprecation")
+        FlutterEngine engine = binding.getFlutterEngine();
+        engine.addEngineLifecycleListener(new EngineLifecycleListener() {
+            @Override
+            public void onPreEngineRestart() {
+                methodCallHandler.dispose();
+            }
+
+            @Override
+            public void onEngineWillDestroy() {
+            }
+        });
     }
 
     @Override
@@ -62,14 +60,8 @@ public class JustAudioPlugin implements FlutterPlugin, ActivityAware {
         methodCallHandler.setActivityPluginBinding(null);
     }
 
-    private void startListening(final Context applicationContext, BinaryMessenger messenger) {
-        methodCallHandler = new MainMethodCallHandler(applicationContext, messenger);
-
-        channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
-        channel.setMethodCallHandler(methodCallHandler);
-    }
-
-    private void stopListening() {
+    @Override
+    public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         methodCallHandler.dispose();
         methodCallHandler = null;
 

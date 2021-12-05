@@ -61,11 +61,15 @@ abstract class AudioPlayerPlatform {
 
   AudioPlayerPlatform(this.id);
 
-  /// A stream of playback events.
+  /// A broadcast stream of playback events.
   Stream<PlaybackEventMessage> get playbackEventMessageStream {
     throw UnimplementedError(
         'playbackEventMessageStream has not been implemented.');
   }
+
+  /// A broadcast stream of data updates.
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      Stream<PlayerDataMessage>.empty();
 
   /// A stream of visualizer waveform data.
   Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream {
@@ -108,7 +112,7 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError("setPitch() has not been implemented.");
   }
 
-  /// sets skipSilence to true/false.
+  /// Sets skipSilence to true/false.
   Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) {
     throw UnimplementedError("setSkipSilence() has not been implemented.");
   }
@@ -169,7 +173,7 @@ abstract class AudioPlayerPlatform {
         "setAndroidAudioAttributes() has not been implemented.");
   }
 
-  /// This method has been superceded by [JustAudioPlatform.disposePlayer].
+  /// This method has been superseded by [JustAudioPlatform.disposePlayer].
   /// For backward compatibility, this method will still be called as a
   /// fallback if [JustAudioPlatform.disposePlayer] is not implemented.
   Future<DisposeResponse> dispose(DisposeRequest request) {
@@ -206,6 +210,74 @@ abstract class AudioPlayerPlatform {
   Future<StopVisualizerResponse> stopVisualizer(StopVisualizerRequest request) {
     throw UnimplementedError("stopVisualizer() has not been implemented.");
   }
+
+  /// Changes the enabled status of an audio effect.
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) {
+    throw UnimplementedError(
+        "audioEffectSetEnabled() has not been implemented.");
+  }
+
+  /// Sets the target gain on the Android loudness enhancer.
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) {
+    throw UnimplementedError(
+        "androidLoudnessEnhancerSetTargetGain() has not been implemented.");
+  }
+
+  /// Gets the Android equalizer parameters.
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) {
+    throw UnimplementedError(
+        "androidEqualizerGetParameters() has not been implemented.");
+  }
+
+  /// Sets the gain for an Android equalizer band.
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) {
+    throw UnimplementedError(
+        "androidEqualizerBandSetGain() has not been implemented.");
+  }
+}
+
+/// A data update communicated from the platform implementation to the Flutter
+/// plugin. Each field should trigger a state update in the frontend plugin if
+/// and only if it is not null. Normally, the platform implementation will not
+/// need to broadcast new state changes for this state as such state changes
+/// will be initiated from the frontend.
+class PlayerDataMessage {
+  final bool? playing;
+  final double? volume;
+  final double? speed;
+  final double? pitch;
+  final LoopModeMessage? loopMode;
+  final ShuffleModeMessage? shuffleMode;
+  // TODO: Eventually move other state here?
+  // bufferedPosition, androidAudioSessionId, icyMetadata
+
+  PlayerDataMessage({
+    this.playing,
+    this.volume,
+    this.speed,
+    this.pitch,
+    this.loopMode,
+    this.shuffleMode,
+  });
+
+  static PlayerDataMessage fromMap(Map<dynamic, dynamic> map) =>
+      PlayerDataMessage(
+        playing: map['playing'] as bool?,
+        volume: map['volume'] as double?,
+        speed: map['speed'] as double?,
+        pitch: map['pitch'] as double?,
+        loopMode: map['loopMode'] != null
+            ? LoopModeMessage.values[map['loopMode'] as int]
+            : null,
+        shuffleMode: map['shuffleMode'] != null
+            ? ShuffleModeMessage.values[map['shuffleMode'] as int]
+            : null,
+      );
 }
 
 /// A playback event communicated from the platform implementation to the
@@ -331,12 +403,25 @@ class IcyHeadersMessage {
 class InitRequest {
   final String id;
   final AudioLoadConfigurationMessage? audioLoadConfiguration;
+  final List<AudioEffectMessage> androidAudioEffects;
+  final List<AudioEffectMessage> darwinAudioEffects;
 
-  InitRequest({required this.id, this.audioLoadConfiguration});
+  InitRequest({
+    required this.id,
+    this.audioLoadConfiguration,
+    this.androidAudioEffects = const [],
+    this.darwinAudioEffects = const [],
+  });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'id': id,
         'audioLoadConfiguration': audioLoadConfiguration?.toMap(),
+        'androidAudioEffects': androidAudioEffects
+            .map((audioEffect) => audioEffect.toMap())
+            .toList(),
+        'darwinAudioEffects': darwinAudioEffects
+            .map((audioEffect) => audioEffect.toMap())
+            .toList(),
       };
 }
 
@@ -1008,20 +1093,24 @@ abstract class AudioSourceMessage {
 /// Information about an indexed audio source to be communicated with the
 /// platform implementation.
 abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
-  IndexedAudioSourceMessage({required String id}) : super(id: id);
+  /// Since the tag type is unknown, this can only be used by platform
+  /// implementations that pass by reference.
+  final dynamic tag;
+  IndexedAudioSourceMessage({required String id, this.tag}) : super(id: id);
 }
 
 /// Information about a URI audio source to be communicated with the platform
 /// implementation.
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
-  final Map<dynamic, dynamic>? headers;
+  final Map<String, String>? headers;
 
   UriAudioSourceMessage({
     required String id,
     required this.uri,
     this.headers,
-  }) : super(id: id);
+    dynamic tag,
+  }) : super(id: id, tag: tag);
 }
 
 /// Information about a progressive audio source to be communicated with the
@@ -1030,8 +1119,9 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
   ProgressiveAudioSourceMessage({
     required String id,
     required String uri,
-    Map<dynamic, dynamic>? headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    Map<String, String>? headers,
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1048,8 +1138,9 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
   DashAudioSourceMessage({
     required String id,
     required String uri,
-    Map<dynamic, dynamic>? headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    Map<String, String>? headers,
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1066,8 +1157,9 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
   HlsAudioSourceMessage({
     required String id,
     required String uri,
-    Map<dynamic, dynamic>? headers,
-  }) : super(id: id, uri: uri, headers: headers);
+    Map<String, String>? headers,
+    dynamic tag,
+  }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1075,6 +1167,24 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+      };
+}
+
+/// Information about a silence audio source to be communicated with the
+/// platform implementation.
+class SilenceAudioSourceMessage extends IndexedAudioSourceMessage {
+  final Duration duration;
+
+  SilenceAudioSourceMessage({
+    required String id,
+    required this.duration,
+  }) : super(id: id);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'silence',
+        'id': id,
+        'duration': duration.inMicroseconds,
       };
 }
 
@@ -1114,7 +1224,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
     required this.child,
     this.start,
     this.end,
-  }) : super(id: id);
+    dynamic tag,
+  }) : super(id: id, tag: tag);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1144,5 +1255,222 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
         'id': id,
         'child': child.toMap(),
         'count': count,
+      };
+}
+
+/// Information communicated to the platform implementation when setting the
+/// enabled status of an audio effect.
+class AudioEffectSetEnabledRequest {
+  final String type;
+  final bool enabled;
+
+  AudioEffectSetEnabledRequest({
+    required this.type,
+    required this.enabled,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': type,
+        'enabled': enabled,
+      };
+}
+
+/// Information returned by the platform implementation after setting the
+/// enabled status of an audio effect.
+class AudioEffectSetEnabledResponse {
+  static AudioEffectSetEnabledResponse fromMap(Map<dynamic, dynamic> map) =>
+      AudioEffectSetEnabledResponse();
+}
+
+/// Information communicated to the platform implementation when setting the
+/// target gain on the loudness enhancer audio effect.
+class AndroidLoudnessEnhancerSetTargetGainRequest {
+  /// The target gain in decibels.
+  final double targetGain;
+
+  AndroidLoudnessEnhancerSetTargetGainRequest({
+    required this.targetGain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'targetGain': targetGain,
+      };
+}
+
+/// Information returned by the platform implementation after setting the target
+/// gain on the loudness enhancer audio effect.
+class AndroidLoudnessEnhancerSetTargetGainResponse {
+  static AndroidLoudnessEnhancerSetTargetGainResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      AndroidLoudnessEnhancerSetTargetGainResponse();
+}
+
+/// Information communicated to the platform implementation when requesting the
+/// equalizer parameters.
+class AndroidEqualizerGetParametersRequest {
+  AndroidEqualizerGetParametersRequest();
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{};
+}
+
+/// Information communicated to the platform implementation after requesting the
+/// equalizer parameters.
+class AndroidEqualizerGetParametersResponse {
+  final AndroidEqualizerParametersMessage parameters;
+
+  AndroidEqualizerGetParametersResponse({required this.parameters});
+
+  static AndroidEqualizerGetParametersResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      AndroidEqualizerGetParametersResponse(
+        parameters: AndroidEqualizerParametersMessage.fromMap(
+            map['parameters'] as Map<dynamic, dynamic>),
+      );
+}
+
+/// Information communicated to the platform implementation when setting the
+/// gain for an equalizer band.
+class AndroidEqualizerBandSetGainRequest {
+  final int bandIndex;
+  final double gain;
+
+  AndroidEqualizerBandSetGainRequest({
+    required this.bandIndex,
+    required this.gain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'bandIndex': bandIndex,
+        'gain': gain,
+      };
+}
+
+/// Information returned by the platform implementation after setting the gain
+/// for an equalizer band.
+class AndroidEqualizerBandSetGainResponse {
+  AndroidEqualizerBandSetGainResponse();
+
+  static AndroidEqualizerBandSetGainResponse fromMap(
+          Map<dynamic, dynamic> map) =>
+      AndroidEqualizerBandSetGainResponse();
+}
+
+/// Information about an audio effect to be communicated with the platform
+/// implementation.
+abstract class AudioEffectMessage {
+  final bool enabled;
+
+  AudioEffectMessage({required this.enabled});
+
+  Map<dynamic, dynamic> toMap();
+}
+
+/// Information about a loudness enhancer to be communicated with the platform
+/// implementation.
+class AndroidLoudnessEnhancerMessage extends AudioEffectMessage {
+  final double targetGain;
+
+  AndroidLoudnessEnhancerMessage({
+    required bool enabled,
+    required this.targetGain,
+  }) : super(enabled: enabled);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'AndroidLoudnessEnhancer',
+        'enabled': enabled,
+        'targetGain': targetGain,
+      };
+}
+
+/// Information about an equalizer band to be communicated with the platform
+/// implementation.
+class AndroidEqualizerBandMessage {
+  /// A zero-based index of the position of this band within its [AndroidEqualizer].
+  final int index;
+
+  /// The lower frequency of this band in hertz.
+  final double lowerFrequency;
+
+  /// The upper frequency of this band in hertz.
+  final double upperFrequency;
+
+  /// The center frequency of this band in hertz.
+  final double centerFrequency;
+
+  /// The gain for this band in decibels.
+  final double gain;
+
+  AndroidEqualizerBandMessage({
+    required this.index,
+    required this.lowerFrequency,
+    required this.upperFrequency,
+    required this.centerFrequency,
+    required this.gain,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'index': index,
+        'lowerFrequency': lowerFrequency,
+        'upperFrequency': upperFrequency,
+        'centerFrequency': centerFrequency,
+        'gain': gain,
+      };
+
+  static AndroidEqualizerBandMessage fromMap(Map<dynamic, dynamic> map) =>
+      AndroidEqualizerBandMessage(
+        index: map['index'] as int,
+        lowerFrequency: map['lowerFrequency'] as double,
+        upperFrequency: map['upperFrequency'] as double,
+        centerFrequency: map['centerFrequency'] as double,
+        gain: map['gain'] as double,
+      );
+}
+
+/// Information about the equalizer parameters to be communicated with the
+/// platform implementation.
+class AndroidEqualizerParametersMessage {
+  final double minDecibels;
+  final double maxDecibels;
+  final List<AndroidEqualizerBandMessage> bands;
+
+  AndroidEqualizerParametersMessage({
+    required this.minDecibels,
+    required this.maxDecibels,
+    required this.bands,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'minDecibels': minDecibels,
+        'maxDecibels': maxDecibels,
+        'bands': bands.map((band) => band.toMap()).toList(),
+      };
+
+  static AndroidEqualizerParametersMessage fromMap(Map<dynamic, dynamic> map) =>
+      AndroidEqualizerParametersMessage(
+        minDecibels: map['minDecibels'] as double,
+        maxDecibels: map['maxDecibels'] as double,
+        bands: (map['bands'] as List<dynamic>)
+            .map((dynamic bandMap) => AndroidEqualizerBandMessage.fromMap(
+                bandMap as Map<dynamic, dynamic>))
+            .toList(),
+      );
+}
+
+/// Information about the equalizer to be communicated with the platform
+/// implementation.
+class AndroidEqualizerMessage extends AudioEffectMessage {
+  final AndroidEqualizerParametersMessage? parameters;
+
+  AndroidEqualizerMessage({
+    required bool enabled,
+    required this.parameters,
+  }) : super(enabled: enabled);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'AndroidEqualizer',
+        'enabled': enabled,
+        'parameters': parameters?.toMap(),
       };
 }
