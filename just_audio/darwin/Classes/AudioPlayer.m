@@ -10,12 +10,14 @@
 #import <AVFoundation/AVFoundation.h>
 #import <stdlib.h>
 #include <TargetConditionals.h>
+#include "AndroidFFT.h"
 
 typedef struct JATapStorage {
     void *self;
     Float64 samplingRate;
     int captureSize;
     void *waveform;
+    void *fft;
 } JATapStorage;
 
 // TODO: Check for and report invalid state transitions.
@@ -429,6 +431,7 @@ static void initTap(MTAudioProcessingTapRef tap, void *clientInfo, void **tapSto
     storage->self = clientInfo;
     storage->captureSize = self.visualizerCaptureSize;
     storage->waveform = calloc(1, self.visualizerCaptureSize);
+    storage->fft = calloc(1, self.visualizerCaptureSize);
     *tapStorageOut = storage;
 }
 
@@ -451,7 +454,7 @@ static void processTap(MTAudioProcessingTapRef tap, CMItemCount frameCount, MTAu
 
     UInt8 *waveform = (UInt8 *)storage->waveform;
     int captureSize = storage->captureSize;
-    
+
     AudioBuffer *buffer = &bufferListInOut->mBuffers[0];
     int bufferSize = buffer->mDataByteSize;
     // TODO: Handle interleaved channels.
@@ -467,15 +470,21 @@ static void processTap(MTAudioProcessingTapRef tap, CMItemCount frameCount, MTAu
         else if (unsignedSample < 0) unsignedSample = 0;
         waveform[i] = (UInt8)unsignedSample;
     }
-
+    
     // TODO: Take captureRate into account. Maybe let the main thread
     // periodically take samples, and we provide them here in a CMSimpleQueue.
     AudioPlayer *self = (__bridge AudioPlayer *)(storage->self);
     // NOTE: Apple recommends to NOT allocate any memory in the tap process function.
     // TODO: Check impact on performance and memory.
+    
+    // FFT
+    UInt8 *fftMag = (UInt8*)storage->fft;
+    [AndroidFFT doFft:fftMag :waveform :captureSize];
+    
     dispatch_async(dispatch_get_main_queue(), ^{
         NSData *data = [NSData dataWithBytes:(void *)waveform length:captureSize];
-        [self broadcastVisualizerCapture:data samplingRate:(int)(storage->samplingRate)];
+        NSData *data2 = [NSData dataWithBytes:(void *)fftMag length:captureSize];
+        [self broadcastVisualizerCapture:data :data2 samplingRate:(int)(storage->samplingRate)];
     });
 }
 
@@ -486,6 +495,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     JATapStorage *storage = (JATapStorage *)MTAudioProcessingTapGetStorage(tap);
     storage->self = NULL;
     free(storage->waveform);
+    free(storage->fft);
     free(storage);
 }
 
@@ -494,12 +504,17 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
     return _visualizerCaptureSize;
 }
 
-- (void)broadcastVisualizerCapture:(NSData *)waveform samplingRate:(int)samplingRate {
+- (void)broadcastVisualizerCapture:(NSData *)waveform :(NSData *)fft samplingRate:(int)samplingRate {
     [_waveformEventChannel sendEvent:@{
         @"data": waveform,
         @"samplingRate": @(samplingRate),
     }];
+    [_fftEventChannel sendEvent:@{
+        @"data": fft,
+        @"samplingRate": @(samplingRate),
+    }];
 }
+
 
 - (void)broadcastPlaybackEvent {
     [_eventChannel sendEvent:@{

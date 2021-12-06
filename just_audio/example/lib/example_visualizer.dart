@@ -12,6 +12,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_example/common.dart';
 import 'package:rxdart/rxdart.dart';
 
+import 'frequency_visualizer.dart';
+
 void main() => runApp(MyApp());
 
 class MyApp extends StatefulWidget {
@@ -31,7 +33,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             state.processingState != ProcessingState.idle &&
             state.processingState != ProcessingState.completed) {
           _player.startVisualizer(
-              enableWaveform: true, enableFft: false, captureRate: 25000);
+              enableWaveform: true, enableFft: true, captureRate: 25000);
         } else {
           _player.stopVisualizer();
         }
@@ -102,6 +104,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Display the visualizer widget
+              if (!kIsWeb)
+                Container(
+                  height: 50.0,
+                  width: double.maxFinite,
+                  child: StreamBuilder<VisualizerFftCapture>(
+                    stream: _player.visualizerFftStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.data == null) return SizedBox();
+                      return FrequencyVisualizerWidget(snapshot.data!);
+                    },
+                  ),
+                ),
               // Display the visualizer widget
               if (!kIsWeb)
                 Container(
