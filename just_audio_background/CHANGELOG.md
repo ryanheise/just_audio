@@ -1,3 +1,7 @@
+## 0.0.1-beta.2
+
+* Remove Android notification on stop.
+
 ## 0.0.1-beta.1
 
 * Disable next/prev buttons when boundary reached.
