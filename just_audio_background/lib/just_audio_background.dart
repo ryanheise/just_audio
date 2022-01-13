@@ -318,6 +318,11 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
     return await _playerAudioHandler
         .customSetAutomaticallyWaitsToMinimizeStalling(request);
   }
+
+  @override
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(SetAllowsExternalPlaybackRequest request) async {
+    return await _playerAudioHandler.setAllowsExternalPlayback(request);
+  }
 }
 
 class _PlayerAudioHandler extends BaseAudioHandler
@@ -488,6 +493,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
           SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
     return await (await _player)
         .setAutomaticallyWaitsToMinimizeStalling(request);
+  }
+
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(SetAllowsExternalPlaybackRequest request) async {
+    return await (await _player).setAllowsExternalPlayback(request);
   }
 
   Future<void> _updateQueue() async {

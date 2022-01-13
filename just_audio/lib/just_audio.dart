@@ -126,6 +126,7 @@ class AudioPlayer {
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
+  bool _allowsExternalPlayback = true;
   double _preferredPeakBitRate = 0;
   bool _playInterrupted = false;
   bool _platformLoading = false;
@@ -505,6 +506,10 @@ class AudioPlayer {
   /// iOS/macOS.
   bool get canUseNetworkResourcesForLiveStreamingWhilePaused =>
       _canUseNetworkResourcesForLiveStreamingWhilePaused;
+
+  /// Whether the player allows switching to external playback mode on iOS/macOS.
+  /// Default is [true].
+  bool get allowsExternalPlayback => _allowsExternalPlayback;
 
   /// The preferred peak bit rate (in bits per second) of bandwidth usage on iOS/macOS.
   double get preferredPeakBitRate => _preferredPeakBitRate;
@@ -1044,6 +1049,14 @@ class AudioPlayer {
     _preferredPeakBitRate = preferredPeakBitRate;
     await (await _platform).setPreferredPeakBitRate(
         SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
+  }
+
+  /// Sets allowsExternalPlayback on iOS/macOS, defaults to true.
+  Future<void> setAllowsExternalPlayback(final bool allowsExternalPlayback) async {
+    if (_disposed) return;
+    _allowsExternalPlayback = allowsExternalPlayback;
+    await (await _platform)
+        .setAllowsExternalPlayback(SetAllowsExternalPlaybackRequest(enabled: allowsExternalPlayback));
   }
 
   /// Seeks to a particular [position]. If a composition of multiple
@@ -3318,6 +3331,11 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
       SetPreferredPeakBitRateRequest request) async {
     return SetPreferredPeakBitRateResponse();
+  }
+
+  @override
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(SetAllowsExternalPlaybackRequest request) async {
+    return SetAllowsExternalPlaybackResponse();
   }
 
   @override

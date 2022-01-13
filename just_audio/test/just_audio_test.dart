@@ -301,6 +301,14 @@ void runTests() {
     await player.dispose();
   });
 
+  test('setAllowsExternalPlayback', () async {
+    final player = AudioPlayer();
+    expect(player.allowsExternalPlayback, true);
+    await player.setAllowsExternalPlayback(false);
+    expect(player.allowsExternalPlayback, false);
+    await player.dispose();
+  });
+
   test('setAndroidAudioAttributes', () async {
     final player = AudioPlayer();
     await player.setAndroidAudioAttributes(AndroidAudioAttributes());
@@ -1422,6 +1430,11 @@ class MockAudioPlayer implements AudioPlayerPlatform {
       setAutomaticallyWaitsToMinimizeStalling(
           SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
     return SetAutomaticallyWaitsToMinimizeStallingResponse();
+  }
+
+  @override
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(SetAllowsExternalPlaybackRequest request) async {
+    return SetAllowsExternalPlaybackResponse();
   }
 
   @override

@@ -39,6 +39,7 @@
     FlutterResult _playResult;
     id _timeObserver;
     BOOL _automaticallyWaitsToMinimizeStalling;
+    BOOL _allowsExternalPlayback;
     LoadControl *_loadControl;
     BOOL _playing;
     float _speed;
@@ -81,6 +82,7 @@
     _loadResult = nil;
     _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
+    _allowsExternalPlayback = YES;
     _loadControl = nil;
     if (loadConfiguration != (id)[NSNull null]) {
         NSDictionary *map = loadConfiguration[@"darwinLoadControl"];
@@ -146,6 +148,9 @@
             result(@{});
         } else if ([@"setPreferredPeakBitRate" isEqualToString:call.method]) {
             [self setPreferredPeakBitRate:(NSNumber *)request[@"bitRate"]];
+            result(@{});
+        } else if ([@"setAllowsExternalPlayback" isEqualToString:call.method]) {
+            [self setAllowsExternalPlayback:(BOOL)[request[@"enabled"] boolValue]];
             result(@{});
         } else if ([@"seek" isEqualToString:call.method]) {
             CMTime position = request[@"position"] == (id)[NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
@@ -634,6 +639,9 @@
     // Set up an empty player
     if (!_player) {
         _player = [[AVQueuePlayer alloc] initWithItems:@[]];
+        if (!_allowsExternalPlayback) {
+            _player.allowsExternalPlayback = _allowsExternalPlayback;
+        }
         if (@available(macOS 10.12, iOS 10.0, *)) {
             _player.automaticallyWaitsToMinimizeStalling = _automaticallyWaitsToMinimizeStalling;
             // TODO: Remove these observers in dispose.
@@ -1153,6 +1161,13 @@
     if (!_indexedAudioSources) return;
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         [_indexedAudioSources[i] applyPreferredPeakBitRate];
+    }
+}
+
+- (void)setAllowsExternalPlayback:(BOOL)allowsExternalPlayback {
+    _allowsExternalPlayback = allowsExternalPlayback;
+    if (_player) {
+        _player.allowsExternalPlayback = allowsExternalPlayback;
     }
 }
 
