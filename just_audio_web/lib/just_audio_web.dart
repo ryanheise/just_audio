@@ -44,6 +44,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   bool _playing = false;
   int? _index;
+  double _speed = 1.0;
 
   /// Creates a platform player with the given [id].
   JustAudioPlayer({required String id}) : super(id);
@@ -121,6 +122,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
       transition(ProcessingStateMessage.buffering);
     });
     _audioElement.addEventListener('canplaythrough', (event) {
+      _audioElement.playbackRate = _speed;
       transition(ProcessingStateMessage.ready);
     });
     _audioElement.addEventListener('progress', (event) {
@@ -226,6 +228,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     if (src != _audioElement.src) {
       _durationCompleter = Completer<dynamic>();
       _audioElement.src = src;
+      _audioElement.playbackRate = _speed;
       _audioElement.preload = 'auto';
       _audioElement.load();
       if (initialPosition != null) {
@@ -275,7 +278,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<SetSpeedResponse> setSpeed(SetSpeedRequest request) async {
-    _audioElement.playbackRate = request.speed;
+    _audioElement.playbackRate = _speed = request.speed;
     return SetSpeedResponse();
   }
 
