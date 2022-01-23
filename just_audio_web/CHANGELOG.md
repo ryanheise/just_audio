@@ -1,3 +1,7 @@
+## 0.4.3
+
+* Fix bug where setSpeed is forgotten after load().
+
 ## 0.4.2
 
 * Fix bug loading audio after concat delete/insert.
