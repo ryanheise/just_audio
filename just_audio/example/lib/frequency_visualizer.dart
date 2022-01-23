@@ -1,31 +1,4 @@
-MIT License
-
-Copyright (c) 2019-2020 Ryan Heise and the project contributors.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-==============================================================================
-
-This software includes the ExoPlayer library and Android Open Source Project
-source code which are licensed under the Apache License, Version 2.0.
-
-
+/*
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -214,7 +187,7 @@ source code which are licensed under the Apache License, Version 2.0.
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright [yyyy] [name of copyright owner]
+   Copyright [2019] [Sahdeep Singh]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -227,3 +200,77 @@ source code which are licensed under the Apache License, Version 2.0.
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+   
+*/
+
+import 'dart:core';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:just_audio/just_audio.dart';
+
+class FrequencyVisualizerWidget extends StatefulWidget {
+  final VisualizerFftCapture capture;
+
+  FrequencyVisualizerWidget(this.capture);
+  @override
+  FrequencyVisualizerWidgetState createState() => FrequencyVisualizerWidgetState();
+}
+
+class FrequencyVisualizerWidgetState extends State<FrequencyVisualizerWidget> {
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: CustomPaint(
+        painter: FrequencyVisualizerPainter(
+          capture: widget.capture,
+          color: Colors.blueAccent,
+        ),
+      ),
+    );
+  }
+}
+
+// https://github.com/iamSahdeep/FlutterVisualizers/blob/master/lib/Visualizers/BarVisualizer.dart
+class FrequencyVisualizerPainter extends CustomPainter {
+  final VisualizerFftCapture capture;
+  final Color color;
+  final Paint wavePaint;
+  final int density;
+  final int gap;
+
+  FrequencyVisualizerPainter({
+    required this.capture,
+    required this.color,
+    this.density = 100,
+    this.gap = 2,
+  }) : wavePaint = Paint()
+          ..color = color.withOpacity(1.0)
+          ..style = PaintingStyle.fill;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final width = size.width;
+    final height = size.height;
+    final buffer = capture.data.buffer;
+    final bytes = ByteData.view(buffer);
+
+    double barWidth = width / density;
+    double div = capture.data.length / density;
+    wavePaint.strokeWidth = barWidth - gap;
+    for (int i = 0; i < density; i++) {
+      int bytePosition = (i * div).ceil();
+      int value = bytes.getInt8(bytePosition);
+      double top = (height / 2 - (((value)).abs()));
+      double barX = (i * barWidth) + (barWidth / 2);
+      if (top > height) top = top - height;
+      canvas.drawLine(Offset(barX, height / 2), Offset(barX, top), wavePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return true;
+  }
+}
