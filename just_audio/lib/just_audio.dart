@@ -1296,7 +1296,7 @@ class AudioPlayer {
       _visualizerFftSubscription = platform.visualizerFftStream
           .listen((message) => _visualizerFftSubject.add(VisualizerFftCapture(
                 samplingRate: message.samplingRate,
-                data: message.data,
+                data: Int8List.sublistView(message.data),
               )));
     }
 
@@ -1515,13 +1515,47 @@ class VisualizerFftCapture {
   /// The sampling rate of the capture.
   final int samplingRate;
 
-  /// The FFT data.
-  final Uint8List data;
+  /// The FFT data representing n/2+1 frequency components, where n is the
+  /// capture size, with a frequency range from 0 to [samplingRate]. The first
+  /// two elements contain the real parts of the 0th and (n/2)th frequency
+  /// component. The remaining elements contain the alternating real and
+  /// imaginary parts of the frequency components up to the (n/2-1)th one.
+  final Int8List data;
 
   VisualizerFftCapture({
     required this.samplingRate,
     required this.data,
   });
+
+  int get length => data.length ~/ 2 + 1;
+
+  /// Extracts the magnitude of the [k]th frequency from [data].
+  double getMagnitude(int k) {
+    if (k == 0) {
+      return data[0].abs().toDouble();
+    } else if (k == data.length ~/ 2) {
+      return data[1].abs().toDouble();
+    } else {
+      final i = k * 2;
+      final v1 = data[i];
+      final v2 = data[i + 1];
+      return sqrt(v1 * v1 + v2 * v2);
+    }
+  }
+
+  /// Extracts the phase of the [k]th frequency from [data].
+  double getPhase(int k) {
+    if (k == 0) {
+      return 0.0;
+    } else if (k == data.length ~/ 2) {
+      return 0.0;
+    } else {
+      final i = k * 2;
+      final v1 = data[i];
+      final v2 = data[i + 1];
+      return atan2(v2, v1);
+    }
+  }
 }
 
 /// Encapsulates the playback state and current position of the player.

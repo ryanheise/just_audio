@@ -4,6 +4,8 @@
 //
 // flutter run -t lib/example_visualizer.dart
 
+import 'dart:math';
+
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +61,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Try to load audio from a source and catch any errors.
     try {
       await _player.setAudioSource(AudioSource.uri(Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
+          "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/VW6RKBygup9QgTPkgSkUYccTLLIMKxuMR4si1oLh.mp3")));
     } catch (e) {
       print("Error loading audio source: $e");
     }
@@ -104,29 +106,31 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Display the visualizer widget
+              // Display the FFT visualizer widget
               if (!kIsWeb)
                 Container(
                   height: 50.0,
+                  padding: EdgeInsets.all(16.0),
                   width: double.maxFinite,
                   child: StreamBuilder<VisualizerFftCapture>(
                     stream: _player.visualizerFftStream,
                     builder: (context, snapshot) {
                       if (snapshot.data == null) return SizedBox();
-                      return FrequencyVisualizerWidget(snapshot.data!);
+                      return FftVisualizerWidget(snapshot.data!);
                     },
                   ),
                 ),
-              // Display the visualizer widget
+              // Display the waveform visualizer widget
               if (!kIsWeb)
                 Container(
                   height: 50.0,
+                  padding: EdgeInsets.all(16.0),
                   width: double.maxFinite,
                   child: StreamBuilder<VisualizerWaveformCapture>(
                     stream: _player.visualizerWaveformStream,
                     builder: (context, snapshot) {
                       if (snapshot.data == null) return SizedBox();
-                      return AudioVisualizerWidget(snapshot.data!);
+                      return WaveformVisualizerWidget(snapshot.data!);
                     },
                   ),
                 ),
@@ -155,29 +159,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 }
 
-class AudioVisualizerWidget extends StatelessWidget {
+class WaveformVisualizerWidget extends StatelessWidget {
   final VisualizerWaveformCapture capture;
 
-  AudioVisualizerWidget(this.capture);
+  WaveformVisualizerWidget(this.capture);
 
   @override
   Widget build(BuildContext context) {
     return ClipRect(
       child: CustomPaint(
-        painter: AudioVisualizerPainter(capture),
+        painter: WaveformVisualizerPainter(capture),
       ),
     );
   }
 }
 
-class AudioVisualizerPainter extends CustomPainter {
+class WaveformVisualizerPainter extends CustomPainter {
   final VisualizerWaveformCapture capture;
   final Paint barPaint = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.0
     ..color = Colors.blue;
 
-  AudioVisualizerPainter(this.capture);
+  WaveformVisualizerPainter(this.capture);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -203,7 +207,54 @@ class AudioVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant AudioVisualizerPainter oldDelegate) {
+  bool shouldRepaint(covariant WaveformVisualizerPainter oldDelegate) {
+    return true;
+  }
+}
+
+class FftVisualizerWidget extends StatelessWidget {
+  final VisualizerFftCapture capture;
+
+  FftVisualizerWidget(this.capture);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: CustomPaint(
+        painter: FftVisualizerPainter(capture),
+      ),
+    );
+  }
+}
+
+class FftVisualizerPainter extends CustomPainter {
+  final VisualizerFftCapture capture;
+
+  FftVisualizerPainter(this.capture);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const barCount = 16;
+    const minDbThresh = 5;
+
+    final length = capture.length;
+    final barWidth = size.width / barCount;
+    final barPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = barWidth * 0.8
+      ..color = Colors.blue;
+    double log10(num x) => log(x) / ln10;
+    for (var i = 0; i < barCount; i++) {
+      final magnitude = pow(capture.getMagnitude(i * length ~/ barCount), 2);
+      final barX = barWidth * (i + 0.5);
+      final db = magnitude < 1.0 ? 0.0 : 10.0 * log10(magnitude);
+      canvas.drawLine(Offset(barX, size.height),
+          Offset(barX, size.height - (db - minDbThresh)), barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant FftVisualizerPainter oldDelegate) {
     return true;
   }
 }
