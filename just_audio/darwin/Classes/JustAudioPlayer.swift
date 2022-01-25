@@ -37,7 +37,7 @@ public class JustAudioPlayer: NSObject {
     var currentSource: IndexedAudioSource? = nil
     
     var offeset: Double = 0
-    var currentPosition: Int = 0
+    var currentPosition: CMTime = CMTime.zero
     var updateTime: Int64 = 0
     var savedCurrentTime: AVAudioTime? = nil
     var order: [Int] = []
@@ -66,7 +66,7 @@ public class JustAudioPlayer: NSObject {
             let request = call.arguments as! Dictionary<String, Any>
             switch call.method {
             case "load":
-                print("load:", request)
+                print("========== load:", request)
                 let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1000000)
                 try load(source: request["audioSource"] as! Dictionary<String, Any>, initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
                 break
@@ -107,6 +107,15 @@ public class JustAudioPlayer: NSObject {
                 result([:])
                 break
             case "setShuffleMode":
+                let shuffleMode = request["shuffleMode"] as? Int;
+                switch (shuffleMode) {
+                case 1:
+                    shuffleModeEnabled = true;
+                default:
+                    shuffleModeEnabled = false;
+                }
+                updateOrder();
+                broadcastPlaybackEvent()
                 print("TODO: setShuffleMode", request)
                 result([:])
                 break
@@ -127,10 +136,17 @@ public class JustAudioPlayer: NSObject {
                 result([:])
                 break
             case "seek":
-                let position = request["position"] == nil ? CMTime.invalid : CMTimeMake(value: request["position"] as! Int64, timescale: 1000000)
-                seek(position: position, index: request["index"] as? Int ?? 0) {
+                print("========== seek", request)
+                // microseconds
+                let position = CMTimeMake(value: request["position"] as? Int64 ?? 0, timescale: 1000000)
+                let index = request["index"] as? Int ?? 0
+                
+                print("\(position.seconds) \(position.milliSeconds) \(position.value) \(position.timescale)")
+                
+                seek(position: position, index: index) {
                     result([:])
                 }
+                
                 break
             case "concatenatingInsertAll":
                 print("TODO: concatenatingInsertAll", request)
@@ -229,9 +245,18 @@ public class JustAudioPlayer: NSObject {
     }
     
     func seek(position: CMTime, index: Int, completionHandler: () -> Void){
+        self.playerNode.stop()
         try! enqueueFrom(index)
-        self.updatePosition()
+        
+        currentPosition = position
+        updateTime = Int64(Date().timeIntervalSince1970 * 1000)
+        
         self.processingState = .ready
+        
+//        let sampleRate = currentSource!.getSampleRate()
+//        let sampleTime = position.seconds * sampleRate
+        
+//        self.playerNode.play(at: position.seconds > 0 ? AVAudioTime(hostTime: mach_absolute_time(), sampleTime: Int64(sampleTime), atRate: sampleRate) : nil)
         self.playerNode.play()
         self.broadcastPlaybackEvent()
         completionHandler()
@@ -274,7 +299,7 @@ public class JustAudioPlayer: NSObject {
     func broadcastPlaybackEvent() {
         eventChannel.sendEvent([
             "processingState": processingState.rawValue,
-            "updatePosition": Int64(currentPosition * 1000),
+            "updatePosition": currentPosition.microSeconds,
             "updateTime": updateTime,
             "bufferedPosition": 0,
             "icyMetadata": [:],
@@ -292,17 +317,17 @@ public class JustAudioPlayer: NSObject {
         broadcastPlaybackEvent()
     }
     
-    func getCurrentPosition() -> Int {
+    func getCurrentPosition() -> CMTime {
         if (indexedAudioSources.count > 0) {
-            guard let lastRenderTime = playerNode.lastRenderTime else { return 0 }
-            guard let playerTime = playerNode.playerTime(forNodeTime: lastRenderTime) else { return 0 }
+            guard let lastRenderTime = playerNode.lastRenderTime else { return CMTime.zero }
+            guard let playerTime = playerNode.playerTime(forNodeTime: lastRenderTime) else { return CMTime.zero }
             let sampleRate = playerTime.sampleRate
             let sampleTime = playerTime.sampleTime
             let currentTime = Double(sampleTime) / sampleRate
-            let ms = Int(currentTime * 1000);
-            return ms < 0 ? 0 : ms
+            let milliSeconds = Int64(currentTime * 1000);
+            return milliSeconds < 0 ? CMTime.zero : CMTime(value: milliSeconds, timescale: 1000)
         } else {
-            return 0
+            return CMTime.zero
         }
     }
     
@@ -325,8 +350,10 @@ public class JustAudioPlayer: NSObject {
         self.index = index
         
         currentSource = indexedAudioSources[index]
-        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, completionHandler: { _ in
-            self.playNext()
+        print("Index:\(index) \(indexedAudioSources.description)")
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, completionHandler: { type in
+//            self.playNext()
+            print("CompletionHandler \(type.rawValue)")
         })
     }
     
@@ -342,7 +369,7 @@ public class JustAudioPlayer: NSObject {
         case "progressive":
             return UriAudioSource(sid: data["id"] as! String, uri: data["uri"] as! String)
         case "concatenating":
-            return ConcatenatingAudioSource(sid: data["id"] as! String, audioSources: decodeAudioSources(data: data["children"] as! [Dictionary<String, Any>]), shuffleOrder: [])
+            return ConcatenatingAudioSource(sid: data["id"] as! String, audioSources: decodeAudioSources(data: data["children"] as! [Dictionary<String, Any>]))
         default:
             throw PluginError.runtimeError("data source not supported")
         }
@@ -409,5 +436,16 @@ public class JustAudioPlayer: NSObject {
         eventChannel.dispose()
         dataChannel.dispose()
         methodChannel.setMethodCallHandler(nil)
+    }
+}
+
+extension CMTime {
+
+    var milliSeconds: Int64 {
+        return Int64(value * 1000 / Int64(timescale));
+    }
+    
+    var microSeconds: Int64 {
+        return Int64(value * 1000000 / Int64(timescale));
     }
 }
