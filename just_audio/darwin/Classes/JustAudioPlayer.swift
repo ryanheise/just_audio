@@ -256,6 +256,8 @@ class Player {
     }
     
     func seek(index: Int?, position: CMTime) {
+        let isPlaying = playerNode.isPlaying
+        
         if let index = index {
             try! queueFrom(index)
         }
@@ -263,7 +265,6 @@ class Player {
         playerNode.stop()
         
         updatePosition(position);
-        
 
         processingState = .ready
 
@@ -275,7 +276,9 @@ class Player {
             print("seek \(self.index == index) \(self.positionOffset == position) \(self.playerNode.isPlaying)")
         })
 
-        playerNode.play()
+        if (isPlaying) {
+            playerNode.play()
+        }
 
         broadcastPlaybackEvent()
     }
