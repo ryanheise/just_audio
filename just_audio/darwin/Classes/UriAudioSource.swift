@@ -24,7 +24,7 @@ class UriAudioSource: IndexedAudioSource {
 
             let missingTime = duration.seconds - position.seconds
             let framestoplay = AVAudioFrameCount(sampleRate * missingTime)
-
+            
             if framestoplay > 1000 {
                 playerNode.scheduleSegment(audioFile, startingFrame: framePosition, frameCount: framestoplay, at: nil,  completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
             }

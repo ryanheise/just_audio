@@ -143,8 +143,7 @@ class Player {
     var audioUnitEQ: AVAudioUnitEQ?
 
     // State properties
-    var playing = false
-    var processingState: ProcessingState = .loading
+    var processingState: ProcessingState = .none
     var shuffleModeEnabled = false
     var loopMode: LoopMode = .loopOff
     
@@ -176,8 +175,6 @@ class Player {
     // Extra properties
     var volume: Float = 1
     var rate: Float = 1
-    
-    
 
     init(audioEffects: [[String: Any]], onEvent: @escaping ([String: Any]) -> Void) {
         self.audioEffects = audioEffects
@@ -231,7 +228,9 @@ class Player {
             }
         }
 
-        try! enqueueFrom(index)
+        try! setQueueFrom(index)
+        
+        _loadCurrentSource()
 
         if !engine.isRunning {
             try! engine.start()
@@ -256,27 +255,22 @@ class Player {
     }
     
     func seek(index: Int?, position: CMTime) {
-        let isPlaying = playerNode.isPlaying
+        let wasPlaying = self.playerNode.isPlaying
         
         if let index = index {
-            try! queueFrom(index)
+            try! setQueueFrom(index)
         }
 
-        playerNode.stop()
+        _stop()
         
-        updatePosition(position);
+        updatePosition(position)
 
         processingState = .ready
 
-//        let iSource = indexedAudioSources[index]
-//        let iUpdateTime = updateTime
-//        let iPosition = currentPosition
-        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: position, completionHandler: { type in
-//            self.playNext()
-            print("seek \(self.index == index) \(self.positionOffset == position) \(self.playerNode.isPlaying)")
-        })
-
-        if (isPlaying) {
+        _loadCurrentSource()
+       
+        // Restart play if player was playning
+        if (wasPlaying) {
             playerNode.play()
         }
 
@@ -288,43 +282,45 @@ class Player {
         if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
         self.positionOffset = indexedAudioSources.count > 0 && positionUpdate == nil ? self.playerNode.currentTime : CMTime.zero
     }
-
-//    func playNext() {
-//        DispatchQueue.main.async {
-//            let newIndex = self.index + 1
-//            if newIndex >= self.indexedAudioSources.count {
-//                self.complete()
-//            } else {
-//                self.playerNode.stop()
-//                try! self.enqueueFrom(newIndex)
-//                self.updatePosition()
-//                self.playerNode.play()
-//                self.broadcastPlaybackEvent()
-//            }
-//        }
-//    }
-
-//    func complete() {
-//        updatePosition(nil)
-//        processingState = .completed
-//        if playerNode != nil {
-//            playerNode.stop()
-//        }
-//        broadcastPlaybackEvent()
-//    }
     
-    // ========== QUEUE
-
-    func enqueueFrom(_ index: Int) throws {
-        try! queueFrom(index)
-        let source = indexedAudioSources[index]
-        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: nil, completionHandler: { type in
-//            self.playNext()
-            print("enqueueFrom \(self.currentSource === source)  \(self.playerNode.isPlaying)")
-        })
+    var _isStopping = false
+    func _stop() {
+        _isStopping = true
+        if playerNode.isPlaying { playerNode.stop() }
+        _isStopping = false
     }
     
-    func queueFrom(_ index: Int) throws {
+    func _loadCurrentSource() {
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {  _ in
+            if (self._isStopping) {return}
+            self._playNext()
+        })
+    }
+
+    func _playNext() {
+        DispatchQueue.main.async {
+            let newIndex = self.index + 1
+            if newIndex >= self.indexedAudioSources.count {
+                self._complete()
+            } else {
+                self.seek(index: newIndex, position: CMTime.zero)
+                self.play()
+            }
+        }
+    }
+
+    func _complete() {
+        updatePosition(nil)
+        processingState = .completed
+        if playerNode != nil {
+            playerNode.stop()
+        }
+        broadcastPlaybackEvent()
+    }
+    
+    // ========== QUEUE
+    
+    func setQueueFrom(_ index: Int) throws {
         self.index = index
         guard !indexedAudioSources.isEmpty else {
             preconditionFailure("no songs on library")
