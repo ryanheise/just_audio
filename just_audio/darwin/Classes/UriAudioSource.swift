@@ -10,15 +10,15 @@ class UriAudioSource: IndexedAudioSource {
         super.init(sid: sid)
     }
 
-    override func load(engine _: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl _: AVAudioUnitVarispeed, position: CMTime?, completionHandler _: @escaping AVAudioPlayerNodeCompletionHandler) throws {
+    override func load(engine _: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl _: AVAudioUnitVarispeed, position: CMTime?, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
 
         let audioFile = try! AVAudioFile(forReading: url)
         let audioFormat = audioFile.fileFormat
 
         duration = TimeInterval(Double(audioFile.length) / audioFormat.sampleRate)
+        let sampleRate = audioFormat.sampleRate
         
         if let position = position, position.seconds > 0 {
-            let sampleRate = audioFormat.sampleRate
             
             let framePosition = AVAudioFramePosition(sampleRate * position.seconds)
 
@@ -26,10 +26,10 @@ class UriAudioSource: IndexedAudioSource {
             let framestoplay = AVAudioFrameCount(sampleRate * missingTime)
 
             if framestoplay > 1000 {
-                playerNode.scheduleSegment(audioFile, startingFrame: framePosition, frameCount: framestoplay, at: nil, completionHandler: nil)
+                playerNode.scheduleSegment(audioFile, startingFrame: framePosition, frameCount: framestoplay, at: nil,  completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
             }
         } else {
-            playerNode.scheduleFile(audioFile, at: nil, completionHandler: { print("Hola") })
+            playerNode.scheduleFile(audioFile, at: nil, completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
         }
     }
     

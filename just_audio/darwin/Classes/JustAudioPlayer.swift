@@ -37,8 +37,12 @@ public class JustAudioPlayer: NSObject {
     var currentSource: IndexedAudioSource?
 
     var offeset: Double = 0
-    var currentPosition: CMTime = .zero
-    var updateTime: Int64 = 0
+    
+    var positionUpdatedAt: Int64 = 0
+    var positionUpdate: CMTime = .zero
+    var positionOffset: CMTime = .zero
+    var currentPosition: CMTime { return positionUpdate + positionOffset }
+    
     var savedCurrentTime: AVAudioTime?
     var order: [Int] = []
     var orderInv: [Int] = []
@@ -71,11 +75,12 @@ public class JustAudioPlayer: NSObject {
                 try load(source: request["audioSource"] as! [String: Any], initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
             case "play":
                 playerNode.play()
-                updatePosition()
+                updatePosition(nil)
                 broadcastPlaybackEvent()
                 result([:])
             case "pause":
-                updatePosition()
+                print(playerNode.currentTime)
+                updatePosition(nil)
                 playerNode.pause()
                 broadcastPlaybackEvent()
                 result([:])
@@ -94,7 +99,7 @@ public class JustAudioPlayer: NSObject {
                 if speedControl != nil {
                     speedControl.rate = rate
                 }
-                updatePosition()
+                updatePosition(nil)
                 result([:])
             case "setLoopMode":
                 setLoopMode(mode: Mapping.loopModeFrom(value: request["loopMode"] as! Int))
@@ -156,7 +161,7 @@ public class JustAudioPlayer: NSObject {
         loadResult = result
         index = initialIndex
         processingState = .loading
-        updatePosition()
+        updatePosition(CMTime.zero)
         // Decode audio source
         audioSource = try! decodeAudioSource(data: source)
 
@@ -211,18 +216,21 @@ public class JustAudioPlayer: NSObject {
     }
 
     func seek(position: CMTime, index: Int, completionHandler: () -> Void) {
-        try! enqueueFrom(index)
+        try! queueFrom(index)
 
         playerNode.stop()
-
-        currentPosition = position
-        updateTime = Int64(Date().timeIntervalSince1970 * 1000)
+        
+        updatePosition(position);
+        
 
         processingState = .ready
 
+//        let iSource = indexedAudioSources[index]
+//        let iUpdateTime = updateTime
+//        let iPosition = currentPosition
         try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: position, completionHandler: { type in
 //            self.playNext()
-            print("CompletionHandler \(type.rawValue)")
+            print("seek \(self.index == index) \(self.positionOffset == position) \(self.playerNode.isPlaying)")
         })
 
         playerNode.play()
@@ -231,20 +239,20 @@ public class JustAudioPlayer: NSObject {
         completionHandler()
     }
 
-    func playNext() {
-        DispatchQueue.main.async {
-            let newIndex = self.index + 1
-            if newIndex >= self.indexedAudioSources.count {
-                self.complete()
-            } else {
-                self.playerNode.stop()
-                try! self.enqueueFrom(newIndex)
-                self.updatePosition()
-                self.playerNode.play()
-                self.broadcastPlaybackEvent()
-            }
-        }
-    }
+//    func playNext() {
+//        DispatchQueue.main.async {
+//            let newIndex = self.index + 1
+//            if newIndex >= self.indexedAudioSources.count {
+//                self.complete()
+//            } else {
+//                self.playerNode.stop()
+//                try! self.enqueueFrom(newIndex)
+//                self.updatePosition()
+//                self.playerNode.play()
+//                self.broadcastPlaybackEvent()
+//            }
+//        }
+//    }
 
     func updateOrder() {
         orderInv = Array(repeating: 0, count: indexedAudioSources.count)
@@ -260,16 +268,30 @@ public class JustAudioPlayer: NSObject {
         }
     }
 
-    func updatePosition() {
-        currentPosition = getCurrentPosition()
-        updateTime = Int64(Date().timeIntervalSince1970 * 1000)
+    func updatePosition(_ positionUpdate: CMTime?) {
+        self.positionUpdatedAt = Int64(Date().timeIntervalSince1970 * 1000)
+        if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
+        self.positionOffset = indexedAudioSources.count > 0 ? self.playerNode.currentTime : CMTime.zero
     }
+    
+//    // use only in updatePosition
+//    func getCurrentPosition() -> CMTime {
+//        if indexedAudioSources.count > 0 {
+//            let currentTime = self.playerNode.currentTime
+//            if (self.playerNode.isPlaying) {
+//                return self.currentPosition + currentTime
+//            }
+//            return currentTime
+//        } else {
+//            return CMTime.zero
+//        }
+//    }
 
     func broadcastPlaybackEvent() {
         eventChannel.sendEvent([
             "processingState": processingState.rawValue,
-            "updatePosition": currentPosition.microSeconds,
-            "updateTime": updateTime,
+            "updatePosition": self.currentPosition.microSeconds,
+            "updateTime": self.positionUpdatedAt,
             "bufferedPosition": 0,
             "icyMetadata": [:],
             "duration": getDurationMicroseconds(),
@@ -278,7 +300,7 @@ public class JustAudioPlayer: NSObject {
     }
 
     func complete() {
-        updatePosition()
+        updatePosition(nil)
         processingState = .completed
         if playerNode != nil {
             playerNode.stop()
@@ -286,19 +308,7 @@ public class JustAudioPlayer: NSObject {
         broadcastPlaybackEvent()
     }
 
-    func getCurrentPosition() -> CMTime {
-        if indexedAudioSources.count > 0 {
-            guard let lastRenderTime = playerNode.lastRenderTime else { return CMTime.zero }
-            guard let playerTime = playerNode.playerTime(forNodeTime: lastRenderTime) else { return CMTime.zero }
-            let sampleRate = playerTime.sampleRate
-            let sampleTime = playerTime.sampleTime
-            let currentTime = Double(sampleTime) / sampleRate
-            let milliSeconds = Int64(currentTime * 1000)
-            return milliSeconds < 0 ? CMTime.zero : CMTime(value: milliSeconds, timescale: 1000)
-        } else {
-            return CMTime.zero
-        }
-    }
+    
 
     func getDuration() -> Int {
         if processingState == .none || processingState == .loading {
@@ -316,15 +326,20 @@ public class JustAudioPlayer: NSObject {
     }
 
     func enqueueFrom(_ index: Int) throws {
+        try! queueFrom(index)
+        let source = indexedAudioSources[index]
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: nil, completionHandler: { type in
+//            self.playNext()
+            print("enqueueFrom \(self.currentSource === source)  \(self.playerNode.isPlaying)")
+        })
+    }
+    
+    func queueFrom(_ index: Int) throws {
         self.index = index
         guard !indexedAudioSources.isEmpty else {
             preconditionFailure("no songs on library")
         }
         currentSource = indexedAudioSources[index]
-        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: nil, completionHandler: { type in
-//            self.playNext()
-            print("CompletionHandler \(type.rawValue)")
-        })
     }
 
     func decodeAudioSources(data: [[String: Any]]) -> [AudioSource] {
@@ -429,11 +444,13 @@ extension CMTime {
 }
 
 extension AVAudioPlayerNode {
-    var currentTime: Double {
+    var currentTime: CMTime {
         if let nodeTime: AVAudioTime = lastRenderTime, let playerTime: AVAudioTime = playerTime(forNodeTime: nodeTime) {
-            return Double(playerTime.sampleTime) / playerTime.sampleRate
+            let currentTime = Double(playerTime.sampleTime) / playerTime.sampleRate
+            let milliSeconds = Int64(currentTime * 1000)
+            return milliSeconds < 0 ? CMTime.zero : CMTime(value: milliSeconds, timescale: 1000)
         }
-        return 0.0
+        return CMTime.zero
     }
 }
 
