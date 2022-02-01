@@ -18,37 +18,37 @@ public class JustAudioPlayer: NSObject {
     let eventChannel: BetterEventChannel
     let dataChannel: BetterEventChannel
 
-    let audioEffects: [[String: Any]]
-
     var engine: AVAudioEngine!
     var playerNode: AVAudioPlayerNode!
     var speedControl: AVAudioUnitVarispeed!
     var audioUnitEQ: AVAudioUnitEQ?
+    let audioEffects: [[String: Any]]
 
+    // State properties
     var playing = false
     var processingState: ProcessingState = .none
     var shuffleModeEnabled = false
     var loopMode: LoopMode = .loopOff
-    var loadResult: FlutterResult?
+    
+    // Queue properties
     var index: Int = 0
     var audioSource: AudioSource!
     var indexedAudioSources: [IndexedAudioSource] = []
-
     var currentSource: IndexedAudioSource?
-
-    var offeset: Double = 0
+    var order: [Int] = []
+    var orderInv: [Int] = []
     
+    // Positions properties
     var positionUpdatedAt: Int64 = 0
     var positionUpdate: CMTime = .zero
     var positionOffset: CMTime = .zero
     var currentPosition: CMTime { return positionUpdate + positionOffset }
-    
-    var savedCurrentTime: AVAudioTime?
-    var order: [Int] = []
-    var orderInv: [Int] = []
 
+    // Extra properties
     var volume: Float = 1
     var rate: Float = 1
+    
+    var loadResult: FlutterResult?
 
     init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: [String: Any], audioEffects: [[String: Any]]) {
         self.playerId = playerId
@@ -273,19 +273,6 @@ public class JustAudioPlayer: NSObject {
         if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
         self.positionOffset = indexedAudioSources.count > 0 ? self.playerNode.currentTime : CMTime.zero
     }
-    
-//    // use only in updatePosition
-//    func getCurrentPosition() -> CMTime {
-//        if indexedAudioSources.count > 0 {
-//            let currentTime = self.playerNode.currentTime
-//            if (self.playerNode.isPlaying) {
-//                return self.currentPosition + currentTime
-//            }
-//            return currentTime
-//        } else {
-//            return CMTime.zero
-//        }
-//    }
 
     func broadcastPlaybackEvent() {
         eventChannel.sendEvent([
