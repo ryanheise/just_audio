@@ -2,6 +2,7 @@ import AVFoundation
 
 class AudioSource {
     let sourceId: String
+    
     init(sid: String) {
         sourceId = sid
     }

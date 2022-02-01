@@ -5,8 +5,8 @@ class IndexedAudioSource: AudioSource {
         throw PluginError.runtimeError("no buffer")
     }
 
-    func getDuration() -> TimeInterval {
-        return 0
+    func getDuration() -> CMTime {
+        return CMTime.invalid
     }
 
     override func buildSequence(sequence: inout [IndexedAudioSource], treeIndex: Int) -> Int {

@@ -31,12 +31,23 @@ public class JustAudioPlayer: NSObject {
     var loopMode: LoopMode = .loopOff
     
     // Queue properties
-    var index: Int = 0
-    var audioSource: AudioSource!
     var indexedAudioSources: [IndexedAudioSource] = []
     var currentSource: IndexedAudioSource?
     var order: [Int] = []
     var orderInv: [Int] = []
+    
+    // Current Source
+    var index: Int = 0
+    var audioSource: AudioSource!
+    var duration: CMTime {
+        if processingState == .none || processingState == .loading {
+            return CMTime.invalid
+        } else if indexedAudioSources.count > 0 {
+            return currentSource!.getDuration()
+        } else {
+            return CMTime.zero
+        }
+    }
     
     // Positions properties
     var positionUpdatedAt: Int64 = 0
@@ -209,12 +220,12 @@ public class JustAudioPlayer: NSObject {
 
         processingState = .ready
 
-        loadResult?(["duration": getDurationMicroseconds()])
+        loadResult?(["duration": duration.microSeconds])
         loadResult = nil
 
         broadcastPlaybackEvent()
     }
-
+    
     func seek(position: CMTime, index: Int, completionHandler: () -> Void) {
         try! queueFrom(index)
 
@@ -238,6 +249,12 @@ public class JustAudioPlayer: NSObject {
         broadcastPlaybackEvent()
         completionHandler()
     }
+    
+    func updatePosition(_ positionUpdate: CMTime?) {
+        self.positionUpdatedAt = Int64(Date().timeIntervalSince1970 * 1000)
+        if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
+        self.positionOffset = indexedAudioSources.count > 0 ? self.playerNode.currentTime : CMTime.zero
+    }
 
 //    func playNext() {
 //        DispatchQueue.main.async {
@@ -254,63 +271,16 @@ public class JustAudioPlayer: NSObject {
 //        }
 //    }
 
-    func updateOrder() {
-        orderInv = Array(repeating: 0, count: indexedAudioSources.count)
-        if shuffleModeEnabled {
-            order = audioSource.getShuffleIndices()
-        } else {
-            order = indexedAudioSources.enumerated().map { index, _ in
-                index
-            }
-        }
-        for i in 0 ..< indexedAudioSources.count {
-            orderInv[order[i]] = i
-        }
-    }
-
-    func updatePosition(_ positionUpdate: CMTime?) {
-        self.positionUpdatedAt = Int64(Date().timeIntervalSince1970 * 1000)
-        if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
-        self.positionOffset = indexedAudioSources.count > 0 ? self.playerNode.currentTime : CMTime.zero
-    }
-
-    func broadcastPlaybackEvent() {
-        eventChannel.sendEvent([
-            "processingState": processingState.rawValue,
-            "updatePosition": self.currentPosition.microSeconds,
-            "updateTime": self.positionUpdatedAt,
-            "bufferedPosition": 0,
-            "icyMetadata": [:],
-            "duration": getDurationMicroseconds(),
-            "currentIndex": index,
-        ])
-    }
-
-    func complete() {
-        updatePosition(nil)
-        processingState = .completed
-        if playerNode != nil {
-            playerNode.stop()
-        }
-        broadcastPlaybackEvent()
-    }
-
+//    func complete() {
+//        updatePosition(nil)
+//        processingState = .completed
+//        if playerNode != nil {
+//            playerNode.stop()
+//        }
+//        broadcastPlaybackEvent()
+//    }
     
-
-    func getDuration() -> Int {
-        if processingState == .none || processingState == .loading {
-            return -1
-        } else if indexedAudioSources.count > 0 {
-            return Int(1000 * currentSource!.getDuration())
-        } else {
-            return 0
-        }
-    }
-
-    func getDurationMicroseconds() -> Int64 {
-        let duration = getDuration()
-        return duration < 0 ? -1 : Int64(1000 * duration)
-    }
+    // ========== QUEUE
 
     func enqueueFrom(_ index: Int) throws {
         try! queueFrom(index)
@@ -346,6 +316,35 @@ public class JustAudioPlayer: NSObject {
             throw PluginError.runtimeError("data source not supported")
         }
     }
+    
+    // ========== MODES
+    
+    func setShuffleMode(isEnalbed: Bool) {
+        shuffleModeEnabled = isEnalbed
+        updateOrder()
+        broadcastPlaybackEvent()
+    }
+    
+    func setLoopMode(mode: LoopMode) {
+        loopMode = mode
+        broadcastPlaybackEvent()
+    }
+    
+    func updateOrder() {
+        orderInv = Array(repeating: 0, count: indexedAudioSources.count)
+        if shuffleModeEnabled {
+            order = audioSource.getShuffleIndices()
+        } else {
+            order = indexedAudioSources.enumerated().map { index, _ in
+                index
+            }
+        }
+        for i in 0 ..< indexedAudioSources.count {
+            orderInv[order[i]] = i
+        }
+    }
+    
+    // ========== EFFECTS
 
     func createAudioEffects() throws {
         for effect in audioEffects {
@@ -385,15 +384,18 @@ public class JustAudioPlayer: NSObject {
         audioUnitEQ?.bands[bandIndex].gain = gain
     }
     
-    func setShuffleMode(isEnalbed: Bool) {
-        shuffleModeEnabled = isEnalbed
-        updateOrder()
-        broadcastPlaybackEvent()
-    }
+    // ======== EXTRA
     
-    func setLoopMode(mode: LoopMode) {
-        loopMode = mode
-        broadcastPlaybackEvent()
+    func broadcastPlaybackEvent() {
+        eventChannel.sendEvent([
+            "processingState": processingState.rawValue,
+            "updatePosition": self.currentPosition.microSeconds,
+            "updateTime": self.positionUpdatedAt,
+            "bufferedPosition": 0,
+            "icyMetadata": [:],
+            "duration": duration.microSeconds,
+            "currentIndex": index,
+        ])
     }
 
     func dispose() {
@@ -422,11 +424,11 @@ public class JustAudioPlayer: NSObject {
 
 extension CMTime {
     var milliSeconds: Int64 {
-        return Int64(value * 1000 / Int64(timescale))
+        return self == CMTime.invalid ? -1 : Int64(value * 1000 / Int64(timescale))
     }
 
     var microSeconds: Int64 {
-        return Int64(value * 1_000_000 / Int64(timescale))
+        return self == CMTime.invalid ? -1 : Int64(value * 1_000_000 / Int64(timescale))
     }
 }
 
