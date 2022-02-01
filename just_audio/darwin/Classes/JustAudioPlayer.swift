@@ -4,6 +4,127 @@ enum PluginError: Error {
     case runtimeError(String)
 }
 
+public class JustAudioPlayer: NSObject {
+    let playerId: String
+    let audioEffects: [[String: Any]]
+    
+    let methodChannel: FlutterMethodChannel
+    let eventChannel: BetterEventChannel
+    let dataChannel: BetterEventChannel
+    
+    var player: Player!
+
+    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: [String: Any], audioEffects: [[String: Any]]) {
+        self.playerId = playerId
+        self.audioEffects = audioEffects
+        
+        methodChannel = FlutterMethodChannel(name: String(format: "com.ryanheise.just_audio.methods.%@", playerId), binaryMessenger: registrar.messenger())
+        eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
+        dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
+
+        print("TODO: loadConfiguration", loadConfiguration)
+
+        super.init()
+        methodChannel.setMethodCallHandler { call, result in
+            self.handleMethodCall(call: call, result: result)
+        }
+    }
+    
+    func handleMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        if (player == nil) {
+            player = Player(audioEffects: audioEffects, onEvent: eventChannel.sendEvent);
+        }
+        
+        do {
+            let request = call.arguments as! [String: Any]
+            print("=========== \(call.method) \(request)")
+            
+            switch call.method {
+            case "load":
+                let source = request["audioSource"] as! [String: Any]
+                let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1_000_000)
+                let initialIndex = request["initialIndex"] as? Int ?? 0
+                
+                let duration = player.load(source: source, initialPosition: initialPosition, initialIndex: initialIndex)
+                
+                result(["duration": duration.microSeconds])
+            case "play":
+                player.play()
+                result([:])
+            case "pause":
+                player.pause()
+                result([:])
+            case "setVolume":
+                player.setVolume(Float(request["volume"] as! Double))
+                result([:])
+            case "setSkipSilence":
+                print("TODO: setSkipSilence", request)
+                result([:])
+            case "setSpeed":
+                player.setSpeed(Float(request["speed"] as! Double))
+                result([:])
+            case "setLoopMode":
+                player.setLoopMode(mode: Mapping.loopModeFrom(value: request["loopMode"] as! Int))
+                result([:])
+            case "setShuffleMode":
+                player.setShuffleMode(isEnalbed: Mapping.shuffleModeFrom(value: request["shuffleMode"] as! Int))
+                result([:])
+//            case "setShuffleOrder":
+//                print("TODO: setShuffleOrder", request)
+//                result([:])
+//            case "setAutomaticallyWaitsToMinimizeStalling":
+//                print("TODO: setAutomaticallyWaitsToMinimizeStalling", request)
+//                result([:])
+//            case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
+//                print("TODO: setCanUseNetworkResourcesForLiveStreamingWhilePaused", request)
+//                result([:])
+//            case "setPreferredPeakBitRate":
+//                print("TODO: setPreferredPeakBitRate", request)
+//                result([:])
+            case "seek":
+                let position = Mapping.timeFrom(microseconds: request["position"] as! Int64)
+                let index = request["index"] as? Int ?? 0
+
+                player.seek(position: position, index: index)
+                
+                result([:])
+//            case "concatenatingInsertAll":
+//                print("TODO: concatenatingInsertAll", request)
+//                result([:])
+//            case "concatenatingRemoveRange":
+//                print("TODO: concatenatingRemoveRange", request)
+//                result([:])
+//            case "concatenatingMove":
+//                print("TODO: concatenatingMove", request)
+//                result([:])
+//            case "setAndroidAudioAttributes":
+//                print("TODO: setAndroidAudioAttributes", request)
+//                result([:])
+            case "audioEffectSetEnabled":
+                try player.enableEffect(type: request["type"] as! String, enabled: request["enabled"] as! Bool)
+                result([:])
+            case "darwinEqualizerBandSetGain":
+                player.setEqualizerBandGain(bandIndex: request["bandIndex"] as! Int, gain: Float(request["gain"] as! Double))
+                result([:])
+            default:
+                result(FlutterMethodNotImplemented)
+            }
+        } catch {
+            let flutterError = FlutterError(code: "error", message: "Error in handleMethodCall", details: nil)
+            result(flutterError)
+        }
+    }
+    
+    func dispose() {
+        player?.dispose()
+        player = nil
+        
+        eventChannel.dispose()
+        dataChannel.dispose()
+        methodChannel.setMethodCallHandler(nil)
+    }
+}
+
 enum ProcessingState: Int {
     case none, loading, buffering, ready, completed
 }
@@ -12,21 +133,18 @@ enum LoopMode: Int {
     case loopOff, loopOne, loopAll
 }
 
-public class JustAudioPlayer: NSObject {
-    let playerId: String
-    let methodChannel: FlutterMethodChannel
-    let eventChannel: BetterEventChannel
-    let dataChannel: BetterEventChannel
-
+class Player {
+    let onEvent: ([String: Any]) -> Void
+    let audioEffects: [[String: Any]]
+    
     var engine: AVAudioEngine!
     var playerNode: AVAudioPlayerNode!
     var speedControl: AVAudioUnitVarispeed!
     var audioUnitEQ: AVAudioUnitEQ?
-    let audioEffects: [[String: Any]]
 
     // State properties
     var playing = false
-    var processingState: ProcessingState = .none
+    var processingState: ProcessingState = .loading
     var shuffleModeEnabled = false
     var loopMode: LoopMode = .loopOff
     
@@ -59,117 +177,18 @@ public class JustAudioPlayer: NSObject {
     var volume: Float = 1
     var rate: Float = 1
     
-    var loadResult: FlutterResult?
+    
 
-    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: [String: Any], audioEffects: [[String: Any]]) {
-        self.playerId = playerId
+    init(audioEffects: [[String: Any]], onEvent: @escaping ([String: Any]) -> Void) {
         self.audioEffects = audioEffects
-        methodChannel = FlutterMethodChannel(name: String(format: "com.ryanheise.just_audio.methods.%@", playerId), binaryMessenger: registrar.messenger())
-        eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
-        dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
-
-        print("TODO: loadConfiguration", loadConfiguration)
-
-        super.init()
-        methodChannel.setMethodCallHandler { call, result in
-            self.handleMethodCall(call: call, result: result)
-        }
+        self.onEvent = onEvent
     }
 
-    func handleMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        do {
-            let request = call.arguments as! [String: Any]
-            print("=========== \(call.method) \(request)")
-            switch call.method {
-            case "load":
-                let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1_000_000)
-                try load(source: request["audioSource"] as! [String: Any], initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
-            case "play":
-                playerNode.play()
-                updatePosition(nil)
-                broadcastPlaybackEvent()
-                result([:])
-            case "pause":
-                print(playerNode.currentTime)
-                updatePosition(nil)
-                playerNode.pause()
-                broadcastPlaybackEvent()
-                result([:])
-            case "setVolume":
-                volume = Float(request["volume"] as? Double ?? 1)
-                if playerNode != nil {
-                    playerNode.volume = volume
-                }
-                broadcastPlaybackEvent()
-                result([:])
-            case "setSkipSilence":
-                print("TODO: setSkipSilence", request)
-                result([:])
-            case "setSpeed":
-                rate = Float(request["speed"] as? Double ?? 1)
-                if speedControl != nil {
-                    speedControl.rate = rate
-                }
-                updatePosition(nil)
-                result([:])
-            case "setLoopMode":
-                setLoopMode(mode: Mapping.loopModeFrom(value: request["loopMode"] as! Int))
-                result([:])
-            case "setShuffleMode":
-                setShuffleMode(isEnalbed: Mapping.shuffleModeFrom(value: request["shuffleMode"] as! Int))
-                result([:])
-            case "setShuffleOrder":
-                print("TODO: setShuffleOrder", request)
-                result([:])
-            case "setAutomaticallyWaitsToMinimizeStalling":
-                print("TODO: setAutomaticallyWaitsToMinimizeStalling", request)
-                result([:])
-            case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
-                print("TODO: setCanUseNetworkResourcesForLiveStreamingWhilePaused", request)
-                result([:])
-            case "setPreferredPeakBitRate":
-                print("TODO: setPreferredPeakBitRate", request)
-                result([:])
-            case "seek":
-                let position = Mapping.timeFrom(microseconds: request["position"] as! Int64)
-                let index = request["index"] as? Int ?? 0
-
-                seek(position: position, index: index, completionHandler: {
-                    result([:])
-                })
-            case "concatenatingInsertAll":
-                print("TODO: concatenatingInsertAll", request)
-                result([:])
-            case "concatenatingRemoveRange":
-                print("TODO: concatenatingRemoveRange", request)
-                result([:])
-            case "concatenatingMove":
-                print("TODO: concatenatingMove", request)
-                result([:])
-            case "setAndroidAudioAttributes":
-                print("TODO: setAndroidAudioAttributes", request)
-                result([:])
-            case "audioEffectSetEnabled":
-                try! enableEffect(type: request["type"] as! String, enabled: request["enabled"] as! Bool)
-                result([:])
-            case "darwinEqualizerBandSetGain":
-                setEqualizerBandGain(bandIndex: request["bandIndex"] as! Int, gain: Float(request["gain"] as! Double))
-                result([:])
-            default:
-                result(FlutterMethodNotImplemented)
-            }
-        } catch {
-            let flutterError = FlutterError(code: "error", message: "Error in handleMethodCall", details: nil)
-            result(flutterError)
-        }
-    }
-
-    func load(source: [String: Any], initialPosition _: CMTime, initialIndex: Int, result: @escaping FlutterResult) throws {
+    func load(source: [String: Any], initialPosition _: CMTime, initialIndex: Int) -> CMTime {
         if playerNode != nil {
             playerNode.pause()
         }
 
-        loadResult = result
         index = initialIndex
         processingState = .loading
         updatePosition(CMTime.zero)
@@ -220,17 +239,28 @@ public class JustAudioPlayer: NSObject {
 
         processingState = .ready
 
-        loadResult?(["duration": duration.microSeconds])
-        loadResult = nil
-
+        broadcastPlaybackEvent()
+        return duration
+    }
+    
+    func play() {
+        playerNode.play()
+        updatePosition(nil)
         broadcastPlaybackEvent()
     }
     
-    func seek(position: CMTime, index: Int, completionHandler: () -> Void) {
+    func pause() {
+        updatePosition(nil)
+        playerNode.pause()
+        broadcastPlaybackEvent()
+    }
+    
+    func seek(position: CMTime, index: Int) {
         try! queueFrom(index)
 
         playerNode.stop()
         
+        print("lenght \(indexedAudioSources.count)")
         updatePosition(position);
         
 
@@ -247,13 +277,12 @@ public class JustAudioPlayer: NSObject {
         playerNode.play()
 
         broadcastPlaybackEvent()
-        completionHandler()
     }
     
     func updatePosition(_ positionUpdate: CMTime?) {
         self.positionUpdatedAt = Int64(Date().timeIntervalSince1970 * 1000)
         if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
-        self.positionOffset = indexedAudioSources.count > 0 ? self.playerNode.currentTime : CMTime.zero
+        self.positionOffset = indexedAudioSources.count > 0 && positionUpdate == nil ? self.playerNode.currentTime : CMTime.zero
     }
 
 //    func playNext() {
@@ -386,8 +415,24 @@ public class JustAudioPlayer: NSObject {
     
     // ======== EXTRA
     
+    func setVolume(_ value: Float) {
+        volume = value
+        if playerNode != nil {
+            playerNode.volume = volume
+        }
+        broadcastPlaybackEvent()
+    }
+    
+    func setSpeed(_ value: Float) {
+        rate = value
+        if speedControl != nil {
+            speedControl.rate = rate
+        }
+        updatePosition(nil)
+    }
+    
     func broadcastPlaybackEvent() {
-        eventChannel.sendEvent([
+        onEvent([
             "processingState": processingState.rawValue,
             "updatePosition": self.currentPosition.microSeconds,
             "updateTime": self.positionUpdatedAt,
@@ -399,26 +444,14 @@ public class JustAudioPlayer: NSObject {
     }
 
     func dispose() {
-        if playerNode == nil {
-            return
-        }
         if processingState != .none {
             playerNode.pause()
             processingState = .none
         }
         audioSource = nil
         indexedAudioSources = []
-        if playerNode != nil {
-            playerNode.stop()
-            playerNode = nil
-        }
-        if engine != nil {
-            engine.stop()
-            engine = nil
-        }
-        eventChannel.dispose()
-        dataChannel.dispose()
-        methodChannel.setMethodCallHandler(nil)
+        playerNode.stop()
+        engine.stop()
     }
 }
 
