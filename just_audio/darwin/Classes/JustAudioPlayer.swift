@@ -83,9 +83,9 @@ public class JustAudioPlayer: NSObject {
 //                result([:])
             case "seek":
                 let position = Mapping.timeFrom(microseconds: request["position"] as! Int64)
-                let index = request["index"] as? Int ?? 0
+                let index = request["index"] as? Int
 
-                player.seek(position: position, index: index)
+                player.seek(index: index, position: position)
                 
                 result([:])
 //            case "concatenatingInsertAll":
@@ -255,12 +255,13 @@ class Player {
         broadcastPlaybackEvent()
     }
     
-    func seek(position: CMTime, index: Int) {
-        try! queueFrom(index)
+    func seek(index: Int?, position: CMTime) {
+        if let index = index {
+            try! queueFrom(index)
+        }
 
         playerNode.stop()
         
-        print("lenght \(indexedAudioSources.count)")
         updatePosition(position);
         
 
