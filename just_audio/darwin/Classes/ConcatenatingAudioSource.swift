@@ -2,9 +2,11 @@ import AVFoundation
 
 class ConcatenatingAudioSource: AudioSource {
     let audioSources: [AudioSource]
+    let shuffleOrder: [Int]
 
-    init(sid: String, audioSources: [AudioSource]) {
+    init(sid: String, audioSources: [AudioSource], shuffleOrder: [Int]) {
         self.audioSources = audioSources
+        self.shuffleOrder = shuffleOrder
         super.init(sid: sid)
     }
 
@@ -17,10 +19,6 @@ class ConcatenatingAudioSource: AudioSource {
     }
 
     override func getShuffleIndices() -> [Int] {
-        var indexes = audioSources.enumerated().map { index, _ in
-            index
-        }
-        indexes.shuffle()
-        return indexes
+        return shuffleOrder;
     }
 }

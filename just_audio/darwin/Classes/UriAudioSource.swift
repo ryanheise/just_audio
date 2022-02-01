@@ -1,43 +1,50 @@
 
 
 class UriAudioSource: IndexedAudioSource {
-    var uri: String
-    var duration: TimeInterval?
-    var simpleRate: Double = 0
-    var simpleTime: Int64 = 0
+    var url: URL
+    var duration: TimeInterval = 0
 
     init(sid: String, uri: String) {
-        self.uri = uri
-
-        if uri.hasPrefix("file://") {
-            self.uri = String(uri[uri.index(uri.startIndex, offsetBy: 7)...])
-        }
+        self.url = UriAudioSource.urlFrom(uri: uri)
 
         super.init(sid: sid)
     }
 
-    override func load(engine _: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl _: AVAudioUnitVarispeed, completionHandler _: @escaping AVAudioPlayerNodeCompletionHandler) throws {
-        let url = uri.starts(with: "ipod-library://") ? URL(string: uri)! : URL(fileURLWithPath: uri)
+    override func load(engine _: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl _: AVAudioUnitVarispeed, position: CMTime?, completionHandler _: @escaping AVAudioPlayerNodeCompletionHandler) throws {
 
         let audioFile = try! AVAudioFile(forReading: url)
         let audioFormat = audioFile.fileFormat
 
-        simpleRate = audioFormat.sampleRate
-        simpleTime = audioFile.length
         duration = TimeInterval(Double(audioFile.length) / audioFormat.sampleRate)
+        
+        if let position = position, position.seconds > 0 {
+            let sampleRate = audioFormat.sampleRate
+            
+            let framePosition = AVAudioFramePosition(sampleRate * position.seconds)
 
-        playerNode.scheduleFile(audioFile, at: nil, completionHandler: { print("Hola") })
+            let missingTime = duration - position.seconds
+            let framestoplay = AVAudioFrameCount(sampleRate * missingTime)
+
+            if framestoplay > 1000 {
+                playerNode.scheduleSegment(audioFile, startingFrame: framePosition, frameCount: framestoplay, at: nil, completionHandler: nil)
+            }
+        } else {
+            playerNode.scheduleFile(audioFile, at: nil, completionHandler: { print("Hola") })
+        }
     }
-
-    override func getSampleRate() -> Double {
-        return simpleRate
-    }
-
-    override func getSampleTime() -> Int64 {
-        return simpleTime
-    }
-
+    
     override func getDuration() -> TimeInterval {
-        return duration ?? 0
+        return duration
+    }
+    
+    static func urlFrom(uri: String) -> URL {
+        if (uri.hasPrefix("ipod-library://")) {
+            return URL(string: uri)!
+        } else if (uri.hasPrefix("file://")) {
+            let fineUri = String(uri[uri.index(uri.startIndex, offsetBy: 7)...])
+            return URL(fileURLWithPath: fineUri);
+        } else {
+            return URL(fileURLWithPath: uri)
+        }
     }
 }

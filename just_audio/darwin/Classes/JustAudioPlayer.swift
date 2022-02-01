@@ -64,9 +64,9 @@ public class JustAudioPlayer: NSObject {
     func handleMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
         do {
             let request = call.arguments as! [String: Any]
+            print("=========== \(call.method) \(request)")
             switch call.method {
             case "load":
-                print("========== load:", request)
                 let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1_000_000)
                 try load(source: request["audioSource"] as! [String: Any], initialPosition: initialPosition, initialIndex: request["initialIndex"] as? Int ?? 0, result: result)
             case "play":
@@ -97,13 +97,10 @@ public class JustAudioPlayer: NSObject {
                 updatePosition()
                 result([:])
             case "setLoopMode":
-                toggleLoopMode()
+                setLoopMode(mode: Mapping.loopModeFrom(value: request["loopMode"] as! Int))
                 result([:])
             case "setShuffleMode":
-                toggleShuffleMode(shuffleMode: request["shuffleMode"] as? Int ?? 0)
-                updateOrder()
-                broadcastPlaybackEvent()
-                print("TODO: setShuffleMode", request)
+                setShuffleMode(isEnalbed: Mapping.shuffleModeFrom(value: request["shuffleMode"] as! Int))
                 result([:])
             case "setShuffleOrder":
                 print("TODO: setShuffleOrder", request)
@@ -118,12 +115,8 @@ public class JustAudioPlayer: NSObject {
                 print("TODO: setPreferredPeakBitRate", request)
                 result([:])
             case "seek":
-                print("========== seek", request)
-                // microseconds
-                let position = CMTimeMake(value: request["position"] as? Int64 ?? 0, timescale: 1_000_000)
+                let position = Mapping.timeFrom(microseconds: request["position"] as! Int64)
                 let index = request["index"] as? Int ?? 0
-
-                print("\(position.seconds) \(position.milliSeconds) \(position.value) \(position.timescale)")
 
                 seek(position: position, index: index, completionHandler: {
                     result([:])
@@ -152,26 +145,6 @@ public class JustAudioPlayer: NSObject {
         } catch {
             let flutterError = FlutterError(code: "error", message: "Error in handleMethodCall", details: nil)
             result(flutterError)
-        }
-    }
-
-    private func toggleLoopMode() {
-        switch loopMode {
-        case .loopOff:
-            loopMode = .loopOne
-        case .loopOne:
-            loopMode = .loopAll
-        case .loopAll:
-            loopMode = .loopOff
-        }
-    }
-
-    private func toggleShuffleMode(shuffleMode: Int) {
-        switch shuffleMode {
-        case 1:
-            shuffleModeEnabled = true
-        default:
-            shuffleModeEnabled = false
         }
     }
 
@@ -247,20 +220,10 @@ public class JustAudioPlayer: NSObject {
 
         processingState = .ready
 
-        let sampleRate = currentSource?.getSampleRate() ?? 0
-        let newsampletime = AVAudioFramePosition(sampleRate * position.seconds)
-
-        let length = Float(currentSource?.getDuration() ?? 0) - Float(position.seconds)
-        let framestoplay = AVAudioFrameCount(Float(sampleRate) * length)
-
-        if framestoplay > 1000 {
-            let uri = (currentSource as! UriAudioSource).uri
-            let url = uri.starts(with: "ipod-library://") ? URL(string: uri)! : URL(fileURLWithPath: uri)
-
-            let audioFile = try! AVAudioFile(forReading: url)
-
-            playerNode.scheduleSegment(audioFile, startingFrame: newsampletime, frameCount: framestoplay, at: nil, completionHandler: nil)
-        }
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: position, completionHandler: { type in
+//            self.playNext()
+            print("CompletionHandler \(type.rawValue)")
+        })
 
         playerNode.play()
 
@@ -358,8 +321,7 @@ public class JustAudioPlayer: NSObject {
             preconditionFailure("no songs on library")
         }
         currentSource = indexedAudioSources[index]
-        print("Index:\(index) \(indexedAudioSources.description)")
-        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, completionHandler: { type in
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: nil, completionHandler: { type in
 //            self.playNext()
             print("CompletionHandler \(type.rawValue)")
         })
@@ -377,7 +339,7 @@ public class JustAudioPlayer: NSObject {
         case "progressive":
             return UriAudioSource(sid: data["id"] as! String, uri: data["uri"] as! String)
         case "concatenating":
-            return ConcatenatingAudioSource(sid: data["id"] as! String, audioSources: decodeAudioSources(data: data["children"] as! [[String: Any]]))
+            return ConcatenatingAudioSource(sid: data["id"] as! String, audioSources: decodeAudioSources(data: data["children"] as! [Dictionary<String, Any>]), shuffleOrder: data["shuffleOrder"] as! Array<Int>)
         default:
             throw PluginError.runtimeError("data source not supported")
         }
@@ -420,6 +382,17 @@ public class JustAudioPlayer: NSObject {
     func setEqualizerBandGain(bandIndex: Int, gain: Float) {
         audioUnitEQ?.bands[bandIndex].gain = gain
     }
+    
+    func setShuffleMode(isEnalbed: Bool) {
+        shuffleModeEnabled = isEnalbed
+        updateOrder()
+        broadcastPlaybackEvent()
+    }
+    
+    func setLoopMode(mode: LoopMode) {
+        loopMode = mode
+        broadcastPlaybackEvent()
+    }
 
     func dispose() {
         if playerNode == nil {
@@ -461,5 +434,26 @@ extension AVAudioPlayerNode {
             return Double(playerTime.sampleTime) / playerTime.sampleRate
         }
         return 0.0
+    }
+}
+
+class Mapping {
+    static func timeFrom(microseconds: Int64) -> CMTime {
+        return CMTimeMake(value: microseconds, timescale: 1_000_000)
+    }
+    
+    static func loopModeFrom(value: Int) -> LoopMode {
+        switch (value) {
+        case 1:
+            return LoopMode.loopOne
+        case 2:
+            return LoopMode.loopAll
+        default:
+            return LoopMode.loopOff
+        }
+    }
+    
+    static func shuffleModeFrom(value: Int) -> Bool {
+        return value == 1
     }
 }
