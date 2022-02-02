@@ -1,7 +1,25 @@
 import AVFoundation
 
-enum PluginError: Error {
-    case runtimeError(String)
+class PluginError : Error {
+    let code: Int
+    let message: String
+    
+    init(_ code: Int, _ message: String) {
+        self.code = code;
+        self.message = message
+    }
+    
+    static func notImplemented(_ message: String) -> PluginError {
+        return PluginError(500, message)
+    }
+    
+    static func notInitialized(_ message: String) -> PluginError {
+        return PluginError(403, message)
+    }
+    
+    static func notSupported(_ value: Any, _ message: Any) -> PluginError {
+        return PluginError(400, "Not support \(value)\n\(message)")
+    }
 }
 
 public class JustAudioPlayer: NSObject {
@@ -31,22 +49,21 @@ public class JustAudioPlayer: NSObject {
     }
     
     func handleMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        if (player == nil) {
-            player = Player(audioEffects: audioEffects, onEvent: eventChannel.sendEvent);
-        }
-        
         do {
+            if (player == nil) {
+                player = Player(audioEffects: try! audioEffects.map(Mapping.effectFrom), onEvent: onPlaybackEvent);
+            }
+            
             let request = call.arguments as! [String: Any]
             print("=========== \(call.method) \(request)")
             
             switch call.method {
             case "load":
-                let source = request["audioSource"] as! [String: Any]
+                let source = try AudioSource.fromJson(request["audioSource"] as! [String: Any])
                 let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1_000_000)
                 let initialIndex = request["initialIndex"] as? Int ?? 0
                 
                 let duration = player.load(source: source, initialPosition: initialPosition, initialIndex: initialIndex)
-                
                 result(["duration": duration.microSeconds])
             case "play":
                 player.play()
@@ -57,17 +74,17 @@ public class JustAudioPlayer: NSObject {
             case "setVolume":
                 player.setVolume(Float(request["volume"] as! Double))
                 result([:])
-            case "setSkipSilence":
-                print("TODO: setSkipSilence", request)
-                result([:])
+//            case "setSkipSilence":
+//                print("TODO: setSkipSilence", request)
+//                result([:])
             case "setSpeed":
                 player.setSpeed(Float(request["speed"] as! Double))
                 result([:])
             case "setLoopMode":
-                player.setLoopMode(mode: Mapping.loopModeFrom(value: request["loopMode"] as! Int))
+                player.setLoopMode(mode: Mapping.loopModeFrom(request["loopMode"] as! Int))
                 result([:])
             case "setShuffleMode":
-                player.setShuffleMode(isEnalbed: Mapping.shuffleModeFrom(value: request["shuffleMode"] as! Int))
+                player.setShuffleMode(isEnalbed: Mapping.shuffleModeFrom(request["shuffleMode"] as! Int))
                 result([:])
 //            case "setShuffleOrder":
 //                print("TODO: setShuffleOrder", request)
@@ -86,7 +103,6 @@ public class JustAudioPlayer: NSObject {
                 let index = request["index"] as? Int
 
                 player.seek(index: index, position: position)
-                
                 result([:])
 //            case "concatenatingInsertAll":
 //                print("TODO: concatenatingInsertAll", request)
@@ -97,9 +113,6 @@ public class JustAudioPlayer: NSObject {
 //            case "concatenatingMove":
 //                print("TODO: concatenatingMove", request)
 //                result([:])
-//            case "setAndroidAudioAttributes":
-//                print("TODO: setAndroidAudioAttributes", request)
-//                result([:])
             case "audioEffectSetEnabled":
                 try player.enableEffect(type: request["type"] as! String, enabled: request["enabled"] as! Bool)
                 result([:])
@@ -109,10 +122,24 @@ public class JustAudioPlayer: NSObject {
             default:
                 result(FlutterMethodNotImplemented)
             }
-        } catch {
-            let flutterError = FlutterError(code: "error", message: "Error in handleMethodCall", details: nil)
-            result(flutterError)
+        } catch let error as PluginError {
+            result(FlutterError(code: "\(error.code)", message: error.message, details: nil))
+        } catch let error {
+            print(error)
+            result(FlutterError(code: "500", message: error.localizedDescription, details: nil))
         }
+    }
+    
+    func onPlaybackEvent(event: PlaybackEvent) {
+        eventChannel.sendEvent([
+            "processingState": event.processingState.rawValue,
+            "updatePosition": event.updatePosition.microSeconds,
+            "updateTime": event.updateTime,
+            "bufferedPosition": 0,
+            "icyMetadata": [:],
+            "duration": event.duration.microSeconds,
+            "currentIndex": event.currentIndex,
+        ])
     }
     
     func dispose() {
@@ -125,7 +152,7 @@ public class JustAudioPlayer: NSObject {
     }
 }
 
-enum ProcessingState: Int {
+enum ProcessingState: Int, Codable {
     case none, loading, buffering, ready, completed
 }
 
@@ -134,8 +161,8 @@ enum LoopMode: Int {
 }
 
 class Player {
-    let onEvent: ([String: Any]) -> Void
-    let audioEffects: [[String: Any]]
+    let onEvent: (PlaybackEvent) -> Void
+    let audioEffects: [EffectData]
     
     var engine: AVAudioEngine!
     var playerNode: AVAudioPlayerNode!
@@ -176,12 +203,12 @@ class Player {
     var volume: Float = 1
     var rate: Float = 1
 
-    init(audioEffects: [[String: Any]], onEvent: @escaping ([String: Any]) -> Void) {
+    init(audioEffects: [EffectData], onEvent: @escaping (PlaybackEvent) -> Void) {
         self.audioEffects = audioEffects
         self.onEvent = onEvent
     }
 
-    func load(source: [String: Any], initialPosition _: CMTime, initialIndex: Int) -> CMTime {
+    func load(source: AudioSource, initialPosition _: CMTime, initialIndex: Int) -> CMTime {
         if playerNode != nil {
             playerNode.pause()
         }
@@ -190,7 +217,7 @@ class Player {
         processingState = .loading
         updatePosition(CMTime.zero)
         // Decode audio source
-        audioSource = try! decodeAudioSource(data: source)
+        audioSource = source
 
         indexedAudioSources = []
         _ = audioSource.buildSequence(sequence: &indexedAudioSources, treeIndex: 0)
@@ -219,7 +246,7 @@ class Player {
             for node in nodes {
                 engine.attach(node!)
             }
-
+            
             // add mainMixerNode
             nodes.append(engine.mainMixerNode)
 
@@ -284,6 +311,7 @@ class Player {
     }
     
     var _isStopping = false
+    // Permit to check if [load(completionHandler)] is called when you force a stop
     func _stop() {
         _isStopping = true
         if playerNode.isPlaying { playerNode.stop() }
@@ -327,24 +355,6 @@ class Player {
         }
         currentSource = indexedAudioSources[index]
     }
-
-    func decodeAudioSources(data: [[String: Any]]) -> [AudioSource] {
-        return data.map { item in
-            try! decodeAudioSource(data: item)
-        }
-    }
-
-    func decodeAudioSource(data: [String: Any]) throws -> AudioSource {
-        let type = data["type"] as! String
-        switch type {
-        case "progressive":
-            return UriAudioSource(sid: data["id"] as! String, uri: data["uri"] as! String)
-        case "concatenating":
-            return ConcatenatingAudioSource(sid: data["id"] as! String, audioSources: decodeAudioSources(data: data["children"] as! [Dictionary<String, Any>]), shuffleOrder: data["shuffleOrder"] as! Array<Int>)
-        default:
-            throw PluginError.runtimeError("data source not supported")
-        }
-    }
     
     // ========== MODES
     
@@ -377,25 +387,20 @@ class Player {
 
     func createAudioEffects() throws {
         for effect in audioEffects {
-            let parameters = effect["parameters"] as! [String: Any]
-            switch effect["type"] as? String {
-            case "DarwinEqualizer":
-                let bands = parameters["bands"] as! [[String: Any]]
-                audioUnitEQ = AVAudioUnitEQ(numberOfBands: bands.count)
-                for (i, band) in bands.enumerated() {
+            if let effect = effect as? EqualizerEffectData {
+                audioUnitEQ = AVAudioUnitEQ(numberOfBands: effect.parameters.bands.count)
+                
+                for (i, band) in effect.parameters.bands.enumerated() {
                     audioUnitEQ!.bands[i].filterType = .parametric
-                    audioUnitEQ!.bands[i].frequency = band["centerFrequency"] as! Float
-                    audioUnitEQ!.bands[i].bandwidth = 0.5 // half an octave
-                    audioUnitEQ!.bands[i].gain = Float(band["gain"] as? Double ?? 0)
+                    audioUnitEQ!.bands[i].frequency = band.centerFrequency
+                    audioUnitEQ!.bands[i].bandwidth = 1 // half an octave
+                    audioUnitEQ!.bands[i].gain = Mapping.gainFrom(band.gain)
                     audioUnitEQ!.bands[i].bypass = false
                 }
-                if let enabled = effect["enabled"] as? Bool {
-                    audioUnitEQ!.bypass = !enabled
-                } else {
-                    audioUnitEQ!.bypass = true
-                }
-            default:
-                throw PluginError.runtimeError("effect type not supported")
+                
+                audioUnitEQ!.bypass = !effect.enabled
+            } else {
+                throw PluginError.notSupported(effect.type, "When initialize effect")
             }
         }
     }
@@ -405,7 +410,7 @@ class Player {
         case "DarwinEqualizer":
             audioUnitEQ!.bypass = !enabled
         default:
-            throw PluginError.runtimeError("effect type not supported")
+            throw PluginError.notInitialized("Not initialized effect \(type)")
         }
     }
 
@@ -432,26 +437,24 @@ class Player {
     }
     
     func broadcastPlaybackEvent() {
-        onEvent([
-            "processingState": processingState.rawValue,
-            "updatePosition": self.currentPosition.microSeconds,
-            "updateTime": self.positionUpdatedAt,
-            "bufferedPosition": 0,
-            "icyMetadata": [:],
-            "duration": duration.microSeconds,
-            "currentIndex": index,
-        ])
+        onEvent(PlaybackEvent(
+            processingState: processingState,
+            updatePosition: self.currentPosition,
+            updateTime: self.positionUpdatedAt,
+            duration: duration,
+            currentIndex: index
+        ))
     }
 
     func dispose() {
         if processingState != .none {
-            playerNode.pause()
+            playerNode?.pause()
             processingState = .none
         }
         audioSource = nil
         indexedAudioSources = []
-        playerNode.stop()
-        engine.stop()
+        playerNode?.stop()
+        engine?.stop()
     }
 }
 
@@ -481,7 +484,7 @@ class Mapping {
         return CMTimeMake(value: microseconds, timescale: 1_000_000)
     }
     
-    static func loopModeFrom(value: Int) -> LoopMode {
+    static func loopModeFrom(_ value: Int) -> LoopMode {
         switch (value) {
         case 1:
             return LoopMode.loopOne
@@ -492,7 +495,58 @@ class Mapping {
         }
     }
     
-    static func shuffleModeFrom(value: Int) -> Bool {
+    static func shuffleModeFrom(_ value: Int) -> Bool {
         return value == 1
     }
+    
+    static func gainFrom(_ value: Float) -> Float {
+        // Equalize the level between ios and android
+        return value * 2.8
+    }
+    
+    static func effectFrom(_ map: [String: Any]) throws -> EffectData {
+        let type = map["type"] as! String
+        switch (type) {
+        case EffectType.darwinEqualizer.rawValue:
+            return EqualizerEffectData.fromJson(map)
+        default:
+            throw PluginError.notSupported(type, "When decoding effect")
+        }
+    }
+}
+
+enum EffectType : String, Codable {
+    case darwinEqualizer = "DarwinEqualizer"
+}
+
+protocol EffectData {
+    var type: EffectType { get }
+}
+
+struct EqualizerEffectData : EffectData, Codable {
+    let type: EffectType
+    let enabled: Bool
+    let parameters: ParamsEqualizerData
+    
+    static func fromJson(_ map: [String: Any]) -> EqualizerEffectData {
+        return try! JSONDecoder().decode(EqualizerEffectData.self, from: JSONSerialization.data(withJSONObject: map))
+    }
+}
+
+struct ParamsEqualizerData : Codable {
+    let bands: Array<BandEqualizerData>
+}
+
+struct BandEqualizerData : Codable {
+    let index: Int
+    let centerFrequency: Float
+    let gain: Float
+}
+
+struct PlaybackEvent {
+    let processingState: ProcessingState
+    let updatePosition: CMTime
+    let updateTime: Int64
+    let duration: CMTime
+    let currentIndex: Int
 }

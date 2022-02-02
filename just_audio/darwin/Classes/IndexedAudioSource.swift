@@ -2,7 +2,7 @@ import AVFoundation
 
 class IndexedAudioSource: AudioSource {
     func load(engine _: AVAudioEngine, playerNode _: AVAudioPlayerNode, speedControl _: AVAudioUnitVarispeed, position _: CMTime?, completionHandler _: @escaping AVAudioPlayerNodeCompletionHandler) throws {
-        throw PluginError.runtimeError("no buffer")
+        throw PluginError.notImplemented("Not implemented IndexedAudioSource.load")
     }
 
     func getDuration() -> CMTime {

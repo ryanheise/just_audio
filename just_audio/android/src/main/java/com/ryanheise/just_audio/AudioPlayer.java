@@ -777,7 +777,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void equalizerBandSetGain(int bandIndex, double gain) {
-        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
+        // dB = 0.1 bels | 0.8 = Equalize the level between ios and android
+        final short millibels = (short)(Math.round(gain * 100.0 * 0.8));
+        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, millibels);
     }
 
     /// Creates an event based on the current state.
