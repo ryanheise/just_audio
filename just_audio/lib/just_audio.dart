@@ -2160,14 +2160,19 @@ abstract class UriAudioSource extends IndexedAudioSource {
 ///
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
+///
+/// If androidIndexSeeking is ture, set FLAG_ENABLE_INDEX_SEEKING is used for
+/// exact but slow seeking. (only Android)
 class ProgressiveAudioSource extends UriAudioSource {
+  bool androidIndexSeeking;
+
   ProgressiveAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
+      {Map<String, String>? headers, dynamic tag, Duration? duration, bool this.androidIndexSeeking = false})
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag, androidIndexSeeking: androidIndexSeeking);
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are

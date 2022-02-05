@@ -1020,11 +1020,14 @@ abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
 /// Information about a progressive audio source to be communicated with the
 /// platform implementation.
 class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
+  final bool androidIndexSeeking;
+
   ProgressiveAudioSourceMessage({
     required String id,
     required String uri,
     Map<String, String>? headers,
     dynamic tag,
+    bool this.androidIndexSeeking = false,
   }) : super(id: id, uri: uri, headers: headers, tag: tag);
 
   @override
@@ -1033,6 +1036,7 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'androidIndexSeeking': androidIndexSeeking,
       };
 }
 
