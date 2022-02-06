@@ -17,6 +17,26 @@ import 'package:uuid/uuid.dart';
 
 final _uuid = Uuid();
 
+JustAudioPlatform? _pluginPlatformCache;
+
+JustAudioPlatform get _pluginPlatform {
+  var pluginPlatform = JustAudioPlatform.instance;
+  // If this is a new FlutterEngine or if we've just hot restarted an existing
+  // FlutterEngine...
+  if (_pluginPlatformCache == null) {
+    // Dispose of all existing players within this FlutterEngine. This helps to
+    // shut down existing players on a hot restart. TODO: Remove this hack once
+    // https://github.com/flutter/flutter/issues/10437 is implemented.
+    try {
+      pluginPlatform.disposeAllPlayers(DisposeAllPlayersRequest());
+    } catch (e) {
+      print(e);
+    }
+    _pluginPlatformCache = pluginPlatform;
+  }
+  return pluginPlatform;
+}
+
 /// An object to manage playing audio from a URL, a locale file or an asset.
 ///
 /// ```
@@ -1252,8 +1272,7 @@ class AudioPlayer {
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
       final platform = active
-          ? await (_nativePlatform =
-              JustAudioPlatform.instance.init(InitRequest(
+          ? await (_nativePlatform = _pluginPlatform.init(InitRequest(
               id: _id,
               audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
               androidAudioEffects: (_isAndroid() || _isUnitTest())
@@ -1379,8 +1398,7 @@ class AudioPlayer {
     } else {
       _nativePlatform = null;
       try {
-        await JustAudioPlatform.instance
-            .disposePlayer(DisposePlayerRequest(id: _id));
+        await _pluginPlatform.disposePlayer(DisposePlayerRequest(id: _id));
       } catch (e) {
         // Fallback if disposePlayer hasn't been implemented.
         await platform.dispose(DisposeRequest());

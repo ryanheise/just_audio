@@ -21,6 +21,14 @@ class MethodChannelJustAudio extends JustAudioPlatform {
         (await _mainChannel.invokeMethod<Map<dynamic, dynamic>>(
             'disposePlayer', request.toMap()))!);
   }
+
+  @override
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
+    return DisposeAllPlayersResponse.fromMap(
+        (await _mainChannel.invokeMethod<Map<dynamic, dynamic>>(
+            'disposeAllPlayers', request.toMap()))!);
+  }
 }
 
 /// An implementation of [AudioPlayerPlatform] that uses method channels.

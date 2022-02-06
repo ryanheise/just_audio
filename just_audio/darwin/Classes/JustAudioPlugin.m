@@ -43,6 +43,12 @@
         [_players[playerId] dispose];
         [_players setValue:nil forKey:playerId];
         result(@{});
+    } else if ([@"disposeAllPlayers" isEqualToString:call.method]) {
+        for (NSString *playerId in _players) {
+            [_players[playerId] dispose];
+        }
+        [_players removeAllObjects];
+        result(@{});
     } else {
         result(FlutterMethodNotImplemented);
     }
