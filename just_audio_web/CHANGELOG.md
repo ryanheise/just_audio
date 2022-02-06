@@ -1,3 +1,7 @@
+## 0.4.4
+
+* Implement disposeAllPlayers.
+
 ## 0.4.3
 
 * Fix bug where setSpeed is forgotten after load().
