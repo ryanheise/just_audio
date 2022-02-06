@@ -17,11 +17,11 @@ dependencies:
     path: ../
 
 # Uncomment when testing platform interface changes.
-dependency_overrides:
-  just_audio_platform_interface:
-    path: ../../just_audio_platform_interface
-  just_audio_web:
-    path: ../../just_audio_web
+# dependency_overrides:
+#   just_audio_platform_interface:
+#     path: ../../just_audio_platform_interface
+#   just_audio_web:
+#     path: ../../just_audio_web
 
 dev_dependencies:
   # TODO: uncomment these dependencies when they have nullsafe versions.

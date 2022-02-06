@@ -4,7 +4,7 @@ homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_backgro
 version: 0.0.1-beta.3
 
 dependencies:
-  just_audio_platform_interface: ^4.0.0
+  just_audio_platform_interface: ^4.1.0
   # just_audio_platform_interface:
   #   path: ../just_audio_platform_interface
   audio_service: ^0.18.3
