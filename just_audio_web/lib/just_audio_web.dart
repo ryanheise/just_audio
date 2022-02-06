@@ -35,6 +35,16 @@ class JustAudioPlugin extends JustAudioPlatform {
     players.remove(request.id);
     return DisposePlayerResponse();
   }
+
+  @override
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
+    for (var player in players.values) {
+      await player.release();
+    }
+    players.clear();
+    return DisposeAllPlayersResponse();
+  }
 }
 
 /// The web impluementation of [AudioPlayerPlatform].
