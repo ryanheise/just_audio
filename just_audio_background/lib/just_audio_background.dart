@@ -144,6 +144,14 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     _player = null;
     return DisposePlayerResponse();
   }
+
+  @override
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
+    await _player?.release();
+    _player = null;
+    return DisposeAllPlayersResponse();
+  }
 }
 
 class _JustAudioPlayer extends AudioPlayerPlatform {
