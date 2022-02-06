@@ -1,3 +1,8 @@
+## 0.9.19
+
+* Dispose players on iOS/macOS hot restart.
+* Fix initialIndex out of bounds bug on iOS/macOS.
+
 ## 0.9.18
 
 * Fix null duration bug on LockCachingAudioSource.
