@@ -1,3 +1,7 @@
+## 0.0.1-beta.4
+
+* Implement disposeAllPlayers.
+
 ## 0.0.1-beta.3
 
 * Fix build when targeting Android 12.

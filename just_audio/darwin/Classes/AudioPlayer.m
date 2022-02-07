@@ -577,9 +577,9 @@
         [self abortExistingConnection];
     }
     _loadResult = result;
-    _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     _processingState = loading;
     [self updatePosition];
+    _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     // Remove previous observers
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
