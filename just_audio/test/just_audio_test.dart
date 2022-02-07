@@ -1261,6 +1261,16 @@ class MockJustAudio extends Mock
     _players.remove(request.id);
     return DisposePlayerResponse();
   }
+
+  @override
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
+    for (var player in _players.values) {
+      player.dispose(DisposeRequest());
+    }
+    _players.clear();
+    return DisposeAllPlayersResponse();
+  }
 }
 
 const audioSourceDuration = Duration(minutes: 2);
