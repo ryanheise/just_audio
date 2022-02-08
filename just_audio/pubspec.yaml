@@ -11,13 +11,13 @@ dependencies:
   # just_audio_platform_interface: ^4.0.0
   just_audio_platform_interface:
     git:
-      url: git@github.com:wavy-assistant/just_audio.git
-      ref: feature/new_ios_implementation
+      url: https://github.com/Kuama-IT/just_audio.git
+      ref: feature/swift_implementation
       path: just_audio_platform_interface
   just_audio_web:
     git:
-      url: git@github.com:wavy-assistant/just_audio.git
-      ref: feature/new_ios_implementation
+      url: https://github.com/Kuama-IT/just_audio.git
+      ref: feature/swift_implementation
       path: just_audio_web
   # just_audio_web:
   #   path: ../just_audio_web

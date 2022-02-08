@@ -55,7 +55,7 @@ public class JustAudioPlayer: NSObject {
             }
             
             let request = call.arguments as! [String: Any]
-            print("=========== \(call.method) \(request)")
+//             print("=========== \(call.method) \(request)")
             
             switch call.method {
             case "load":
@@ -319,7 +319,7 @@ class Player {
     }
     
     func _loadCurrentSource() {
-        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {  _ in
+        try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {
             if (self._isStopping) {return}
             self._playNext()
         })
