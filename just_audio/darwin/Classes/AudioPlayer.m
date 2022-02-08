@@ -578,7 +578,6 @@
     }
     _loadResult = result;
     _processingState = loading;
-    [self updatePosition];
     _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     // Remove previous observers
     if (_indexedAudioSources) {
@@ -628,6 +627,7 @@
         [self addItemObservers:source.playerItem];
         source.playerItem.audioSource = source;
     }
+    [self updatePosition];
     [self updateOrder];
     // Set up an empty player
     if (!_player) {
