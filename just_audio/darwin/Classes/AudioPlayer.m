@@ -331,6 +331,8 @@
 }
 
 - (int)getCurrentPosition {
+    // XXX: During load, the second case will be selected returning 0.
+    // TODO: Provide a similar case as _seekPos for _initialPos.
     if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
     } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
