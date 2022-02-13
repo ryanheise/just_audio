@@ -1,3 +1,7 @@
+## 0.9.20
+
+* Fix initial position on iOS/macOS when switching sources (@addie9000).
+
 ## 0.9.19
 
 * Dispose players on iOS/macOS hot restart.
