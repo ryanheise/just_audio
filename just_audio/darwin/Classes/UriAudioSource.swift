@@ -43,11 +43,8 @@ class UriAudioSource: IndexedAudioSource {
     }
     
     static func urlFrom(uri: String) -> URL {
-        if (uri.hasPrefix("ipod-library://")) {
+        if (uri.hasPrefix("ipod-library://") || uri.hasPrefix("file://")) {
             return URL(string: uri)!
-        } else if (uri.hasPrefix("file://")) {
-            let fineUri = String(uri[uri.index(uri.startIndex, offsetBy: 7)...])
-            return URL(fileURLWithPath: fineUri);
         } else {
             return URL(fileURLWithPath: uri)
         }
