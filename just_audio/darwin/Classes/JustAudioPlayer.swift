@@ -219,11 +219,18 @@ class Player {
         // Decode audio source
         audioSource = source
 
-        indexedAudioSources = []
-        _ = audioSource.buildSequence(sequence: &indexedAudioSources, treeIndex: 0)
+        indexedAudioSources = audioSource.buildSequence()
 
         updateOrder()
         index = 0
+        
+        if indexedAudioSources.isEmpty {
+            
+            processingState = .none
+            broadcastPlaybackEvent()
+            
+            return CMTime.zero
+        }
 
         if engine == nil {
             engine = AVAudioEngine()
@@ -253,6 +260,13 @@ class Player {
             for i in 1 ..< nodes.count {
                 engine.connect(nodes[i - 1]!, to: nodes[i]!, format: nil)
             }
+            
+            // Observe for changes in the audio engine configuration
+            NotificationCenter.default.addObserver(self,
+               selector: #selector(_handleInterruption),
+               name: NSNotification.Name.AVAudioEngineConfigurationChange,
+               object: nil
+            )
         }
 
         try! setQueueFrom(index)
@@ -264,13 +278,17 @@ class Player {
         }
 
         processingState = .ready
-
         broadcastPlaybackEvent()
+        
         return duration
     }
     
+    @objc func _handleInterruption(notification: Notification) {
+        _resume()
+    }
+    
     func play() {
-        playerNode.play()
+        _play()
         updatePosition(nil)
         broadcastPlaybackEvent()
     }
@@ -279,6 +297,19 @@ class Player {
         updatePosition(nil)
         playerNode.pause()
         broadcastPlaybackEvent()
+    }
+    
+    func _resume() {
+        let wasPlaying = playerNode.isPlaying
+        
+        playerNode.pause()
+        if (!engine.isRunning) {
+            try! engine.start()
+        }
+        
+        if (wasPlaying) {
+            playerNode.play()
+        }
     }
     
     func seek(index: Int?, position: CMTime) {
@@ -298,7 +329,7 @@ class Player {
        
         // Restart play if player was playning
         if (wasPlaying) {
-            playerNode.play()
+            _play()
         }
 
         broadcastPlaybackEvent()
@@ -316,6 +347,13 @@ class Player {
         _isStopping = true
         if playerNode.isPlaying { playerNode.stop() }
         _isStopping = false
+    }
+    
+    func _play() {
+        if (!self.engine.isRunning) {
+            try! self.engine.start()
+        }
+        playerNode.play()
     }
     
     func _loadCurrentSource() {

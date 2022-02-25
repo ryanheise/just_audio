@@ -9,8 +9,7 @@ class IndexedAudioSource: AudioSource {
         return CMTime.invalid
     }
 
-    override func buildSequence(sequence: inout [IndexedAudioSource], treeIndex: Int) -> Int {
-        sequence.append(self)
-        return treeIndex + 1
+    override func buildSequence() -> Array<IndexedAudioSource> {
+        return [self]
     }
 }

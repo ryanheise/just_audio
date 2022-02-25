@@ -7,8 +7,8 @@ class AudioSource {
         sourceId = sid
     }
 
-    func buildSequence(sequence _: inout [IndexedAudioSource], treeIndex _: Int) -> Int {
-        return 0
+    func buildSequence() -> Array<IndexedAudioSource> {
+        return []
     }
 
     func getShuffleIndices() -> [Int] {

@@ -10,12 +10,10 @@ class ConcatenatingAudioSource: AudioSource {
         super.init(sid: sid)
     }
 
-    override func buildSequence(sequence: inout [IndexedAudioSource], treeIndex: Int) -> Int {
-        var index = treeIndex
-        for source in audioSources {
-            index = source.buildSequence(sequence: &sequence, treeIndex: index)
+    override func buildSequence() -> [IndexedAudioSource] {
+        return audioSources.flatMap {
+            $0.buildSequence()
         }
-        return index
     }
 
     override func getShuffleIndices() -> [Int] {
