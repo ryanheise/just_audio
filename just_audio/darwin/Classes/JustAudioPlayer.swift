@@ -359,19 +359,30 @@ class Player {
     func _loadCurrentSource() {
         try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {
             if (self._isStopping) {return}
-            self._playNext()
+            DispatchQueue.main.async {
+                self._playNext()
+            }
         })
+    }
+    
+    func _getRelativeIndex(_ offset: Int) -> Int {
+        switch (loopMode) {
+        case .loopOne:
+            return self.index
+        case .loopAll:
+            return offset >= self.indexedAudioSources.count ? 0 : self.orderInv[offset]
+        case .loopOff:
+            return self.orderInv[offset]
+        }
     }
 
     func _playNext() {
-        DispatchQueue.main.async {
-            let newIndex = self.index + 1
-            if newIndex >= self.indexedAudioSources.count {
-                self._complete()
-            } else {
-                self.seek(index: newIndex, position: CMTime.zero)
-                self.play()
-            }
+        let newIndex = self.index + 1
+        if newIndex >= self.indexedAudioSources.count {
+            self._complete()
+        } else {
+            self.seek(index: self._getRelativeIndex(newIndex), position: CMTime.zero)
+            self.play()
         }
     }
 
