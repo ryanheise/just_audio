@@ -40,7 +40,7 @@ public class JustAudioPlayer: NSObject {
         eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
         dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
 
-        print("TODO: loadConfiguration", loadConfiguration)
+//        print("TODO: loadConfiguration", loadConfiguration)
 
         super.init()
         methodChannel.setMethodCallHandler { call, result in
@@ -55,7 +55,7 @@ public class JustAudioPlayer: NSObject {
             }
             
             let request = call.arguments as! [String: Any]
-//             print("=========== \(call.method) \(request)")
+             print("=========== \(call.method) \(request)")
             
             switch call.method {
             case "load":
@@ -222,7 +222,6 @@ class Player {
         indexedAudioSources = audioSource.buildSequence()
 
         updateOrder()
-        index = 0
         
         if indexedAudioSources.isEmpty {
             
@@ -345,7 +344,7 @@ class Player {
     // Permit to check if [load(completionHandler)] is called when you force a stop
     func _stop() {
         _isStopping = true
-        if playerNode.isPlaying { playerNode.stop() }
+        playerNode.stop()
         _isStopping = false
     }
     
@@ -398,10 +397,10 @@ class Player {
     // ========== QUEUE
     
     func setQueueFrom(_ index: Int) throws {
-        self.index = index
         guard !indexedAudioSources.isEmpty else {
             preconditionFailure("no songs on library")
         }
+        self.index = index
         currentSource = indexedAudioSources[index]
     }
     
