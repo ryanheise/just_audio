@@ -140,16 +140,18 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
   @override
   Future<DisposePlayerResponse> disposePlayer(
       DisposePlayerRequest request) async {
-    await _player?.release();
+    final player = _player;
     _player = null;
+    await player?.release();
     return DisposePlayerResponse();
   }
 
   @override
   Future<DisposeAllPlayersResponse> disposeAllPlayers(
       DisposeAllPlayersRequest request) async {
-    await _player?.release();
+    final player = _player;
     _player = null;
+    await player?.release();
     return DisposeAllPlayersResponse();
   }
 }
