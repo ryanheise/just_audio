@@ -1,3 +1,7 @@
+## 0.4.5
+
+* Fix interrupted play request bug.
+
 ## 0.4.4
 
 * Implement disposeAllPlayers.
