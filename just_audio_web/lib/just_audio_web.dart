@@ -538,6 +538,8 @@ abstract class AudioSourcePlayer {
 
 /// A player for an [IndexedAudioSourceMessage].
 abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
+  late final _playPauseQueue = _PlayPauseQueue(_audioElement);
+
   IndexedAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id)
       : super(html5AudioPlayer, id);
 
@@ -613,7 +615,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<void> play() async {
     _audioElement.currentTime = _resumePos!;
-    await _audioElement.play();
+    await _playPauseQueue.play();
     _completer = Completer<dynamic>();
     await _completer!.future;
     _completer = null;
@@ -622,7 +624,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<void> pause() async {
     _resumePos = _audioElement.currentTime as double?;
-    _audioElement.pause();
+    _playPauseQueue.pause();
     _interruptPlay();
   }
 
@@ -806,7 +808,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Future<void> play() async {
     _interruptPlay(ClipInterruptReason.simultaneous);
     _audioElement.currentTime = _resumePos!;
-    await _audioElement.play();
+    await _playPauseQueue.play();
     _completer = Completer<ClipInterruptReason>();
     ClipInterruptReason reason;
     while ((reason = await _completer!.future) == ClipInterruptReason.seek) {
@@ -822,7 +824,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Future<void> pause() async {
     _interruptPlay(ClipInterruptReason.pause);
     _resumePos = _audioElement.currentTime as double?;
-    _audioElement.pause();
+    _playPauseQueue.pause();
   }
 
   @override
@@ -920,5 +922,44 @@ class LoopingAudioSourcePlayer extends AudioSourcePlayer {
       offset += childShuffleOrder.length;
     }
     return order;
+  }
+}
+
+class _PlayPauseRequest {
+  final bool playing;
+  final completer = Completer<void>();
+
+  _PlayPauseRequest(this.playing);
+}
+
+class _PlayPauseQueue {
+  final AudioElement audioElement;
+  final _queue = StreamController<_PlayPauseRequest>();
+
+  _PlayPauseQueue(this.audioElement) {
+    _run();
+  }
+
+  Future<void> play() async {
+    final request = _PlayPauseRequest(true);
+    _queue.add(request);
+    await request.completer.future;
+  }
+
+  Future<void> pause() async {
+    final request = _PlayPauseRequest(false);
+    _queue.add(request);
+    await request.completer.future;
+  }
+
+  Future<void> _run() async {
+    await for (var request in _queue.stream) {
+      if (request.playing) {
+        await audioElement.play();
+      } else {
+        audioElement.pause();
+      }
+      request.completer.complete();
+    }
   }
 }
