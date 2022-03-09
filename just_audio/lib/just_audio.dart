@@ -1256,7 +1256,10 @@ class AudioPlayer {
             _playbackEvent.processingState == ProcessingState.idle) {
           _setPlatformActive(false)?.catchError((dynamic e) {});
         }
-      }, onError: _playbackEventSubject.addError);
+      }, onError: (Object e) {
+        _playbackEventSubject.addError(e);
+        _setPlatformActive(false)?.catchError((dynamic e) {});
+      });
     }
 
     Future<AudioPlayerPlatform> setPlatform() async {
@@ -1367,7 +1370,6 @@ class AudioPlayer {
           if (checkInterruption()) return platform;
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
-          await _setPlatformActive(false)?.catchError((dynamic e) {});
           durationCompleter.completeError(e, stackTrace);
         }
       } else {
