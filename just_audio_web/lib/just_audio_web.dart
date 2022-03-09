@@ -813,10 +813,10 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
   @override
   Future<void> play() async {
-    _interruptPlay(ClipInterruptReason.simultaneous);
+    if (_completer != null) return;
+    _completer = Completer<ClipInterruptReason>();
     _audioElement.currentTime = _resumePos!;
     await _playPauseQueue.play();
-    _completer = Completer<ClipInterruptReason>();
     ClipInterruptReason reason;
     while ((reason = await _completer!.future) == ClipInterruptReason.seek) {
       _completer = Completer<ClipInterruptReason>();
@@ -899,7 +899,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
 }
 
 /// Reasons why playback of a clipping audio source may be interrupted.
-enum ClipInterruptReason { end, pause, seek, simultaneous }
+enum ClipInterruptReason { end, pause, seek }
 
 /// A player for a [LoopingAudioSourceMessage].
 class LoopingAudioSourcePlayer extends AudioSourcePlayer {
