@@ -100,6 +100,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
 /// An HTML5-specific implementation of [JustAudioPlayer].
 class Html5AudioPlayer extends JustAudioPlayer {
   final _audioElement = AudioElement();
+  late final _playPauseQueue = _PlayPauseQueue(_audioElement);
   Completer? _durationCompleter;
   AudioSourcePlayer? _audioSourcePlayer;
   LoopModeMessage _loopMode = LoopModeMessage.off;
@@ -189,6 +190,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
             }
           }
         } else {
+          await _currentAudioSourcePlayer?.pause();
           transition(ProcessingStateMessage.completed);
         }
       }
@@ -538,8 +540,6 @@ abstract class AudioSourcePlayer {
 
 /// A player for an [IndexedAudioSourceMessage].
 abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
-  late final _playPauseQueue = _PlayPauseQueue(_audioElement);
-
   IndexedAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id)
       : super(html5AudioPlayer, id);
 
@@ -572,6 +572,8 @@ abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
 
   /// The audio element that renders the audio.
   AudioElement get _audioElement => html5AudioPlayer._audioElement;
+
+  _PlayPauseQueue get _playPauseQueue => html5AudioPlayer._playPauseQueue;
 
   @override
   String toString() => "$runtimeType";
@@ -792,12 +794,17 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
         effectiveStart.inMilliseconds + initialPosition;
     _resumePos = absoluteInitialPosition / 1000.0;
     final fullDuration = (await html5AudioPlayer.loadUri(audioSourcePlayer.uri,
-        Duration(milliseconds: absoluteInitialPosition)))!;
+        Duration(milliseconds: absoluteInitialPosition)));
     _initialPos = null;
-    _duration = Duration(
-        milliseconds: min((end ?? fullDuration).inMilliseconds,
-                fullDuration.inMilliseconds) -
-            effectiveStart.inMilliseconds);
+    if (fullDuration != null) {
+      _duration = Duration(
+          milliseconds: min((end ?? fullDuration).inMilliseconds,
+                  fullDuration.inMilliseconds) -
+              effectiveStart.inMilliseconds);
+    } else if (end != null) {
+      _duration = Duration(
+          milliseconds: end!.inMilliseconds - effectiveStart.inMilliseconds);
+    }
     return _duration;
   }
 
