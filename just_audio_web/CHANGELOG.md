@@ -1,3 +1,7 @@
+## 0.4.7
+
+* Fix bug handling simultaneous play requests.
+
 ## 0.4.6
 
 * Fix bug playing quickly after load.
