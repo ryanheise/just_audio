@@ -1,3 +1,7 @@
+## 0.4.6
+
+* Fix bug playing quickly after load.
+
 ## 0.4.5
 
 * Fix interrupted play request bug.
