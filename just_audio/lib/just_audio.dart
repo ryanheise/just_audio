@@ -1945,6 +1945,10 @@ class _ProxyHttpServer {
         final handler = _handlerMap[uriPath]!;
         handler(request);
       }
+    }, onDone: () {
+      _running = false;
+    }, onError: (Object e, StackTrace st) {
+      _running = false;
     });
   }
 
@@ -2862,6 +2866,8 @@ class LockCachingAudioSource extends StreamAudioSource {
           ));
         }, onError: (dynamic e, StackTrace? stackTrace) {
           request.fail(e, stackTrace);
+        }).onError((Object e, StackTrace st) {
+          request.fail(e, st);
         });
       }
     }, onDone: () async {
@@ -2989,9 +2995,13 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     request.response.headers.clear();
 
     StreamAudioResponse sourceResponse;
+    Stream<List<int>> stream;
     try {
       sourceResponse =
           await source.request(rangeRequest?.start, rangeRequest?.endEx);
+      stream = sourceResponse.stream.asBroadcastStream();
+      stream.listen((event) {},
+          onError: source._player?._playbackEventSubject.addError);
     } catch (e, stackTrace) {
       print("Proxy request failed: $e");
       print(stackTrace);
@@ -3024,7 +3034,7 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     }
 
     // Pipe response
-    await sourceResponse.stream.pipe(request.response);
+    await stream.pipe(request.response);
     await request.response.close();
   }
 
