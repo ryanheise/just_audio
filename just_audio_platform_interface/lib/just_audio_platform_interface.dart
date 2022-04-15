@@ -74,7 +74,7 @@ abstract class AudioPlayerPlatform {
 
   /// A broadcast stream of data updates.
   Stream<PlayerDataMessage> get playerDataMessageStream =>
-      Stream<PlayerDataMessage>.empty();
+      const Stream<PlayerDataMessage>.empty();
 
   /// Loads an audio source.
   Future<LoadResponse> load(LoadRequest request) {

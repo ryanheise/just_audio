@@ -1,3 +1,9 @@
+## Next version
+
+* Handle and report network disconnections in StreamAudioSource.
+* Migrate from pedantic to flutter_lints.
+* Accept Longs in AndroidLivePlaybackSpeedControl where appropriate (@aam).
+
 ## 0.9.20
 
 * Fix initial position on iOS/macOS when switching sources (@addie9000).

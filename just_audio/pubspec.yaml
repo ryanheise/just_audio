@@ -31,6 +31,7 @@ dev_dependencies:
   mockito: ^5.0.0
   plugin_platform_interface: ^2.0.0
   pedantic: ^1.10.0
+  flutter_lints: ^1.0.4
 
 flutter:
   plugin:
