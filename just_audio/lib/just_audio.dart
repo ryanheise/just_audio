@@ -229,7 +229,8 @@ class AudioPlayer {
             .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
-    _setPlatformActive(false, force: true)?.catchError((dynamic e) {});
+    _setPlatformActive(false, force: true)
+        ?.catchError((dynamic e) async => null);
     _sequenceSubject.add(null);
     // Respond to changes to AndroidAudioAttributes configuration.
     if (androidApplyAudioAttributes && _isAndroid()) {
@@ -703,7 +704,7 @@ class AudioPlayer {
     if (preload) {
       duration = await load();
     } else {
-      await _setPlatformActive(false)?.catchError((dynamic e) {});
+      await _setPlatformActive(false)?.catchError((dynamic e) async => null);
     }
     return duration;
   }
@@ -814,7 +815,7 @@ class AudioPlayer {
   /// [ProcessingState.idle] state.
   Future<Duration?> setClip({Duration? start, Duration? end}) async {
     if (_disposed) return null;
-    _setPlatformActive(true)?.catchError((dynamic e) {});
+    _setPlatformActive(true)?.catchError((dynamic e) async => null);
     final duration = await _load(
         await _platform,
         start == null && end == null
@@ -875,7 +876,7 @@ class AudioPlayer {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
           _setPlatformActive(true, playCompleter: playCompleter)
-              ?.catchError((dynamic e) {});
+              ?.catchError((dynamic e) async => null);
         }
       }
     } else {
@@ -925,7 +926,8 @@ class AudioPlayer {
   /// decoders alive so that the app can quickly resume audio playback.
   Future<void> stop() async {
     if (_disposed) return;
-    final future = _setPlatformActive(false)?.catchError((dynamic e) {});
+    final future =
+        _setPlatformActive(false)?.catchError((dynamic e) async => null);
 
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
@@ -1257,7 +1259,7 @@ class AudioPlayer {
         if (_playbackEvent.processingState !=
                 oldPlaybackEvent.processingState &&
             _playbackEvent.processingState == ProcessingState.idle) {
-          _setPlatformActive(false)?.catchError((dynamic e) {});
+          _setPlatformActive(false)?.catchError((dynamic e) async => null);
         }
       }, onError: _playbackEventSubject.addError);
     }
@@ -1370,7 +1372,8 @@ class AudioPlayer {
           if (checkInterruption()) return platform;
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
-          await _setPlatformActive(false)?.catchError((dynamic e) {});
+          await _setPlatformActive(false)
+              ?.catchError((dynamic e) async => null);
           durationCompleter.completeError(e, stackTrace);
         }
       } else {
@@ -1389,7 +1392,7 @@ class AudioPlayer {
 
     _platform = setPlatform();
     if (_active) {
-      initAudioEffects().catchError((dynamic e) {});
+      initAudioEffects().catchError((dynamic e) async {});
     }
     return durationCompleter.future;
   }
@@ -2920,13 +2923,15 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
-    _response ??= _fetch().catchError((dynamic error, StackTrace? stackTrace) {
+    _response ??=
+        _fetch().catchError((dynamic error, StackTrace? stackTrace) async {
       // So that we can restart later
       _response = null;
       // Cancel any pending request
       for (final req in _requests) {
         req.fail(error, stackTrace);
       }
+      return Future<HttpClientResponse>.error(error as Object, stackTrace);
     });
     return byteRangeRequest.future;
   }

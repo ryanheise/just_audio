@@ -4,6 +4,7 @@
 * Fix iOS/macOS bug starting with empty playlist.
 * Migrate from pedantic to flutter_lints.
 * Accept Longs in AndroidLivePlaybackSpeedControl where appropriate (@aam).
+* Handle unhandled exceptions.
 
 ## 0.9.20
 
