@@ -2839,7 +2839,7 @@ class LockCachingAudioSource extends StreamAudioSource {
               effectiveEnd != null ? effectiveEnd - effectiveStart : null,
           offset: start,
           contentType: mimeType,
-          stream: responseStream,
+          stream: responseStream.asBroadcastStream(),
         ));
       }
       subscription.resume();
@@ -2868,7 +2868,7 @@ class LockCachingAudioSource extends StreamAudioSource {
             contentLength: end != null ? end - start : null,
             offset: start,
             contentType: mimeType,
-            stream: response,
+            stream: response.asBroadcastStream(),
           ));
         }, onError: (dynamic e, StackTrace? stackTrace) {
           request.fail(e, stackTrace);
@@ -2918,7 +2918,7 @@ class LockCachingAudioSource extends StreamAudioSource {
         contentLength: (end ?? sourceLength) - (start ?? 0),
         offset: start,
         contentType: await _readCachedMimeType(),
-        stream: cacheFile.openRead(start, end),
+        stream: cacheFile.openRead(start, end).asBroadcastStream(),
       );
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
@@ -2933,7 +2933,17 @@ class LockCachingAudioSource extends StreamAudioSource {
       }
       return Future<HttpClientResponse>.error(error as Object, stackTrace);
     });
-    return byteRangeRequest.future;
+    return byteRangeRequest.future.then((response) {
+      response.stream.listen((event) {}, onError: (Object e, StackTrace st) {
+        // So that we can restart later
+        _response = null;
+        // Cancel any pending request
+        for (final req in _requests) {
+          req.fail(e, st);
+        }
+      });
+      return response;
+    });
   }
 }
 
@@ -3006,9 +3016,7 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     try {
       sourceResponse =
           await source.request(rangeRequest?.start, rangeRequest?.endEx);
-      stream = sourceResponse.stream.asBroadcastStream();
-      stream.listen((event) {},
-          onError: source._player?._playbackEventSubject.addError);
+      stream = sourceResponse.stream;
     } catch (e, st) {
       // ignore: avoid_print
       print("Proxy request failed: $e\n$st");
@@ -3040,8 +3048,17 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
       request.response.statusCode = 200;
     }
 
-    // Pipe response
-    await stream.pipe(request.response);
+    final completer = Completer<void>();
+    stream.listen((event) {
+      request.response.add(event);
+    }, onError: (Object e, StackTrace st) {
+      source._player?._playbackEventSubject.addError(e, st);
+    }, onDone: () {
+      completer.complete();
+    });
+
+    await completer.future;
+
     await request.response.close();
   }
 
