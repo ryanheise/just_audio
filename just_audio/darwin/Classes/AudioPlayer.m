@@ -667,7 +667,8 @@
         [_indexedAudioSources[i] attach:_player initialPos:(i == _index ? initialPosition : kCMTimeInvalid)];
     }
 
-    if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
+    if (_indexedAudioSources.count == 0 || !_player.currentItem ||
+            _player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
         _processingState = ready;
         _loadResult(@{@"duration": @([self getDurationMicroseconds])});
         _loadResult = nil;

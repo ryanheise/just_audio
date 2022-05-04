@@ -13,9 +13,11 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_example/common.dart';
 import 'package:rxdart/rxdart.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(const MyApp());
 
 class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
+
   @override
   _MyAppState createState() => _MyAppState();
 }
@@ -36,7 +38,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance?.addObserver(this);
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
     _init();
@@ -44,7 +46,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Future<void> _init() async {
     final session = await AudioSession.instance;
-    await session.configure(AudioSessionConfiguration.speech());
+    await session.configure(const AudioSessionConfiguration.speech());
     try {
       await _player.setAudioSource(AudioSource.uri(Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
@@ -93,7 +95,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 builder: (context, snapshot) {
                   final enabled = snapshot.data ?? false;
                   return SwitchListTile(
-                    title: Text('Loudness Enhancer'),
+                    title: const Text('Loudness Enhancer'),
                     value: enabled,
                     onChanged: _loudnessEnhancer.setEnabled,
                   );
@@ -105,7 +107,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 builder: (context, snapshot) {
                   final enabled = snapshot.data ?? false;
                   return SwitchListTile(
-                    title: Text('Equalizer'),
+                    title: const Text('Equalizer'),
                     value: enabled,
                     onChanged: _equalizer.setEnabled,
                   );
@@ -176,7 +178,7 @@ class EqualizerControls extends StatelessWidget {
       future: equalizer.parameters,
       builder: (context, snapshot) {
         final parameters = snapshot.data;
-        if (parameters == null) return SizedBox();
+        if (parameters == null) return const SizedBox();
         return Row(
           mainAxisSize: MainAxisSize.max,
           children: [
@@ -248,7 +250,7 @@ class VerticalSlider extends StatelessWidget {
 class ControlButtons extends StatelessWidget {
   final AudioPlayer player;
 
-  ControlButtons(this.player);
+  const ControlButtons(this.player, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -256,7 +258,7 @@ class ControlButtons extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: Icon(Icons.volume_up),
+          icon: const Icon(Icons.volume_up),
           onPressed: () {
             showSliderDialog(
               context: context,
@@ -279,26 +281,26 @@ class ControlButtons extends StatelessWidget {
             if (processingState == ProcessingState.loading ||
                 processingState == ProcessingState.buffering) {
               return Container(
-                margin: EdgeInsets.all(8.0),
+                margin: const EdgeInsets.all(8.0),
                 width: 64.0,
                 height: 64.0,
-                child: CircularProgressIndicator(),
+                child: const CircularProgressIndicator(),
               );
             } else if (playing != true) {
               return IconButton(
-                icon: Icon(Icons.play_arrow),
+                icon: const Icon(Icons.play_arrow),
                 iconSize: 64.0,
                 onPressed: player.play,
               );
             } else if (processingState != ProcessingState.completed) {
               return IconButton(
-                icon: Icon(Icons.pause),
+                icon: const Icon(Icons.pause),
                 iconSize: 64.0,
                 onPressed: player.pause,
               );
             } else {
               return IconButton(
-                icon: Icon(Icons.replay),
+                icon: const Icon(Icons.replay),
                 iconSize: 64.0,
                 onPressed: () => player.seek(Duration.zero),
               );
@@ -309,7 +311,7 @@ class ControlButtons extends StatelessWidget {
           stream: player.speedStream,
           builder: (context, snapshot) => IconButton(
             icon: Text("${snapshot.data?.toStringAsFixed(1)}x",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             onPressed: () {
               showSliderDialog(
                 context: context,
