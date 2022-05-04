@@ -23,7 +23,7 @@ void main() {
 void runTests() {
   final mock = MockJustAudio();
   JustAudioPlatform.instance = mock;
-  final audioSessionChannel = MethodChannel('com.ryanheise.audio_session');
+  const audioSessionChannel = MethodChannel('com.ryanheise.audio_session');
 
   void expectDuration(Duration a, Duration b, {int epsilon = 200}) {
     expect((a - b).inMilliseconds.abs(), lessThanOrEqualTo(epsilon));
@@ -97,8 +97,9 @@ void runTests() {
     expect(player.loopMode, equals(LoopMode.one));
     await player.setShuffleModeEnabled(true);
     expect(player.shuffleModeEnabled, equals(true));
-    await player.seek(Duration(seconds: 1));
-    expectState(player: player, playing: false, position: Duration(seconds: 1));
+    await player.seek(const Duration(seconds: 1));
+    expectState(
+        player: player, playing: false, position: const Duration(seconds: 1));
     final playlist = ConcatenatingAudioSource(children: []);
     await player.setAudioSource(playlist, preload: false);
     await playlist.addAll([
@@ -189,26 +190,26 @@ void runTests() {
       position: point1,
       processingState: ProcessingState.ready,
     );
-    await Future<dynamic>.delayed(Duration(milliseconds: 100));
+    await Future<dynamic>.delayed(const Duration(milliseconds: 100));
     expectState(player: player, playing: true);
-    await Future<dynamic>.delayed(Duration(seconds: 1));
+    await Future<dynamic>.delayed(const Duration(seconds: 1));
     expectState(
       player: player,
-      position: point1 + Duration(seconds: 1),
+      position: point1 + const Duration(seconds: 1),
       processingState: ProcessingState.ready,
       playing: true,
     );
-    await player.seek(duration - Duration(seconds: 3));
+    await player.seek(duration - const Duration(seconds: 3));
     expectState(
       player: player,
-      position: duration - Duration(seconds: 3),
+      position: duration - const Duration(seconds: 3),
       processingState: ProcessingState.ready,
       playing: true,
     );
     await player.pause();
     expectState(
       player: player,
-      position: duration - Duration(seconds: 3),
+      position: duration - const Duration(seconds: 3),
       processingState: ProcessingState.ready,
       playing: false,
     );
@@ -217,12 +218,12 @@ void runTests() {
     final playFuture = player.play();
     expectState(
       player: player,
-      position: duration - Duration(seconds: 3),
+      position: duration - const Duration(seconds: 3),
       processingState: ProcessingState.ready,
     );
     expectState(player: player, playing: true);
     await playFuture;
-    expectDuration(stopwatch.elapsed, Duration(seconds: 3));
+    expectDuration(stopwatch.elapsed, const Duration(seconds: 3));
     expectState(
       player: player,
       position: duration,
@@ -235,10 +236,10 @@ void runTests() {
   test('speed', () async {
     final player = AudioPlayer();
     /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
-    final period1 = Duration(seconds: 2);
-    final period2 = Duration(seconds: 2);
-    final speed1 = 0.75;
-    final speed2 = 1.5;
+    const period1 = Duration(seconds: 2);
+    const period2 = Duration(seconds: 2);
+    const speed1 = 0.75;
+    const speed2 = 1.5;
     final position1 = period1 * speed1;
     final position2 = position1 + period2 * speed2;
     expectState(player: player, position: Duration.zero);
@@ -303,18 +304,18 @@ void runTests() {
 
   test('setAndroidAudioAttributes', () async {
     final player = AudioPlayer();
-    await player.setAndroidAudioAttributes(AndroidAudioAttributes());
+    await player.setAndroidAudioAttributes(const AndroidAudioAttributes());
     await player.dispose();
   });
 
   test('positionStream', () async {
     final player = AudioPlayer();
     /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
-    final period = Duration(seconds: 3);
-    final position1 = period;
+    const period = Duration(seconds: 3);
+    const position1 = period;
     final position2 = position1 + period;
-    final speed1 = 0.75;
-    final speed2 = 1.5;
+    const speed1 = 0.75;
+    const speed2 = 1.5;
     final stepDuration = period ~/ 5;
     var target = stepDuration;
     player.setSpeed(speed1);
@@ -468,8 +469,8 @@ void runTests() {
       LoopingAudioSource(
         count: 2,
         child: ClippingAudioSource(
-          start: Duration(seconds: 60),
-          end: Duration(seconds: 65),
+          start: const Duration(seconds: 60),
+          end: const Duration(seconds: 65),
           child: AudioSource.uri(Uri.parse("https://foo.foo/foo.mp3")),
           tag: 'a',
         ),
@@ -603,13 +604,14 @@ void runTests() {
     final player = AudioPlayer();
     final duration1 = await player.setUrl('https://bar.bar/foo.mp3');
     expectDuration(duration1!, audioSourceDuration);
-    final duration2 = await player.setClip(start: Duration(seconds: 10));
-    expectDuration(duration2!, audioSourceDuration - Duration(seconds: 10));
-    final duration3 = await player.setClip(end: Duration(seconds: 15));
-    expectDuration(duration3!, Duration(seconds: 15));
+    final duration2 = await player.setClip(start: const Duration(seconds: 10));
+    expectDuration(
+        duration2!, audioSourceDuration - const Duration(seconds: 10));
+    final duration3 = await player.setClip(end: const Duration(seconds: 15));
+    expectDuration(duration3!, const Duration(seconds: 15));
     final duration4 = await player.setClip(
-        start: Duration(seconds: 10), end: Duration(seconds: 21));
-    expectDuration(duration4!, Duration(seconds: 11));
+        start: const Duration(seconds: 10), end: const Duration(seconds: 21));
+    expectDuration(duration4!, const Duration(seconds: 11));
     final duration5 = await player.setClip();
     expectDuration(duration5!, audioSourceDuration);
     await player.dispose();
@@ -674,8 +676,8 @@ void runTests() {
             LoopingAudioSource(
               count: 2,
               child: ClippingAudioSource(
-                start: Duration(seconds: 60),
-                end: Duration(seconds: 65),
+                start: const Duration(seconds: 60),
+                end: const Duration(seconds: 65),
                 child: AudioSource.uri(Uri.parse("https://foo.foo/foo.mp3")),
                 tag: 'a',
               ),
@@ -777,21 +779,21 @@ void runTests() {
     expect(player.processingState, ProcessingState.idle);
     await player.load();
     expect(player.processingState, ProcessingState.ready);
-    await player.seek(Duration(seconds: 5), index: 1);
+    await player.seek(const Duration(seconds: 5), index: 1);
     await player.setVolume(0.5);
     await player.setSpeed(0.7);
     await player.setShuffleModeEnabled(true);
     await player.setLoopMode(LoopMode.one);
     await player.stop();
     expect(player.processingState, ProcessingState.idle);
-    expect(player.position, Duration(seconds: 5));
+    expect(player.position, const Duration(seconds: 5));
     expect(player.volume, 0.5);
     expect(player.speed, 0.7);
     expect(player.shuffleModeEnabled, true);
     expect(player.loopMode, LoopMode.one);
     await player.load();
     expect(player.processingState, ProcessingState.ready);
-    expect(player.position, Duration(seconds: 5));
+    expect(player.position, const Duration(seconds: 5));
     expect(player.volume, 0.5);
     expect(player.speed, 0.7);
     expect(player.shuffleModeEnabled, true);
@@ -812,8 +814,8 @@ void runTests() {
       expect(player.processingState, equals(ProcessingState.ready));
       expect(player.playing, equals(true));
       expectDuration(player.position, Duration.zero);
-      await Future<dynamic>.delayed(Duration(seconds: 1));
-      expectDuration(player.position, Duration(seconds: 1));
+      await Future<dynamic>.delayed(const Duration(seconds: 1));
+      expectDuration(player.position, const Duration(seconds: 1));
       await player.dispose();
     }
   });
@@ -831,8 +833,8 @@ void runTests() {
       expect(player.processingState, equals(ProcessingState.ready));
       expect(player.playing, equals(true));
       expectDuration(player.position, Duration.zero);
-      await Future<dynamic>.delayed(Duration(seconds: 1));
-      expectDuration(player.position, Duration(seconds: 1));
+      await Future<dynamic>.delayed(const Duration(seconds: 1));
+      expectDuration(player.position, const Duration(seconds: 1));
       await player.dispose();
     }
   });
@@ -849,8 +851,8 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration.zero);
-    await Future<dynamic>.delayed(Duration(seconds: 1));
-    expectDuration(player.position, Duration(seconds: 1));
+    await Future<dynamic>.delayed(const Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 1));
     await player.dispose();
   });
 
@@ -951,15 +953,15 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
-    expectDuration(player.position, Duration(seconds: 0));
-    await Future<dynamic>.delayed(Duration(seconds: 1));
-    expectDuration(player.position, Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 0));
+    await Future<dynamic>.delayed(const Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 1));
     await player.setUrl('https://bar.bar/bar.mp3');
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
-    expectDuration(player.position, Duration(seconds: 0));
-    await Future<dynamic>.delayed(Duration(seconds: 1));
-    expectDuration(player.position, Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 0));
+    await Future<dynamic>.delayed(const Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 1));
     await player.dispose();
   });
 
@@ -969,9 +971,9 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
-    expectDuration(player.position, Duration(seconds: 0));
-    await Future<dynamic>.delayed(Duration(seconds: 1));
-    expectDuration(player.position, Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 0));
+    await Future<dynamic>.delayed(const Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 1));
     player.pause();
     expect(player.playing, equals(false));
     await player.setUrl('https://bar.bar/bar.mp3', preload: false);
@@ -981,12 +983,12 @@ void runTests() {
     await player.load();
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(false));
-    expectDuration(player.position, Duration(seconds: 0));
+    expectDuration(player.position, const Duration(seconds: 0));
     player.play();
     expect(player.playing, equals(true));
-    expectDuration(player.position, Duration(seconds: 0));
-    await Future<dynamic>.delayed(Duration(seconds: 1));
-    expectDuration(player.position, Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 0));
+    await Future<dynamic>.delayed(const Duration(seconds: 1));
+    expectDuration(player.position, const Duration(seconds: 1));
     await player.dispose();
   });
 
@@ -1003,7 +1005,7 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     player.play();
     await player.pause();
-    await Future<void>.delayed(Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(mock.mostRecentPlayer?._playing, false);
     await player.dispose();
   });
@@ -1013,7 +1015,7 @@ void runTests() {
     await player.setUrl('https://bar.bar/foo.mp3');
     player.play();
     await player.stop();
-    await Future<void>.delayed(Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(mock.mostRecentPlayer?._playing, false);
     await player.dispose();
   });
@@ -1036,9 +1038,9 @@ void runTests() {
     });
     await completer.future;
 
-    final duration1 = Duration(seconds: 1);
-    final duration2 = Duration(milliseconds: 600);
-    final duration3 = Duration(milliseconds: 750);
+    const duration1 = Duration(seconds: 1);
+    const duration2 = Duration(milliseconds: 600);
+    const duration3 = Duration(milliseconds: 750);
 
     await player.seek(duration1);
     expectState(
@@ -1115,8 +1117,8 @@ void runTests() {
     });
     await completer.future;
 
-    final duration1 = Duration(seconds: 1);
-    final duration2 = Duration(seconds: 600);
+    const duration1 = Duration(seconds: 1);
+    const duration2 = Duration(seconds: 600);
 
     await player.seek(duration1);
     expect(player.currentIndex, 0);
@@ -1361,7 +1363,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     _audioSource = audioSource;
     _index = request.initialIndex ?? 0;
     // Simulate loading time.
-    await Future<dynamic>.delayed(Duration(milliseconds: 100));
+    await Future<dynamic>.delayed(const Duration(milliseconds: 100));
     _setPosition(request.initialPosition ?? Duration.zero);
     _processingState = ProcessingStateMessage.ready;
     _broadcastPlaybackEvent();

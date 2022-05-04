@@ -1,6 +1,6 @@
 name: just_audio
 description: A feature-rich audio player for Flutter. Loop, clip and concatenate any sound from any source (asset/file/URL/stream) in a variety of audio formats with gapless playback.
-version: 0.9.20
+version: 0.9.21
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio
 
 environment:
@@ -31,6 +31,7 @@ dev_dependencies:
   mockito: ^5.0.0
   plugin_platform_interface: ^2.0.0
   pedantic: ^1.10.0
+  flutter_lints: ^1.0.4
 
 flutter:
   plugin:

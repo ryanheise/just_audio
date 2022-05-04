@@ -171,18 +171,18 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
     _audioHandler.playbackState.listen((playbackState) {
       broadcastPlaybackEvent();
     });
-    _audioHandler.customEvent.listen((event) {
+    _audioHandler.customEvent.listen((dynamic event) {
       switch (event['type']) {
         case 'icyMetadata':
-          _icyMetadata = event['value'];
+          _icyMetadata = event['value'] as IcyMetadataMessage?;
           broadcastPlaybackEvent();
           break;
         case 'androidAudioSessionId':
-          _androidAudioSessionId = event['value'];
+          _androidAudioSessionId = event['value'] as int?;
           broadcastPlaybackEvent();
           break;
         case 'currentIndex':
-          _index = event['value'];
+          _index = event['value'] as int?;
           // The event is broadcast in response to the next mediaItem update
           // which happens immediately after this.
           break;
@@ -201,7 +201,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
     await _audioHandler.stop();
   }
 
-  broadcastPlaybackEvent() {
+  void broadcastPlaybackEvent() {
     if (eventController.isClosed) return;
     eventController.add(PlaybackEventMessage(
       //processingState: playbackState.processingState,
@@ -324,7 +324,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
 
 class _PlayerAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
-  Completer<AudioPlayerPlatform> _playerCompleter = Completer();
+  final _playerCompleter = Completer<AudioPlayerPlatform>();
   PlaybackEventMessage _justAudioEvent = PlaybackEventMessage(
     processingState: ProcessingStateMessage.idle,
     updateTime: DateTime.now(),
@@ -657,8 +657,9 @@ class _PlayerAudioHandler extends BaseAudioHandler
     var newPosition = currentPosition + offset;
     // Make sure we don't jump out of bounds.
     if (newPosition < Duration.zero) newPosition = Duration.zero;
-    if (newPosition > currentMediaItem!.duration!)
+    if (newPosition > currentMediaItem!.duration!) {
       newPosition = currentMediaItem!.duration!;
+    }
     // Perform the jump via a seek.
     await (await _player).seek(SeekRequest(position: newPosition));
   }
@@ -670,7 +671,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
     _seeker?.stop();
     if (begin) {
       _seeker = _Seeker(this, Duration(seconds: 10 * direction),
-          Duration(seconds: 1), currentMediaItem!.duration!)
+          const Duration(seconds: 1), currentMediaItem!.duration!)
         ..start();
     }
   }
@@ -729,18 +730,18 @@ class _Seeker {
     this.duration,
   );
 
-  start() async {
+  void start() async {
     _running = true;
     while (_running) {
       Duration newPosition = handler.currentPosition + positionInterval;
       if (newPosition < Duration.zero) newPosition = Duration.zero;
       if (newPosition > duration) newPosition = duration;
       handler.seek(newPosition);
-      await Future.delayed(stepInterval);
+      await Future<dynamic>.delayed(stepInterval);
     }
   }
 
-  stop() {
+  void stop() {
     _running = false;
   }
 }
