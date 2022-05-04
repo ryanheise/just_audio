@@ -529,6 +529,8 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
 }
 
 - (int)getCurrentPosition {
+    // XXX: During load, the second case will be selected returning 0.
+    // TODO: Provide a similar case as _seekPos for _initialPos.
     if (CMTIME_IS_VALID(_seekPos)) {
         return (int)(1000 * CMTimeGetSeconds(_seekPos));
     } else if (_indexedAudioSources && _indexedAudioSources.count > 0) {
@@ -775,9 +777,8 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
         [self abortExistingConnection];
     }
     _loadResult = result;
-    _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     _processingState = loading;
-    [self updatePosition];
+    _index = (initialIndex != (id)[NSNull null]) ? [initialIndex intValue] : 0;
     // Remove previous observers
     if (_indexedAudioSources) {
         for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -826,6 +827,7 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
         [self addItemObservers:source.playerItem];
         source.playerItem.audioSource = source;
     }
+    [self updatePosition];
     [self updateOrder];
     // Set up an empty player
     if (!_player) {
@@ -863,7 +865,8 @@ static void finalizeTap(MTAudioProcessingTapRef tap) {
         [_indexedAudioSources[i] attach:_player initialPos:(i == _index ? initialPosition : kCMTimeInvalid)];
     }
 
-    if (_player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
+    if (_indexedAudioSources.count == 0 || !_player.currentItem ||
+            _player.currentItem.status == AVPlayerItemStatusReadyToPlay) {
         _processingState = ready;
         _loadResult(@{@"duration": @([self getDurationMicroseconds])});
         _loadResult = nil;

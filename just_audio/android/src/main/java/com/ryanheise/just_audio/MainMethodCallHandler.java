@@ -62,6 +62,11 @@ public class MainMethodCallHandler implements MethodCallHandler {
             result.success(new HashMap<String, Object>());
             break;
         }
+        case "disposeAllPlayers": {
+            dispose();
+            result.success(new HashMap<String, Object>());
+            break;
+        }
         default:
             result.notImplemented();
             break;
@@ -72,5 +77,6 @@ public class MainMethodCallHandler implements MethodCallHandler {
         for (AudioPlayer player : new ArrayList<AudioPlayer>(players.values())) {
             player.dispose();
         }
+        players.clear();
     }
 }

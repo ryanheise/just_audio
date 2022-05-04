@@ -1,3 +1,23 @@
+## 0.4.7
+
+* Fix bug handling simultaneous play requests.
+
+## 0.4.6
+
+* Fix bug playing quickly after load.
+
+## 0.4.5
+
+* Fix interrupted play request bug.
+
+## 0.4.4
+
+* Implement disposeAllPlayers.
+
+## 0.4.3
+
+* Fix bug where setSpeed is forgotten after load().
+
 ## 0.4.2
 
 * Fix bug loading audio after concat delete/insert.

@@ -16,7 +16,27 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 
-final _uuid = Uuid();
+const _uuid = Uuid();
+
+JustAudioPlatform? _pluginPlatformCache;
+
+JustAudioPlatform get _pluginPlatform {
+  var pluginPlatform = JustAudioPlatform.instance;
+  // If this is a new FlutterEngine or if we've just hot restarted an existing
+  // FlutterEngine...
+  if (_pluginPlatformCache == null) {
+    // Dispose of all existing players within this FlutterEngine. This helps to
+    // shut down existing players on a hot restart. TODO: Remove this hack once
+    // https://github.com/flutter/flutter/issues/10437 is implemented.
+    try {
+      pluginPlatform.disposeAllPlayers(DisposeAllPlayersRequest());
+    } catch (e) {
+      // Silently ignore if a platform doesn't support this method.
+    }
+    _pluginPlatformCache = pluginPlatform;
+  }
+  return pluginPlatform;
+}
 
 /// An object to manage playing audio from a URL, a locale file or an asset.
 ///
@@ -220,7 +240,8 @@ class AudioPlayer {
             .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
-    _setPlatformActive(false, force: true)?.catchError((dynamic e) {});
+    _setPlatformActive(false, force: true)
+        ?.catchError((dynamic e) async => null);
     _sequenceSubject.add(null);
     // Respond to changes to AndroidAudioAttributes configuration.
     if (androidApplyAudioAttributes && _isAndroid()) {
@@ -295,6 +316,7 @@ class AudioPlayer {
         try {
           oldAssetCacheDir.deleteSync(recursive: true);
         } catch (e) {
+          // ignore: avoid_print
           print("Failed to delete old asset cache dir: $e");
         }
       }
@@ -536,8 +558,8 @@ class AudioPlayer {
       if (!_disposed) {
         _positionSubject!.addStream(createPositionStream(
             steps: 800,
-            minPeriod: Duration(milliseconds: 16),
-            maxPeriod: Duration(milliseconds: 200)));
+            minPeriod: const Duration(milliseconds: 16),
+            maxPeriod: const Duration(milliseconds: 200)));
       }
     }
     return _positionSubject!.stream;
@@ -701,7 +723,7 @@ class AudioPlayer {
     if (preload) {
       duration = await load();
     } else {
-      await _setPlatformActive(false)?.catchError((dynamic e) {});
+      await _setPlatformActive(false)?.catchError((dynamic e) async => null);
     }
     return duration;
   }
@@ -812,7 +834,7 @@ class AudioPlayer {
   /// [ProcessingState.idle] state.
   Future<Duration?> setClip({Duration? start, Duration? end}) async {
     if (_disposed) return null;
-    _setPlatformActive(true)?.catchError((dynamic e) {});
+    _setPlatformActive(true)?.catchError((dynamic e) async => null);
     final duration = await _load(
         await _platform,
         start == null && end == null
@@ -873,7 +895,7 @@ class AudioPlayer {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
           _setPlatformActive(true, playCompleter: playCompleter)
-              ?.catchError((dynamic e) {});
+              ?.catchError((dynamic e) async => null);
         }
       }
     } else {
@@ -923,7 +945,8 @@ class AudioPlayer {
   /// decoders alive so that the app can quickly resume audio playback.
   Future<void> stop() async {
     if (_disposed) return;
-    final future = _setPlatformActive(false)?.catchError((dynamic e) {});
+    final future =
+        _setPlatformActive(false)?.catchError((dynamic e) async => null);
 
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
@@ -1146,7 +1169,9 @@ class AudioPlayer {
       _idlePlatform = null;
     }
     _audioSource = null;
-    _audioSources.values.forEach((s) => s._dispose());
+    for (var s in _audioSources.values) {
+      s._dispose();
+    }
     _audioSources.clear();
     _proxy.stop();
     await _durationSubject.close();
@@ -1283,7 +1308,7 @@ class AudioPlayer {
         if (_playbackEvent.processingState !=
                 oldPlaybackEvent.processingState &&
             _playbackEvent.processingState == ProcessingState.idle) {
-          _setPlatformActive(false)?.catchError((dynamic e) {});
+          _setPlatformActive(false)?.catchError((dynamic e) async => null);
         }
       }, onError: _playbackEventSubject.addError);
       _visualizerWaveformSubscription =
@@ -1308,7 +1333,7 @@ class AudioPlayer {
 
       if (!force) {
         final oldPlatform = _platformValue!;
-        if (!(oldPlatform is _IdleAudioPlayer)) {
+        if (oldPlatform is! _IdleAudioPlayer) {
           await _disposePlatform(oldPlatform);
         }
       }
@@ -1316,8 +1341,7 @@ class AudioPlayer {
       // During initialisation, we must only use this platform reference in case
       // _platform is updated again during initialisation.
       final platform = active
-          ? await (_nativePlatform =
-              JustAudioPlatform.instance.init(InitRequest(
+          ? await (_nativePlatform = _pluginPlatform.init(InitRequest(
               id: _id,
               audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
               androidAudioEffects: (_isAndroid() || _isUnitTest())
@@ -1415,7 +1439,8 @@ class AudioPlayer {
           if (checkInterruption()) return platform;
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
-          await _setPlatformActive(false)?.catchError((dynamic e) {});
+          await _setPlatformActive(false)
+              ?.catchError((dynamic e) async => null);
           durationCompleter.completeError(e, stackTrace);
         }
       } else {
@@ -1434,7 +1459,7 @@ class AudioPlayer {
 
     _platform = setPlatform();
     if (_active) {
-      initAudioEffects().catchError((dynamic e) {});
+      initAudioEffects().catchError((dynamic e) async {});
     }
     return durationCompleter.future;
   }
@@ -1446,8 +1471,7 @@ class AudioPlayer {
     } else {
       _nativePlatform = null;
       try {
-        await JustAudioPlatform.instance
-            .disposePlayer(DisposePlayerRequest(id: _id));
+        await _pluginPlatform.disposePlayer(DisposePlayerRequest(id: _id));
       } catch (e) {
         // Fallback if disposePlayer hasn't been implemented.
         await platform.dispose(DisposeRequest());
@@ -2056,6 +2080,10 @@ class _ProxyHttpServer {
         final handler = _handlerMap[uriPath]!;
         handler(request);
       }
+    }, onDone: () {
+      _running = false;
+    }, onError: (Object e, StackTrace st) {
+      _running = false;
     });
   }
 
@@ -2940,7 +2968,7 @@ class LockCachingAudioSource extends StreamAudioSource {
               effectiveEnd != null ? effectiveEnd - effectiveStart : null,
           offset: start,
           contentType: mimeType,
-          stream: responseStream,
+          stream: responseStream.asBroadcastStream(),
         ));
       }
       subscription.resume();
@@ -2969,10 +2997,12 @@ class LockCachingAudioSource extends StreamAudioSource {
             contentLength: end != null ? end - start : null,
             offset: start,
             contentType: mimeType,
-            stream: response,
+            stream: response.asBroadcastStream(),
           ));
         }, onError: (dynamic e, StackTrace? stackTrace) {
           request.fail(e, stackTrace);
+        }).onError((Object e, StackTrace st) {
+          request.fail(e, st);
         });
       }
     }, onDone: () async {
@@ -2984,12 +3014,11 @@ class LockCachingAudioSource extends StreamAudioSource {
           cacheResponse.controller.close();
         }
       }
-      (await _partialCacheFile).renameSync((await cacheFile).path);
+      (await _partialCacheFile).renameSync(cacheFile.path);
       await subscription.cancel();
       httpClient.close();
       _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
-      print(stackTrace);
       (await _partialCacheFile).deleteSync();
       httpClient.close();
       // Fail all pending requests
@@ -3018,20 +3047,32 @@ class LockCachingAudioSource extends StreamAudioSource {
         contentLength: (end ?? sourceLength) - (start ?? 0),
         offset: start,
         contentType: await _readCachedMimeType(),
-        stream: cacheFile.openRead(start, end),
+        stream: cacheFile.openRead(start, end).asBroadcastStream(),
       );
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
-    _response ??= _fetch().catchError((dynamic error, StackTrace? stackTrace) {
+    _response ??=
+        _fetch().catchError((dynamic error, StackTrace? stackTrace) async {
       // So that we can restart later
       _response = null;
       // Cancel any pending request
       for (final req in _requests) {
         req.fail(error, stackTrace);
       }
+      return Future<HttpClientResponse>.error(error as Object, stackTrace);
     });
-    return byteRangeRequest.future;
+    return byteRangeRequest.future.then((response) {
+      response.stream.listen((event) {}, onError: (Object e, StackTrace st) {
+        // So that we can restart later
+        _response = null;
+        // Cancel any pending request
+        for (final req in _requests) {
+          req.fail(e, st);
+        }
+      });
+      return response;
+    });
   }
 }
 
@@ -3100,12 +3141,14 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     request.response.headers.clear();
 
     StreamAudioResponse sourceResponse;
+    Stream<List<int>> stream;
     try {
       sourceResponse =
           await source.request(rangeRequest?.start, rangeRequest?.endEx);
-    } catch (e, stackTrace) {
-      print("Proxy request failed: $e");
-      print(stackTrace);
+      stream = sourceResponse.stream;
+    } catch (e, st) {
+      // ignore: avoid_print
+      print("Proxy request failed: $e\n$st");
 
       request.response.headers.clear();
       request.response.statusCode = HttpStatus.internalServerError;
@@ -3134,8 +3177,17 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
       request.response.statusCode = 200;
     }
 
-    // Pipe response
-    await sourceResponse.stream.pipe(request.response);
+    final completer = Completer<void>();
+    stream.listen((event) {
+      request.response.add(event);
+    }, onError: (Object e, StackTrace st) {
+      source._player?._playbackEventSubject.addError(e, st);
+    }, onDone: () {
+      completer.complete();
+    });
+
+    await completer.future;
+
     await request.response.close();
   }
 
@@ -3155,9 +3207,9 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
     request.headers.forEach((name, value) {
       originRequest.headers.set(name, value);
     });
-    headers?.entries.forEach((entry) {
+    for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
       originRequest.headers.set(entry.key, entry.value);
-    });
+    }
     if (host != null) {
       originRequest.headers.set('host', host);
     } else {
@@ -3266,7 +3318,7 @@ class DefaultShuffleOrder extends ShuffleOrder {
     indices.shuffle(_random);
     if (initialIndex == null) return;
 
-    final initialPos = 0;
+    const initialPos = 0;
     final swapPos = indices.indexOf(initialIndex);
     // Swap the indices at initialPos and swapPos.
     final swapIndex = indices[initialPos];
@@ -3547,7 +3599,9 @@ class AudioPipeline {
       <AudioEffect>[...androidAudioEffects, ...darwinAudioEffects];
 
   void _setup(AudioPlayer player) {
-    _audioEffects.forEach((effect) => effect._setup(player));
+    for (var effect in _audioEffects) {
+      effect._setup(player);
+    }
   }
 }
 

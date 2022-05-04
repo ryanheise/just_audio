@@ -1,3 +1,19 @@
+## 0.9.21
+
+* Handle and report network disconnections in StreamAudioSource.
+* Fix iOS/macOS bug starting with empty playlist.
+* Migrate from pedantic to flutter_lints.
+* Accept Longs in AndroidLivePlaybackSpeedControl where appropriate (@aam).
+
+## 0.9.20
+
+* Fix initial position on iOS/macOS when switching sources (@addie9000).
+
+## 0.9.19
+
+* Dispose players on iOS/macOS hot restart.
+* Fix initialIndex out of bounds bug on iOS/macOS.
+
 ## 0.9.18
 
 * Fix null duration bug on LockCachingAudioSource.
