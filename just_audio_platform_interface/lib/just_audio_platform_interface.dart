@@ -929,6 +929,9 @@ class AndroidLoadControlMessage {
   /// (Android) The back buffer duration.
   final Duration backBufferDuration;
 
+  /// (Android) Whether to enable constant bitrate seeking
+  final bool enableConstantBitrateSeeking;
+
   AndroidLoadControlMessage({
     required this.minBufferDuration,
     required this.maxBufferDuration,
@@ -937,6 +940,7 @@ class AndroidLoadControlMessage {
     required this.targetBufferBytes,
     required this.prioritizeTimeOverSizeThresholds,
     required this.backBufferDuration,
+    required this.enableConstantBitrateSeeking,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -948,6 +952,7 @@ class AndroidLoadControlMessage {
         'targetBufferBytes': targetBufferBytes,
         'prioritizeTimeOverSizeThresholds': prioritizeTimeOverSizeThresholds,
         'backBufferDuration': backBufferDuration.inMicroseconds,
+        'enableConstantBitrateSeeking': enableConstantBitrateSeeking,
       };
 }
 

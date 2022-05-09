@@ -22,6 +22,8 @@ import com.google.android.exoplayer2.Player.PositionInfo;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
+import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
@@ -95,6 +97,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Map<String, AudioEffect> audioEffectsMap = new HashMap<String, AudioEffect>();
     private int lastPlaylistLength = 0;
     private Map<String, Object> pendingPlaybackEvent;
+    private ExtractorsFactory extractorsFactory;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
@@ -138,6 +141,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
         dataEventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.data." + id);
         processingState = ProcessingState.none;
+
+        DefaultExtractorsFactory factory = new DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true);
+        extractorsFactory = factory;
         if (audioLoadConfiguration != null) {
             Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
             if (loadControlMap != null) {
@@ -154,6 +160,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     builder.setTargetBufferBytes((Integer)loadControlMap.get("targetBufferBytes"));
                 }
                 loadControl = builder.build();
+
+                if(loadControlMap.get("enableConstantBitrateSeeking") != null) {
+                    factory.setConstantBitrateSeekingEnabled((Boolean)loadControlMap.get("enableConstantBitrateSeeking"));
+                }
             }
             Map<?, ?> livePlaybackSpeedControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLivePlaybackSpeedControl");
             if (livePlaybackSpeedControlMap != null) {
@@ -587,7 +597,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         String id = (String)map.get("id");
         switch ((String)map.get("type")) {
         case "progressive":
-            return new ProgressiveMediaSource.Factory(buildDataSourceFactory())
+            return new ProgressiveMediaSource.Factory(buildDataSourceFactory(), extractorsFactory)
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setTag(id)

@@ -1807,6 +1807,9 @@ class AndroidLoadControl {
   /// (Android) The back buffer duration.
   final Duration backBufferDuration;
 
+  /// (Android) Whether to enable constant bitrate seeking
+  final bool enableConstantBitrateSeeking;
+
   AndroidLoadControl({
     this.minBufferDuration = const Duration(seconds: 50),
     this.maxBufferDuration = const Duration(seconds: 50),
@@ -1815,6 +1818,7 @@ class AndroidLoadControl {
     this.targetBufferBytes,
     this.prioritizeTimeOverSizeThresholds = false,
     this.backBufferDuration = Duration.zero,
+    this.enableConstantBitrateSeeking = false,
   });
 
   AndroidLoadControlMessage _toMessage() => AndroidLoadControlMessage(
@@ -1826,6 +1830,7 @@ class AndroidLoadControl {
         targetBufferBytes: targetBufferBytes,
         prioritizeTimeOverSizeThresholds: prioritizeTimeOverSizeThresholds,
         backBufferDuration: backBufferDuration,
+        enableConstantBitrateSeeking: enableConstantBitrateSeeking,
       );
 }
 
