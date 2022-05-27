@@ -1,3 +1,7 @@
+## 0.9.22
+
+* Fix Flutter 3 nullability warnings.
+
 ## 0.9.21
 
 * Handle and report network disconnections in StreamAudioSource.
