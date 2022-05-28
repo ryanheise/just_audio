@@ -33,14 +33,21 @@ The GitHub "New issue" page provides 2 templates for suggesting improvements: Fe
 
 Pull requests are used to contribute bug fixes, new features or documentation improvements. Before working on a pull request, an issue should exist that describes the feature or bug.
 
-To start a pull request, you first create a fork of this repository, create a new branch, commit and push your code to it.
+To create a pull request:
 
-You may branch your pull request off the `master` branch or `dev` branch depending on the nature of your contribution. Generally, bug fixes or other urgent changes should branch off `master` while new features should branch off `dev`.
+1. Fork this repository
+2. Create a branch for your changes. Branch off the `major` branch if introducing a breaking change that is not backwards compatible, or instead off the `minor` branch if making a non-breaking change or bug fix.
+3. Make your changes, updating the documentation if you have changed any API's behaviour.
+4. If you are the first to contribute to the next version, increment the version number in `pubspec.yaml` according to the [pub versioning philosophy](https://dart.dev/tools/pub/versioning).
+5. Add a description of your change to `CHANGELOG.md` (format: `* DESCRIPTION OF YOUR CHANGE (@your-git-username)`).
+6. Run `flutter analyze` to ensure your code meets the static analysis requirements.
+7. Run `flutter test` to ensure all unit tests continue to work (Please consider also contributing unit tests covering your new code).
+8. Create the pull request via [GitHub's instructions](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork).
+9. [link](https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue) that pull request with the original issue.
 
-After making your changes, run `flutter analyze` to ensure your code meets the static analysis requirements, and run `flutter test` to ensure all unit tests continue to work. Where appropriate, update any documentation related to your code change.
+Best practices for a pull request:
 
-If you contribute either a feature or a bug fix involving Dart code, we would appreciate a new matching unit test in `just_audio/test/just_audio_test.dart`. In the case of a bug fix, the ideal unit test is one that would have failed before your fix and succeeds after your fix.
-
-Add a description of your feature or bug fix to `CHANGELOG.md`. For bug fixes that should be released ASAP, increment the version number in `pubspec.yaml` and add the new version to the CHANGELOG. For new features on `dev`, you can leave the version number unchanged, and list the new feature under an undetermined version heading such as `## Next version`.
-
-Finally create the pull request via [GitHub's instructions](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork) and [link](https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue) that pull request with the original issue.
+* Follow the style of existing code, paying attention to whitespace and formatting. (In Dart, we use `dart format` which may already be integrated into your IDE.)
+* Check your diffs prior to submission. Try to make your pull request diff reflect only the lines of code that needed to be changed to address the issue at hand. If your diff also changes other things, such as by making superficial changes to code formatting and layout, or checking in superfluous files such as your IDE or other config files, please remove them so that your diff focus on the essential. That helps keep the commit history clean and also makes your pull request easier to review.
+* Try not to introduce multiple unrelated changes in a single pull request. Create individual pull requests so that they can be evaluated and accepted independently.
+* Use meaningful commit messages so that your changes can be more easily browsed and referenced.
