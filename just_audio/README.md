@@ -1,6 +1,6 @@
 # just_audio
 
-just_audio is a feature-rich audio player for Android, iOS, macOS and web.
+just_audio is a feature-rich audio player for Android, iOS, macOS, web, Linux and Windows.
 
 ![Screenshot with arrows pointing to features](https://user-images.githubusercontent.com/19899190/125459608-e89cd6d4-9f09-426c-abcc-ed7513d9acfc.png)
 
@@ -31,8 +31,6 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 
 This project is supported by the amazing open source community of GitHub contributors and sponsors. Thank you!
 
-- [libwinmedia](https://github.com/harmonoid/libwinmedia) for backing the Windows and Linux implementation.
-
 ## Features
 
 | Feature                        | Android | iOS | macOS | Web | Windows | Linux |
@@ -40,26 +38,26 @@ This project is supported by the amazing open source community of GitHub contrib
 | read from URL                  | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | read from file                 | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | read from asset                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| read from byte stream          | ✅      | ✅  | ✅    | ✅  |         |       |
-| request headers                | ✅      | ✅  | ✅    |     |         |       |
-| DASH                           | ✅      |     |       |     | ✅      |       |
-| HLS                            | ✅      | ✅  | ✅    |     | ✅      |       |
+| read from byte stream          | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| request headers                | ✅      | ✅  | ✅    |     | ✅      | ✅    |
+| DASH                           | ✅      |     |       |     | ✅      | ✅    |
+| HLS                            | ✅      | ✅  | ✅    |     | ✅      | ✅    |
 | ICY metadata                   | ✅      | ✅  | ✅    |     |         |       |
 | buffer status/position         | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | play/pause/seek                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | set volume/speed               | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| clip audio                     | ✅      | ✅  | ✅    | ✅  |         |       |
+| clip audio                     | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | playlists                      | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | looping/shuffling              | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| compose audio                  | ✅      | ✅  | ✅    | ✅  |         |       |
-| gapless playback               | ✅      | ✅  | ✅    |     | ✅      |       |
+| compose audio                  | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| gapless playback               | ✅      | ✅  | ✅    |     | ✅      | ✅    |
 | report player errors           | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | handle phonecall interruptions | ✅      | ✅  |       |     |         |       |
 | buffering/loading options      | ✅      | ✅  | ✅    |     |         |       |
 | set pitch                      | ✅      |     |       |     |         |       |
 | skip silence                   | ✅      |     |       |     |         |       |
-| equalizer                      | ✅      |     |       |     |         |       |
-| volume boost                   | ✅      |     |       |     |         |       |
+| equalizer                      | ✅      |     |       |     | ✅      | ✅    |
+| volume boost                   | ✅      |     |       |     | ✅      | ✅    |
 
 ## Experimental features
 
@@ -383,7 +381,13 @@ The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length`
 
 ### Windows
 
-Add the [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) dependency to your `pubspec.yaml` alongside `just_audio`:
+Windows support is enabled by adding an additional dependency to your `pubspec.yaml` alongside `just_audio`. There are a number of alternative options:
+
+* [just_audio_mpv](https://pub.dev/packages/just_audio_mpv)
+* [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia)
+* [just_audio_windows](https://github.com/bdlukaa/just_audio/tree/master/just_audio_windows) (BETA - to supersede just_audio_libwinmedia)
+
+Example:
 
 ```yaml
 dependencies:
@@ -391,17 +395,19 @@ dependencies:
   just_audio_libwinmedia: any # substitute version number
 ```
 
-### Linux (untested)
+For issues with the Windows implementation, please open an issue on the respective implementation's GitHub issues page.
 
-Add the [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) dependency to your `pubspec.yaml` alongside `just_audio`:
+### Linux
+
+Linux support is enabled by adding an additional dependency to your `pubspec.yaml` alongside `just_audio`. There are a number of alternative options:
+
+* [just_audio_mpv](https://pub.dev/packages/just_audio_mpv)
+* [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) (untested)
 
 ```yaml
 dependencies:
   just_audio: any # substitute version number
-  just_audio_libwinmedia: any # substitute version number
+  just_audio_mpv: any # substitute version number
 ```
 
-## Related plugins
-
-* [audio_service](https://pub.dev/packages/audio_service): play any audio in the background and control playback from the lock screen, Android notifications, the iOS Control Center, and headset buttons.
-* [audio_session](https://pub.dev/packages/audio_session): configure your app's audio category (e.g. music vs speech) and configure how your app interacts with other audio apps (e.g. audio focus, ducking, mixing).
+For issues with the Linux implementation, please open an issue on the respective implementation's GitHub issues page.

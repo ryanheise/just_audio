@@ -19,10 +19,10 @@ class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
   @override
-  _MyAppState createState() => _MyAppState();
+  MyAppState createState() => MyAppState();
 }
 
-class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _equalizer = AndroidEqualizer();
   final _loudnessEnhancer = AndroidLoudnessEnhancer();
   late final AudioPlayer _player = AudioPlayer(
@@ -37,7 +37,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance?.addObserver(this);
+    ambiguate(WidgetsBinding.instance)!.addObserver(this);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
@@ -57,7 +57,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance?.removeObserver(this);
+    ambiguate(WidgetsBinding.instance)!.removeObserver(this);
     _player.dispose();
     super.dispose();
   }
