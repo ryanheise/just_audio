@@ -18,10 +18,10 @@ class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
   @override
-  _MyAppState createState() => _MyAppState();
+  MyAppState createState() => MyAppState();
 }
 
-class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _player = AudioPlayer();
   final _audioSource = LockCachingAudioSource(Uri.parse(
     // Supports range requests:
@@ -33,7 +33,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance?.addObserver(this);
+    ambiguate(WidgetsBinding.instance)!.addObserver(this);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
@@ -57,7 +57,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance?.removeObserver(this);
+    ambiguate(WidgetsBinding.instance)!.removeObserver(this);
     // Release decoders and buffers back to the operating system making them
     // available for other apps to use.
     _player.dispose();
@@ -115,8 +115,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 },
               ),
               ElevatedButton(
-                child: const Text('Clear cache'),
                 onPressed: _audioSource.clearCache,
+                child: const Text('Clear cache'),
               ),
             ],
           ),

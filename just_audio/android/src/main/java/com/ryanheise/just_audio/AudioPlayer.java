@@ -19,8 +19,9 @@ import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Player.PositionInfo;
-import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.TracksInfo;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
@@ -34,12 +35,11 @@ import com.google.android.exoplayer2.source.ShuffleOrder;
 import com.google.android.exoplayer2.source.ShuffleOrder.DefaultShuffleOrder;
 import com.google.android.exoplayer2.source.SilenceMediaSource;
 import com.google.android.exoplayer2.source.TrackGroup;
-import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.DataSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -96,7 +96,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private int lastPlaylistLength = 0;
     private Map<String, Object> pendingPlaybackEvent;
 
-    private SimpleExoPlayer player;
+    private ExoPlayer player;
     private Integer audioSessionId;
     private MediaSource mediaSource;
     private Integer currentIndex;
@@ -214,9 +214,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     @Override
-    public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-        for (int i = 0; i < trackGroups.length; i++) {
-            TrackGroup trackGroup = trackGroups.get(i);
+    public void onTracksInfoChanged(TracksInfo tracks) {
+        for (int i = 0; i < tracks.getTrackGroupInfos().size(); i++) {
+            TrackGroup trackGroup = tracks.getTrackGroupInfos().get(i).getTrackGroup();
 
             for (int j = 0; j < trackGroup.length; j++) {
                 Metadata metadata = trackGroup.getFormat(j).metadata;
@@ -272,14 +272,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if (player.getPlaybackState() == Player.STATE_ENDED) {
             try {
                 if (player.getPlayWhenReady()) {
-                    if (player.hasNextWindow()) {
-                        player.seekToNextWindow();
+                    if (player.hasNextMediaItem()) {
+                        player.seekToNextMediaItem();
                     } else if (lastPlaylistLength == 0 && player.getMediaItemCount() > 0) {
                         player.seekTo(0, 0L);
                     }
                 } else {
-                    if (player.getCurrentWindowIndex() < player.getMediaItemCount()) {
-                        player.seekTo(player.getCurrentWindowIndex(), 0L);
+                    if (player.getCurrentMediaItemIndex() < player.getMediaItemCount()) {
+                        player.seekTo(player.getCurrentMediaItemIndex(), 0L);
                     }
                 }
             } catch (Exception e) {
@@ -290,7 +290,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private boolean updateCurrentIndex() {
-        Integer newIndex = player.getCurrentWindowIndex();
+        Integer newIndex = player.getCurrentMediaItemIndex();
         // newIndex is never null.
         // currentIndex is sometimes null.
         if (!newIndex.equals(currentIndex)) {
@@ -380,7 +380,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             sendError(String.valueOf(error.errorCode), error.getMessage());
         }
         errorCount++;
-        if (player.hasNextWindow() && currentIndex != null && errorCount <= 5) {
+        if (player.hasNextMediaItem() && currentIndex != null && errorCount <= 5) {
             int nextIndex = currentIndex + 1;
             Timeline timeline = player.getCurrentTimeline();
             // This condition is due to: https://github.com/ryanheise/just_audio/pull/310
@@ -686,7 +686,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
             .setUserAgent(userAgent)
             .setAllowCrossProtocolRedirects(true);
-        return new DefaultDataSourceFactory(context, httpDataSourceFactory);
+        return new DefaultDataSource.Factory(context, httpDataSourceFactory);
     }
 
     private void load(final MediaSource mediaSource, final long initialPosition, final Integer initialIndex, final Result result) {
@@ -717,7 +717,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private void ensurePlayerInitialized() {
         if (player == null) {
-            SimpleExoPlayer.Builder builder = new SimpleExoPlayer.Builder(context);
+            ExoPlayer.Builder builder = new ExoPlayer.Builder(context);
             if (loadControl != null) {
                 builder.setLoadControl(loadControl);
             }
@@ -955,7 +955,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         seekPos = position;
         seekResult = result;
         try {
-            int windowIndex = index != null ? index : player.getCurrentWindowIndex();
+            int windowIndex = index != null ? index : player.getCurrentMediaItemIndex();
             player.seekTo(windowIndex, position);
         } catch (RuntimeException e) {
             seekResult = null;
