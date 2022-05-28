@@ -1,3 +1,7 @@
+## 0.9.23
+
+* Fallback to constant bitrate seeking on Android.
+
 ## 0.9.22
 
 * Migrate to Flutter 3, Xcode 13, ExoPlayer 2.17.1.

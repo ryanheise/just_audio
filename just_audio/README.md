@@ -384,15 +384,15 @@ The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length`
 Windows support is enabled by adding an additional dependency to your `pubspec.yaml` alongside `just_audio`. There are a number of alternative options:
 
 * [just_audio_mpv](https://pub.dev/packages/just_audio_mpv)
+* [just_audio_windows](https://pub.dev/packages/just_audio_windows)
 * [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia)
-* [just_audio_windows](https://github.com/bdlukaa/just_audio/tree/master/just_audio_windows) (BETA - to supersede just_audio_libwinmedia)
 
 Example:
 
 ```yaml
 dependencies:
   just_audio: any # substitute version number
-  just_audio_libwinmedia: any # substitute version number
+  just_audio_windows: any # substitute version number
 ```
 
 For issues with the Windows implementation, please open an issue on the respective implementation's GitHub issues page.
