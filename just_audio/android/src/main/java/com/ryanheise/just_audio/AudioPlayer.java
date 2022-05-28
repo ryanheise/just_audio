@@ -29,6 +29,7 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.TracksInfo;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
@@ -110,6 +111,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Map<String, Object> pendingPlaybackEvent;
 
     private ExoPlayer player;
+    private DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
     private Integer audioSessionId;
     private MediaSource mediaSource;
     private Integer currentIndex;
@@ -152,6 +154,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         dataEventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.data." + id);
         visualizer = new BetterVisualizer(messenger, id);
         processingState = ProcessingState.none;
+        extractorsFactory.setConstantBitrateSeekingEnabled(true);
         if (audioLoadConfiguration != null) {
             Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
             if (loadControlMap != null) {
@@ -676,7 +679,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         String id = (String)map.get("id");
         switch ((String)map.get("type")) {
         case "progressive":
-            return new ProgressiveMediaSource.Factory(buildDataSourceFactory())
+            return new ProgressiveMediaSource.Factory(buildDataSourceFactory(), extractorsFactory)
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setTag(id)
