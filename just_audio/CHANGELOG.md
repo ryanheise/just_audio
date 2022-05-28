@@ -1,6 +1,7 @@
 ## 0.9.22
 
-* Fix Flutter 3 nullability warnings.
+* Migrate to Flutter 3, Xcode 13, ExoPlayer 2.17.1.
+* Add just_audio_mpv and just_audio_windows to example.
 
 ## 0.9.21
 
