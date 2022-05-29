@@ -341,15 +341,20 @@ class IcyMetadataMessage {
 /// Icy info communicated from the platform implementation.
 class IcyInfoMessage {
   final String? title;
+  final String? artist;
   final String? url;
 
   IcyInfoMessage({
     required this.title,
+    required this.artist,
     required this.url,
   });
 
   static IcyInfoMessage fromMap(Map<dynamic, dynamic> json) => IcyInfoMessage(
-      title: json['title'] as String?, url: json['url'] as String?);
+        title: json['title'] as String?,
+        artist: json['artist'] as String?,
+        url: json['url'] as String?,
+      );
 }
 
 /// Icy headers communicated from the platform implementation.

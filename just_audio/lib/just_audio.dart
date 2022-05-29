@@ -1592,26 +1592,29 @@ class PlayerState {
 
 class IcyInfo {
   final String? title;
+  final String? artist;
   final String? url;
 
   static IcyInfo _fromMessage(IcyInfoMessage message) => IcyInfo(
         title: message.title,
+        artist: message.artist,
         url: message.url,
       );
 
-  IcyInfo({required this.title, required this.url});
+  IcyInfo({required this.title, required this.artist, required this.url});
 
   @override
-  String toString() => 'title=$title,url=$url';
+  String toString() => 'title=$title,artist=$artist,url=$url';
 
   @override
-  int get hashCode => hashValues(title, url);
+  int get hashCode => hashValues(title, artist, url);
 
   @override
   bool operator ==(Object other) =>
       other.runtimeType == runtimeType &&
       other is IcyInfo &&
       other.title == title &&
+      other.artist == artist &&
       other.url == url;
 }
 

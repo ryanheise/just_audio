@@ -1,3 +1,7 @@
+## 4.1.1
+
+- Added support for HLS title and artist metadata.
+
 ## 4.1.0
 
 - Add disposeAllPlayers method.

@@ -1,3 +1,7 @@
+## 0.9.25
+
+* Added support for HLS title and artist metadata.
+
 ## 0.9.24
 
 * Bump Android compileSdkVersion to 31.

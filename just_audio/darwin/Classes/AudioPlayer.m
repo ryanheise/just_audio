@@ -411,6 +411,7 @@
     // ICY headers aren't available here. Maybe do this in the proxy.
     BOOL hasIcyData = NO;
     NSString *title = (NSString *)[NSNull null];
+    NSString *artist = (NSString *)[NSNull null];
     NSString *url = (NSString *)[NSNull null];
     for (int i = 0; i < groups.count; i++) {
         AVTimedMetadataGroup *group = groups[i];
@@ -422,6 +423,12 @@
             } else if ([@"icy/StreamUrl" isEqualToString:item.identifier]) {
                 hasIcyData = YES;
                 url = (NSString *)item.value;
+            } else if ([@"id3/TIT2" isEqualToString:item.identifier]) {
+                hasIcyData = YES;
+                title = (NSString *)item.value;
+            } else if ([@"id3/TPE1" isEqualToString:item.identifier]) {
+                hasIcyData = YES;
+                artist = (NSString *)item.value;
             }
         }
     }
@@ -429,6 +436,7 @@
         _icyMetadata = @{
             @"info": @{
                 @"title": title,
+                @"artist": artist,
                 @"url": url,
             },
         };
