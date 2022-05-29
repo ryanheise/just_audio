@@ -1,3 +1,11 @@
+## 0.10.1
+
+* 
+
+## 0.9.24
+
+* Bump Android compileSdkVersion to 31.
+
 ## 0.9.23
 
 * Fallback to constant bitrate seeking on Android.
