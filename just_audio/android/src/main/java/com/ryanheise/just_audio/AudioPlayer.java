@@ -15,6 +15,7 @@ import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.LivePlaybackSpeedControl;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.MediaMetadata;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -87,6 +88,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
     private IcyInfo icyInfo;
     private IcyHeaders icyHeaders;
+    private MediaMetadata mediaMetadata;
     private int errorCount;
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
@@ -203,6 +205,12 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public void onAudioSessionIdChanged(int audioSessionId) {
         setAudioSessionId(audioSessionId);
         broadcastPendingPlaybackEvent();
+    }
+
+    @Override
+    public void onMediaMetadataChanged(MediaMetadata _mediaMetadata) {
+        mediaMetadata = _mediaMetadata;
+        broadcastImmediatePlaybackEvent();
     }
 
     @Override
@@ -830,10 +838,16 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private Map<String, Object> collectIcyMetadata() {
         final Map<String, Object> icyData = new HashMap<>();
-        if (icyInfo != null) {
+        if (icyInfo != null || mediaMetadata != null) {
             final Map<String, String> info = new HashMap<>();
-            info.put("title", icyInfo.title);
-            info.put("url", icyInfo.url);
+            if (icyInfo != null) {
+                info.put("title", icyInfo.title);
+                info.put("url", icyInfo.url);
+            }
+            if (mediaMetadata != null) {
+                info.put("title", mediaMetadata.title.toString());
+                info.put("artist", mediaMetadata.artist.toString());
+            }
             icyData.put("info", info);
         }
         if (icyHeaders != null) {
