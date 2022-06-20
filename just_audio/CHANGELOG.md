@@ -1,3 +1,7 @@
+## 0.9.25
+
+* Fix compile issue with Android SDK 33.
+
 ## 0.9.24
 
 * Bump Android compileSdkVersion to 31.
