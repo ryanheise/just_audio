@@ -1099,7 +1099,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     // depending on the number of bits required to
     // represent it.
     public static Long getLong(Object o) {
-        return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
+        return (o == null || o instanceof Long) ? (Long)o : Long.valueOf(((Integer)o).intValue());
     }
 
     @SuppressWarnings("unchecked")
