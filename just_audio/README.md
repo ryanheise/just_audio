@@ -46,18 +46,18 @@ This project is supported by the amazing open source community of GitHub contrib
 | buffer status/position         | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | play/pause/seek                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | set volume/speed               | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| clip audio                     | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| clip audio                     | ✅      | ✅  | ✅    | ✅  |         | ✅    |
 | playlists                      | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | looping/shuffling              | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| compose audio                  | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
+| compose audio                  | ✅      | ✅  | ✅    | ✅  |         | ✅    |
 | gapless playback               | ✅      | ✅  | ✅    |     | ✅      | ✅    |
 | report player errors           | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | handle phonecall interruptions | ✅      | ✅  |       |     |         |       |
 | buffering/loading options      | ✅      | ✅  | ✅    |     |         |       |
 | set pitch                      | ✅      |     |       |     |         |       |
 | skip silence                   | ✅      |     |       |     |         |       |
-| equalizer                      | ✅      |     |       |     | ✅      | ✅    |
-| volume boost                   | ✅      |     |       |     | ✅      | ✅    |
+| equalizer                      | ✅      |     |       |     |         | ✅    |
+| volume boost                   | ✅      |     |       |     |         | ✅    |
 
 ## Experimental features
 
@@ -383,7 +383,6 @@ The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length`
 
 Windows support is enabled by adding an additional dependency to your `pubspec.yaml` alongside `just_audio`. There are a number of alternative options:
 
-* [just_audio_mpv](https://pub.dev/packages/just_audio_mpv)
 * [just_audio_windows](https://pub.dev/packages/just_audio_windows)
 * [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia)
 
