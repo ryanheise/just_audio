@@ -314,6 +314,18 @@ If you wish to connect to non-HTTPS URLS, also add the following attribute to th
 
 If you need access to the player's AudioSession ID, you can listen to `AudioPlayer.androidAudioSessionIdStream`. Note that the AudioSession ID will change whenever you set new AudioAttributes.
 
+If there are multiple plugins in your app that use ExoPlayer to decode media, it is possible to encounter a `Duplicate class` error if those plugins use different versions of ExoPlayer. In this case you may report an issue for each respective plugin to upgrade to the latest version of ExoPlayer, or you may downgrade one or more of your app's plugins until the versions match. In some cases where a plugin uses non-breaking parts of the ExoPlayer API, you can also try forcing all plugins to use the same version of ExoPlayer by editing your own app's `android/app/build.gradle` file and inserting the dependencies for the desired Exoplayer version:
+
+```
+dependencies {
+    def exoplayer_version = "...specify-version-here...."
+    implementation "com.google.android.exoplayer:exoplayer-core:$exoplayer_version"
+    implementation "com.google.android.exoplayer:exoplayer-dash:$exoplayer_version"
+    implementation "com.google.android.exoplayer:exoplayer-hls:$exoplayer_version"
+    implementation "com.google.android.exoplayer:exoplayer-smoothstreaming:$exoplayer_version"
+}
+```
+
 ### iOS
 
 Using the default configuration, the App Store will detect that your app uses the AVAudioSession API which includes a microphone API, and for privacy reasons it will ask you to describe your app's usage of the microphone. If your app does indeed use the microphone, you can describe your usage by editing the `Info.plist` file as follows:
