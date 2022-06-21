@@ -275,10 +275,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if (player.getPlaybackState() == Player.STATE_ENDED) {
             try {
                 if (player.getPlayWhenReady()) {
-                    if (player.hasNextMediaItem()) {
-                        player.seekToNextMediaItem();
-                    } else if (lastPlaylistLength == 0 && player.getMediaItemCount() > 0) {
+                    if (lastPlaylistLength == 0 && player.getMediaItemCount() > 0) {
                         player.seekTo(0, 0L);
+                    } else if (player.hasNextMediaItem()) {
+                        player.seekToNextMediaItem();
                     }
                 } else {
                     if (player.getCurrentMediaItemIndex() < player.getMediaItemCount()) {
