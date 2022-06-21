@@ -1,6 +1,7 @@
 ## 0.0.1-beta.6
 
 * Update documentation/example for Android 12.
+* Migrate from pedantic to flutter_lints.
 * Support content:// art URIs on Android (@nt4f04uNd).
 
 ## 0.0.1-beta.5
