@@ -2,6 +2,10 @@
 
 * 
 
+## 0.9.26
+
+* Auto-correct invalid HTTP headers in proxy.
+
 ## 0.9.25
 
 * Fix compile issue with Android SDK 33.
