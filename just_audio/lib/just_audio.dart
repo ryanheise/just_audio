@@ -3093,7 +3093,10 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
 
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
-        request.response.headers.set(name, value);
+        final filteredValue = value
+            .map((e) => e.replaceAll(RegExp(r'[^\x09\x20-\x7F]'), '?'))
+            .toList();
+        request.response.headers.set(name, filteredValue);
       });
       request.response.statusCode = originResponse.statusCode;
 
