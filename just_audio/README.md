@@ -87,8 +87,8 @@ await player.setLoopMode(LoopMode.all);        // Set playlist to loop (off|all|
 await player.setShuffleModeEnabled(true);      // Shuffle playlist order (true|false)
 
 // Update the playlist
-await playlist.add(newChild);
-await playlist.insert(3, newChild);
+await playlist.add(newChild1);
+await playlist.insert(3, newChild2);
 await playlist.removeAt(3);
 ```
 
@@ -128,7 +128,7 @@ Note: `LockCachingAudioSource` is implemented via a local HTTP proxy which on An
 // Feed your own stream of bytes into the player
 class MyCustomSource extends StreamAudioSource {
   final List<int> bytes;
-  MySource(this.bytes);
+  MyCustomSource(this.bytes);
   
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {

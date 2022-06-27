@@ -1,3 +1,8 @@
+## 0.0.1-beta.7
+
+* Fix build when targeting Android 13.
+* Add MediaItem.artHeaders.
+
 ## 0.0.1-beta.6
 
 * Update documentation/example for Android 12.
