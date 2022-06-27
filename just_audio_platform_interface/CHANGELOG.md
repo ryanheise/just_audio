@@ -1,3 +1,7 @@
+## 4.2.0
+
+- Add InitRequest.androidOffloadSchedulingEnabled.
+
 ## 4.1.0
 
 - Add disposeAllPlayers method.
