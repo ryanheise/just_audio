@@ -1,3 +1,7 @@
+## 0.9.27
+
+* Support offload scheduling on Android.
+
 ## 0.9.26
 
 * Auto-correct invalid HTTP headers in proxy.
