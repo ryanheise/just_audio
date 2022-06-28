@@ -1,3 +1,8 @@
+## 0.9.27
+
+* Support offload scheduling on Android.
+* Fix iOS/macOS documentation for non-HTTP URLS and proxy usage.
+
 ## 0.9.26
 
 * Auto-correct invalid HTTP headers in proxy.
