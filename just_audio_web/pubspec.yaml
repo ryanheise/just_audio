@@ -11,7 +11,7 @@ flutter:
         fileName: just_audio_web.dart
 
 dependencies:
-  just_audio_platform_interface: ^4.1.0
+  just_audio_platform_interface: ^4.2.0
   # just_audio_platform_interface:
   #   path: ../just_audio_platform_interface
   flutter:
