@@ -61,6 +61,8 @@ class AudioPlayer {
 
   final AudioLoadConfiguration? _audioLoadConfiguration;
 
+  final bool _androidOffloadSchedulingEnabled;
+
   /// This is `true` when the audio player needs to engage the native platform
   /// side of the plugin to decode or play audio, and is `false` when the native
   /// resources are not needed (i.e. after initial instantiation and after [stop]).
@@ -166,13 +168,15 @@ class AudioPlayer {
     bool handleAudioSessionActivation = true,
     AudioLoadConfiguration? audioLoadConfiguration,
     AudioPipeline? audioPipeline,
+    bool androidOffloadSchedulingEnabled = false,
   })  : _id = _uuid.v4(),
         _userAgent = userAgent,
         _androidApplyAudioAttributes =
             androidApplyAudioAttributes && _isAndroid(),
         _handleAudioSessionActivation = handleAudioSessionActivation,
         _audioLoadConfiguration = audioLoadConfiguration,
-        _audioPipeline = audioPipeline ?? AudioPipeline() {
+        _audioPipeline = audioPipeline ?? AudioPipeline(),
+        _androidOffloadSchedulingEnabled = androidOffloadSchedulingEnabled {
     _audioPipeline._setup(this);
     if (_audioLoadConfiguration?.darwinLoadControl != null) {
       _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
@@ -1290,6 +1294,7 @@ class AudioPlayer {
                       .map((audioEffect) => audioEffect._toMessage())
                       .toList()
                   : [],
+              androidOffloadSchedulingEnabled: _androidOffloadSchedulingEnabled,
             )))
           : (_idlePlatform =
               _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream));
@@ -3096,7 +3101,10 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
 
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
-        request.response.headers.set(name, value);
+        final filteredValue = value
+            .map((e) => e.replaceAll(RegExp(r'[^\x09\x20-\x7F]'), '?'))
+            .toList();
+        request.response.headers.set(name, filteredValue);
       });
       request.response.statusCode = originResponse.statusCode;
 

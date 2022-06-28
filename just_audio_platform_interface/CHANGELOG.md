@@ -1,6 +1,10 @@
-## 4.1.1
+## 4.2.1
 
 - Added support for HLS title and artist metadata.
+
+## 4.2.0
+
+- Add InitRequest.androidOffloadSchedulingEnabled.
 
 ## 4.1.0
 

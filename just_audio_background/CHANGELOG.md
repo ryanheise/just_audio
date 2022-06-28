@@ -1,3 +1,14 @@
+## 0.0.1-beta.7
+
+* Fix build when targeting Android 13.
+* Add MediaItem.artHeaders.
+
+## 0.0.1-beta.6
+
+* Update documentation/example for Android 12.
+* Migrate from pedantic to flutter_lints.
+* Support content:// art URIs on Android (@nt4f04uNd).
+
 ## 0.0.1-beta.5
 
 * Fix bug in stop.

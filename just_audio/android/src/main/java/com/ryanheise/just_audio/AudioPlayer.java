@@ -11,6 +11,7 @@ import android.os.Looper;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLivePlaybackSpeedControl;
 import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.LivePlaybackSpeedControl;
 import com.google.android.exoplayer2.LoadControl;
@@ -92,6 +93,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private int errorCount;
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
+    private boolean offloadSchedulingEnabled;
     private LivePlaybackSpeedControl livePlaybackSpeedControl;
     private List<Object> rawAudioEffects;
     private List<AudioEffect> audioEffects = new ArrayList<AudioEffect>();
@@ -134,9 +136,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
     };
 
-    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration, List<Object> rawAudioEffects) {
+    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration, List<Object> rawAudioEffects, Boolean offloadSchedulingEnabled) {
         this.context = applicationContext;
         this.rawAudioEffects = rawAudioEffects;
+        this.offloadSchedulingEnabled = offloadSchedulingEnabled != null ? offloadSchedulingEnabled : false;
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
         eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
@@ -283,10 +286,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if (player.getPlaybackState() == Player.STATE_ENDED) {
             try {
                 if (player.getPlayWhenReady()) {
-                    if (player.hasNextMediaItem()) {
-                        player.seekToNextMediaItem();
-                    } else if (lastPlaylistLength == 0 && player.getMediaItemCount() > 0) {
+                    if (lastPlaylistLength == 0 && player.getMediaItemCount() > 0) {
                         player.seekTo(0, 0L);
+                    } else if (player.hasNextMediaItem()) {
+                        player.seekToNextMediaItem();
                     }
                 } else {
                     if (player.getCurrentMediaItemIndex() < player.getMediaItemCount()) {
@@ -735,7 +738,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             if (livePlaybackSpeedControl != null) {
                 builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
             }
+            if (offloadSchedulingEnabled) {
+                builder.setRenderersFactory(new DefaultRenderersFactory(context).setEnableAudioOffload(true));
+            }
             player = builder.build();
+            player.experimentalSetOffloadSchedulingEnabled(offloadSchedulingEnabled);
             setAudioSessionId(player.getAudioSessionId());
             player.addListener(this);
         }
@@ -1023,7 +1030,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     // depending on the number of bits required to
     // represent it.
     public static Long getLong(Object o) {
-        return (o == null || o instanceof Long) ? (Long)o : new Long(((Integer)o).intValue());
+        return (o == null || o instanceof Long) ? (Long)o : Long.valueOf(((Integer)o).intValue());
     }
 
     @SuppressWarnings("unchecked")
