@@ -312,8 +312,6 @@ If you wish to connect to non-HTTPS URLS, or if you use a feature that depends o
 <dict>
     <key>NSAllowsArbitraryLoads</key>
     <true/>
-    <key>NSAllowsArbitraryLoadsForMedia</key>
-    <true/>
 </dict>
 ```
 
