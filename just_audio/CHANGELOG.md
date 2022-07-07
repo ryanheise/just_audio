@@ -1,3 +1,7 @@
+## 0.9.28
+
+* Recursively apply headers to HLS fragments.
+
 ## 0.9.27
 
 * Support offload scheduling on Android.
