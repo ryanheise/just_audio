@@ -2039,7 +2039,7 @@ class _ProxyHttpServer {
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
-    if (source._player!._userAgent != null) {
+    if (source._player?._userAgent != null) {
       headers['user-agent'] = source._player!._userAgent!;
     }
     final path = _requestKey(uri);
@@ -2083,7 +2083,7 @@ class _ProxyHttpServer {
       if (request.method == 'GET') {
         final uriPath = _requestKey(request.uri);
         final handler = _handlerMap[uriPath]!;
-        handler(request);
+        handler(this, request);
       }
     }, onDone: () {
       _running = false;
@@ -3135,11 +3135,12 @@ class _StreamingByteRangeRequest {
 }
 
 /// The type of functions that can handle HTTP requests sent to the proxy.
-typedef _ProxyHandler = void Function(HttpRequest request);
+typedef _ProxyHandler = void Function(
+    _ProxyHttpServer server, HttpRequest request);
 
 /// A proxy handler for serving audio from a [StreamAudioSource].
 _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
-  Future<void> handler(HttpRequest request) async {
+  Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final rangeRequest =
         _HttpRangeRequest.parse(request.headers[HttpHeaders.rangeHeader]);
 
@@ -3200,10 +3201,8 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
-///
-/// TODO: Recursively attach headers to items in playlists like m3u8.
 _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
-  Future<void> handler(HttpRequest request) async {
+  Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final originRequest = await HttpClient().getUrl(uri);
 
     // Rewrite request headers
@@ -3234,8 +3233,39 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
       });
       request.response.statusCode = originResponse.statusCode;
 
-      // Pipe response
-      await originResponse.pipe(request.response);
+      // Send response
+      if (headers != null && request.uri.path.toLowerCase().endsWith('.m3u8') ||
+          ['application/x-mpegURL', 'application/vnd.apple.mpegurl']
+              .contains(request.headers.value(HttpHeaders.contentTypeHeader))) {
+        // If this is an m3u8 file with headers, prepare the nested URIs.
+        // TODO: Handle other playlist formats similarly?
+        final m3u8 = await originResponse.transform(utf8.decoder).join();
+        for (var line in const LineSplitter().convert(m3u8)) {
+          line = line.replaceAll(RegExp(r'#.*$'), '').trim();
+          if (line.isEmpty) continue;
+          try {
+            final rawNestedUri = Uri.parse(line);
+            if (rawNestedUri.hasScheme) {
+              // Don't propagate headers
+              server.addUriAudioSource(AudioSource.uri(rawNestedUri));
+            } else {
+              // This is a resource on the same server, so propagate the headers.
+              final basePath = rawNestedUri.path.startsWith('/')
+                  ? ''
+                  : uri.path.replaceAll(RegExp(r'/[^/]*$'), '/');
+              final nestedUri =
+                  uri.replace(path: '$basePath${rawNestedUri.path}');
+              server.addUriAudioSource(
+                  AudioSource.uri(nestedUri, headers: headers));
+            }
+          } catch (e) {
+            // ignore malformed lines
+          }
+        }
+        request.response.add(utf8.encode(m3u8));
+      } else {
+        await originResponse.pipe(request.response);
+      }
       await request.response.close();
     } on HttpException {
       // We likely are dealing with a streaming protocol
