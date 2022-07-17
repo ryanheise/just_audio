@@ -124,8 +124,8 @@ class AudioPlayer {
   final _loopModeSubject = BehaviorSubject.seeded(LoopMode.off);
   final _shuffleModeEnabledSubject = BehaviorSubject.seeded(false);
   final _androidAudioSessionIdSubject = BehaviorSubject<int?>();
-  final _positionDiscontinuityReasonSubject =
-      PublishSubject<PositionDiscontinuityReason>(sync: true);
+  final _positionDiscontinuitySubject =
+      PublishSubject<PositionDiscontinuity>(sync: true);
   var _seeking = false;
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
@@ -206,8 +206,8 @@ class AudioPlayer {
       if (prev.currentIndex == null || curr.currentIndex == null) return;
       if (curr.currentIndex != prev.currentIndex) {
         // If we've changed item without seeking, it must be an autoAdvance.
-        _positionDiscontinuityReasonSubject
-            .add(PositionDiscontinuityReason.autoAdvance);
+        _positionDiscontinuitySubject.add(PositionDiscontinuity(
+            PositionDiscontinuityReason.autoAdvance, prev, curr));
       } else {
         // If the item is the same, try to determine whether we have looped
         // back.
@@ -222,8 +222,8 @@ class AudioPlayer {
             currPos - prevPos < const Duration(seconds: 1)) {
           return;
         }
-        _positionDiscontinuityReasonSubject
-            .add(PositionDiscontinuityReason.autoAdvance);
+        _positionDiscontinuitySubject.add(PositionDiscontinuity(
+            PositionDiscontinuityReason.autoAdvance, prev, curr));
       }
     }, onError: (Object e, StackTrace st) {});
     _currentIndexSubject.addStream(playbackEventStream
@@ -533,9 +533,9 @@ class AudioPlayer {
   Stream<int?> get androidAudioSessionIdStream =>
       _androidAudioSessionIdSubject.stream;
 
-  /// A stream broadcasting the reason for every position discontinuity.
-  Stream<PositionDiscontinuityReason> get positionDiscontinuityReasonStream =>
-      _positionDiscontinuityReasonSubject.stream;
+  /// A stream broadcasting every position discontinuity.
+  Stream<PositionDiscontinuity> get positionDiscontinuityStream =>
+      _positionDiscontinuitySubject.stream;
 
   /// Whether the player should automatically delay playback in order to
   /// minimize stalling. (iOS 10.0 or later only)
@@ -1104,13 +1104,16 @@ class AudioPlayer {
       default:
         try {
           _seeking = true;
-          _playbackEvent = _playbackEvent.copyWith(
+          final prevPlaybackEvent = _playbackEvent;
+          _playbackEvent = prevPlaybackEvent.copyWith(
             updatePosition: position,
             updateTime: DateTime.now(),
           );
           _playbackEventSubject.add(_playbackEvent);
-          _positionDiscontinuityReasonSubject
-              .add(PositionDiscontinuityReason.seek);
+          _positionDiscontinuitySubject.add(PositionDiscontinuity(
+              PositionDiscontinuityReason.seek,
+              prevPlaybackEvent,
+              _playbackEvent));
           await (await _platform)
               .seek(SeekRequest(position: position, index: index));
         } finally {
@@ -3744,6 +3747,20 @@ bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 extension _ValueStreamExtension<T> on ValueStream<T> {
   /// Backwards compatible version of valueOrNull.
   T? get nvalue => hasValue ? value : null;
+}
+
+/// Information collected when a position discontinuity occurs.
+class PositionDiscontinuity {
+  /// The reason for the position discontinuity.
+  final PositionDiscontinuityReason reason;
+
+  /// The previous event before the position discontinuity.
+  final PlaybackEvent previousEvent;
+
+  /// The event that caused the position discontinuity.
+  final PlaybackEvent event;
+
+  const PositionDiscontinuity(this.reason, this.previousEvent, this.event);
 }
 
 /// The reasons for position discontinuities.

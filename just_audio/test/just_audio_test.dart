@@ -1212,9 +1212,9 @@ void runTests() {
 
   test('positionDiscontinuity', () async {
     final player = AudioPlayer();
-    final discontinuityReasons = <PositionDiscontinuityReason>[];
-    final subscription = player.positionDiscontinuityReasonStream
-        .listen(discontinuityReasons.add);
+    final discontinuityEvents = <PositionDiscontinuity>[];
+    final subscription =
+        player.positionDiscontinuityStream.listen(discontinuityEvents.add);
     final playlist = ConcatenatingAudioSource(children: [
       AudioSource.uri(
         Uri.parse("https://bar.bar/bar.mp3"),
@@ -1227,41 +1227,42 @@ void runTests() {
     ]);
     await player.setAudioSource(playlist);
     expect(player.currentIndex, equals(0));
-    expect(discontinuityReasons.length, equals(0));
+    expect(discontinuityEvents.length, equals(0));
     player.play();
     await Future<void>.delayed(const Duration(milliseconds: 500));
-    expect(discontinuityReasons.length, equals(0));
+    expect(discontinuityEvents.length, equals(0));
     for (var mockPlayer in mock._players.values) {
       await mockPlayer._autoAdvance();
     }
     expect(player.currentIndex, equals(1));
     expect(
-        discontinuityReasons.length == 1 &&
-            discontinuityReasons.first ==
+        discontinuityEvents.length == 1 &&
+            discontinuityEvents.first.reason ==
                 PositionDiscontinuityReason.autoAdvance,
         equals(true));
-    discontinuityReasons.clear();
+    discontinuityEvents.clear();
     await player.seek(Duration.zero, index: 0);
     expect(player.currentIndex, equals(0));
     expect(
-        discontinuityReasons.length == 1 &&
-            discontinuityReasons.first == PositionDiscontinuityReason.seek,
+        discontinuityEvents.length == 1 &&
+            discontinuityEvents.first.reason ==
+                PositionDiscontinuityReason.seek,
         equals(true));
-    discontinuityReasons.clear();
+    discontinuityEvents.clear();
     // Test loop one
     await player.setLoopMode(LoopMode.one);
     await player.seek(const Duration(seconds: 119));
-    discontinuityReasons.clear();
+    discontinuityEvents.clear();
     for (var mockPlayer in mock._players.values) {
       await mockPlayer._autoAdvance();
     }
     expect(player.currentIndex, equals(0));
     expect(
-        discontinuityReasons.length == 1 &&
-            discontinuityReasons.first ==
+        discontinuityEvents.length == 1 &&
+            discontinuityEvents.first.reason ==
                 PositionDiscontinuityReason.autoAdvance,
         equals(true));
-    discontinuityReasons.clear();
+    discontinuityEvents.clear();
 
     await player.dispose();
     subscription.cancel();
