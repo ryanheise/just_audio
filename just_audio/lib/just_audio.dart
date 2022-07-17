@@ -124,6 +124,9 @@ class AudioPlayer {
   final _loopModeSubject = BehaviorSubject.seeded(LoopMode.off);
   final _shuffleModeEnabledSubject = BehaviorSubject.seeded(false);
   final _androidAudioSessionIdSubject = BehaviorSubject<int?>();
+  final _positionDiscontinuitySubject =
+      PublishSubject<PositionDiscontinuity>(sync: true);
+  var _seeking = false;
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
@@ -195,6 +198,34 @@ class AudioPlayer {
         .map((event) => event.icyMetadata)
         .distinct()
         .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+    playbackEventStream.pairwise().listen((pair) {
+      final prev = pair.first;
+      final curr = pair.last;
+      // Detect auto-advance
+      if (_seeking) return;
+      if (prev.currentIndex == null || curr.currentIndex == null) return;
+      if (curr.currentIndex != prev.currentIndex) {
+        // If we've changed item without seeking, it must be an autoAdvance.
+        _positionDiscontinuitySubject.add(PositionDiscontinuity(
+            PositionDiscontinuityReason.autoAdvance, prev, curr));
+      } else {
+        // If the item is the same, try to determine whether we have looped
+        // back.
+        final prevPos = _getPositionFor(prev);
+        final currPos = _getPositionFor(curr);
+        if (loopMode != LoopMode.one) return;
+        if (currPos >= prevPos) return;
+        if (currPos >= const Duration(milliseconds: 300)) return;
+        final duration = this.duration;
+        if (duration != null && prevPos < duration * 0.6) return;
+        if (duration == null &&
+            currPos - prevPos < const Duration(seconds: 1)) {
+          return;
+        }
+        _positionDiscontinuitySubject.add(PositionDiscontinuity(
+            PositionDiscontinuityReason.autoAdvance, prev, curr));
+      }
+    }, onError: (Object e, StackTrace st) {});
     _currentIndexSubject.addStream(playbackEventStream
         .map((event) => event.currentIndex)
         .distinct()
@@ -502,6 +533,10 @@ class AudioPlayer {
   Stream<int?> get androidAudioSessionIdStream =>
       _androidAudioSessionIdSubject.stream;
 
+  /// A stream broadcasting every position discontinuity.
+  Stream<PositionDiscontinuity> get positionDiscontinuityStream =>
+      _positionDiscontinuitySubject.stream;
+
   /// Whether the player should automatically delay playback in order to
   /// minimize stalling. (iOS 10.0 or later only)
   bool get automaticallyWaitsToMinimizeStalling =>
@@ -516,16 +551,17 @@ class AudioPlayer {
   double get preferredPeakBitRate => _preferredPeakBitRate;
 
   /// The current position of the player.
-  Duration get position {
+  Duration get position => _getPositionFor(_playbackEvent);
+
+  Duration _getPositionFor(PlaybackEvent playbackEvent) {
     if (playing && processingState == ProcessingState.ready) {
-      final result = _playbackEvent.updatePosition +
-          (DateTime.now().difference(_playbackEvent.updateTime)) * speed;
-      return _playbackEvent.duration == null ||
-              result <= _playbackEvent.duration!
+      final result = playbackEvent.updatePosition +
+          (DateTime.now().difference(playbackEvent.updateTime)) * speed;
+      return playbackEvent.duration == null || result <= playbackEvent.duration!
           ? result
-          : _playbackEvent.duration!;
+          : playbackEvent.duration!;
     } else {
-      return _playbackEvent.updatePosition;
+      return playbackEvent.updatePosition;
     }
   }
 
@@ -1066,13 +1102,23 @@ class AudioPlayer {
       case ProcessingState.loading:
         return;
       default:
-        _playbackEvent = _playbackEvent.copyWith(
-          updatePosition: position,
-          updateTime: DateTime.now(),
-        );
-        _playbackEventSubject.add(_playbackEvent);
-        await (await _platform)
-            .seek(SeekRequest(position: position, index: index));
+        try {
+          _seeking = true;
+          final prevPlaybackEvent = _playbackEvent;
+          _playbackEvent = prevPlaybackEvent.copyWith(
+            updatePosition: position,
+            updateTime: DateTime.now(),
+          );
+          _playbackEventSubject.add(_playbackEvent);
+          _positionDiscontinuitySubject.add(PositionDiscontinuity(
+              PositionDiscontinuityReason.seek,
+              prevPlaybackEvent,
+              _playbackEvent));
+          await (await _platform)
+              .seek(SeekRequest(position: position, index: index));
+        } finally {
+          _seeking = false;
+        }
     }
   }
 
@@ -3442,20 +3488,6 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
           AndroidLoudnessEnhancerSetTargetGainRequest request) async {
     return AndroidLoudnessEnhancerSetTargetGainResponse();
   }
-
-  @override
-  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
-      AndroidEqualizerGetParametersRequest request) async {
-    throw UnimplementedError(
-        "androidEqualizerGetParameters() has not been implemented.");
-  }
-
-  @override
-  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
-      AndroidEqualizerBandSetGainRequest request) {
-    throw UnimplementedError(
-        "androidEqualizerBandSetGain() has not been implemented.");
-  }
 }
 
 /// Holds the initial requested position and index for a newly loaded audio
@@ -3715,4 +3747,28 @@ bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 extension _ValueStreamExtension<T> on ValueStream<T> {
   /// Backwards compatible version of valueOrNull.
   T? get nvalue => hasValue ? value : null;
+}
+
+/// Information collected when a position discontinuity occurs.
+class PositionDiscontinuity {
+  /// The reason for the position discontinuity.
+  final PositionDiscontinuityReason reason;
+
+  /// The previous event before the position discontinuity.
+  final PlaybackEvent previousEvent;
+
+  /// The event that caused the position discontinuity.
+  final PlaybackEvent event;
+
+  const PositionDiscontinuity(this.reason, this.previousEvent, this.event);
+}
+
+/// The reasons for position discontinuities.
+enum PositionDiscontinuityReason {
+  /// The position discontinuity was initiated by a seek.
+  seek,
+
+  /// The position discontinuity occurred because the player reached the end of
+  /// the current item and auto-advanced to the next item.
+  autoAdvance,
 }
