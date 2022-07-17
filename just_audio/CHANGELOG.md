@@ -5,6 +5,7 @@
 ## 0.9.28
 
 * Recursively apply headers to HLS fragments.
+* Add positionDiscontinuityStream.
 
 ## 0.9.27
 
