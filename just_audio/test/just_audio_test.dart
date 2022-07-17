@@ -528,6 +528,48 @@ void runTests() {
     await player.dispose();
   });
 
+  test('idle-sequence', () async {
+    final source = ConcatenatingAudioSource(children: []);
+    final player = AudioPlayer();
+    await player.setAudioSource(source);
+    await player.stop();
+    expect(source.sequence.length, equals(0));
+    await source.add(AudioSource.uri(Uri.parse('https://b.b/b.mp3'), tag: 'b'));
+    await source.insert(
+        0, AudioSource.uri(Uri.parse('https://a.a/a.mp3'), tag: 'a'));
+    await source.insert(
+        2, AudioSource.uri(Uri.parse('https://c.c/c.mp3'), tag: 'c'));
+    await source.addAll([
+      AudioSource.uri(Uri.parse('https://d.d/d.mp3'), tag: 'd'),
+      AudioSource.uri(Uri.parse('https://e.e/e.mp3'), tag: 'e'),
+    ]);
+    await source.insertAll(3, [
+      AudioSource.uri(Uri.parse('https://e.e/e.mp3'), tag: 'e'),
+      AudioSource.uri(Uri.parse('https://f.f/f.mp3'), tag: 'f'),
+    ]);
+    expect(source.sequence.map((s) => s.tag as String?),
+        equals(['a', 'b', 'c', 'e', 'f', 'd', 'e']));
+    await source.removeAt(0);
+    expect(source.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'e', 'f', 'd', 'e']));
+    await source.move(3, 2);
+    expect(source.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'f', 'e', 'd', 'e']));
+    await source.move(2, 3);
+    expect(source.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'e', 'f', 'd', 'e']));
+    await source.removeRange(0, 2);
+    expect(source.sequence.map((s) => s.tag as String?),
+        equals(['e', 'f', 'd', 'e']));
+    await source.removeAt(3);
+    expect(
+        source.sequence.map((s) => s.tag as String?), equals(['e', 'f', 'd']));
+    await source.removeRange(1, 3);
+    expect(source.sequence.map((s) => s.tag as String?), equals(['e']));
+    await source.clear();
+    expect(source.sequence.map((s) => s.tag as String?), equals(<String>[]));
+  });
+
   test('sequence-state', () async {
     final player = AudioPlayer();
     expect(player.sequenceState, equals(null));
@@ -1168,6 +1210,64 @@ void runTests() {
     await player.dispose();
   });
 
+  test('positionDiscontinuity', () async {
+    final player = AudioPlayer();
+    final discontinuityEvents = <PositionDiscontinuity>[];
+    final subscription =
+        player.positionDiscontinuityStream.listen(discontinuityEvents.add);
+    final playlist = ConcatenatingAudioSource(children: [
+      AudioSource.uri(
+        Uri.parse("https://bar.bar/bar.mp3"),
+        tag: 'a',
+      ),
+      AudioSource.uri(
+        Uri.parse("https://baz.baz/baz.mp3"),
+        tag: 'b',
+      ),
+    ]);
+    await player.setAudioSource(playlist);
+    expect(player.currentIndex, equals(0));
+    expect(discontinuityEvents.length, equals(0));
+    player.play();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect(discontinuityEvents.length, equals(0));
+    for (var mockPlayer in mock._players.values) {
+      await mockPlayer._autoAdvance();
+    }
+    expect(player.currentIndex, equals(1));
+    expect(
+        discontinuityEvents.length == 1 &&
+            discontinuityEvents.first.reason ==
+                PositionDiscontinuityReason.autoAdvance,
+        equals(true));
+    discontinuityEvents.clear();
+    await player.seek(Duration.zero, index: 0);
+    expect(player.currentIndex, equals(0));
+    expect(
+        discontinuityEvents.length == 1 &&
+            discontinuityEvents.first.reason ==
+                PositionDiscontinuityReason.seek,
+        equals(true));
+    discontinuityEvents.clear();
+    // Test loop one
+    await player.setLoopMode(LoopMode.one);
+    await player.seek(const Duration(seconds: 119));
+    discontinuityEvents.clear();
+    for (var mockPlayer in mock._players.values) {
+      await mockPlayer._autoAdvance();
+    }
+    expect(player.currentIndex, equals(0));
+    expect(
+        discontinuityEvents.length == 1 &&
+            discontinuityEvents.first.reason ==
+                PositionDiscontinuityReason.autoAdvance,
+        equals(true));
+    discontinuityEvents.clear();
+
+    await player.dispose();
+    subscription.cancel();
+  });
+
   test('loadConfiguration', () async {
     final audioLoadConfiguration = AudioLoadConfiguration(
       darwinLoadControl: DarwinLoadControl(),
@@ -1307,8 +1407,7 @@ final icyMetadataMessage = IcyMetadataMessage(
   ),
 );
 
-class MockAudioPlayer implements AudioPlayerPlatform {
-  final String _id;
+class MockAudioPlayer extends AudioPlayerPlatform {
   final eventController = StreamController<PlaybackEventMessage>();
   final AudioLoadConfigurationMessage? audioLoadConfiguration;
   AudioSourceMessage? _audioSource;
@@ -1322,17 +1421,15 @@ class MockAudioPlayer implements AudioPlayerPlatform {
   var _speed = 1.0;
   Completer<dynamic>? _playCompleter;
   Timer? _playTimer;
+  LoopModeMessage _loopMode = LoopModeMessage.off;
 
   MockAudioPlayer(InitRequest request)
-      : _id = request.id,
-        audioLoadConfiguration = request.audioLoadConfiguration;
+      : audioLoadConfiguration = request.audioLoadConfiguration,
+        super(request.id);
 
   @override
   Stream<PlayerDataMessage> get playerDataMessageStream =>
       StreamController<PlayerDataMessage>().stream;
-
-  @override
-  String get id => _id;
 
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
@@ -1413,6 +1510,14 @@ class MockAudioPlayer implements AudioPlayerPlatform {
     return SeekResponse();
   }
 
+  Future<void> _autoAdvance() async {
+    _setPosition(Duration.zero);
+    if (_loopMode == LoopModeMessage.off) {
+      _index = _index! + 1;
+    }
+    _broadcastPlaybackEvent();
+  }
+
   @override
   Future<SetAndroidAudioAttributesResponse> setAndroidAudioAttributes(
       SetAndroidAudioAttributesRequest request) async {
@@ -1428,6 +1533,7 @@ class MockAudioPlayer implements AudioPlayerPlatform {
 
   @override
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async {
+    _loopMode = request.loopMode;
     return SetLoopModeResponse();
   }
 
