@@ -203,7 +203,7 @@ class AudioPlayer {
       final curr = pair.last;
       // Detect auto-advance
       if (_seeking) return;
-      if (prev.currentIndex == null) return;
+      if (prev.currentIndex == null || curr.currentIndex == null) return;
       if (curr.currentIndex != prev.currentIndex) {
         // If we've changed item without seeking, it must be an autoAdvance.
         _positionDiscontinuityReasonSubject
@@ -3484,20 +3484,6 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
       androidLoudnessEnhancerSetTargetGain(
           AndroidLoudnessEnhancerSetTargetGainRequest request) async {
     return AndroidLoudnessEnhancerSetTargetGainResponse();
-  }
-
-  @override
-  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
-      AndroidEqualizerGetParametersRequest request) async {
-    throw UnimplementedError(
-        "androidEqualizerGetParameters() has not been implemented.");
-  }
-
-  @override
-  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
-      AndroidEqualizerBandSetGainRequest request) {
-    throw UnimplementedError(
-        "androidEqualizerBandSetGain() has not been implemented.");
   }
 }
 
