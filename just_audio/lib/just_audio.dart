@@ -2145,6 +2145,9 @@ abstract class IndexedAudioSource extends AudioSource {
   void _shuffle({int? initialIndex}) {}
 
   @override
+  IndexedAudioSourceMessage _toMessage();
+
+  @override
   List<IndexedAudioSource> get sequence => [this];
 
   @override
@@ -2245,7 +2248,7 @@ class ProgressiveAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
       id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
@@ -2269,7 +2272,7 @@ class DashAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() => DashAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => DashAudioSourceMessage(
       id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
@@ -2292,7 +2295,7 @@ class HlsAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => HlsAudioSourceMessage(
       id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
@@ -2312,8 +2315,27 @@ class SilenceAudioSource extends IndexedAudioSource {
   }) : super(tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() =>
+  IndexedAudioSourceMessage _toMessage() =>
       SilenceAudioSourceMessage(id: _id, duration: duration);
+}
+
+class MappingAudioSource<T> extends IndexedAudioSource {
+  final T identifier;
+  final Future<IndexedAudioSource> Function(T identifier) createAudioSource;
+
+  MappingAudioSource(
+    this.identifier,
+    this.createAudioSource, {
+    dynamic tag,
+    Duration? duration,
+  }) : super(tag: tag, duration: duration);
+
+  @override
+  IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage<T>(
+        id: _id,
+        createAudioSourceMessage: () => createAudioSource(identifier)
+            .then((audioSource) => audioSource._toMessage()),
+      );
 }
 
 /// An [AudioSource] representing a concatenation of multiple audio sources to
@@ -2562,7 +2584,7 @@ class ClippingAudioSource extends IndexedAudioSource {
   }
 
   @override
-  AudioSourceMessage _toMessage() => ClippingAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => ClippingAudioSourceMessage(
       id: _id,
       child: child._toMessage() as UriAudioSourceMessage,
       start: start,
@@ -2634,7 +2656,7 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   Future<StreamAudioResponse> request([int? start, int? end]);
 
   @override
-  AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
       id: _id, uri: _uri.toString(), headers: null, tag: tag);
 }
 

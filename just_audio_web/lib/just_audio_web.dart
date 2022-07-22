@@ -498,6 +498,16 @@ class Html5AudioPlayer extends JustAudioPlayer {
     } else if (audioSourceMessage is HlsAudioSourceMessage) {
       return HlsAudioSourcePlayer(this, audioSourceMessage.id,
           Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
+    } else if (audioSourceMessage is MappingAudioSourceMessage) {
+      return MappingAudioSourcePlayer(
+        this,
+        audioSourceMessage.id,
+        () async {
+          final innerMessage =
+              await audioSourceMessage.createAudioSourceMessage();
+          return decodeAudioSource(innerMessage) as IndexedAudioSourcePlayer;
+        },
+      );
     } else if (audioSourceMessage is ConcatenatingAudioSourceMessage) {
       return ConcatenatingAudioSourcePlayer(
           this,
@@ -696,6 +706,51 @@ class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
   HlsAudioSourcePlayer(
       Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
       : super(html5AudioPlayer, id, uri, headers);
+}
+
+class MappingAudioSourcePlayer extends IndexedAudioSourcePlayer {
+  final Future<IndexedAudioSourcePlayer> Function() _generateInnerPlayer;
+  IndexedAudioSourcePlayer? _innerPlayer;
+
+  MappingAudioSourcePlayer(
+      Html5AudioPlayer html5AudioPlayer, String id, this._generateInnerPlayer)
+      : super(html5AudioPlayer, id);
+
+  @override
+  Future<Duration?> load([int? initialPosition]) async =>
+      (_innerPlayer = await _generateInnerPlayer()).load(initialPosition);
+
+  @override
+  List<IndexedAudioSourcePlayer> get sequence => [this];
+
+  @override
+  List<int> get shuffleIndices => [0];
+
+  @override
+  Future<void> play() => _innerPlayer!.play();
+
+  @override
+  Future<void> pause() => _innerPlayer!.pause();
+
+  @override
+  Future<void> seek(int position) => _innerPlayer!.seek(position);
+
+  @override
+  Future<void> complete() => _innerPlayer!.complete();
+
+  @override
+  Future<void> timeUpdated(double seconds) async =>
+      _innerPlayer?.timeUpdated(seconds);
+
+  @override
+  Duration? get duration => _innerPlayer?.duration;
+
+  @override
+  Duration get position => _innerPlayer?.position ?? Duration.zero;
+
+  @override
+  Duration get bufferedPosition =>
+      _innerPlayer?.bufferedPosition ?? Duration.zero;
 }
 
 /// A player for a [ConcatenatingAudioSourceMessage].
