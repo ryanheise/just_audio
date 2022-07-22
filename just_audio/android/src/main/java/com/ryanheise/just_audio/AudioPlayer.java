@@ -31,6 +31,7 @@ import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
 import com.google.android.exoplayer2.metadata.icy.IcyInfo;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
+import com.google.android.exoplayer2.source.MaskingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.ShuffleOrder;
@@ -62,7 +63,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-public class AudioPlayer implements MethodCallHandler, Player.Listener, MetadataOutput {
+public class AudioPlayer implements MethodCallHandler, Player.Listener, MetadataOutput, LazyMediaSourceProvider {
 
     static final String TAG = "AudioPlayer";
 
@@ -611,6 +612,17 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setMimeType(MimeTypes.APPLICATION_M3U8)
                             .build());
+        case "mapping":
+            return new MaskingMediaSource(
+                    new LazyMediaSource(
+                            this,
+                            id,
+                            new MediaItem.Builder()
+                                    .setTag(id)
+                                    .build()
+                    ),
+                    true
+            );
         case "silence":
             return new SilenceMediaSource.Factory()
                     .setDurationUs(getLong(map.get("duration")))
@@ -693,6 +705,29 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             .setUserAgent(userAgent)
             .setAllowCrossProtocolRedirects(true);
         return new DefaultDataSource.Factory(context, httpDataSourceFactory);
+    }
+
+    @Override
+    public void createMediaSource(String id, LazyMediaSourceReceiver receiver) {
+        handler.post(() -> {
+            methodChannel.invokeMethod("createMappedAudioSourceSource", Collections.singletonMap("id", id), new Result() {
+                @Override
+                public void success(Object json) {
+                    final MediaSource mediaSource = decodeAudioSource(json);
+                    receiver.onMediaSourceCreated(mediaSource);
+                }
+
+                @Override
+                public void error(String errorCode, String errorMessage, Object errorDetails) {
+                    throw new IllegalStateException("createMappedAudioSourceSource failed. Cannot proceed. (" + errorCode + ", " + errorMessage + ", " + errorDetails + ")");
+                }
+
+                @Override
+                public void notImplemented() {
+                    throw new IllegalArgumentException("createMappedAudioSourceSource is not implemented by the platform.");
+                }
+            });
+        });
     }
 
     private void load(final MediaSource mediaSource, final long initialPosition, final Integer initialIndex, final Result result) {
