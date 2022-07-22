@@ -9,6 +9,7 @@ import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSourceEventListener;
+import com.google.android.exoplayer2.source.SilenceMediaSource;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.TransferListener;
 
@@ -101,16 +102,21 @@ class LazyMediaSource implements MediaSource {
             PlayerId playerId
     ) {
         mediaSourceProvider.createMediaSource(id, (mediaSource) -> {
-            this.mediaSource = mediaSource;
+            if (mediaSource == null) {
+                this.mediaSource = new SilenceMediaSource(0);
+            } else {
+                this.mediaSource = mediaSource;
+            }
+
             for (Map.Entry<MediaSourceEventListener, Handler> entry : pendingEventListeners.entrySet()) {
-                mediaSource.addEventListener(entry.getValue(), entry.getKey());
+                this.mediaSource.addEventListener(entry.getValue(), entry.getKey());
             }
             pendingEventListeners.clear();
             for (Map.Entry<DrmSessionEventListener, Handler> entry : pendingDrmEventListeners.entrySet()) {
-                mediaSource.addDrmEventListener(entry.getValue(), entry.getKey());
+                this.mediaSource.addDrmEventListener(entry.getValue(), entry.getKey());
             }
             pendingDrmEventListeners.clear();
-            mediaSource.prepareSource(caller, mediaTransferListener, playerId);
+            this.mediaSource.prepareSource(caller, mediaTransferListener, playerId);
         });
     }
 

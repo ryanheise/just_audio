@@ -2326,7 +2326,7 @@ class SilenceAudioSource extends IndexedAudioSource {
 
 class MappingAudioSource<T> extends IndexedAudioSource {
   final T identifier;
-  final Future<IndexedAudioSource> Function(T identifier) createAudioSource;
+  final Future<IndexedAudioSource?> Function(T identifier) createAudioSource;
 
   MappingAudioSource(
     this.identifier,
@@ -2339,7 +2339,7 @@ class MappingAudioSource<T> extends IndexedAudioSource {
   IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage<T>(
         id: _id,
         createAudioSourceMessage: () => createAudioSource(identifier)
-            .then((audioSource) => audioSource._toMessage()),
+            .then((audioSource) => audioSource?._toMessage()),
       );
 }
 

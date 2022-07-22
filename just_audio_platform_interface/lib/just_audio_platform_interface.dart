@@ -1133,7 +1133,7 @@ class SilenceAudioSourceMessage extends IndexedAudioSourceMessage {
 class MappingAudioSourceMessage<T> extends IndexedAudioSourceMessage {
   /// The closure can only be used by platform implementations that pass by
   /// reference.
-  final Future<IndexedAudioSourceMessage> Function() createAudioSourceMessage;
+  final Future<IndexedAudioSourceMessage?> Function() createAudioSourceMessage;
 
   MappingAudioSourceMessage({
     required String id,

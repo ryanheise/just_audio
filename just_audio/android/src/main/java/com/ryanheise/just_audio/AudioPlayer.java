@@ -713,7 +713,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             methodChannel.invokeMethod("createMappedAudioSourceSource", Collections.singletonMap("id", id), new Result() {
                 @Override
                 public void success(Object json) {
-                    final MediaSource mediaSource = decodeAudioSource(json);
+                    final MediaSource mediaSource = json == null ? null : decodeAudioSource(json);
                     receiver.onMediaSourceCreated(mediaSource);
                 }
 

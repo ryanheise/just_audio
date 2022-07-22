@@ -240,7 +240,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
         final id = (call.arguments as Map)['id'] as String;
         final message = getAudioSourceMessage(id) as MappingAudioSourceMessage;
         final innerMessage = await message.createAudioSourceMessage();
-        return innerMessage.toMap();
+        return innerMessage?.toMap();
       default:
         throw UnimplementedError('Unimplemented method: ${call.method}');
     }

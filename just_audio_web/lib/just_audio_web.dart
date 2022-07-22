@@ -520,6 +520,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
         () async {
           final innerMessage =
               await audioSourceMessage.createAudioSourceMessage();
+          if (innerMessage == null) return null;
           return decodeAudioSource(innerMessage) as IndexedAudioSourcePlayer;
         },
       );
@@ -724,7 +725,7 @@ class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
 }
 
 class MappingAudioSourcePlayer extends IndexedAudioSourcePlayer {
-  final Future<IndexedAudioSourcePlayer> Function() _generateInnerPlayer;
+  final Future<IndexedAudioSourcePlayer?> Function() _generateInnerPlayer;
   IndexedAudioSourcePlayer? _innerPlayer;
 
   MappingAudioSourcePlayer(
@@ -733,7 +734,19 @@ class MappingAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
   @override
   Future<Duration?> load([int? initialPosition]) async =>
-      (_innerPlayer = await _generateInnerPlayer()).load(initialPosition);
+      (_innerPlayer = (await _generateInnerPlayer()) ??
+              ProgressiveAudioSourcePlayer(
+                html5AudioPlayer,
+                id,
+                Uri(
+                  scheme: 'data',
+                  path:
+                      // 0 seconds, single channel, 44.1kHz. https://www.skypack.dev/view/wav-dummy
+                      'audio/wav;base64,UklGRgAAACRXQVZFZm10IBAAAAABAAEARKwAAESsAAABAAgAZGF0YQAAAAA=',
+                ),
+                null,
+              ))
+          .load(initialPosition);
 
   @override
   List<IndexedAudioSourcePlayer> get sequence => [this];
