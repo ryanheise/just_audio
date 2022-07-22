@@ -2336,7 +2336,7 @@ class MappingAudioSource<T> extends IndexedAudioSource {
   }) : super(tag: tag, duration: duration);
 
   @override
-  IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage<T>(
+  IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage(
         id: _id,
         createAudioSourceMessage: () => createAudioSource(identifier)
             .then((audioSource) => audioSource?._toMessage()),
