@@ -23,7 +23,10 @@ class JustAudioPlugin extends JustAudioPlatform {
           code: "error",
           message: "Platform player ${request.id} already exists");
     }
-    final player = Html5AudioPlayer(id: request.id);
+    final player = Html5AudioPlayer(
+      id: request.id,
+      getAudioServiceMessage: request.getAudioSourceMessage,
+    );
     players[request.id] = player;
     return player;
   }
@@ -57,7 +60,13 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
   double _speed = 1.0;
 
   /// Creates a platform player with the given [id].
-  JustAudioPlayer({required String id}) : super(id);
+  JustAudioPlayer({
+    required String id,
+    required AudioSourceMessageGetter getAudioServiceMessage,
+  }) : super(
+          id,
+          getAudioSourceMessage: getAudioServiceMessage,
+        );
 
   @mustCallSuper
   Future<void> release() async {
@@ -108,7 +117,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
   final Map<String, AudioSourcePlayer> _audioSourcePlayers = {};
 
   /// Creates an [Html5AudioPlayer] with the given [id].
-  Html5AudioPlayer({required String id}) : super(id: id) {
+  Html5AudioPlayer(
+      {required String id,
+      required AudioSourceMessageGetter getAudioServiceMessage})
+      : super(
+          id: id,
+          getAudioServiceMessage: getAudioServiceMessage,
+        ) {
     _audioElement.addEventListener('durationchange', (event) {
       _durationCompleter?.complete();
       broadcastPlaybackEvent();

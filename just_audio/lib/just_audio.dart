@@ -1329,6 +1329,11 @@ class AudioPlayer {
       final platform = active
           ? await (_nativePlatform = _pluginPlatform.init(InitRequest(
               id: _id,
+              getAudioSourceMessage: (id) {
+                assert(_audioSources.containsKey(id),
+                    'Audio source with ID $id does not exist!');
+                return _audioSources[id]!._toMessage();
+              },
               audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
               androidAudioEffects: (_isAndroid() || _isUnitTest())
                   ? _audioPipeline.androidAudioEffects

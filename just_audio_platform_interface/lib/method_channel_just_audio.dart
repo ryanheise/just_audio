@@ -11,7 +11,10 @@ class MethodChannelJustAudio extends JustAudioPlatform {
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     await _mainChannel.invokeMethod<void>('init', request.toMap());
-    return MethodChannelAudioPlayer(request.id);
+    return MethodChannelAudioPlayer(
+      request.id,
+      getAudioSourceMessage: request.getAudioSourceMessage,
+    );
   }
 
   @override
@@ -35,9 +38,16 @@ class MethodChannelJustAudio extends JustAudioPlatform {
 class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   final MethodChannel _channel;
 
-  MethodChannelAudioPlayer(String id)
-      : _channel = MethodChannel('com.ryanheise.just_audio.methods.$id'),
-        super(id);
+  MethodChannelAudioPlayer(
+    String id, {
+    required AudioSourceMessageGetter getAudioSourceMessage,
+  })  : _channel = MethodChannel('com.ryanheise.just_audio.methods.$id'),
+        super(
+          id,
+          getAudioSourceMessage: getAudioSourceMessage,
+        ) {
+    _channel.setMethodCallHandler(_methodCallHandler);
+  }
 
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
@@ -222,5 +232,17 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
     return AndroidEqualizerBandSetGainResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'androidEqualizerBandSetGain', request.toMap()))!);
+  }
+
+  Future<Object?> _methodCallHandler(MethodCall call) async {
+    switch (call.method) {
+      case 'createMappedAudioSourceSource':
+        final id = (call.arguments as Map)['id'] as String;
+        final message = getAudioSourceMessage(id) as MappingAudioSourceMessage;
+        final innerMessage = await message.createAudioSourceMessage();
+        return innerMessage.toMap();
+      default:
+        throw UnimplementedError('Unimplemented method: ${call.method}');
+    }
   }
 }
