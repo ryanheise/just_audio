@@ -2324,8 +2324,24 @@ class SilenceAudioSource extends IndexedAudioSource {
       SilenceAudioSourceMessage(id: _id, duration: duration);
 }
 
+/// An [AudioSource] that maps to another [AudioSource] when it is first loaded.
+///
+/// This is useful, for example, inside a [ConcatenatingAudioSource], if an
+/// audio URL cannot be loaded until just before it is played.
+///
+/// Note that [AudioSource]s are not currently disposed of until the
+/// [AudioPlayer] completes. It is recommended to keep the [identifier] and
+/// [createAudioSource] values light - the [identifier], for example, could be a
+/// basic [Object] that points to a value in a map stored elsewhere.
+///
+/// NOTE: This is currently supported on Android and the Web only.
 class MappingAudioSource<T> extends IndexedAudioSource {
+  /// An identifier representing the [AudioSource] to be created.
   final T identifier;
+
+  /// A function that creates the [AudioSource] to be played.
+  ///
+  /// If `null` is returned, a silent, instant sound will be used instead.
   final Future<IndexedAudioSource?> Function(T identifier) createAudioSource;
 
   MappingAudioSource(

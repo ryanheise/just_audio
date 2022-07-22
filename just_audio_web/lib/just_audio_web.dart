@@ -724,6 +724,7 @@ class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
       : super(html5AudioPlayer, id, uri, headers);
 }
 
+/// A player for a [MappingAudioSourceMessage].
 class MappingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   final Future<IndexedAudioSourcePlayer?> Function() _generateInnerPlayer;
   IndexedAudioSourcePlayer? _innerPlayer;
