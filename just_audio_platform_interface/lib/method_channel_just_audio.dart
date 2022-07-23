@@ -1,12 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 
 import 'just_audio_platform_interface.dart';
 
 /// An implementation of [JustAudioPlatform] that uses method channels.
+///
+/// For third-party platform implementations, be sure to extend this class and
+/// override supported feature flags like [supportsMappingAudioSource] to fit
+/// the supported feature set.
 class MethodChannelJustAudio extends JustAudioPlatform {
   static const _mainChannel = MethodChannel('com.ryanheise.just_audio.methods');
+
+  @override
+  bool get supportsMappingAudioSource => Platform.isAndroid;
 
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {

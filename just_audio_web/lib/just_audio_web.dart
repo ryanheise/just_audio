@@ -17,6 +17,9 @@ class JustAudioPlugin extends JustAudioPlatform {
   }
 
   @override
+  bool get supportsMappingAudioSource => true;
+
+  @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     if (players.containsKey(request.id)) {
       throw PlatformException(

@@ -34,6 +34,9 @@ abstract class JustAudioPlatform extends PlatformInterface {
     _instance = instance;
   }
 
+  /// True if the platform can handle [MappingAudioSourceMessage]s.
+  bool get supportsMappingAudioSource => false;
+
   /// Creates a new platform player and returns a nested platform interface for
   /// communicating with that player.
   Future<AudioPlayerPlatform> init(InitRequest request) {

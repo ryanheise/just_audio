@@ -2334,7 +2334,8 @@ class SilenceAudioSource extends IndexedAudioSource {
 /// [createAudioSource] values light - the [identifier], for example, could be a
 /// basic [Object] that points to a value in a map stored elsewhere.
 ///
-/// NOTE: This is currently supported on Android and the Web only.
+/// NOTE: This is officially supported on Android and the Web only. Check
+/// [supportedOnCurrentPlatform] before using.
 class MappingAudioSource<T> extends IndexedAudioSource {
   /// An identifier representing the [AudioSource] to be created.
   final T identifier;
@@ -2349,7 +2350,8 @@ class MappingAudioSource<T> extends IndexedAudioSource {
     this.createAudioSource, {
     dynamic tag,
     Duration? duration,
-  }) : super(tag: tag, duration: duration);
+  })  : assert(supportedOnCurrentPlatform),
+        super(tag: tag, duration: duration);
 
   @override
   IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage(
@@ -2357,6 +2359,9 @@ class MappingAudioSource<T> extends IndexedAudioSource {
         createAudioSourceMessage: () => createAudioSource(identifier)
             .then((audioSource) => audioSource?._toMessage()),
       );
+
+  static bool get supportedOnCurrentPlatform =>
+      JustAudioPlatform.instance.supportsMappingAudioSource;
 }
 
 /// An [AudioSource] representing a concatenation of multiple audio sources to
