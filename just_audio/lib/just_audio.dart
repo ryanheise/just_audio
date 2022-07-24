@@ -2353,10 +2353,14 @@ class MappingAudioSource<T> extends IndexedAudioSource {
   })  : assert(supportedOnCurrentPlatform),
         super(tag: tag, duration: duration);
 
+  Future<IndexedAudioSource?>? _audioSourceFuture;
+
   @override
   IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage(
         id: _id,
-        createAudioSourceMessage: () => createAudioSource(identifier)
+        createAudioSourceMessage: () => (_audioSourceFuture ??=
+                createAudioSource(identifier).then((audioSource) =>
+                    audioSource?._setup(_player!).then((_) => audioSource)))
             .then((audioSource) => audioSource?._toMessage()),
       );
 
