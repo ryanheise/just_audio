@@ -19,3 +19,6 @@ pubspec.lock
 # IntelliJ
 .idea
 *.iml
+
+# VS Code
+.vscode
