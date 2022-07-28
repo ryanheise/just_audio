@@ -15,3 +15,7 @@ build/
 .flutter-plugins
 coverage
 pubspec.lock
+
+# IntelliJ
+.idea
+*.iml
