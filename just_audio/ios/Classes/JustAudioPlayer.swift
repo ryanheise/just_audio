@@ -1,22 +1,22 @@
 import AVFoundation
 
-class PluginError : Error {
+class PluginError: Error {
     let code: Int
     let message: String
-    
+
     init(_ code: Int, _ message: String) {
-        self.code = code;
+        self.code = code
         self.message = message
     }
-    
+
     static func notImplemented(_ message: String) -> PluginError {
         return PluginError(500, message)
     }
-    
+
     static func notInitialized(_ message: String) -> PluginError {
         return PluginError(403, message)
     }
-    
+
     static func notSupported(_ value: Any, _ message: Any) -> PluginError {
         return PluginError(400, "Not support \(value)\n\(message)")
     }
@@ -25,17 +25,17 @@ class PluginError : Error {
 public class JustAudioPlayer: NSObject {
     let playerId: String
     let audioEffects: [[String: Any]]
-    
+
     let methodChannel: FlutterMethodChannel
     let eventChannel: BetterEventChannel
     let dataChannel: BetterEventChannel
-    
+
     var player: Player!
 
-    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration: [String: Any], audioEffects: [[String: Any]]) {
+    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration _: [String: Any], audioEffects: [[String: Any]]) {
         self.playerId = playerId
         self.audioEffects = audioEffects
-        
+
         methodChannel = FlutterMethodChannel(name: String(format: "com.ryanheise.just_audio.methods.%@", playerId), binaryMessenger: registrar.messenger())
         eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
         dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
@@ -47,22 +47,22 @@ public class JustAudioPlayer: NSObject {
             self.handleMethodCall(call: call, result: result)
         }
     }
-    
+
     func handleMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
         do {
-            if (player == nil) {
-                player = Player(audioEffects: try! audioEffects.map(Mapping.effectFrom), onEvent: onPlaybackEvent);
+            if player == nil {
+                player = Player(audioEffects: try! audioEffects.map(Mapping.effectFrom), onEvent: onPlaybackEvent)
             }
-            
+
             let request = call.arguments as! [String: Any]
-             print("=========== \(call.method) \(request)")
-            
+            print("=========== \(call.method) \(request)")
+
             switch call.method {
             case "load":
                 let source = try AudioSource.fromJson(request["audioSource"] as! [String: Any])
                 let initialPosition = request["initialPosition"] != nil ? CMTime.invalid : CMTimeMake(value: request["initialPosition"] as! Int64, timescale: 1_000_000)
                 let initialIndex = request["initialIndex"] as? Int ?? 0
-                
+
                 let duration = player.load(source: source, initialPosition: initialPosition, initialIndex: initialIndex)
                 result(["duration": duration.microSeconds])
             case "play":
@@ -124,12 +124,12 @@ public class JustAudioPlayer: NSObject {
             }
         } catch let error as PluginError {
             result(FlutterError(code: "\(error.code)", message: error.message, details: nil))
-        } catch let error {
+        } catch {
             print(error)
             result(FlutterError(code: "500", message: error.localizedDescription, details: nil))
         }
     }
-    
+
     func onPlaybackEvent(event: PlaybackEvent) {
         eventChannel.sendEvent([
             "processingState": event.processingState.rawValue,
@@ -141,11 +141,11 @@ public class JustAudioPlayer: NSObject {
             "currentIndex": event.currentIndex,
         ])
     }
-    
+
     func dispose() {
         player?.dispose()
         player = nil
-        
+
         eventChannel.dispose()
         dataChannel.dispose()
         methodChannel.setMethodCallHandler(nil)
@@ -163,7 +163,7 @@ enum LoopMode: Int {
 class Player {
     let onEvent: (PlaybackEvent) -> Void
     let audioEffects: [EffectData]
-    
+
     var engine: AVAudioEngine!
     var playerNode: AVAudioPlayerNode!
     var speedControl: AVAudioUnitVarispeed!
@@ -173,13 +173,13 @@ class Player {
     var processingState: ProcessingState = .none
     var shuffleModeEnabled = false
     var loopMode: LoopMode = .loopOff
-    
+
     // Queue properties
     var indexedAudioSources: [IndexedAudioSource] = []
     var currentSource: IndexedAudioSource?
     var order: [Int] = []
     var orderInv: [Int] = []
-    
+
     // Current Source
     var index: Int = 0
     var audioSource: AudioSource!
@@ -192,7 +192,7 @@ class Player {
             return CMTime.zero
         }
     }
-    
+
     // Positions properties
     var positionUpdatedAt: Int64 = 0
     var positionUpdate: CMTime = .zero
@@ -222,12 +222,11 @@ class Player {
         indexedAudioSources = audioSource.buildSequence()
 
         updateOrder()
-        
+
         if indexedAudioSources.isEmpty {
-            
             processingState = .none
             broadcastPlaybackEvent()
-            
+
             return CMTime.zero
         }
 
@@ -252,24 +251,23 @@ class Player {
             for node in nodes {
                 engine.attach(node!)
             }
-            
+
             // add mainMixerNode
             nodes.append(engine.mainMixerNode)
 
             for i in 1 ..< nodes.count {
                 engine.connect(nodes[i - 1]!, to: nodes[i]!, format: nil)
             }
-            
+
             // Observe for changes in the audio engine configuration
             NotificationCenter.default.addObserver(self,
-               selector: #selector(_handleInterruption),
-               name: NSNotification.Name.AVAudioEngineConfigurationChange,
-               object: nil
-            )
+                                                   selector: #selector(_handleInterruption),
+                                                   name: NSNotification.Name.AVAudioEngineConfigurationChange,
+                                                   object: nil)
         }
 
         try! setQueueFrom(index)
-        
+
         _loadCurrentSource()
 
         if !engine.isRunning {
@@ -278,68 +276,68 @@ class Player {
 
         processingState = .ready
         broadcastPlaybackEvent()
-        
+
         return duration
     }
-    
-    @objc func _handleInterruption(notification: Notification) {
+
+    @objc func _handleInterruption(notification _: Notification) {
         _resume()
     }
-    
+
     func play() {
         _play()
         updatePosition(nil)
         broadcastPlaybackEvent()
     }
-    
+
     func pause() {
         updatePosition(nil)
         playerNode.pause()
         broadcastPlaybackEvent()
     }
-    
+
     func _resume() {
         let wasPlaying = playerNode.isPlaying
-        
+
         playerNode.pause()
-        if (!engine.isRunning) {
+        if !engine.isRunning {
             try! engine.start()
         }
-        
-        if (wasPlaying) {
+
+        if wasPlaying {
             playerNode.play()
         }
     }
-    
+
     func seek(index: Int?, position: CMTime) {
-        let wasPlaying = self.playerNode.isPlaying
-        
+        let wasPlaying = playerNode.isPlaying
+
         if let index = index {
             try! setQueueFrom(index)
         }
 
         _stop()
-        
+
         updatePosition(position)
 
         processingState = .ready
 
         _loadCurrentSource()
-       
+
         // Restart play if player was playning
-        if (wasPlaying) {
+        if wasPlaying {
             _play()
         }
 
         broadcastPlaybackEvent()
     }
-    
+
     func updatePosition(_ positionUpdate: CMTime?) {
-        self.positionUpdatedAt = Int64(Date().timeIntervalSince1970 * 1000)
-        if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate  }
-        self.positionOffset = indexedAudioSources.count > 0 && positionUpdate == nil ? self.playerNode.currentTime : CMTime.zero
+        positionUpdatedAt = Int64(Date().timeIntervalSince1970 * 1000)
+        if let positionUpdate = positionUpdate { self.positionUpdate = positionUpdate }
+        positionOffset = indexedAudioSources.count > 0 && positionUpdate == nil ? playerNode.currentTime : CMTime.zero
     }
-    
+
     var _isStopping = false
     // Permit to check if [load(completionHandler)] is called when you force a stop
     func _stop() {
@@ -347,41 +345,41 @@ class Player {
         playerNode.stop()
         _isStopping = false
     }
-    
+
     func _play() {
-        if (!self.engine.isRunning) {
-            try! self.engine.start()
+        if !engine.isRunning {
+            try! engine.start()
         }
         playerNode.play()
     }
-    
+
     func _loadCurrentSource() {
         try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {
-            if (self._isStopping) {return}
+            if self._isStopping { return }
             DispatchQueue.main.async {
                 self._playNext()
             }
         })
     }
-    
+
     func _getRelativeIndex(_ offset: Int) -> Int {
-        switch (loopMode) {
+        switch loopMode {
         case .loopOne:
-            return self.index
+            return index
         case .loopAll:
-            return offset >= self.indexedAudioSources.count ? 0 : self.orderInv[offset]
+            return offset >= indexedAudioSources.count ? 0 : orderInv[offset]
         case .loopOff:
-            return self.orderInv[offset]
+            return orderInv[offset]
         }
     }
 
     func _playNext() {
-        let newIndex = self.index + 1
-        if newIndex >= self.indexedAudioSources.count {
-            self._complete()
+        let newIndex = index + 1
+        if newIndex >= indexedAudioSources.count {
+            _complete()
         } else {
-            self.seek(index: self._getRelativeIndex(newIndex), position: CMTime.zero)
-            self.play()
+            seek(index: _getRelativeIndex(newIndex), position: CMTime.zero)
+            play()
         }
     }
 
@@ -393,9 +391,9 @@ class Player {
         }
         broadcastPlaybackEvent()
     }
-    
+
     // ========== QUEUE
-    
+
     func setQueueFrom(_ index: Int) throws {
         guard !indexedAudioSources.isEmpty else {
             preconditionFailure("no songs on library")
@@ -403,20 +401,20 @@ class Player {
         self.index = index
         currentSource = indexedAudioSources[index]
     }
-    
+
     // ========== MODES
-    
+
     func setShuffleMode(isEnalbed: Bool) {
         shuffleModeEnabled = isEnalbed
         updateOrder()
         broadcastPlaybackEvent()
     }
-    
+
     func setLoopMode(mode: LoopMode) {
         loopMode = mode
         broadcastPlaybackEvent()
     }
-    
+
     func updateOrder() {
         orderInv = Array(repeating: 0, count: indexedAudioSources.count)
         if shuffleModeEnabled {
@@ -430,14 +428,14 @@ class Player {
             orderInv[order[i]] = i
         }
     }
-    
+
     // ========== EFFECTS
 
     func createAudioEffects() throws {
         for effect in audioEffects {
             if let effect = effect as? EqualizerEffectData {
                 audioUnitEQ = AVAudioUnitEQ(numberOfBands: effect.parameters.bands.count)
-                
+
                 for (i, band) in effect.parameters.bands.enumerated() {
                     audioUnitEQ!.bands[i].filterType = .parametric
                     audioUnitEQ!.bands[i].frequency = band.centerFrequency
@@ -445,7 +443,7 @@ class Player {
                     audioUnitEQ!.bands[i].gain = Mapping.gainFrom(band.gain)
                     audioUnitEQ!.bands[i].bypass = false
                 }
-                
+
                 audioUnitEQ!.bypass = !effect.enabled
             } else {
                 throw PluginError.notSupported(effect.type, "When initialize effect")
@@ -465,9 +463,9 @@ class Player {
     func setEqualizerBandGain(bandIndex: Int, gain: Float) {
         audioUnitEQ?.bands[bandIndex].gain = gain
     }
-    
+
     // ======== EXTRA
-    
+
     func setVolume(_ value: Float) {
         volume = value
         if playerNode != nil {
@@ -475,7 +473,7 @@ class Player {
         }
         broadcastPlaybackEvent()
     }
-    
+
     func setSpeed(_ value: Float) {
         rate = value
         if speedControl != nil {
@@ -483,12 +481,12 @@ class Player {
         }
         updatePosition(nil)
     }
-    
+
     func broadcastPlaybackEvent() {
         onEvent(PlaybackEvent(
             processingState: processingState,
-            updatePosition: self.currentPosition,
-            updateTime: self.positionUpdatedAt,
+            updatePosition: currentPosition,
+            updateTime: positionUpdatedAt,
             duration: duration,
             currentIndex: index
         ))
@@ -527,13 +525,13 @@ extension AVAudioPlayerNode {
     }
 }
 
-class Mapping {
+enum Mapping {
     static func timeFrom(microseconds: Int64) -> CMTime {
         return CMTimeMake(value: microseconds, timescale: 1_000_000)
     }
-    
+
     static func loopModeFrom(_ value: Int) -> LoopMode {
-        switch (value) {
+        switch value {
         case 1:
             return LoopMode.loopOne
         case 2:
@@ -542,19 +540,19 @@ class Mapping {
             return LoopMode.loopOff
         }
     }
-    
+
     static func shuffleModeFrom(_ value: Int) -> Bool {
         return value == 1
     }
-    
+
     static func gainFrom(_ value: Float) -> Float {
         // Equalize the level between ios and android
         return value * 2.8
     }
-    
+
     static func effectFrom(_ map: [String: Any]) throws -> EffectData {
         let type = map["type"] as! String
-        switch (type) {
+        switch type {
         case EffectType.darwinEqualizer.rawValue:
             return EqualizerEffectData.fromJson(map)
         default:
@@ -563,7 +561,7 @@ class Mapping {
     }
 }
 
-enum EffectType : String, Codable {
+enum EffectType: String, Codable {
     case darwinEqualizer = "DarwinEqualizer"
 }
 
@@ -571,21 +569,21 @@ protocol EffectData {
     var type: EffectType { get }
 }
 
-struct EqualizerEffectData : EffectData, Codable {
+struct EqualizerEffectData: EffectData, Codable {
     let type: EffectType
     let enabled: Bool
     let parameters: ParamsEqualizerData
-    
+
     static func fromJson(_ map: [String: Any]) -> EqualizerEffectData {
         return try! JSONDecoder().decode(EqualizerEffectData.self, from: JSONSerialization.data(withJSONObject: map))
     }
 }
 
-struct ParamsEqualizerData : Codable {
-    let bands: Array<BandEqualizerData>
+struct ParamsEqualizerData: Codable {
+    let bands: [BandEqualizerData]
 }
 
-struct BandEqualizerData : Codable {
+struct BandEqualizerData: Codable {
     let index: Int
     let centerFrequency: Float
     let gain: Float

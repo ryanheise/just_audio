@@ -17,6 +17,6 @@ class ConcatenatingAudioSource: AudioSource {
     }
 
     override func getShuffleIndices() -> [Int] {
-        return shuffleOrder;
+        return shuffleOrder
     }
 }
