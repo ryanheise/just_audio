@@ -1,16 +1,15 @@
-import AVFAudio
+import AVFoundation
 
 class IndexedAudioSource: AudioSource {
-    func load(engine: AVAudioEngine, playerNode: AVAudioPlayerNode, speedControl: AVAudioUnitVarispeed, completionHandler: @escaping AVAudioPlayerNodeCompletionHandler) throws {
-        throw PluginError.runtimeError("no buffer")
-    }
-    
-    func getDuration() -> TimeInterval {
-        return 0
+    func load(engine _: AVAudioEngine, playerNode _: AVAudioPlayerNode, speedControl _: AVAudioUnitVarispeed, position _: CMTime?, completionHandler _: @escaping () -> Void) throws {
+        throw PluginError.notImplemented("Not implemented IndexedAudioSource.load")
     }
 
-    override func buildSequence(sequence: inout [IndexedAudioSource], treeIndex: Int) -> Int {
-        sequence.append(self)
-        return treeIndex + 1
+    func getDuration() -> CMTime {
+        return CMTime.invalid
+    }
+
+    override func buildSequence() -> Array<IndexedAudioSource> {
+        return [self]
     }
 }
