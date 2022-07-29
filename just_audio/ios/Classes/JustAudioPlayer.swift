@@ -71,6 +71,9 @@ public class JustAudioPlayer: NSObject {
             case "pause":
                 player.pause()
                 result([:])
+            case "stop":
+                player.stop()
+                result([:])
             case "setVolume":
                 player.setVolume(Float(request["volume"] as! Double))
                 result([:])
@@ -268,7 +271,7 @@ class Player {
 
         try! setQueueFrom(index)
 
-        _loadCurrentSource()
+        loadCurrentSource()
 
         if !engine.isRunning {
             try! engine.start()
@@ -285,7 +288,7 @@ class Player {
     }
 
     func play() {
-        _play()
+        playPlayerNode()
         updatePosition(nil)
         broadcastPlaybackEvent()
     }
@@ -293,6 +296,12 @@ class Player {
     func pause() {
         updatePosition(nil)
         playerNode.pause()
+        broadcastPlaybackEvent()
+    }
+
+    func stop() {
+        stopPlayerNode()
+        updatePosition(nil)
         broadcastPlaybackEvent()
     }
 
@@ -316,17 +325,17 @@ class Player {
             try! setQueueFrom(index)
         }
 
-        _stop()
+        stopPlayerNode()
 
         updatePosition(position)
 
         processingState = .ready
 
-        _loadCurrentSource()
+        loadCurrentSource()
 
         // Restart play if player was playning
         if wasPlaying {
-            _play()
+            playPlayerNode()
         }
 
         broadcastPlaybackEvent()
@@ -338,31 +347,31 @@ class Player {
         positionOffset = indexedAudioSources.count > 0 && positionUpdate == nil ? playerNode.currentTime : CMTime.zero
     }
 
-    var _isStopping = false
+    private var isStopping = false
     // Permit to check if [load(completionHandler)] is called when you force a stop
-    func _stop() {
-        _isStopping = true
+    private func stopPlayerNode() {
+        isStopping = true
         playerNode.stop()
-        _isStopping = false
+        isStopping = false
     }
 
-    func _play() {
+    private func playPlayerNode() {
         if !engine.isRunning {
             try! engine.start()
         }
         playerNode.play()
     }
 
-    func _loadCurrentSource() {
+    private func loadCurrentSource() {
         try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {
-            if self._isStopping { return }
+            if self.isStopping { return }
             DispatchQueue.main.async {
-                self._playNext()
+                self.playNext()
             }
         })
     }
 
-    func _getRelativeIndex(_ offset: Int) -> Int {
+    private func getRelativeIndex(_ offset: Int) -> Int {
         switch loopMode {
         case .loopOne:
             return index
@@ -373,17 +382,17 @@ class Player {
         }
     }
 
-    func _playNext() {
+    private func playNext() {
         let newIndex = index + 1
         if newIndex >= indexedAudioSources.count {
-            _complete()
+            complete()
         } else {
-            seek(index: _getRelativeIndex(newIndex), position: CMTime.zero)
+            seek(index: getRelativeIndex(newIndex), position: CMTime.zero)
             play()
         }
     }
 
-    func _complete() {
+    private func complete() {
         updatePosition(nil)
         processingState = .completed
         if playerNode != nil {
