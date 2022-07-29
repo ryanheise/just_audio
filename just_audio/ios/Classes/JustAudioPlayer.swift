@@ -40,8 +40,6 @@ public class JustAudioPlayer: NSObject {
         eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
         dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
 
-//        print("TODO: loadConfiguration", loadConfiguration)
-
         super.init()
         methodChannel.setMethodCallHandler { call, result in
             self.handleMethodCall(call: call, result: result)
@@ -71,12 +69,18 @@ public class JustAudioPlayer: NSObject {
             case "pause":
                 player.pause()
                 result([:])
+            case "stop":
+                player.stop()
+                result([:])
             case "setVolume":
                 player.setVolume(Float(request["volume"] as! Double))
                 result([:])
-//            case "setSkipSilence":
-//                print("TODO: setSkipSilence", request)
-//                result([:])
+            case "setPitch":
+                player.setPitch(Float(request["pitch"] as! Double))
+                result([:])
+            case "setSkipSilence":
+                // TODO: player.setSkipSilence(request["enabled"] as! Bool)
+                result(PluginError.notImplemented(call.method))
             case "setSpeed":
                 player.setSpeed(Float(request["speed"] as! Double))
                 result([:])
@@ -84,35 +88,37 @@ public class JustAudioPlayer: NSObject {
                 player.setLoopMode(mode: Mapping.loopModeFrom(request["loopMode"] as! Int))
                 result([:])
             case "setShuffleMode":
+                // random or normal
                 player.setShuffleMode(isEnalbed: Mapping.shuffleModeFrom(request["shuffleMode"] as! Int))
                 result([:])
-//            case "setShuffleOrder":
-//                print("TODO: setShuffleOrder", request)
-//                result([:])
-//            case "setAutomaticallyWaitsToMinimizeStalling":
-//                print("TODO: setAutomaticallyWaitsToMinimizeStalling", request)
-//                result([:])
-//            case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
-//                print("TODO: setCanUseNetworkResourcesForLiveStreamingWhilePaused", request)
-//                result([:])
-//            case "setPreferredPeakBitRate":
-//                print("TODO: setPreferredPeakBitRate", request)
-//                result([:])
+            case "setShuffleOrder":
+                // TODO: TEST
+                player.setShuffleOrder(data: request["audioSource"] as! [String: Any])
+                result([:])
+            case "setAutomaticallyWaitsToMinimizeStalling":
+                // android is still to be implemented too
+                result(PluginError.notImplemented(call.method))
+            case "setCanUseNetworkResourcesForLiveStreamingWhilePaused":
+                // even android is still to be implemented too
+                result(PluginError.notImplemented(call.method))
+            case "setPreferredPeakBitRate":
+                // even android is still to be implemented too
+                result(PluginError.notImplemented(call.method))
+            case "setClip":
+                // even android is still to be implemented too
+                result(PluginError.notImplemented(call.method))
             case "seek":
                 let position = Mapping.timeFrom(microseconds: request["position"] as! Int64)
                 let index = request["index"] as? Int
 
                 player.seek(index: index, position: position)
                 result([:])
-//            case "concatenatingInsertAll":
-//                print("TODO: concatenatingInsertAll", request)
-//                result([:])
-//            case "concatenatingRemoveRange":
-//                print("TODO: concatenatingRemoveRange", request)
-//                result([:])
-//            case "concatenatingMove":
-//                print("TODO: concatenatingMove", request)
-//                result([:])
+            case "concatenatingInsertAll":
+                result(PluginError.notImplemented(call.method))
+            case "concatenatingRemoveRange":
+                result(PluginError.notImplemented(call.method))
+            case "concatenatingMove":
+                result(PluginError.notImplemented(call.method))
             case "audioEffectSetEnabled":
                 try player.enableEffect(type: request["type"] as! String, enabled: request["enabled"] as! Bool)
                 result([:])
@@ -167,6 +173,7 @@ class Player {
     var engine: AVAudioEngine!
     var playerNode: AVAudioPlayerNode!
     var speedControl: AVAudioUnitVarispeed!
+    var pitchControl: AVAudioUnitTimePitch!
     var audioUnitEQ: AVAudioUnitEQ?
 
     // State properties
@@ -201,6 +208,7 @@ class Player {
 
     // Extra properties
     var volume: Float = 1
+    var pitch: Float = 1
     var rate: Float = 1
 
     init(audioEffects: [EffectData], onEvent: @escaping (PlaybackEvent) -> Void) {
@@ -234,13 +242,15 @@ class Player {
             engine = AVAudioEngine()
             playerNode = AVAudioPlayerNode()
             speedControl = AVAudioUnitVarispeed()
+            pitchControl = AVAudioUnitTimePitch()
 
             try! createAudioEffects()
 
             playerNode.volume = volume
             speedControl.rate = rate
+            pitchControl.pitch = pitch
 
-            var nodes = [playerNode, speedControl]
+            var nodes = [playerNode, speedControl, pitchControl]
 
             // add equalizer node
             if audioUnitEQ != nil {
@@ -268,7 +278,7 @@ class Player {
 
         try! setQueueFrom(index)
 
-        _loadCurrentSource()
+        loadCurrentSource()
 
         if !engine.isRunning {
             try! engine.start()
@@ -285,7 +295,7 @@ class Player {
     }
 
     func play() {
-        _play()
+        playPlayerNode()
         updatePosition(nil)
         broadcastPlaybackEvent()
     }
@@ -293,6 +303,12 @@ class Player {
     func pause() {
         updatePosition(nil)
         playerNode.pause()
+        broadcastPlaybackEvent()
+    }
+
+    func stop() {
+        stopPlayerNode()
+        updatePosition(nil)
         broadcastPlaybackEvent()
     }
 
@@ -316,17 +332,17 @@ class Player {
             try! setQueueFrom(index)
         }
 
-        _stop()
+        stopPlayerNode()
 
         updatePosition(position)
 
         processingState = .ready
 
-        _loadCurrentSource()
+        loadCurrentSource()
 
-        // Restart play if player was playning
+        // Restart play if player was playing
         if wasPlaying {
-            _play()
+            playPlayerNode()
         }
 
         broadcastPlaybackEvent()
@@ -338,31 +354,31 @@ class Player {
         positionOffset = indexedAudioSources.count > 0 && positionUpdate == nil ? playerNode.currentTime : CMTime.zero
     }
 
-    var _isStopping = false
+    private var isStopping = false
     // Permit to check if [load(completionHandler)] is called when you force a stop
-    func _stop() {
-        _isStopping = true
+    private func stopPlayerNode() {
+        isStopping = true
         playerNode.stop()
-        _isStopping = false
+        isStopping = false
     }
 
-    func _play() {
+    private func playPlayerNode() {
         if !engine.isRunning {
             try! engine.start()
         }
         playerNode.play()
     }
 
-    func _loadCurrentSource() {
+    private func loadCurrentSource() {
         try! currentSource!.load(engine: engine, playerNode: playerNode, speedControl: speedControl, position: positionUpdate, completionHandler: {
-            if self._isStopping { return }
+            if self.isStopping { return }
             DispatchQueue.main.async {
-                self._playNext()
+                self.playNext()
             }
         })
     }
 
-    func _getRelativeIndex(_ offset: Int) -> Int {
+    private func getRelativeIndex(_ offset: Int) -> Int {
         switch loopMode {
         case .loopOne:
             return index
@@ -373,17 +389,17 @@ class Player {
         }
     }
 
-    func _playNext() {
+    private func playNext() {
         let newIndex = index + 1
         if newIndex >= indexedAudioSources.count {
-            _complete()
+            complete()
         } else {
-            seek(index: _getRelativeIndex(newIndex), position: CMTime.zero)
+            seek(index: getRelativeIndex(newIndex), position: CMTime.zero)
             play()
         }
     }
 
-    func _complete() {
+    private func complete() {
         updatePosition(nil)
         processingState = .completed
         if playerNode != nil {
@@ -394,7 +410,7 @@ class Player {
 
     // ========== QUEUE
 
-    func setQueueFrom(_ index: Int) throws {
+    fileprivate func setQueueFrom(_ index: Int) throws {
         guard !indexedAudioSources.isEmpty else {
             preconditionFailure("no songs on library")
         }
@@ -404,18 +420,35 @@ class Player {
 
     // ========== MODES
 
-    func setShuffleMode(isEnalbed: Bool) {
+    fileprivate func setShuffleMode(isEnalbed: Bool) {
         shuffleModeEnabled = isEnalbed
         updateOrder()
         broadcastPlaybackEvent()
     }
 
-    func setLoopMode(mode: LoopMode) {
+    fileprivate func setShuffleOrder(data: [String: Any]) {
+        audioSource = try! .fromJson(data)
+        switch data["type"] as! String {
+        case "concatenating":
+            let children = (data["children"] as! [[String: Any]])
+            for child in children {
+                setShuffleOrder(data: child)
+            }
+        case "looping":
+            setShuffleOrder(data: data["child"] as! [String: Any])
+        default:
+            break
+        }
+
+        print(audioSource.sourceId)
+    }
+
+    fileprivate func setLoopMode(mode: LoopMode) {
         loopMode = mode
         broadcastPlaybackEvent()
     }
 
-    func updateOrder() {
+    fileprivate func updateOrder() {
         orderInv = Array(repeating: 0, count: indexedAudioSources.count)
         if shuffleModeEnabled {
             order = audioSource.getShuffleIndices()
@@ -431,7 +464,7 @@ class Player {
 
     // ========== EFFECTS
 
-    func createAudioEffects() throws {
+    fileprivate func createAudioEffects() throws {
         for effect in audioEffects {
             if let effect = effect as? EqualizerEffectData {
                 audioUnitEQ = AVAudioUnitEQ(numberOfBands: effect.parameters.bands.count)
@@ -451,7 +484,7 @@ class Player {
         }
     }
 
-    func enableEffect(type: String, enabled: Bool) throws {
+    fileprivate func enableEffect(type: String, enabled: Bool) throws {
         switch type {
         case "DarwinEqualizer":
             audioUnitEQ!.bypass = !enabled
@@ -460,13 +493,13 @@ class Player {
         }
     }
 
-    func setEqualizerBandGain(bandIndex: Int, gain: Float) {
+    fileprivate func setEqualizerBandGain(bandIndex: Int, gain: Float) {
         audioUnitEQ?.bands[bandIndex].gain = gain
     }
 
     // ======== EXTRA
 
-    func setVolume(_ value: Float) {
+    fileprivate func setVolume(_ value: Float) {
         volume = value
         if playerNode != nil {
             playerNode.volume = volume
@@ -474,7 +507,15 @@ class Player {
         broadcastPlaybackEvent()
     }
 
-    func setSpeed(_ value: Float) {
+    fileprivate func setPitch(_ value: Float) {
+        pitch = value
+        if pitchControl != nil {
+            pitchControl.pitch = pitch
+        }
+        broadcastPlaybackEvent()
+    }
+
+    fileprivate func setSpeed(_ value: Float) {
         rate = value
         if speedControl != nil {
             speedControl.rate = rate
@@ -482,7 +523,7 @@ class Player {
         updatePosition(nil)
     }
 
-    func broadcastPlaybackEvent() {
+    fileprivate func broadcastPlaybackEvent() {
         onEvent(PlaybackEvent(
             processingState: processingState,
             updatePosition: currentPosition,
@@ -492,7 +533,7 @@ class Player {
         ))
     }
 
-    func dispose() {
+    fileprivate func dispose() {
         if processingState != .none {
             playerNode?.pause()
             processingState = .none
@@ -546,7 +587,7 @@ enum Mapping {
     }
 
     static func gainFrom(_ value: Float) -> Float {
-        // Equalize the level between ios and android
+        // Equalize the level between iOS and android
         return value * 2.8
     }
 
