@@ -15,8 +15,11 @@ dependencies:
       ref: swift_implementation
       path: just_audio_platform_interface
   #  just_audio_web: ^0.4.4
-  # just_audio_web:
-  #   path: ../just_audio_web
+  just_audio_web:
+    git:
+      url: https://github.com/Kuama-IT/just_audio.git
+      ref: swift_implementation
+      path:   just_audio_web
   audio_session: ^0.1.7
   rxdart: '>=0.26.0 <0.28.0'
   path: ^1.8.0
@@ -40,6 +43,9 @@ dev_dependencies:
 dependency_overrides:
   just_audio_platform_interface:
     path: ../just_audio_platform_interface
+  just_audio_web:
+    path: ../just_audio_web
+
 #  just_audio_web:
 #    path: ../just_audio_web
 
