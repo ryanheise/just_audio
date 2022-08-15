@@ -1956,11 +1956,12 @@ class _ProxyHttpServer {
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
-    if (source._player?._userAgent != null) {
-      headers['user-agent'] = source._player!._userAgent!;
-    }
     final path = _requestKey(uri);
-    _handlerMap[path] = _proxyHandlerForUri(uri, headers);
+    _handlerMap[path] = _proxyHandlerForUri(
+      uri,
+      headers: headers,
+      userAgent: source._player?._userAgent,
+    );
     return uri.replace(
       scheme: 'http',
       host: InternetAddress.loopbackIPv4.address,
@@ -3119,13 +3120,27 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
-_ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
+_ProxyHandler _proxyHandlerForUri(
+  Uri uri, {
+  Map<String, String>? headers,
+  String? userAgent,
+}) {
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    final originRequest = await HttpClient().getUrl(uri);
+    final client = HttpClient();
+
+    if (userAgent != null) {
+      client.userAgent = userAgent;
+    }
+    final originRequest = await client.getUrl(uri);
 
     // Rewrite request headers
     final host = originRequest.headers.value('host');
     originRequest.headers.clear();
+
+    // Make sure that we send the userAgent header also on the first request
+    if (userAgent != null) {
+      originRequest.headers.set(HttpHeaders.userAgentHeader, userAgent);
+    }
     request.headers.forEach((name, value) {
       originRequest.headers.set(name, value);
     });
