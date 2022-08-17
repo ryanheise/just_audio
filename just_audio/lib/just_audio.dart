@@ -124,6 +124,9 @@ class AudioPlayer {
   final _loopModeSubject = BehaviorSubject.seeded(LoopMode.off);
   final _shuffleModeEnabledSubject = BehaviorSubject.seeded(false);
   final _androidAudioSessionIdSubject = BehaviorSubject<int?>();
+  final _positionDiscontinuitySubject =
+      PublishSubject<PositionDiscontinuity>(sync: true);
+  var _seeking = false;
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
@@ -195,6 +198,34 @@ class AudioPlayer {
         .map((event) => event.icyMetadata)
         .distinct()
         .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+    playbackEventStream.pairwise().listen((pair) {
+      final prev = pair.first;
+      final curr = pair.last;
+      // Detect auto-advance
+      if (_seeking) return;
+      if (prev.currentIndex == null || curr.currentIndex == null) return;
+      if (curr.currentIndex != prev.currentIndex) {
+        // If we've changed item without seeking, it must be an autoAdvance.
+        _positionDiscontinuitySubject.add(PositionDiscontinuity(
+            PositionDiscontinuityReason.autoAdvance, prev, curr));
+      } else {
+        // If the item is the same, try to determine whether we have looped
+        // back.
+        final prevPos = _getPositionFor(prev);
+        final currPos = _getPositionFor(curr);
+        if (loopMode != LoopMode.one) return;
+        if (currPos >= prevPos) return;
+        if (currPos >= const Duration(milliseconds: 300)) return;
+        final duration = this.duration;
+        if (duration != null && prevPos < duration * 0.6) return;
+        if (duration == null &&
+            currPos - prevPos < const Duration(seconds: 1)) {
+          return;
+        }
+        _positionDiscontinuitySubject.add(PositionDiscontinuity(
+            PositionDiscontinuityReason.autoAdvance, prev, curr));
+      }
+    }, onError: (Object e, StackTrace st) {});
     _currentIndexSubject.addStream(playbackEventStream
         .map((event) => event.currentIndex)
         .distinct()
@@ -502,6 +533,10 @@ class AudioPlayer {
   Stream<int?> get androidAudioSessionIdStream =>
       _androidAudioSessionIdSubject.stream;
 
+  /// A stream broadcasting every position discontinuity.
+  Stream<PositionDiscontinuity> get positionDiscontinuityStream =>
+      _positionDiscontinuitySubject.stream;
+
   /// Whether the player should automatically delay playback in order to
   /// minimize stalling. (iOS 10.0 or later only)
   bool get automaticallyWaitsToMinimizeStalling =>
@@ -516,16 +551,17 @@ class AudioPlayer {
   double get preferredPeakBitRate => _preferredPeakBitRate;
 
   /// The current position of the player.
-  Duration get position {
+  Duration get position => _getPositionFor(_playbackEvent);
+
+  Duration _getPositionFor(PlaybackEvent playbackEvent) {
     if (playing && processingState == ProcessingState.ready) {
-      final result = _playbackEvent.updatePosition +
-          (DateTime.now().difference(_playbackEvent.updateTime)) * speed;
-      return _playbackEvent.duration == null ||
-              result <= _playbackEvent.duration!
+      final result = playbackEvent.updatePosition +
+          (DateTime.now().difference(playbackEvent.updateTime)) * speed;
+      return playbackEvent.duration == null || result <= playbackEvent.duration!
           ? result
-          : _playbackEvent.duration!;
+          : playbackEvent.duration!;
     } else {
-      return _playbackEvent.updatePosition;
+      return playbackEvent.updatePosition;
     }
   }
 
@@ -1066,13 +1102,23 @@ class AudioPlayer {
       case ProcessingState.loading:
         return;
       default:
-        _playbackEvent = _playbackEvent.copyWith(
-          updatePosition: position,
-          updateTime: DateTime.now(),
-        );
-        _playbackEventSubject.add(_playbackEvent);
-        await (await _platform)
-            .seek(SeekRequest(position: position, index: index));
+        try {
+          _seeking = true;
+          final prevPlaybackEvent = _playbackEvent;
+          _playbackEvent = prevPlaybackEvent.copyWith(
+            updatePosition: position,
+            updateTime: DateTime.now(),
+          );
+          _playbackEventSubject.add(_playbackEvent);
+          _positionDiscontinuitySubject.add(PositionDiscontinuity(
+              PositionDiscontinuityReason.seek,
+              prevPlaybackEvent,
+              _playbackEvent));
+          await (await _platform)
+              .seek(SeekRequest(position: position, index: index));
+        } finally {
+          _seeking = false;
+        }
     }
   }
 
@@ -1913,7 +1959,7 @@ class _ProxyHttpServer {
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
-    if (source._player!._userAgent != null) {
+    if (source._player?._userAgent != null) {
       headers['user-agent'] = source._player!._userAgent!;
     }
     final path = _requestKey(uri);
@@ -1957,7 +2003,7 @@ class _ProxyHttpServer {
       if (request.method == 'GET') {
         final uriPath = _requestKey(request.uri);
         final handler = _handlerMap[uriPath]!;
-        handler(request);
+        handler(this, request);
       }
     }, onDone: () {
       _running = false;
@@ -3009,11 +3055,12 @@ class _StreamingByteRangeRequest {
 }
 
 /// The type of functions that can handle HTTP requests sent to the proxy.
-typedef _ProxyHandler = void Function(HttpRequest request);
+typedef _ProxyHandler = void Function(
+    _ProxyHttpServer server, HttpRequest request);
 
 /// A proxy handler for serving audio from a [StreamAudioSource].
 _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
-  Future<void> handler(HttpRequest request) async {
+  Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final rangeRequest =
         _HttpRangeRequest.parse(request.headers[HttpHeaders.rangeHeader]);
 
@@ -3074,10 +3121,8 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
-///
-/// TODO: Recursively attach headers to items in playlists like m3u8.
 _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
-  Future<void> handler(HttpRequest request) async {
+  Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final originRequest = await HttpClient().getUrl(uri);
 
     // Rewrite request headers
@@ -3108,8 +3153,39 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
       });
       request.response.statusCode = originResponse.statusCode;
 
-      // Pipe response
-      await originResponse.pipe(request.response);
+      // Send response
+      if (headers != null && request.uri.path.toLowerCase().endsWith('.m3u8') ||
+          ['application/x-mpegURL', 'application/vnd.apple.mpegurl']
+              .contains(request.headers.value(HttpHeaders.contentTypeHeader))) {
+        // If this is an m3u8 file with headers, prepare the nested URIs.
+        // TODO: Handle other playlist formats similarly?
+        final m3u8 = await originResponse.transform(utf8.decoder).join();
+        for (var line in const LineSplitter().convert(m3u8)) {
+          line = line.replaceAll(RegExp(r'#.*$'), '').trim();
+          if (line.isEmpty) continue;
+          try {
+            final rawNestedUri = Uri.parse(line);
+            if (rawNestedUri.hasScheme) {
+              // Don't propagate headers
+              server.addUriAudioSource(AudioSource.uri(rawNestedUri));
+            } else {
+              // This is a resource on the same server, so propagate the headers.
+              final basePath = rawNestedUri.path.startsWith('/')
+                  ? ''
+                  : uri.path.replaceAll(RegExp(r'/[^/]*$'), '/');
+              final nestedUri =
+                  uri.replace(path: '$basePath${rawNestedUri.path}');
+              server.addUriAudioSource(
+                  AudioSource.uri(nestedUri, headers: headers));
+            }
+          } catch (e) {
+            // ignore malformed lines
+          }
+        }
+        request.response.add(utf8.encode(m3u8));
+      } else {
+        await originResponse.pipe(request.response);
+      }
       await request.response.close();
     } on HttpException {
       // We likely are dealing with a streaming protocol
@@ -3415,20 +3491,6 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
           AndroidLoudnessEnhancerSetTargetGainRequest request) async {
     return AndroidLoudnessEnhancerSetTargetGainResponse();
   }
-
-  @override
-  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
-      AndroidEqualizerGetParametersRequest request) async {
-    throw UnimplementedError(
-        "androidEqualizerGetParameters() has not been implemented.");
-  }
-
-  @override
-  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
-      AndroidEqualizerBandSetGainRequest request) {
-    throw UnimplementedError(
-        "androidEqualizerBandSetGain() has not been implemented.");
-  }
 }
 
 /// Holds the initial requested position and index for a newly loaded audio
@@ -3688,4 +3750,28 @@ bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 extension _ValueStreamExtension<T> on ValueStream<T> {
   /// Backwards compatible version of valueOrNull.
   T? get nvalue => hasValue ? value : null;
+}
+
+/// Information collected when a position discontinuity occurs.
+class PositionDiscontinuity {
+  /// The reason for the position discontinuity.
+  final PositionDiscontinuityReason reason;
+
+  /// The previous event before the position discontinuity.
+  final PlaybackEvent previousEvent;
+
+  /// The event that caused the position discontinuity.
+  final PlaybackEvent event;
+
+  const PositionDiscontinuity(this.reason, this.previousEvent, this.event);
+}
+
+/// The reasons for position discontinuities.
+enum PositionDiscontinuityReason {
+  /// The position discontinuity was initiated by a seek.
+  seek,
+
+  /// The position discontinuity occurred because the player reached the end of
+  /// the current item and auto-advanced to the next item.
+  autoAdvance,
 }

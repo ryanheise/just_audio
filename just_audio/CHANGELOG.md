@@ -1,6 +1,11 @@
-## 0.9.28
+## 0.9.29
 
 * Added support for HLS title and artist metadata.
+
+## 0.9.28
+
+* Recursively apply headers to HLS fragments.
+* Add positionDiscontinuityStream.
 
 ## 0.9.27
 

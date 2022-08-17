@@ -71,6 +71,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
     ),
   ]);
   int _addedCount = 0;
+  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -99,6 +100,29 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // Catch load errors: 404, invalid url...
       print("Error loading audio source: $e");
     }
+    // Show a snackbar whenever reaching the end of an item in the playlist.
+    _player.positionDiscontinuityStream.listen((discontinuity) {
+      if (discontinuity.reason == PositionDiscontinuityReason.autoAdvance) {
+        _showItemFinished(discontinuity.previousEvent.currentIndex);
+      }
+    });
+    _player.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed) {
+        _showItemFinished(_player.currentIndex);
+      }
+    });
+  }
+
+  void _showItemFinished(int? index) {
+    if (index == null) return;
+    final sequence = _player.sequence;
+    if (sequence == null) return;
+    final source = sequence[index];
+    final metadata = source.tag as AudioMetadata;
+    _scaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
+      content: Text('Finished playing ${metadata.title}'),
+      duration: const Duration(seconds: 1),
+    ));
   }
 
   @override
@@ -130,6 +154,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       home: Scaffold(
         body: SafeArea(
           child: Column(
