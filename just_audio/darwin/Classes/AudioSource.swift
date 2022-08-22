@@ -30,7 +30,7 @@ class AudioSource {
         case "concatenating":
             return ConcatenatingAudioSource(sid: data["id"] as! String, audioSources: try AudioSource.fromListJson(data["children"] as! [[String: Any]]), shuffleOrder: data["shuffleOrder"] as! [Int])
         default:
-            throw PluginError.notSupported(type, "When decoding audio source")
+            throw NotSupportedError(value: type, "When decoding audio source")
         }
     }
 }
