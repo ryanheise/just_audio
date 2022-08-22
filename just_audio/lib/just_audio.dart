@@ -3137,6 +3137,9 @@ _ProxyHandler _proxyHandlerForUri(
     final host = originRequest.headers.value('host');
     originRequest.headers.clear();
 
+    // Match ExoPlayer's native behavior
+    originRequest.maxRedirects = 20;
+
     // Make sure that we send the userAgent header also on the first request
     if (userAgent != null) {
       originRequest.headers.set(HttpHeaders.userAgentHeader, userAgent);
