@@ -1,5 +1,5 @@
-import FlutterMacOS
 import AppKit
+import FlutterMacOS
 
 public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
     var players: [String: JustAudioPlayer] = [:]

@@ -25,8 +25,8 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   audio_session: dea1f41890dbf1718f04a56f1d6150fd50039b72
-  FlutterMacOS: 85f90bfb3f1703249cf1539e4dfbff31e8584698
-  just_audio: fa389a9026ec10f6c17e44c4752613b1d4bafc67
+  FlutterMacOS: 57701585bf7de1b3fc2bb61f6378d73bbdea8424
+  just_audio: 9bd03a840e007eb136204e2b7de2a71bf7590fe5
   path_provider_macos: 3c0c3b4b0d4a76d2bf989a913c2de869c5641a19
 
 PODFILE CHECKSUM: a884f6dd3f7494f3892ee6c81feea3a3abbf9153
