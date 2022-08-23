@@ -1977,6 +1977,25 @@ class _ProxyHttpServer {
     return uri;
   }
 
+  Uri addResolvingAudioSource(ResolvingAudioSource source) {
+    final path = Uri.encodeComponent(source.uniqueId);
+    final uri = Uri(
+        scheme: "http",
+        host: InternetAddress.loopbackIPv4.address,
+        port: port,
+        path: path);
+    final headers = <String, String>{};
+    if (source.headers != null) {
+      headers.addAll(source.headers!);
+    }
+    if (source._player?._userAgent != null) {
+      headers['user-agent'] = source._player!._userAgent!;
+    }
+    final handlerKey = _requestKey(uri);
+    _handlerMap[handlerKey] = _proxyHandlerForResolvingAudioSource(source);
+    return uri;
+  }
+
   Uri _sourceUri(StreamAudioSource source) => Uri.http(
       '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}');
 
@@ -2638,6 +2657,40 @@ abstract class StreamAudioSource extends IndexedAudioSource {
       id: _id, uri: _uri.toString(), headers: null, tag: tag);
 }
 
+typedef ResolveSoundUrl = Future<Uri?> Function(String uniquidId);
+
+//An [AudioSource] likes [UriAudioSource] but resolve http url in time.
+class ResolvingAudioSource extends IndexedAudioSource {
+  final String uniqueId;
+  final ResolveSoundUrl resolveSoundUrl;
+  final Map<String, String>? headers;
+  late Uri _proxyUri;
+
+  var _hasRequestedSoundUrl = false;
+  final _soundUrlCompleter = Completer<Uri?>();
+  Future<Uri?> get _soundUrl => _soundUrlCompleter.future;
+
+  ResolvingAudioSource(
+      {required this.uniqueId,
+      required this.resolveSoundUrl,
+      this.headers,
+      dynamic tag})
+      : super(tag: tag);
+
+  @override
+  Future<void> _setup(AudioPlayer player) async {
+    super._setup(player);
+    await player._proxy.ensureRunning();
+    _proxyUri = player._proxy.addResolvingAudioSource(this);
+  }
+
+  @override
+  AudioSourceMessage _toMessage() {
+    return ProgressiveAudioSourceMessage(
+        id: _id, uri: _proxyUri.toString(), headers: headers, tag: tag);
+  }
+}
+
 /// The response for a [StreamAudioSource]. This API is experimental.
 @experimental
 class StreamAudioResponse {
@@ -3120,110 +3173,137 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 /// A proxy handler for serving audio from a URI with optional headers.
 _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    final originRequest = await HttpClient().getUrl(uri);
+    await _handlerProxyRequestForUri(server, request, uri, headers);
+  }
 
-    // Rewrite request headers
-    final host = originRequest.headers.value('host');
-    originRequest.headers.clear();
-    request.headers.forEach((name, value) {
-      originRequest.headers.set(name, value);
+  return handler;
+}
+
+Future<void> _handlerProxyRequestForUri(_ProxyHttpServer server,
+    HttpRequest proxyRequest, Uri uri, Map<String, String>? headers) async {
+  final originRequest = await HttpClient().getUrl(uri);
+  // Rewrite request headers
+  final host = originRequest.headers.value('host');
+  originRequest.headers.clear();
+  proxyRequest.headers.forEach((name, value) {
+    originRequest.headers.set(name, value);
+  });
+  for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
+    originRequest.headers.set(entry.key, entry.value);
+  }
+  if (host != null) {
+    originRequest.headers.set('host', host);
+  } else {
+    originRequest.headers.removeAll('host');
+  }
+
+  // Try to make normal request
+  try {
+    final originResponse = await originRequest.close();
+
+    proxyRequest.response.headers.clear();
+    originResponse.headers.forEach((name, value) {
+      final filteredValue = value
+          .map((e) => e.replaceAll(RegExp(r'[^\x09\x20-\x7F]'), '?'))
+          .toList();
+      proxyRequest.response.headers.set(name, filteredValue);
     });
-    for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
-      originRequest.headers.set(entry.key, entry.value);
-    }
-    if (host != null) {
-      originRequest.headers.set('host', host);
+    proxyRequest.response.statusCode = originResponse.statusCode;
+
+    // Send response
+    if (headers != null &&
+            proxyRequest.uri.path.toLowerCase().endsWith('.m3u8') ||
+        [
+          'application/x-mpegURL',
+          'application/vnd.apple.mpegurl'
+        ].contains(proxyRequest.headers.value(HttpHeaders.contentTypeHeader))) {
+      // If this is an m3u8 file with headers, prepare the nested URIs.
+      // TODO: Handle other playlist formats similarly?
+      final m3u8 = await originResponse.transform(utf8.decoder).join();
+      for (var line in const LineSplitter().convert(m3u8)) {
+        line = line.replaceAll(RegExp(r'#.*$'), '').trim();
+        if (line.isEmpty) continue;
+        try {
+          final rawNestedUri = Uri.parse(line);
+          if (rawNestedUri.hasScheme) {
+            // Don't propagate headers
+            server.addUriAudioSource(AudioSource.uri(rawNestedUri));
+          } else {
+            // This is a resource on the same server, so propagate the headers.
+            final basePath = rawNestedUri.path.startsWith('/')
+                ? ''
+                : uri.path.replaceAll(RegExp(r'/[^/]*$'), '/');
+            final nestedUri =
+                uri.replace(path: '$basePath${rawNestedUri.path}');
+            server.addUriAudioSource(
+                AudioSource.uri(nestedUri, headers: headers));
+          }
+        } catch (e) {
+          // ignore malformed lines
+        }
+      }
+      proxyRequest.response.add(utf8.encode(m3u8));
     } else {
-      originRequest.headers.removeAll('host');
+      await originResponse.pipe(proxyRequest.response);
     }
-
-    // Try to make normal request
-    try {
-      final originResponse = await originRequest.close();
-
-      request.response.headers.clear();
-      originResponse.headers.forEach((name, value) {
-        final filteredValue = value
-            .map((e) => e.replaceAll(RegExp(r'[^\x09\x20-\x7F]'), '?'))
-            .toList();
-        request.response.headers.set(name, filteredValue);
+    await proxyRequest.response.close();
+  } on HttpException {
+    // We likely are dealing with a streaming protocol
+    if (uri.scheme == 'http') {
+      // Try parsing HTTP 0.9 response
+      //request.response.headers.clear();
+      final socket = await Socket.connect(uri.host, uri.port);
+      final clientSocket =
+          await proxyRequest.response.detachSocket(writeHeaders: false);
+      final done = Completer<dynamic>();
+      socket.listen(
+        clientSocket.add,
+        onDone: () async {
+          await clientSocket.flush();
+          socket.close();
+          clientSocket.close();
+          done.complete();
+        },
+      );
+      // Rewrite headers
+      final headers = <String, String?>{};
+      proxyRequest.headers.forEach((name, value) {
+        if (name.toLowerCase() != 'host') {
+          headers[name] = value.join(",");
+        }
       });
-      request.response.statusCode = originResponse.statusCode;
-
-      // Send response
-      if (headers != null && request.uri.path.toLowerCase().endsWith('.m3u8') ||
-          ['application/x-mpegURL', 'application/vnd.apple.mpegurl']
-              .contains(request.headers.value(HttpHeaders.contentTypeHeader))) {
-        // If this is an m3u8 file with headers, prepare the nested URIs.
-        // TODO: Handle other playlist formats similarly?
-        final m3u8 = await originResponse.transform(utf8.decoder).join();
-        for (var line in const LineSplitter().convert(m3u8)) {
-          line = line.replaceAll(RegExp(r'#.*$'), '').trim();
-          if (line.isEmpty) continue;
-          try {
-            final rawNestedUri = Uri.parse(line);
-            if (rawNestedUri.hasScheme) {
-              // Don't propagate headers
-              server.addUriAudioSource(AudioSource.uri(rawNestedUri));
-            } else {
-              // This is a resource on the same server, so propagate the headers.
-              final basePath = rawNestedUri.path.startsWith('/')
-                  ? ''
-                  : uri.path.replaceAll(RegExp(r'/[^/]*$'), '/');
-              final nestedUri =
-                  uri.replace(path: '$basePath${rawNestedUri.path}');
-              server.addUriAudioSource(
-                  AudioSource.uri(nestedUri, headers: headers));
-            }
-          } catch (e) {
-            // ignore malformed lines
-          }
-        }
-        request.response.add(utf8.encode(m3u8));
-      } else {
-        await originResponse.pipe(request.response);
+      for (var name in headers.keys) {
+        headers[name] = headers[name];
       }
-      await request.response.close();
-    } on HttpException {
-      // We likely are dealing with a streaming protocol
-      if (uri.scheme == 'http') {
-        // Try parsing HTTP 0.9 response
-        //request.response.headers.clear();
-        final socket = await Socket.connect(uri.host, uri.port);
-        final clientSocket =
-            await request.response.detachSocket(writeHeaders: false);
-        final done = Completer<dynamic>();
-        socket.listen(
-          clientSocket.add,
-          onDone: () async {
-            await clientSocket.flush();
-            socket.close();
-            clientSocket.close();
-            done.complete();
-          },
-        );
-        // Rewrite headers
-        final headers = <String, String?>{};
-        request.headers.forEach((name, value) {
-          if (name.toLowerCase() != 'host') {
-            headers[name] = value.join(",");
-          }
-        });
-        for (var name in headers.keys) {
-          headers[name] = headers[name];
-        }
-        socket.write("GET ${uri.path} HTTP/1.1\n");
-        if (host != null) {
-          socket.write("Host: $host\n");
-        }
-        for (var name in headers.keys) {
-          socket.write("$name: ${headers[name]}\n");
-        }
-        socket.write("\n");
-        await socket.flush();
-        await done.future;
+      socket.write("GET ${uri.path} HTTP/1.1\n");
+      if (host != null) {
+        socket.write("Host: $host\n");
       }
+      for (var name in headers.keys) {
+        socket.write("$name: ${headers[name]}\n");
+      }
+      socket.write("\n");
+      await socket.flush();
+      await done.future;
     }
+  }
+}
+
+_ProxyHandler _proxyHandlerForResolvingAudioSource(
+    ResolvingAudioSource source) {
+  Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
+    if (!source._hasRequestedSoundUrl) {
+      source._hasRequestedSoundUrl = true;
+      final soundUrl = await source.resolveSoundUrl(source.uniqueId);
+      source._soundUrlCompleter.complete(soundUrl);
+    }
+    final soundUrl = await source._soundUrl;
+    if (soundUrl == null) {
+      request.response.statusCode = HttpStatus.badGateway;
+      request.response.close();
+      return;
+    }
+    await _handlerProxyRequestForUri(server, request, soundUrl, source.headers);
   }
 
   return handler;
