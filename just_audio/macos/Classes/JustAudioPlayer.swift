@@ -10,13 +10,20 @@ public class JustAudioPlayer: NSObject {
 
     var player: Player!
 
-    init(registrar: FlutterPluginRegistrar, playerId: String, loadConfiguration _: [String: Any], audioEffects: [[String: Any]]) {
+    init(registrar _: FlutterPluginRegistrar,
+         playerId: String,
+         loadConfiguration _: [String: Any],
+         audioEffects: [[String: Any]],
+         methodChannel: FlutterMethodChannel,
+         eventChannel: BetterEventChannel,
+         dataChannel: BetterEventChannel)
+    {
         self.playerId = playerId
         self.audioEffects = audioEffects
 
-        methodChannel = FlutterMethodChannel(name: String(format: "com.ryanheise.just_audio.methods.%@", playerId), binaryMessenger: registrar.messenger)
-        eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger)
-        dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger)
+        self.methodChannel = methodChannel
+        self.eventChannel = eventChannel
+        self.dataChannel = dataChannel
 
         super.init()
         methodChannel.setMethodCallHandler { call, result in
