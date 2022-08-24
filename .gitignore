@@ -22,3 +22,5 @@ pubspec.lock
 
 # VS Code
 .vscode
+
+.DS_Store
