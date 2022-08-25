@@ -127,6 +127,7 @@ class AudioPlayer {
   final _positionDiscontinuitySubject =
       PublishSubject<PositionDiscontinuity>(sync: true);
   var _seeking = false;
+
   // ignore: close_sinks
   BehaviorSubject<Duration>? _positionSubject;
   bool _automaticallyWaitsToMinimizeStalling = true;
@@ -189,15 +190,21 @@ class AudioPlayer {
     _processingStateSubject.addStream(playbackEventStream
         .map((event) => event.processingState)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _bufferedPositionSubject.addStream(playbackEventStream
         .map((event) => event.bufferedPosition)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _icyMetadataSubject.addStream(playbackEventStream
         .map((event) => event.icyMetadata)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     playbackEventStream.pairwise().listen((pair) {
       final prev = pair.first;
       final curr = pair.last;
@@ -229,11 +236,15 @@ class AudioPlayer {
     _currentIndexSubject.addStream(playbackEventStream
         .map((event) => event.currentIndex)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _androidAudioSessionIdSubject.addStream(playbackEventStream
         .map((event) => event.androidAudioSessionId)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _sequenceStateSubject.addStream(Rx.combineLatest5<List<IndexedAudioSource>?,
         List<int>?, int?, bool, LoopMode, SequenceState?>(
       sequenceStream,
@@ -254,14 +265,18 @@ class AudioPlayer {
           loopMode,
         );
       },
-    ).distinct().handleError((Object err, StackTrace stackTrace) {/* noop */}));
+    ).distinct().handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _playerStateSubject.addStream(
         Rx.combineLatest2<bool, PlaybackEvent, PlayerState>(
                 playingStream,
                 playbackEventStream,
                 (playing, event) => PlayerState(playing, event.processingState))
             .distinct()
-            .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+            .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
     _setPlatformActive(false, force: true)
@@ -1977,25 +1992,6 @@ class _ProxyHttpServer {
     return uri;
   }
 
-  Uri addResolvingAudioSource(ResolvingAudioSource source) {
-    final path = Uri.encodeComponent(source.uniqueId);
-    final uri = Uri(
-        scheme: "http",
-        host: InternetAddress.loopbackIPv4.address,
-        port: port,
-        path: path);
-    final headers = <String, String>{};
-    if (source.headers != null) {
-      headers.addAll(source.headers!);
-    }
-    if (source._player?._userAgent != null) {
-      headers['user-agent'] = source._player!._userAgent!;
-    }
-    final handlerKey = _requestKey(uri);
-    _handlerMap[handlerKey] = _proxyHandlerForResolvingAudioSource(source);
-    return uri;
-  }
-
   Uri _sourceUri(StreamAudioSource source) => Uri.http(
       '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}');
 
@@ -2630,6 +2626,7 @@ Uri _encodeDataUrl(String base64Data, String mimeType) =>
 @experimental
 abstract class StreamAudioSource extends IndexedAudioSource {
   Uri? _uri;
+
   StreamAudioSource({dynamic tag}) : super(tag: tag);
 
   @override
@@ -2660,15 +2657,19 @@ abstract class StreamAudioSource extends IndexedAudioSource {
 typedef ResolveSoundUrl = Future<Uri?> Function(String uniquidId);
 
 //An [AudioSource] likes [UriAudioSource] but resolve http url in time.
-class ResolvingAudioSource extends IndexedAudioSource {
+class ResolvingAudioSource extends StreamAudioSource {
   final String uniqueId;
   final ResolveSoundUrl resolveSoundUrl;
   final Map<String, String>? headers;
-  late Uri _proxyUri;
 
   var _hasRequestedSoundUrl = false;
   final _soundUrlCompleter = Completer<Uri?>();
+
   Future<Uri?> get _soundUrl => _soundUrlCompleter.future;
+
+  HttpClient? _httpClient;
+
+  HttpClient get httpClient => _httpClient ?? (_httpClient = HttpClient());
 
   ResolvingAudioSource(
       {required this.uniqueId,
@@ -2678,16 +2679,60 @@ class ResolvingAudioSource extends IndexedAudioSource {
       : super(tag: tag);
 
   @override
-  Future<void> _setup(AudioPlayer player) async {
-    super._setup(player);
-    await player._proxy.ensureRunning();
-    _proxyUri = player._proxy.addResolvingAudioSource(this);
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    if (!_hasRequestedSoundUrl) {
+      _hasRequestedSoundUrl = true;
+      final soundUrl = await resolveSoundUrl(uniqueId);
+      _soundUrlCompleter.complete(soundUrl);
+    }
+    final soundUrl = await _soundUrl;
+    if (soundUrl == null) {
+      return StreamAudioResponse(
+          sourceLength: null,
+          contentLength: null,
+          offset: null,
+          stream: const Stream.empty(),
+          contentType: '');
+    }
+    final request = await httpClient.getUrl(soundUrl);
+    for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
+      request.headers.set(entry.key, entry.value);
+    }
+    if (_player?._userAgent != null) {
+      request.headers.set(HttpHeaders.userAgentHeader, _player!._userAgent!);
+    }
+    if (start != null || end != null) {
+      request.headers
+          .set(HttpHeaders.rangeHeader, '${start ?? ""}-${end ?? ""}');
+    }
+    final response = await request.close();
+    final acceptRangesHeader =
+        response.headers.value(HttpHeaders.acceptRangesHeader);
+    final contentRange = response.headers.value(HttpHeaders.contentRangeHeader);
+    int? offset;
+    if (contentRange != null) {
+      int offsetEnd = contentRange.indexOf('-');
+      if (offsetEnd >= 6) {
+        offset = int.tryParse(contentRange.substring(6, offsetEnd));
+      }
+    }
+    final contentLength =
+        response.headers.value(HttpHeaders.contentLengthHeader);
+    final contentType = response.headers.value(HttpHeaders.contentTypeHeader);
+    return StreamAudioResponse(
+        rangeRequestsSupported: acceptRangesHeader == 'bytes',
+        sourceLength: null,
+        contentLength:
+            contentLength == null ? null : int.tryParse(contentLength),
+        offset: offset,
+        stream: response.asBroadcastStream(),
+        contentType: contentType ?? "");
   }
 
   @override
   AudioSourceMessage _toMessage() {
     return ProgressiveAudioSourceMessage(
-        id: _id, uri: _proxyUri.toString(), headers: headers, tag: tag);
+        id: _id, uri: _uri.toString(), headers: headers, tag: tag);
   }
 }
 
@@ -3066,6 +3111,7 @@ class _InProgressCacheResponse {
   // ignore: close_sinks
   final controller = ReplaySubject<List<int>>();
   final int? end;
+
   _InProgressCacheResponse({
     required this.end,
   });
@@ -3173,137 +3219,110 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 /// A proxy handler for serving audio from a URI with optional headers.
 _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    await _handlerProxyRequestForUri(server, request, uri, headers);
-  }
+    final originRequest = await HttpClient().getUrl(uri);
 
-  return handler;
-}
-
-Future<void> _handlerProxyRequestForUri(_ProxyHttpServer server,
-    HttpRequest proxyRequest, Uri uri, Map<String, String>? headers) async {
-  final originRequest = await HttpClient().getUrl(uri);
-  // Rewrite request headers
-  final host = originRequest.headers.value('host');
-  originRequest.headers.clear();
-  proxyRequest.headers.forEach((name, value) {
-    originRequest.headers.set(name, value);
-  });
-  for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
-    originRequest.headers.set(entry.key, entry.value);
-  }
-  if (host != null) {
-    originRequest.headers.set('host', host);
-  } else {
-    originRequest.headers.removeAll('host');
-  }
-
-  // Try to make normal request
-  try {
-    final originResponse = await originRequest.close();
-
-    proxyRequest.response.headers.clear();
-    originResponse.headers.forEach((name, value) {
-      final filteredValue = value
-          .map((e) => e.replaceAll(RegExp(r'[^\x09\x20-\x7F]'), '?'))
-          .toList();
-      proxyRequest.response.headers.set(name, filteredValue);
+    // Rewrite request headers
+    final host = originRequest.headers.value('host');
+    originRequest.headers.clear();
+    request.headers.forEach((name, value) {
+      originRequest.headers.set(name, value);
     });
-    proxyRequest.response.statusCode = originResponse.statusCode;
-
-    // Send response
-    if (headers != null &&
-            proxyRequest.uri.path.toLowerCase().endsWith('.m3u8') ||
-        [
-          'application/x-mpegURL',
-          'application/vnd.apple.mpegurl'
-        ].contains(proxyRequest.headers.value(HttpHeaders.contentTypeHeader))) {
-      // If this is an m3u8 file with headers, prepare the nested URIs.
-      // TODO: Handle other playlist formats similarly?
-      final m3u8 = await originResponse.transform(utf8.decoder).join();
-      for (var line in const LineSplitter().convert(m3u8)) {
-        line = line.replaceAll(RegExp(r'#.*$'), '').trim();
-        if (line.isEmpty) continue;
-        try {
-          final rawNestedUri = Uri.parse(line);
-          if (rawNestedUri.hasScheme) {
-            // Don't propagate headers
-            server.addUriAudioSource(AudioSource.uri(rawNestedUri));
-          } else {
-            // This is a resource on the same server, so propagate the headers.
-            final basePath = rawNestedUri.path.startsWith('/')
-                ? ''
-                : uri.path.replaceAll(RegExp(r'/[^/]*$'), '/');
-            final nestedUri =
-                uri.replace(path: '$basePath${rawNestedUri.path}');
-            server.addUriAudioSource(
-                AudioSource.uri(nestedUri, headers: headers));
-          }
-        } catch (e) {
-          // ignore malformed lines
-        }
-      }
-      proxyRequest.response.add(utf8.encode(m3u8));
+    for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
+      originRequest.headers.set(entry.key, entry.value);
+    }
+    if (host != null) {
+      originRequest.headers.set('host', host);
     } else {
-      await originResponse.pipe(proxyRequest.response);
+      originRequest.headers.removeAll('host');
     }
-    await proxyRequest.response.close();
-  } on HttpException {
-    // We likely are dealing with a streaming protocol
-    if (uri.scheme == 'http') {
-      // Try parsing HTTP 0.9 response
-      //request.response.headers.clear();
-      final socket = await Socket.connect(uri.host, uri.port);
-      final clientSocket =
-          await proxyRequest.response.detachSocket(writeHeaders: false);
-      final done = Completer<dynamic>();
-      socket.listen(
-        clientSocket.add,
-        onDone: () async {
-          await clientSocket.flush();
-          socket.close();
-          clientSocket.close();
-          done.complete();
-        },
-      );
-      // Rewrite headers
-      final headers = <String, String?>{};
-      proxyRequest.headers.forEach((name, value) {
-        if (name.toLowerCase() != 'host') {
-          headers[name] = value.join(",");
-        }
-      });
-      for (var name in headers.keys) {
-        headers[name] = headers[name];
-      }
-      socket.write("GET ${uri.path} HTTP/1.1\n");
-      if (host != null) {
-        socket.write("Host: $host\n");
-      }
-      for (var name in headers.keys) {
-        socket.write("$name: ${headers[name]}\n");
-      }
-      socket.write("\n");
-      await socket.flush();
-      await done.future;
-    }
-  }
-}
 
-_ProxyHandler _proxyHandlerForResolvingAudioSource(
-    ResolvingAudioSource source) {
-  Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    if (!source._hasRequestedSoundUrl) {
-      source._hasRequestedSoundUrl = true;
-      final soundUrl = await source.resolveSoundUrl(source.uniqueId);
-      source._soundUrlCompleter.complete(soundUrl);
+    // Try to make normal request
+    try {
+      final originResponse = await originRequest.close();
+
+      request.response.headers.clear();
+      originResponse.headers.forEach((name, value) {
+        final filteredValue = value
+            .map((e) => e.replaceAll(RegExp(r'[^\x09\x20-\x7F]'), '?'))
+            .toList();
+        request.response.headers.set(name, filteredValue);
+      });
+      request.response.statusCode = originResponse.statusCode;
+
+      // Send response
+      if (headers != null && request.uri.path.toLowerCase().endsWith('.m3u8') ||
+          ['application/x-mpegURL', 'application/vnd.apple.mpegurl']
+              .contains(request.headers.value(HttpHeaders.contentTypeHeader))) {
+        // If this is an m3u8 file with headers, prepare the nested URIs.
+        // TODO: Handle other playlist formats similarly?
+        final m3u8 = await originResponse.transform(utf8.decoder).join();
+        for (var line in const LineSplitter().convert(m3u8)) {
+          line = line.replaceAll(RegExp(r'#.*$'), '').trim();
+          if (line.isEmpty) continue;
+          try {
+            final rawNestedUri = Uri.parse(line);
+            if (rawNestedUri.hasScheme) {
+              // Don't propagate headers
+              server.addUriAudioSource(AudioSource.uri(rawNestedUri));
+            } else {
+              // This is a resource on the same server, so propagate the headers.
+              final basePath = rawNestedUri.path.startsWith('/')
+                  ? ''
+                  : uri.path.replaceAll(RegExp(r'/[^/]*$'), '/');
+              final nestedUri =
+                  uri.replace(path: '$basePath${rawNestedUri.path}');
+              server.addUriAudioSource(
+                  AudioSource.uri(nestedUri, headers: headers));
+            }
+          } catch (e) {
+            // ignore malformed lines
+          }
+        }
+        request.response.add(utf8.encode(m3u8));
+      } else {
+        await originResponse.pipe(request.response);
+      }
+      await request.response.close();
+    } on HttpException {
+      // We likely are dealing with a streaming protocol
+      if (uri.scheme == 'http') {
+        // Try parsing HTTP 0.9 response
+        //request.response.headers.clear();
+        final socket = await Socket.connect(uri.host, uri.port);
+        final clientSocket =
+            await request.response.detachSocket(writeHeaders: false);
+        final done = Completer<dynamic>();
+        socket.listen(
+          clientSocket.add,
+          onDone: () async {
+            await clientSocket.flush();
+            socket.close();
+            clientSocket.close();
+            done.complete();
+          },
+        );
+        // Rewrite headers
+        final headers = <String, String?>{};
+        request.headers.forEach((name, value) {
+          if (name.toLowerCase() != 'host') {
+            headers[name] = value.join(",");
+          }
+        });
+        for (var name in headers.keys) {
+          headers[name] = headers[name];
+        }
+        socket.write("GET ${uri.path} HTTP/1.1\n");
+        if (host != null) {
+          socket.write("Host: $host\n");
+        }
+        for (var name in headers.keys) {
+          socket.write("$name: ${headers[name]}\n");
+        }
+        socket.write("\n");
+        await socket.flush();
+        await done.future;
+      }
     }
-    final soundUrl = await source._soundUrl;
-    if (soundUrl == null) {
-      request.response.statusCode = HttpStatus.badGateway;
-      request.response.close();
-      return;
-    }
-    await _handlerProxyRequestForUri(server, request, soundUrl, source.headers);
   }
 
   return handler;
@@ -3820,7 +3839,9 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
 }
 
 bool _isAndroid() => !kIsWeb && Platform.isAndroid;
+
 bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+
 bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 
 /// Backwards compatible extensions on rxdart's ValueStream
