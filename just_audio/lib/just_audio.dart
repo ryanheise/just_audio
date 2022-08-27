@@ -2703,7 +2703,7 @@ class ResolvingAudioSource extends StreamAudioSource {
     }
     if (start != null || end != null) {
       request.headers
-          .set(HttpHeaders.rangeHeader, '${start ?? ""}-${end ?? ""}');
+          .set(HttpHeaders.rangeHeader, 'bytes=${start ?? ""}-${end ?? ""}');
     }
     final response = await request.close();
     final acceptRangesHeader =
@@ -2720,7 +2720,8 @@ class ResolvingAudioSource extends StreamAudioSource {
         response.headers.value(HttpHeaders.contentLengthHeader);
     final contentType = response.headers.value(HttpHeaders.contentTypeHeader);
     return StreamAudioResponse(
-        rangeRequestsSupported: acceptRangesHeader == 'bytes',
+        rangeRequestsSupported:
+            acceptRangesHeader != null && acceptRangesHeader != 'none',
         sourceLength: null,
         contentLength:
             contentLength == null ? null : int.tryParse(contentLength),
