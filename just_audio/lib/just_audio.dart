@@ -3103,12 +3103,16 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     }
 
     final completer = Completer<void>();
-    stream.listen((event) {
+    final subscription = stream.listen((event) {
       request.response.add(event);
     }, onError: (Object e, StackTrace st) {
       source._player?._playbackEventSubject.addError(e, st);
     }, onDone: () {
       completer.complete();
+    });
+
+    request.response.done.then((dynamic value) {
+      subscription.cancel();
     });
 
     await completer.future;
