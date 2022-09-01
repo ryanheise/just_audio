@@ -1,3 +1,7 @@
+## 0.9.29
+
+* Fix bug in ConcatenatingAudioSource.clear().
+
 ## 0.9.28
 
 * Recursively apply headers to HLS fragments.

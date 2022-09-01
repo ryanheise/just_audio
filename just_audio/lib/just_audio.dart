@@ -2491,6 +2491,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Removes all [AudioSource]s.
   Future<void> clear() async {
+    final end = children.length;
     children.clear();
     _shuffleOrder.clear();
     if (_player != null) {
@@ -2499,7 +2500,7 @@ class ConcatenatingAudioSource extends AudioSource {
           ConcatenatingRemoveRangeRequest(
               id: _id,
               startIndex: 0,
-              endIndex: children.length,
+              endIndex: end,
               shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
