@@ -2,6 +2,11 @@
 
 * 
 
+## 0.9.29
+
+* Fix bug in ConcatenatingAudioSource.clear().
+* Fix bug where proxy drains origin faster than it feeds client.
+
 ## 0.9.28
 
 * Recursively apply headers to HLS fragments.
