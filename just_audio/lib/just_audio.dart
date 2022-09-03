@@ -2620,6 +2620,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Removes all [AudioSource]s.
   Future<void> clear() async {
+    final end = children.length;
     children.clear();
     _shuffleOrder.clear();
     if (_player != null) {
@@ -2628,7 +2629,7 @@ class ConcatenatingAudioSource extends AudioSource {
           ConcatenatingRemoveRangeRequest(
               id: _id,
               startIndex: 0,
-              endIndex: children.length,
+              endIndex: end,
               shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
@@ -3310,8 +3311,16 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
         }
         request.response.add(utf8.encode(m3u8));
       } else {
-        await originResponse.pipe(request.response);
+        request.response.bufferOutput = false;
+        var done = false;
+        request.response.done.then((dynamic _) => done = true);
+        await for (var chunk in originResponse) {
+          if (done) break;
+          request.response.add(chunk);
+          await request.response.flush();
+        }
       }
+      await request.response.flush();
       await request.response.close();
     } on HttpException {
       // We likely are dealing with a streaming protocol
