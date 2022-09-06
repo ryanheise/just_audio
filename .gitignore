@@ -15,3 +15,12 @@ build/
 .flutter-plugins
 coverage
 pubspec.lock
+
+# IntelliJ
+.idea
+*.iml
+
+# VS Code
+.vscode
+
+.DS_Store

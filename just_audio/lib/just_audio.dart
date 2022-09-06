@@ -15,6 +15,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 
+export 'package:just_audio_platform_interface/just_audio_platform_interface.dart'
+    show DarwinEqualizerParametersMessage, DarwinEqualizerBandMessage;
+
 const _uuid = Uuid();
 
 JustAudioPlatform? _pluginPlatformCache;
@@ -3497,6 +3500,13 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
           AndroidLoudnessEnhancerSetTargetGainRequest request) async {
     return AndroidLoudnessEnhancerSetTargetGainResponse();
   }
+
+  @override
+  Future<DarwinEqualizerBandSetGainResponse> darwinEqualizerBandSetGain(
+      DarwinEqualizerBandSetGainRequest request) {
+    throw UnimplementedError(
+        "darwinEqualizerBandSetGain() has not been implemented.");
+  }
 }
 
 /// Holds the initial requested position and index for a newly loaded audio
@@ -3522,8 +3532,10 @@ class AudioPipeline {
         androidAudioEffects = androidAudioEffects ?? const [],
         darwinAudioEffects = darwinAudioEffects ?? const [];
 
-  List<AudioEffect> get _audioEffects =>
-      <AudioEffect>[...androidAudioEffects, ...darwinAudioEffects];
+  List<AudioEffect> get _audioEffects => <AudioEffect>[
+        if (_isAndroid()) ...androidAudioEffects,
+        if (_isDarwin()) ...darwinAudioEffects
+      ];
 
   void _setup(AudioPlayer player) {
     for (var effect in _audioEffects) {
@@ -3676,8 +3688,59 @@ class AndroidEqualizerBand {
       );
 }
 
-/// The parameter values of an [AndroidEqualizer].
-class AndroidEqualizerParameters {
+/// A frequency band within an [AndroidEqualizer].
+class DarwinEqualizerBand {
+  final AudioPlayer _player;
+
+  /// A zero-based index of the position of this band within its [AndroidEqualizer].
+  final int index;
+
+  /// The center frequency of this band in hertz.
+  final double centerFrequency;
+  final _gainSubject = BehaviorSubject<double>();
+
+  DarwinEqualizerBand._({
+    required AudioPlayer player,
+    required this.index,
+    required this.centerFrequency,
+    required double gain,
+  }) : _player = player {
+    _gainSubject.add(gain);
+  }
+
+  /// The gain for this band in decibels.
+  double get gain => _gainSubject.nvalue!;
+
+  /// A stream of the current gain for this band in decibels.
+  Stream<double> get gainStream => _gainSubject.stream;
+
+  /// Sets the gain for this band in decibels.
+  Future<void> setGain(double gain) async {
+    _gainSubject.add(gain);
+    if (_player._active) {
+      await (await _player._platform).darwinEqualizerBandSetGain(
+          DarwinEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+    }
+  }
+
+  /// Restores the gain after reactivating.
+  Future<void> _restore() async {
+    await (await _player._platform).darwinEqualizerBandSetGain(
+        DarwinEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+  }
+
+  static DarwinEqualizerBand _fromMessage(
+          AudioPlayer player, DarwinEqualizerBandMessage message) =>
+      DarwinEqualizerBand._(
+        player: player,
+        index: message.index,
+        centerFrequency: message.centerFrequency,
+        gain: message.gain,
+      );
+}
+
+/// The parameter values of an [DarwinEqualizer].
+class DarwinEqualizerParameters {
   /// The minimum gain value supported by the equalizer.
   final double minDecibels;
 
@@ -3685,9 +3748,9 @@ class AndroidEqualizerParameters {
   final double maxDecibels;
 
   /// The frequency bands of the equalizer.
-  final List<AndroidEqualizerBand> bands;
+  final List<DarwinEqualizerBand> bands;
 
-  AndroidEqualizerParameters({
+  DarwinEqualizerParameters({
     required this.minDecibels,
     required this.maxDecibels,
     required this.bands,
@@ -3700,51 +3763,195 @@ class AndroidEqualizerParameters {
     }
   }
 
-  static AndroidEqualizerParameters _fromMessage(
-          AudioPlayer player, AndroidEqualizerParametersMessage message) =>
-      AndroidEqualizerParameters(
+  static DarwinEqualizerParameters _fromMessage(
+          AudioPlayer player, DarwinEqualizerParametersMessage message) =>
+      DarwinEqualizerParameters(
         minDecibels: message.minDecibels,
         maxDecibels: message.maxDecibels,
         bands: message.bands
             .map((bandMessage) =>
-                AndroidEqualizerBand._fromMessage(player, bandMessage))
+                DarwinEqualizerBand._fromMessage(player, bandMessage))
             .toList(),
       );
 }
 
-/// An [AudioEffect] for Android that can adjust the gain for different
+/// An [AudioEffect] for Both Android And IOS that can adjust the gain for different
 /// frequency bands of an [AudioPlayer]'s audio signal.
-class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
-  AndroidEqualizerParameters? _parameters;
-  final Completer<AndroidEqualizerParameters> _parametersCompleter =
-      Completer<AndroidEqualizerParameters>();
+class Equalizer extends AudioEffect with DarwinAudioEffect, AndroidAudioEffect {
+  EqualizerParameters? _parameters;
+  final DarwinEqualizerParametersMessage _darwinMessageParameters;
+  final Completer<EqualizerParameters> _parametersCompleter =
+      Completer<EqualizerParameters>();
+
+  Equalizer({required DarwinEqualizerParametersMessage darwinMessageParameters})
+      : _darwinMessageParameters = darwinMessageParameters;
 
   @override
-  String get _type => 'AndroidEqualizer';
+  String get _type => _isAndroid() ? 'AndroidEqualizer' : 'DarwinEqualizer';
 
   @override
   Future<void> _activate() async {
     await super._activate();
-    if (_parametersCompleter.isCompleted) {
-      await (await parameters)._restore();
-      return;
+    if (_isAndroid()) {
+      if (_parametersCompleter.isCompleted) {
+        await (await parameters)._restore();
+        return;
+      }
+      final response = await (await _player!._platform)
+          .androidEqualizerGetParameters(
+              AndroidEqualizerGetParametersRequest());
+      _parameters = EqualizerParameters._fromAndroidMessage(
+          _player!, response.parameters);
+      _parametersCompleter.complete(_parameters);
+    } else if (_isDarwin()) {
+      if (_parametersCompleter.isCompleted) {
+        await (await parameters)._restore();
+        return;
+      }
+      _parameters = EqualizerParameters._fromDarwinMessage(
+          _player!, _darwinMessageParameters);
+      _parametersCompleter.complete(_parameters);
+    } else {
+      throw Exception("not implemented");
     }
-    final response = await (await _player!._platform)
-        .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
-    _parameters =
-        AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
-    _parametersCompleter.complete(_parameters);
   }
 
   /// The parameter values of this equalizer.
-  Future<AndroidEqualizerParameters> get parameters =>
-      _parametersCompleter.future;
+  Future<EqualizerParameters> get parameters => _parametersCompleter.future;
 
   @override
-  AudioEffectMessage _toMessage() => AndroidEqualizerMessage(
+  AudioEffectMessage _toMessage() {
+    if (_isAndroid()) {
+      return AndroidEqualizerMessage(
         enabled: enabled,
         // Parameters are only communicated from the platform.
         parameters: null,
+      );
+    } else if (_isDarwin()) {
+      return DarwinEqualizerMessage(
+        enabled: enabled,
+        parameters: _darwinMessageParameters,
+      );
+    } else {
+      throw Exception("not implemented");
+    }
+  }
+}
+
+/// The parameter values of an [AndroidEqualizer].
+class EqualizerParameters {
+  /// The minimum gain value supported by the equalizer.
+  final double minDecibels;
+
+  /// The maximum gain value supported by the equalizer.
+  final double maxDecibels;
+
+  /// The frequency bands of the equalizer.
+  final List<EqualizerBand> bands;
+
+  EqualizerParameters({
+    required this.minDecibels,
+    required this.maxDecibels,
+    required this.bands,
+  });
+
+  /// Restore platform state after reactivating.
+  Future<void> _restore() async {
+    for (var band in bands) {
+      await band._restore();
+    }
+  }
+
+  static EqualizerParameters _fromAndroidMessage(
+          AudioPlayer player, AndroidEqualizerParametersMessage message) =>
+      EqualizerParameters(
+        minDecibels: message.minDecibels,
+        maxDecibels: message.maxDecibels,
+        bands: message.bands
+            .map((bandMessage) =>
+                EqualizerBand._fromAndroidMessage(player, bandMessage))
+            .toList(),
+      );
+
+  static EqualizerParameters _fromDarwinMessage(
+          AudioPlayer player, DarwinEqualizerParametersMessage message) =>
+      EqualizerParameters(
+        minDecibels: message.minDecibels,
+        maxDecibels: message.maxDecibels,
+        bands: message.bands
+            .map((bandMessage) =>
+                EqualizerBand._fromDarwinMessage(player, bandMessage))
+            .toList(),
+      );
+}
+
+/// A frequency band within an [AndroidEqualizer].
+class EqualizerBand {
+  final AudioPlayer _player;
+
+  /// A zero-based index of the position of this band within its [AndroidEqualizer].
+  final int index;
+
+  /// The center frequency of this band in hertz.
+  final double centerFrequency;
+  final _gainSubject = BehaviorSubject<double>();
+
+  EqualizerBand._({
+    required AudioPlayer player,
+    required this.index,
+    required this.centerFrequency,
+    required double gain,
+  }) : _player = player {
+    _gainSubject.add(gain);
+  }
+
+  /// The gain for this band in decibels.
+  double get gain => _gainSubject.nvalue!;
+
+  /// A stream of the current gain for this band in decibels.
+  Stream<double> get gainStream => _gainSubject.stream;
+
+  /// Sets the gain for this band in decibels.
+  Future<void> setGain(double gain) async {
+    _gainSubject.add(gain);
+    if (_player._active) {
+      if (_isAndroid()) {
+        await (await _player._platform).androidEqualizerBandSetGain(
+            AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+      } else if (_isDarwin()) {
+        await (await _player._platform).darwinEqualizerBandSetGain(
+            DarwinEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+      }
+    }
+  }
+
+  /// Restores the gain after reactivating.
+  Future<void> _restore() async {
+    if (_isAndroid()) {
+      await (await _player._platform).androidEqualizerBandSetGain(
+          AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+    } else if (_isDarwin()) {
+      await (await _player._platform).darwinEqualizerBandSetGain(
+          DarwinEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
+    }
+  }
+
+  static EqualizerBand _fromAndroidMessage(
+          AudioPlayer player, AndroidEqualizerBandMessage message) =>
+      EqualizerBand._(
+        player: player,
+        index: message.index,
+        centerFrequency: message.centerFrequency,
+        gain: message.gain,
+      );
+
+  static EqualizerBand _fromDarwinMessage(
+          AudioPlayer player, DarwinEqualizerBandMessage message) =>
+      EqualizerBand._(
+        player: player,
+        index: message.index,
+        centerFrequency: message.centerFrequency,
+        gain: message.gain,
       );
 }
 

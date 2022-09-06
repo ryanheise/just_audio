@@ -1,0 +1,13 @@
+name: cli
+description: Just Audio development utilities
+version: 0.1.0
+
+environment:
+  sdk: '>=2.17.0 <3.0.0'
+
+dependencies:
+  path: ^1.8.2
+  watcher: ^1.0.1
+
+dev_dependencies:
+  lints: ^2.0.0

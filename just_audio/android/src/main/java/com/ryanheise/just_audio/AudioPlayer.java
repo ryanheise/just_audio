@@ -765,29 +765,39 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         ((LoudnessEnhancer)audioEffectsMap.get("AndroidLoudnessEnhancer")).setTargetGain(targetGainMillibels);
     }
 
+    // dB = 0.1 bels | 0.8 = Equalize the level between ios and android
+    private short dbToMillibels(double value) {
+        return  (short)(Math.round(value * 100.0 * 0.8));
+    }
+
+    // dB = 0.1 bels | 0.8 = Equalize the level between ios and android
+    private double millibelsToDb(int value) {
+        return  (double)(Math.round(value / 100.0 / 0.8));
+    }
+
     private Map<String, Object> equalizerAudioEffectGetParameters() {
         Equalizer equalizer = (Equalizer)audioEffectsMap.get("AndroidEqualizer");
         ArrayList<Object> rawBands = new ArrayList<>();
         for (short i = 0; i < equalizer.getNumberOfBands(); i++) {
             rawBands.add(mapOf(
                 "index", i,
-                "lowerFrequency", (double)equalizer.getBandFreqRange(i)[0] / 1000.0,
-                "upperFrequency", (double)equalizer.getBandFreqRange(i)[1] / 1000.0,
-                "centerFrequency", (double)equalizer.getCenterFreq(i) / 1000.0,
-                "gain", equalizer.getBandLevel(i) / 1000.0
+                "lowerFrequency", millibelsToDb(equalizer.getBandFreqRange(i)[0]),
+                "upperFrequency", millibelsToDb(equalizer.getBandFreqRange(i)[1]),
+                "centerFrequency", millibelsToDb(equalizer.getCenterFreq(i)),
+                "gain", millibelsToDb(equalizer.getBandLevel(i))
             ));
         }
         return mapOf(
             "parameters", mapOf(
-                "minDecibels", equalizer.getBandLevelRange()[0] / 1000.0,
-                "maxDecibels", equalizer.getBandLevelRange()[1] / 1000.0,
+                "minDecibels", millibelsToDb(equalizer.getBandLevelRange()[0]),
+                "maxDecibels", millibelsToDb(equalizer.getBandLevelRange()[1]),
                 "bands", rawBands
             )
         );
     }
 
     private void equalizerBandSetGain(int bandIndex, double gain) {
-        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
+        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, dbToMillibels(gain));
     }
 
     /// Creates an event based on the current state.
