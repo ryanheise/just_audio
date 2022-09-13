@@ -3129,13 +3129,15 @@ _ProxyHandler _proxyHandlerForUri(
   Map<String, String>? headers,
   String? userAgent,
 }) {
+  // Keep redirected [Uri] to speed-up requests
+  Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final client = HttpClient();
 
     if (userAgent != null) {
       client.userAgent = userAgent;
     }
-    final originRequest = await client.getUrl(uri);
+    final originRequest = await client.getUrl(redirectedUri ?? uri);
 
     // Rewrite request headers
     final host = originRequest.headers.value('host');
@@ -3163,6 +3165,9 @@ _ProxyHandler _proxyHandlerForUri(
     // Try to make normal request
     try {
       final originResponse = await originRequest.close();
+      if (originResponse.redirects.isNotEmpty) {
+        redirectedUri = originResponse.redirects.last.location;
+      }
 
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
