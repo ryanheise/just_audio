@@ -6,6 +6,8 @@
 
 * Fix bug in ConcatenatingAudioSource.clear().
 * Fix bug where proxy drains origin faster than it feeds client.
+* Fix bug where User Agent was not set on redirects (@mikel-snipd)
+* Fix bug where StreamAudioSource requests are not closed when proxy is disposed (@mikel-snipd)
 
 ## 0.9.28
 

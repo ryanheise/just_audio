@@ -2085,11 +2085,12 @@ class _ProxyHttpServer {
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
-    if (source._player?._userAgent != null) {
-      headers['user-agent'] = source._player!._userAgent!;
-    }
     final path = _requestKey(uri);
-    _handlerMap[path] = _proxyHandlerForUri(uri, headers);
+    _handlerMap[path] = _proxyHandlerForUri(
+      uri,
+      headers: headers,
+      userAgent: source._player?._userAgent,
+    );
     return uri.replace(
       scheme: 'http',
       host: InternetAddress.loopbackIPv4.address,
@@ -3231,12 +3232,16 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     }
 
     final completer = Completer<void>();
-    stream.listen((event) {
+    final subscription = stream.listen((event) {
       request.response.add(event);
     }, onError: (Object e, StackTrace st) {
       source._player?._playbackEventSubject.addError(e, st);
     }, onDone: () {
       completer.complete();
+    });
+
+    request.response.done.then((dynamic value) {
+      subscription.cancel();
     });
 
     await completer.future;
@@ -3248,13 +3253,32 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
-_ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
+_ProxyHandler _proxyHandlerForUri(
+  Uri uri, {
+  Map<String, String>? headers,
+  String? userAgent,
+}) {
+  // Keep redirected [Uri] to speed-up requests
+  Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    final originRequest = await HttpClient().getUrl(uri);
+    final client = HttpClient();
+
+    if (userAgent != null) {
+      client.userAgent = userAgent;
+    }
+    final originRequest = await client.getUrl(redirectedUri ?? uri);
 
     // Rewrite request headers
     final host = originRequest.headers.value('host');
     originRequest.headers.clear();
+
+    // Match ExoPlayer's native behavior
+    originRequest.maxRedirects = 20;
+
+    // Make sure that we send the userAgent header also on the first request
+    if (userAgent != null) {
+      originRequest.headers.set(HttpHeaders.userAgentHeader, userAgent);
+    }
     request.headers.forEach((name, value) {
       originRequest.headers.set(name, value);
     });
@@ -3270,6 +3294,9 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
     // Try to make normal request
     try {
       final originResponse = await originRequest.close();
+      if (originResponse.redirects.isNotEmpty) {
+        redirectedUri = originResponse.redirects.last.location;
+      }
 
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
