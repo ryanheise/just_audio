@@ -320,6 +320,65 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
     return await _playerAudioHandler
         .customSetAutomaticallyWaitsToMinimizeStalling(request);
   }
+
+  @override
+  Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
+      AndroidEqualizerBandSetGainRequest request) async {
+    return forwardRequest('androidEqualizerBandSetGain', request);
+  }
+
+  @override
+  Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
+      AndroidEqualizerGetParametersRequest request) {
+    return forwardRequest('androidEqualizerGetParameters', request);
+  }
+
+  @override
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) {
+    return forwardRequest('androidLoudnessEnhancerSetTargetGain', request);
+  }
+
+  @override
+  Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
+      AudioEffectSetEnabledRequest request) {
+    return forwardRequest('audioEffectSetEnabled', request);
+  }
+
+  @override
+  Future<DisposeResponse> dispose(DisposeRequest request) {
+    return forwardRequest('dispose', request);
+  }
+
+  @override
+  Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest request) {
+    return forwardRequest(
+        'setCanUseNetworkResourcesForLiveStreamingWhilePaused', request);
+  }
+
+  @override
+  Future<SetPitchResponse> setPitch(SetPitchRequest request) async {
+    return forwardRequest('setPitch', request);
+  }
+
+  @override
+  Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
+      SetPreferredPeakBitRateRequest request) {
+    return forwardRequest('setPreferredPeakBitRate', request);
+  }
+
+  @override
+  Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) {
+    return forwardRequest('setSkipSilence', request);
+  }
+
+  Future<Y> forwardRequest<X, Y>(String name, X request) async {
+    return (await _audioHandler
+        .customAction(name, <String, dynamic>{'request': request})) as Y;
+  }
 }
 
 class _PlayerAudioHandler extends BaseAudioHandler
@@ -414,6 +473,44 @@ class _PlayerAudioHandler extends BaseAudioHandler
             mediaItem.add(currentMediaItem!);
           }
         });
+  }
+
+  @override
+  Future<dynamic> customAction(String name,
+      [Map<String, dynamic>? extras]) async {
+    switch (name) {
+      case 'androidEqualizerBandSetGain':
+        return await (await _player).androidEqualizerBandSetGain(
+            extras!['request'] as AndroidEqualizerBandSetGainRequest);
+      case 'androidEqualizerGetParameters':
+        return await (await _player).androidEqualizerGetParameters(
+            extras!['request'] as AndroidEqualizerGetParametersRequest);
+      case 'androidLoudnessEnhancerSetTargetGain':
+        return await (await _player).androidLoudnessEnhancerSetTargetGain(
+            extras!['request'] as AndroidLoudnessEnhancerSetTargetGainRequest);
+      case 'audioEffectSetEnabled':
+        return await (await _player).audioEffectSetEnabled(
+            extras!['request'] as AudioEffectSetEnabledRequest);
+      case 'dispose':
+        return await (await _player)
+            .dispose(extras!['request'] as DisposeRequest);
+      case 'setCanUseNetworkResourcesForLiveStreamingWhilePaused':
+        return await (await _player)
+            .setCanUseNetworkResourcesForLiveStreamingWhilePaused(extras![
+                    'request']
+                as SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest);
+      case 'setPitch':
+        return await (await _player)
+            .setPitch(extras!['request'] as SetPitchRequest);
+      case 'setPreferredPeakBitRate':
+        return await (await _player).setPreferredPeakBitRate(
+            extras!['request'] as SetPreferredPeakBitRateRequest);
+      case 'setSkipSilence':
+        return await (await _player)
+            .setSkipSilence(extras!['request'] as SetSkipSilenceRequest);
+      default:
+        return super.customAction(name, extras);
+    }
   }
 
   @override
