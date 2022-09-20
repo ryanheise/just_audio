@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import kMusicSwift
 
 struct Util {
     static func timeFrom(microseconds: Int64) -> CMTime {
@@ -15,30 +16,20 @@ struct Util {
     static func loopModeFrom(_ value: Int) -> LoopMode {
         switch value {
         case 1:
-            return LoopMode.loopOne
+            return LoopMode.one
         case 2:
-            return LoopMode.loopAll
+            return LoopMode.all
         default:
-            return LoopMode.loopOff
+            return LoopMode.off
         }
     }
 
-    static func shuffleModeFrom(_ value: Int) -> Bool {
+    static func parseShuffleModeEnabled(_ value: Int) -> Bool {
         return value == 1
     }
 
     static func gainFrom(_ value: Float) -> Float {
         // Equalize the level between iOS and android
         return value * 2.8
-    }
-
-    static func effectFrom(_ map: [String: Any]) throws -> EffectData {
-        let type = map["type"] as! String
-        switch type {
-        case EffectType.darwinEqualizer.rawValue:
-            return EqualizerEffectData.fromJson(map)
-        default:
-            throw NotSupportedError(value: type, "When decoding effect")
-        }
     }
 }

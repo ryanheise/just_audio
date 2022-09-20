@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import kMusicSwift
 
 struct PlaybackEvent {
     let processingState: ProcessingState

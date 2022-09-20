@@ -1308,33 +1308,33 @@ void runTests() {
     expect(await loudnessEnhancer.enabledStream.first, equals(true));
   });
 
-  test('AndroidEqualizer', () async {
-    final equalizer = Equalizer(
-        darwinMessageParameters: DarwinEqualizerParametersMessage(
-            maxDecibels: 24, minDecibels: -24, bands: []));
-    final player = AudioPlayer(
-      audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]),
-    );
-    expect(equalizer.enabled, equals(false));
-    expect(await equalizer.enabledStream.first, equals(false));
-    await player.setUrl('https://foo.foo/foo.mp3');
-    expect(equalizer.enabled, equals(false));
-    expect(await equalizer.enabledStream.first, equals(false));
-    await equalizer.setEnabled(true);
-    expect(equalizer.enabled, equals(true));
-    expect(await equalizer.enabledStream.first, equals(true));
-    final parameters = await equalizer.parameters;
-    expect(parameters.minDecibels, equals(0.0));
-    expect(parameters.maxDecibels, equals(10.0));
-    final bands = parameters.bands;
-    expect(bands.length, equals(5));
-    for (var i = 0; i < 5; i++) {
-      final band = bands[i];
-      expect(band.index, equals(i));
-      expect(band.centerFrequency, equals((i + 0.5) * 1000));
-      expect(band.gain, equals(i * 0.1));
-    }
-  });
+  // test('AndroidEqualizer', () async {
+  //   final equalizer = Equalizer(
+  //       darwinMessageParameters: DarwinEqualizerParametersMessage(
+  //           maxDecibels: 24, minDecibels: -24, bands: []));
+  //   final player = AudioPlayer(
+  //     audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]),
+  //   );
+  //   expect(equalizer.enabled, equals(false));
+  //   expect(await equalizer.enabledStream.first, equals(false));
+  //   await player.setUrl('https://foo.foo/foo.mp3');
+  //   expect(equalizer.enabled, equals(false));
+  //   expect(await equalizer.enabledStream.first, equals(false));
+  //   await equalizer.setEnabled(true);
+  //   expect(equalizer.enabled, equals(true));
+  //   expect(await equalizer.enabledStream.first, equals(true));
+  //   final parameters = await equalizer.parameters;
+  //   expect(parameters.minDecibels, equals(0.0));
+  //   expect(parameters.maxDecibels, equals(10.0));
+  //   final bands = parameters.bands;
+  //   expect(bands.length, equals(5));
+  //   for (var i = 0; i < 5; i++) {
+  //     final band = bands[i];
+  //     expect(band.index, equals(i));
+  //     expect(band.centerFrequency, equals((i + 0.5) * 1000));
+  //     expect(band.gain, equals(i * 0.1));
+  //   }
+  // });
 }
 
 class MockJustAudio extends Mock
