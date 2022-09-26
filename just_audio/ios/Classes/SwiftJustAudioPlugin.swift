@@ -2,6 +2,17 @@ import AVFAudio
 import Flutter
 import UIKit
 
+/**
+ TODOS
+ - [do we really need mappings???]
+ - expose missing feature from kmusicswift
+ - hook effects on load
+ - check if we need to map responses
+ - expose streams
+ - add effects on audiosource on dart layer
+ - add effects on audiosource mapping
+ */
+
 @available(iOS 13.0, *)
 public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
     var players: [String: SwiftPlayer] = [:]
@@ -51,9 +62,13 @@ public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
 
 @available(iOS 13.0, *)
 extension SwiftJustAudioPlugin {
-    private func onInit(request: [String: Any]) throws {
-        let initRequestMessage = InitRequestMessage.fromMap(map: request)
-        let playerId = initRequestMessage.id
+    private func onInit(request: [String: Any?]) throws {
+        guard let id = request["id"] as? String else {
+            return
+        }
+        
+        //let initRequestMessage = InitRequestMessage.fromMap(map: request)
+        let playerId = id
 
         guard !players.keys.contains(playerId) else {
             throw SwiftJustAudioPluginError.platformAlreadyExists
@@ -64,9 +79,9 @@ extension SwiftJustAudioPlugin {
         let dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
 
         let player = SwiftPlayer.Builder()
-            .withAudioEffects(initRequestMessage.audioEffects)
-            .withLoadConfiguration(initRequestMessage.configuration)
-            .withPlayerId(initRequestMessage.id)
+            //.withAudioEffects(initRequestMessage.audioEffects)
+            //.withLoadConfiguration(initRequestMessage.configuration)
+            .withPlayerId(id)
 
             .withAudioEngine(engine)
             .withRegistrar(registrar)
@@ -75,17 +90,21 @@ extension SwiftJustAudioPlugin {
             .withEventChannel(eventChannel)
             .withDataChannel(dataChannel)
 
+            .withEqualizer(try request.equalizer)
+
             .build()
 
         players[playerId] = player
     }
 
     private func onDisposePlayer(request: [String: Any]) throws {
-        let message = BaseMessage.fromMap(request)
+        guard let id = request["id"] as? String else {
+            return
+        }
 
-        if let player = players[message.id] {
+        if let player = players[id] {
             player.dispose()
-            players.removeValue(forKey: message.id)?.dispose()
+            players.removeValue(forKey: id)?.dispose()
             engine.stop()
         }
     }

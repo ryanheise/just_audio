@@ -1,21 +1,19 @@
 import AVFoundation
+import Combine
 import Flutter
 import kMusicSwift
 
 /**
  TODOS
- - hook effects on load
- - check for equalizer on load
- - add effects on audiosource mapping
+ - expose missing feature from kmusicswift
+ - handle effects on load
  - add effects on audiosource on dart layer
- - handle equalizer commands
- - map equalizer commands
- - expose streams
+ - handle effects on audiosource
  */
 @available(iOS 13.0, *)
 internal class SwiftPlayer: NSObject {
     let playerId: String
-    let audioEffects: [AudioEffectMessage]
+    //let audioEffects: [AudioEffectMessage]
 
     let methodChannel: FlutterMethodChannel
     let eventChannel: BetterEventChannel
@@ -23,6 +21,9 @@ internal class SwiftPlayer: NSObject {
 
     var player: JustAudioPlayer!
     private var engine: AVAudioEngine!
+    private var equalizer: Equalizer?
+
+    var cancellables: [AnyCancellable] = []
 
     class Builder {
         private var registrar: FlutterPluginRegistrar!
@@ -33,6 +34,7 @@ internal class SwiftPlayer: NSObject {
         private var eventChannel: BetterEventChannel!
         private var dataChannel: BetterEventChannel!
         private var engine: AVAudioEngine!
+        private var equalizer: Equalizer?
 
         func withRegistrar(_ registrar: FlutterPluginRegistrar) -> Builder {
             self.registrar = registrar
@@ -74,16 +76,22 @@ internal class SwiftPlayer: NSObject {
             return self
         }
 
+        func withEqualizer(_ equalizer: Equalizer?) -> Builder {
+            self.equalizer = equalizer
+            return self
+        }
+
         func build() -> SwiftPlayer {
             return SwiftPlayer(
                 registrar: registrar,
                 playerId: playerId,
-                loadConfiguration: loadConfiguration,
-                audioEffects: audioEffects,
+                //loadConfiguration: loadConfiguration,
+                //audioEffects: audioEffects,
                 engine: engine,
                 methodChannel: methodChannel,
                 eventChannel: eventChannel,
-                dataChannel: dataChannel
+                dataChannel: dataChannel,
+                equalizer: equalizer
             )
         }
     }
@@ -91,26 +99,29 @@ internal class SwiftPlayer: NSObject {
     private init(
         registrar _: FlutterPluginRegistrar,
         playerId: String,
-        loadConfiguration _: LoadControlMessage,
-        audioEffects: [AudioEffectMessage],
+        //loadConfiguration _: LoadControlMessage,
+        //audioEffects: [AudioEffectMessage],
         engine: AVAudioEngine,
         methodChannel: FlutterMethodChannel,
         eventChannel: BetterEventChannel,
-        dataChannel: BetterEventChannel
+        dataChannel: BetterEventChannel,
+        equalizer: Equalizer?
     ) {
         self.playerId = playerId
-        self.audioEffects = audioEffects
+        //self.audioEffects = audioEffects
         self.engine = engine
 
         self.methodChannel = methodChannel
         self.eventChannel = eventChannel
         self.dataChannel = dataChannel
 
+        self.equalizer = equalizer
+
+        super.init()
+
         methodChannel.setMethodCallHandler { call, result in
             self.handleMethodCall(call: call, result: result)
         }
-
-        super.init()
     }
 
     func handleMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -118,17 +129,37 @@ internal class SwiftPlayer: NSObject {
             let command = try SwiftPlayerCommand.parse(call.method)
 
             let request = call.arguments as! [String: Any]
+            
+            print("\ncommand: \(String(describing: call.method))")
+            print("\nrequest: \(String(describing: call.arguments))")
 
             // ensure inner instance
             if player == nil {
                 player = JustAudioPlayer(engine: engine)
+
+                if let safeEqualizer = equalizer {
+                    try player.setEqualizer(safeEqualizer)
+                }
+
+                subscribeToPlayerEvents()
             }
 
             switch command {
             case .load:
-                let message = AudioSourceMessage.buildFrom(map: request["audioSource"] as! [String: Any])
-
-                try onLoad(message: message)
+                try onLoad(request: request)
+                
+                // TODO trigger change state in ready in player
+                /*let event = EventChannelMessage(
+                    processingState: .ready,
+                    elapsedTime: 0,
+                    bufferedPosition: 0,
+                    duration: 0,
+                    currentIndex: 0
+                )
+                
+                eventChannel.sendEvent(event.toMap())
+                */
+                
             case .play:
                 try player.play()
             case .pause:
@@ -150,14 +181,7 @@ internal class SwiftPlayer: NSObject {
             case .setShuffleMode:
                 player.setShuffleModeEnabled(Util.parseShuffleModeEnabled(request["shuffleMode"] as! Int))
             case .setShuffleOrder:
-                let message = AudioSourceMessage.buildFrom(map: request["audioSource"] as! [String: Any])
-
-                guard let concatenating = message as? ConcatenatingAudioSourceMessage else {
-                    return
-                }
-
-                try onSetShuffleOrder(index: 0, order: concatenating.shuffleOrder)
-
+                try onSetShuffleOrder(request: request)
             case .setAutomaticallyWaitsToMinimizeStalling:
                 // android is still to be implemented too
                 throw SwiftJustAudioPluginError.notImplementedError(message: call.method)
@@ -171,59 +195,45 @@ internal class SwiftPlayer: NSObject {
                 player.stop()
             case .concatenatingInsertAll:
 
-                let message = ConcatenatingInsertAllMessage.fromMap(map: request)
+                let children = request["children"] as! [[String: Any?]]
 
-                // TODO: Not sure this is the correct behaviour
-                try message.children.forEach {
-                    player.addAudioSource(try $0.toAudioSequence())
+                // TODO: Check, not sure this is the correct behaviour
+                try children.forEach {
+                    player.addAudioSource(try $0.audioSequence)
                 }
 
-                try onSetShuffleOrder(index: message.index, order: message.shuffleOrder)
+                try onSetShuffleOrder(request: request)
             case .concatenatingRemoveRange:
 
-                let message = ConcatenatingRemoveRangeMessage.fromMap(map: request)
+                let startIndex = request["startIndex"] as! Int
+                let endIndex = request["endIndex"] as! Int
 
-                let range = message.startIndex ... message.endIndex
+                let range = startIndex ... endIndex
                 for index in range {
                     try player.removeAudioSource(at: index)
                 }
-                try onSetShuffleOrder(index: 0, order: message.shuffleOrder)
+
+                try onSetShuffleOrder(request: request)
             case .concatenatingMove:
                 // TODO:
                 throw SwiftJustAudioPluginError.notImplementedError(message: call.method)
             case .audioEffectSetEnabled:
-                // TODO:
-                // try player.enableEffect(type: request["type"] as! String, enabled: request["enabled"] as! Bool)
-                throw SwiftJustAudioPluginError.notImplementedError(message: call.method)
+                try onAudioEffectSetEnabled(request)
             case .darwinEqualizerBandSetGain:
-                // TODO: equalizer is passed over as audio effect
-                // player.setEqualizerBandGain(bandIndex: request["bandIndex"] as! Int, gain: Float(request["gain"] as! Double))
-                throw SwiftJustAudioPluginError.notImplementedError(message: call.method)
+                try onEqualizerBandSetGain(request)
             }
-
+            
             result([:])
 
         } catch let error as SwiftJustAudioPluginError {
             result(error.flutterError)
         } catch {
-            // TODO: remove
-            print("command: \(String(describing: call.method))")
-            print("request: \(String(describing: call.arguments))")
+            // TODO: remove once stable
+            print("\ncommand: \(String(describing: call.method))")
+            print("\nrequest: \(String(describing: call.arguments))")
             print(error)
             result(FlutterError(code: "510", message: "\(error)", details: nil))
         }
-    }
-
-    func onPlaybackEvent(event: PlaybackEvent) {
-        eventChannel.sendEvent([
-            "processingState": event.processingState,
-            "updatePosition": event.updatePosition.microseconds,
-            "updateTime": event.updateTime,
-            "bufferedPosition": 0,
-            "icyMetadata": [:],
-            "duration": event.duration.microseconds,
-            "currentIndex": event.currentIndex,
-        ])
     }
 
     func dispose() {
@@ -231,29 +241,285 @@ internal class SwiftPlayer: NSObject {
         eventChannel.dispose()
         dataChannel.dispose()
         methodChannel.setMethodCallHandler(nil)
+
+        cancellables.forEach { cancellable in
+            cancellable.cancel()
+        }
     }
 }
 
-// MARK: - SwiftPlayer extensions
+// MARK: - SwiftPlayer handle extensions
 
 @available(iOS 13.0, *)
 extension SwiftPlayer {
-    func onLoad(message: AudioSourceMessage) throws {
-        let sequence = try message.toAudioSequence()
-        player.addAudioSource(sequence)
+    func onLoad(request: [String: Any?]) throws {
+        player.addAudioSource(try request.audioSequence)
 
-        guard let concatenating = message as? ConcatenatingAudioSourceMessage else {
+        try onSetShuffleOrder(request: request)
+
+        // TODO: (? not sure is needed ?): result(["duration": duration.microseconds])
+    }
+
+    func onSetShuffleOrder(request: [String: Any]) throws {
+        guard let shuffleOrder = request["shuffleOrder"] as? [Int] else {
             return
         }
 
-        let shuffleOrder = concatenating.shuffleOrder
-
-        try onSetShuffleOrder(index: 0, order: shuffleOrder)
-
-        // TODO: (? not sure is needed): result(["duration": duration.microseconds])
+        try player.shuffle(at: 0, inOrder: shuffleOrder)
     }
 
-    func onSetShuffleOrder(index: Int, order: [Int]) throws {
-        try player.shuffle(at: index, inOrder: order)
+    func onAudioEffectSetEnabled(_ request: [String: Any]) throws {
+        let type = request["type"] as! String
+
+        if type == "DarwinEqualizer" {
+            let enabled = request["enabled"] as! Bool
+            if enabled {
+                try player.activateEqualizerPreset(at: 0)
+            } else {
+                try player.resetGains()
+            }
+        }
+
+        // TODO: handle other effects
+    }
+
+    func onEqualizerBandSetGain(_ request: [String: Any]) throws {
+        let bandIndex = request["bandIndex"] as! Int
+        let gain = request["gain"] as! Double
+        try player.tweakEqualizerBandGain(band: bandIndex, gain: Float(gain))
+    }
+}
+
+// MARK: - SwiftPlayer streams
+
+@available(iOS 13.0, *)
+extension SwiftPlayer {
+    func subscribeToPlayerEvents() {
+        guard let safePlayer = player else {
+            return
+        }
+
+        // data channel
+        let outputPublishers = Publishers.CombineLatest(
+            safePlayer.$outputAbsolutePath,
+            safePlayer.$outputWriteError
+        )
+
+        let playerInfoPublishers = Publishers.CombineLatest3(
+            safePlayer.$isPlaying,
+            safePlayer.$volume,
+            safePlayer.$speed
+        )
+
+        let sideInfosPublishers = Publishers.CombineLatest(
+            safePlayer.$loopMode,
+            safePlayer.isShuffling
+        )
+
+        Publishers.CombineLatest3(
+            outputPublishers,
+            playerInfoPublishers,
+            sideInfosPublishers
+        )
+        .map { outputAbsoluteInfo, playerInfoPublishers, sideInfosPublishers in
+
+            DataChannelMessage(
+                outputAbsolutePath: outputAbsoluteInfo.0,
+                outputError: outputAbsoluteInfo.1,
+                playing: playerInfoPublishers.0,
+                volume: playerInfoPublishers.1,
+                speed: playerInfoPublishers.2,
+                loopMode: sideInfosPublishers.0,
+                shuffleMode: sideInfosPublishers.1
+            )
+        }
+        .removeDuplicates()
+        .receive(on: DispatchQueue.main)
+        .sink(receiveValue: { [weak self] event in
+            self?.dataChannel.sendEvent(event.toMap())
+        })
+        .store(in: &cancellables)
+
+        // event channel
+
+        let trackInfos = Publishers.CombineLatest3(
+            safePlayer.$bufferPosition,
+            safePlayer.$duration,
+            safePlayer.$elapsedTime
+        )
+
+        let mainInfos = Publishers.CombineLatest(
+            safePlayer.$processingState,
+            safePlayer.$queueIndex
+        )
+
+        Publishers.CombineLatest3(
+            trackInfos,
+            mainInfos,
+            safePlayer.$equalizer
+        )
+        .removeDuplicates { prev, curr in
+            return prev.1.0 == curr.1.0
+        }
+        .map { trackInfos, mainInfos, _ in
+
+            EventChannelMessage(processingState: mainInfos.0, elapsedTime: trackInfos.2, bufferedPosition: trackInfos.0, duration: trackInfos.1, currentIndex: mainInfos.1)
+        }.removeDuplicates()
+            .throttle(for: 10.0, scheduler: RunLoop.main, latest: true)
+            .receive(on: DispatchQueue.main)
+            .sink(receiveValue: { [weak self] event in
+               // print("===== Sending on event channel")
+               // print(event.toMap())
+                self?.eventChannel.sendEvent(event.toMap())
+            })
+            .store(in: &cancellables)
+    }
+}
+
+// Specify the decimal place to round to using an enum
+public enum RoundingPrecision {
+    case ones
+    case tenths
+    case hundredths
+    case millis
+    case micros
+}
+
+enum RoundingHelper {
+    // Round to the specific decimal place
+    static func preciseRound(_ value: Double,
+                             precision: RoundingPrecision = .ones) -> Int
+    {
+        switch precision {
+        case .ones:
+            return Int(round(value))
+        case .tenths:
+            return Int(round(value * 10) / 10.0)
+        case .hundredths:
+            return Int(round(value * 100) / 100.0)
+        case .millis:
+            return Int(round(value * 1000) / 1000.0)
+        case .micros:
+            return Int(round(value * 1_000_000) / 1_000_000)
+        }
+    }
+}
+
+class DataChannelMessage: Equatable {
+    static func == (lhs: DataChannelMessage, rhs: DataChannelMessage) -> Bool {
+        lhs.outputAbsolutePath == rhs.outputAbsolutePath &&
+            "\(String(describing: lhs.outputError))" == "\(String(describing: rhs.outputError))" &&
+
+            lhs.playing == rhs.playing &&
+            lhs.volume == rhs.volume &&
+            lhs.speed == rhs.speed &&
+
+            lhs.loopMode == rhs.loopMode &&
+            lhs.shuffleMode == rhs.shuffleMode
+    }
+
+    let outputAbsolutePath: String?
+    let outputError: Error?
+
+    let playing: Bool?
+    let volume: Float?
+    let speed: Float?
+
+    let loopMode: Int?
+    let shuffleMode: Int?
+
+    init(outputAbsolutePath: String?, outputError: Error?, playing: Bool, volume: Float?, speed: Float?, loopMode: LoopMode?, shuffleMode: Bool) {
+        self.outputAbsolutePath = outputAbsolutePath
+        self.outputError = outputError
+
+        self.playing = playing
+        self.volume = volume
+        self.speed = speed
+
+        self.shuffleMode = shuffleMode ? 1 : 0
+
+        switch loopMode {
+        case .off:
+            self.loopMode = 0
+        case .one:
+            self.loopMode = 1
+        case .all:
+            self.loopMode = 2
+        default:
+            self.loopMode = nil
+        }
+    }
+
+    func toMap() -> [String: Any?] {
+        return [
+            "outputAbsolutePath": outputAbsolutePath,
+            "outputError": outputError != nil ? "\(String(describing: outputError))" : nil,
+
+            "playing": playing,
+            "volume": volume,
+            "speed": speed,
+
+            "loopMode": loopMode,
+            "shuffleMode": shuffleMode,
+        ]
+    }
+}
+
+// TODO: expose equalizer infos
+class EventChannelMessage: Equatable {
+    static func == (lhs: EventChannelMessage, rhs: EventChannelMessage) -> Bool {
+        lhs.processingState == rhs.processingState &&
+            lhs.updatePosition == rhs.updatePosition &&
+            lhs.bufferedPosition == rhs.bufferedPosition &&
+            lhs.duration == rhs.duration &&
+            lhs.currentIndex == rhs.currentIndex
+    }
+
+    let processingState: Int
+    let updatePosition: Int
+    let bufferedPosition: Int
+    let duration: Int
+    let currentIndex: Int
+
+    init(processingState: ProcessingState?, elapsedTime: Double?, bufferedPosition: Double?, duration: Double?, currentIndex: Int?) {
+        switch processingState {
+        case .none?:
+            self.processingState = 0
+        case .loading:
+            self.processingState = 1
+        case .buffering:
+            self.processingState = 2
+        case .ready:
+            self.processingState = 3
+        case .completed:
+            self.processingState = 4
+        default:
+            self.processingState = 0
+        }
+
+        /*updatePosition = elapsedTime != nil
+            ? RoundingHelper.preciseRound(elapsedTime!, precision: .micros)
+            : 0*/
+        updatePosition = elapsedTime != nil ? Int(elapsedTime! * 1_000_000) : 0
+
+        self.bufferedPosition = bufferedPosition != nil ? Int(bufferedPosition! * 1_000_000) : 0
+
+        self.duration = duration != nil ? Int(duration! * 1_000_000) : 0
+        
+        self.currentIndex = currentIndex ?? 0
+        print("iOS: duration: \(self.duration) | position: \(updatePosition)")
+    }
+
+    func toMap() -> [String: Any?] {
+        
+        return [
+            "processingState": processingState,
+            "updatePosition": updatePosition,
+            "updateTime": Int(Date().timeIntervalSince1970 * 1000),
+            "bufferedPosition": bufferedPosition,
+            "icyMetadata": [:], // Currently not supported
+            "duration": duration,
+            "currentIndex": currentIndex,
+        ]
     }
 }

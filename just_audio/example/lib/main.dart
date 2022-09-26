@@ -155,7 +155,7 @@ class ControlButtons extends StatelessWidget {
               builder: (context, snapshot) {
                 final playerState = snapshot.data;
                 final processingState = playerState?.processingState;
-                final playing = playerState?.playing;
+                final playing = playerState?.playing ?? false;
                 if (processingState == ProcessingState.loading ||
                     processingState == ProcessingState.buffering) {
                   return Container(
@@ -164,7 +164,7 @@ class ControlButtons extends StatelessWidget {
                     height: 64.0,
                     child: const CircularProgressIndicator(),
                   );
-                } else if (playing != true) {
+                } else if (!playing) {
                   return IconButton(
                     icon: const Icon(Icons.play_arrow),
                     iconSize: 64.0,
@@ -213,7 +213,7 @@ class ControlButtons extends StatelessWidget {
           onPressed: () => player.setShuffleModeEnabled(!player.shuffleModeEnabled),
         ),
         IconButton(
-          icon: const Icon(Icons.abc),
+          icon: const Icon(Icons.loop),
           iconSize: 64.0,
           onPressed: () {
             switch (player.loopMode) {
@@ -230,7 +230,7 @@ class ControlButtons extends StatelessWidget {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.abc),
+          icon: const Icon(Icons.shuffle_sharp),
           iconSize: 64.0,
           onPressed: player.shuffle,
         ),

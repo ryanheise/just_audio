@@ -6,7 +6,6 @@
 //
 
 /**
- TODO: should be `CreatePlayerMessage`
  Representation of a request to bootstrap a player in `SwiftJustAudioPlugin` from Flutter
  */
 class InitRequestMessage: BaseMessage {
