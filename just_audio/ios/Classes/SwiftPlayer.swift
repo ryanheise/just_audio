@@ -6,14 +6,13 @@ import kMusicSwift
 /**
  TODOS
  - expose missing feature from kmusicswift
- - handle effects on audiosource
- - map effects & equalizer to flutter plugin
+ - TEST
  */
 @available(iOS 13.0, *)
 internal class SwiftPlayer: NSObject {
     let playerId: String
-    var globalAudioEffects: [String: AudioEffect]
-    var audioSourcesAudioEffects: [String: AudioEffect] = [:]
+    @Published var globalAudioEffects: [String: AudioEffect]
+    @Published var audioSourcesAudioEffects: [String: AudioEffect] = [:]
 
     let methodChannel: FlutterMethodChannel
     let eventChannel: BetterEventChannel
@@ -85,12 +84,12 @@ internal class SwiftPlayer: NSObject {
         equalizer: Equalizer?
     ) {
         self.playerId = playerId
-        var effects: [String: AudioEffect] = [:]
+        let effects: [String: AudioEffect] = [:]
 
-        self.globalAudioEffects = audioEffects.reduce(into: effects) { partialResult, audioEffect in
+        globalAudioEffects = audioEffects.reduce(into: effects) { partialResult, audioEffect in
             partialResult[UUID().uuidString] = audioEffect
         }
-       
+
         self.engine = engine
 
         methodChannel = FlutterMethodChannel(name: playerId.methodsChannel, binaryMessenger: messenger)
@@ -190,85 +189,72 @@ internal class SwiftPlayer: NSObject {
             case .darwinStopWriteOutputToFile:
                 player.stopWritingOutputFile()
             case .darwinDelaySetTargetDelayTime:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DelayAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
-                
-                guard let effect = effect as? DelayAudioEffect else {
-                    return
-                }
-                
+
                 let targetDelayTime = request["targetDelayTime"] as! Double
                 effect.setDelayTime(targetDelayTime)
-                
+
             case .darwinDelaySetTargetFeedback:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DelayAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
+
+                let feedback = request["feedback"] as! Double
+
+                effect.setFeedback(Float(feedback))
             case .darwinDelaySetLowPassCutoff:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DelayAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
+
+                let lowPassCutoff = request["lowPassCutoff"] as! Double
+                effect.setLowPassCutoff(Float(lowPassCutoff))
             case .darwinDelaySetWetDryMix:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DelayAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
+
+                let wetDryMix = request["wetDryMix"] as! Double
+                effect.setWetDryMix(Float(wetDryMix))
             case .darwinDistortionSetWetDryMix:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DistortionAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
+                let wetDryMix = request["wetDryMix"] as! Double
+                effect.setWetDryMix(Float(wetDryMix))
             case .darwinDistortionSetPreGain:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DistortionAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
+
+                let preGain = request["preGain"] as! Double
+                effect.setPreGain(Float(preGain))
             case .darwinDistortionSetPreset:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: DistortionAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
+                guard let preset = AVAudioUnitDistortionPreset(rawValue: request["preset"] as! Int) else {
                     return
                 }
+
+                effect.setPreset(preset)
             case .darwinReverbSetPreset:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: ReverbAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
+                guard let preset = AVAudioUnitReverbPreset(rawValue: request["preset"] as! Int) else {
                     return
                 }
+
+                effect.setPreset(preset)
             case .darwinReverbSetWetDryMix:
-                guard let effectId = request["id"] as? String else{
+                guard let effect: ReverbAudioEffect = getEffectByRequest(request) else {
                     return
                 }
-                
-                guard let effect = getEffectById(effectId) else {
-                    return
-                }
+                let wetDryMix = request["wetDryMix"] as! Double
+                effect.setWetDryMix(Float(wetDryMix))
             }
 
             result([:])
@@ -294,31 +280,34 @@ internal class SwiftPlayer: NSObject {
             cancellable.cancel()
         }
     }
-    
-    private func getEffectByRequest() {
-        guard let effectId = request["id"] as? String else{
-            return
+
+    private func getEffectByRequest<T: AudioEffect>(_ request: [String: Any?]) -> T? {
+        guard let effectId = request["id"] as? String else {
+            return nil
         }
-        
+
         guard let effect = getEffectById(effectId) else {
-            return
+            return nil
         }
-        
-        guard let effect = effect as? DelayAudioEffect else {
-            return
+
+        guard let effect = effect as? T else {
+            return nil
         }
+
+        return effect
     }
-    
-    private func getEffectById(_ id:String) -> AudioEffect? {
+
+    private func getEffectById(_ id: String) -> AudioEffect? {
         guard let effect = globalAudioEffects[id] else {
             return audioSourcesAudioEffects[id]
         }
-        
+
         return effect
     }
 }
 
 // MARK: - SwiftPlayer init player extension
+
 @available(iOS 13.0, *)
 extension SwiftPlayer {
     func initPlayer() throws {
@@ -341,6 +330,7 @@ extension SwiftPlayer {
 }
 
 // MARK: - SwiftPlayer handle extensions
+
 @available(iOS 13.0, *)
 extension SwiftPlayer {
     func onLoad(request: [String: Any?]) throws {
@@ -369,24 +359,23 @@ extension SwiftPlayer {
     func onAudioEffectSetEnabled(_ request: [String: Any]) throws {
         let rawType = request["type"] as! String
         let enabled = request["enabled"] as! Bool
-        
+
         if rawType == "DarwinEqualizer" {
-            
             if enabled {
                 try player.activateEqualizerPreset(at: 0)
             } else {
                 try player.resetGains()
             }
-            
+
             return
         }
 
         let type = DarwinAudioEffect(rawValue: rawType)!
-        
+
         let effect = try globalAudioEffects.values.first(where: { effect in
-            return try effect.type == type
+            try effect.type == type
         })
-        
+
         effect?.setBypass(enabled)
     }
 
@@ -398,6 +387,7 @@ extension SwiftPlayer {
 }
 
 // MARK: - SwiftPlayer streams
+
 @available(iOS 13.0, *)
 extension SwiftPlayer {
     func subscribeToPlayerEvents() {
@@ -457,22 +447,52 @@ extension SwiftPlayer {
             safePlayer.$queueIndex
         )
 
-        Publishers.CombineLatest3(
+        let playerDataSource = Publishers.CombineLatest(
             trackInfos,
-            mainInfos,
-            safePlayer.$equalizer
+            mainInfos
         )
         .removeDuplicates { prev, curr in
+            // do not emit until processing state changes
             prev.1.0 == curr.1.0
         }
-        .map { trackInfos, mainInfos, _ in
-
-            EventChannelMessage(processingState: mainInfos.0, elapsedTime: trackInfos.2, bufferedPosition: trackInfos.0, duration: trackInfos.1, currentIndex: mainInfos.1)
-        }.removeDuplicates()
         .throttle(for: 10.0, scheduler: RunLoop.main, latest: true)
+
+        let effectsDataSource = Publishers.CombineLatest3(
+            safePlayer.$equalizer,
+            $globalAudioEffects,
+            $audioSourcesAudioEffects
+        )
+
+        Publishers.CombineLatest(
+            playerDataSource,
+            effectsDataSource
+        ).map { playerData, effectsData -> EventChannelMessage in
+            let trackInfos = playerData.0
+            let mainInfos = playerData.1
+
+            let equalizerData = effectsData.0
+            let globalEffects = effectsData.1
+            let audioSourceEffects = effectsData.2
+
+            return EventChannelMessage(
+                processingState: mainInfos.0,
+                elapsedTime: trackInfos.2,
+                bufferedPosition: trackInfos.0,
+                duration: trackInfos.1,
+                currentIndex: mainInfos.1,
+                equalizerData: equalizerData,
+                globalEffects: globalEffects,
+                audioSourceEffects: audioSourceEffects
+            )
+        }
         .receive(on: DispatchQueue.main)
         .sink(receiveValue: { [weak self] event in
-            self?.eventChannel.sendEvent(event.toMap())
+            do {
+                self?.eventChannel.sendEvent(try event.toMap())
+            } catch {
+                print(error)
+            }
+
         })
         .store(in: &cancellables)
     }

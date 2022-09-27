@@ -898,6 +898,7 @@ class AudioPlayer {
   }
 
   /// Tells the player to stop recording all the output to a file.
+  ///
   /// The previous output file will not be deleted.
   /// This has only effect on iOS/MacOS.
   Future<void> stopWritingOutputToFile() async {
@@ -907,6 +908,7 @@ class AudioPlayer {
   }
 
   /// Tells the player to record all the output to a file.
+  ///
   /// Returns the output file full path.
   /// This has only effect on iOS/MacOS.
   Future<String?> writeOutputToFile() async {

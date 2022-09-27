@@ -16,7 +16,7 @@ enum DarwinAudioEffect: String {
 extension [String: Any?] {
     var audioEffect: AudioEffect {
         let type = DarwinAudioEffect(rawValue: self["type"] as! String)!
-        let enabled = self["enabled"] as! Bool
+        let enabled = self["enabled"] as? Bool ?? true
 
         switch type {
         case .DarwinReverb:

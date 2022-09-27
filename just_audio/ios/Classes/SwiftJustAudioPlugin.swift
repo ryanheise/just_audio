@@ -73,7 +73,16 @@ extension SwiftJustAudioPlugin {
             throw SwiftJustAudioPluginError.platformAlreadyExists
         }
 
-        let effectsRaw: [[String: Any?]] = request.keys.contains("darwinAudioEffects") ? (request["darwinAudioEffects"] as! [[String: Any?]]) : []
+        var effectsRaw: [[String: Any?]] = request.keys.contains("darwinAudioEffects") ? (request["darwinAudioEffects"] as! [[String: Any?]]) : []
+        
+        var equalizerRaw = effectsRaw.filter({ rawEffect in
+            return (rawEffect["type"] as! String) == "DarwinEqualizer"
+        }).first
+        
+        // exclude equalizer
+        effectsRaw = effectsRaw.filter({ rawEffect in
+            return (rawEffect["type"] as! String) != "DarwinEqualizer"
+        })
 
         var shouldWriteOutputToFile = false
         if let audioLoadConfiguration = request["audioLoadConfiguration"] as? [String: Any] {
@@ -88,7 +97,7 @@ extension SwiftJustAudioPlugin {
             .withMessenger(messenger: registrar.messenger())
             .withAudioEngine(engine)
             .withShouldWriteOutputToFile(shouldWriteOutputToFile)
-            .withEqualizer(try request.equalizer)
+            .withEqualizer(try equalizerRaw?.equalizer)
             .build()
 
         players[playerId] = player

@@ -12,17 +12,16 @@ extension AudioEffect {
             if self is ReverbAudioEffect {
                 return .DarwinReverb
             }
-            
+
             if self is DistortionAudioEffect {
                 return .DarwinDistortion
             }
-            
+
             if self is DelayAudioEffect {
                 return .DarwinDelay
             }
-            
+
             throw SwiftJustAudioPluginError.notSupportedError(value: self, message: "Could not find type for \(self)")
         }
     }
 }
-

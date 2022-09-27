@@ -37,8 +37,10 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.speech());
     // Listen to errors during playback.
-    _player.playbackEventStream.listen((event) {}, onError: (Object e, StackTrace stackTrace) {
+    _player.playbackEventStream.listen((event) {},
+        onError: (Object e, StackTrace stackTrace) {
       print('A stream error occurred: $e');
+      print(stackTrace);
     });
     // Try to load audio from a source and catch any errors.
     try {
@@ -79,8 +81,8 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
           _player.positionStream,
           _player.bufferedPositionStream,
           _player.durationStream,
-          (position, bufferedPosition, duration) =>
-              PositionData(position, bufferedPosition, duration ?? Duration.zero));
+          (position, bufferedPosition, duration) => PositionData(
+              position, bufferedPosition, duration ?? Duration.zero));
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +105,8 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   return SeekBar(
                     duration: positionData?.duration ?? Duration.zero,
                     position: positionData?.position ?? Duration.zero,
-                    bufferedPosition: positionData?.bufferedPosition ?? Duration.zero,
+                    bufferedPosition:
+                        positionData?.bufferedPosition ?? Duration.zero,
                     onChangeEnd: _player.seek,
                   );
                 },
@@ -208,9 +211,11 @@ class ControlButtons extends StatelessWidget {
           ],
         ),
         IconButton(
-          icon: Icon(player.shuffleModeEnabled ? Icons.shuffle : Icons.shuffle_on),
+          icon: Icon(
+              player.shuffleModeEnabled ? Icons.shuffle : Icons.shuffle_on),
           iconSize: 64.0,
-          onPressed: () => player.setShuffleModeEnabled(!player.shuffleModeEnabled),
+          onPressed: () =>
+              player.setShuffleModeEnabled(!player.shuffleModeEnabled),
         ),
         IconButton(
           icon: const Icon(Icons.loop),

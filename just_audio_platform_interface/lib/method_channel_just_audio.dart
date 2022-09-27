@@ -200,75 +200,64 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<DarwinDelaySetDelayTimeResponse> darwinDelaySetTargetDelayTime(
+  Future darwinDelaySetTargetDelayTime(
       DarwinDelaySetDelayTimeRequest request) async {
-    return DarwinDelaySetDelayTimeResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDelaySetTargetDelayTime', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDelaySetTargetDelayTime', request.toMap());
   }
 
   @override
-  Future<DarwinDelaySetFeedbackResponse> darwinDelaySetTargetFeedback(
+  Future darwinDelaySetTargetFeedback(
       DarwinDelaySetFeedbackRequest request) async {
-    return DarwinDelaySetFeedbackResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDelaySetTargetFeedback', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDelaySetTargetFeedback', request.toMap());
   }
 
   @override
-  Future<DarwinDelaySetLowPassCutoffResponse> darwinDelaySetLowPassCutoff(
+  Future darwinDelaySetLowPassCutoff(
       DarwinDelaySetLowPassCutoffRequest request) async {
-    return DarwinDelaySetLowPassCutoffResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDelaySetLowPassCutoff', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDelaySetLowPassCutoff', request.toMap());
   }
 
   @override
-  Future<DarwinDelaySetWetDryMixResponse> darwinDelaySetWetDryMix(
-      DarwinDelaySetWetDryMixRequest request) async {
-    return DarwinDelaySetWetDryMixResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDelaySetWetDryMix', request.toMap()))!);
+  Future darwinDelaySetWetDryMix(DarwinDelaySetWetDryMixRequest request) async {
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDelaySetWetDryMix', request.toMap());
   }
 
   @override
-  Future<DarwinDistortionSetWetDryMixResponse> darwinDistortionSetWetDryMix(
+  Future darwinDistortionSetWetDryMix(
       DarwinDistortionSetWetDryMixRequest request) async {
-    return DarwinDistortionSetWetDryMixResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDistortionSetWetDryMix', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDistortionSetWetDryMix', request.toMap());
   }
 
   @override
-  Future<DarwinDistortionSetPreGainResponse> darwinDistortionSetPreGain(
+  Future darwinDistortionSetPreGain(
       DarwinDistortionSetPreGainRequest request) async {
-    return DarwinDistortionSetPreGainResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDistortionSetPreGain', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDistortionSetPreGain', request.toMap());
   }
 
   @override
-  Future<DarwinDistortionSetPresetResponse> darwinDistortionSetPreset(
+  Future darwinDistortionSetPreset(
       DarwinDistortionSetPresetRequest request) async {
-    return DarwinDistortionSetPresetResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDistortionSetPreset', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinDistortionSetPreset', request.toMap());
   }
 
   @override
-  Future<DarwinReverbSetPresetResponse> darwinReverbSetPreset(
-      DarwinReverbSetPresetRequest request) async {
-    return DarwinReverbSetPresetResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinReverbSetPreset', request.toMap()))!);
+  Future darwinReverbSetPreset(DarwinReverbSetPresetRequest request) async {
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinReverbSetPreset', request.toMap());
   }
 
   @override
-  Future<DarwinReverbSetWetDryMixResponse> darwinReverbSetWetDryMix(
+  Future darwinReverbSetWetDryMix(
       DarwinReverbSetWetDryMixRequest request) async {
-    return DarwinReverbSetWetDryMixResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinReverbSetWetDryMix', request.toMap()))!);
+    await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'darwinReverbSetWetDryMix', request.toMap());
   }
 
   @override
@@ -311,9 +300,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<DarwinStopWriteOutputToFileResponse>
-      darwinStopWriteOutputToFile() async {
-    return DarwinStopWriteOutputToFileResponse.fromMap(
-        (await _channel.invokeMethod('darwinStopWriteOutputToFile'))!);
+  Future darwinStopWriteOutputToFile() async {
+    await _channel.invokeMethod<void>('darwinStopWriteOutputToFile', null);
   }
 }
