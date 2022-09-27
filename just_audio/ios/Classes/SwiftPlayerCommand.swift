@@ -29,6 +29,17 @@ enum SwiftPlayerCommand: String {
     case concatenatingMove
     case audioEffectSetEnabled
     case darwinEqualizerBandSetGain
+    case darwinWriteOutputToFile
+    case darwinStopWriteOutputToFile
+    case darwinDelaySetTargetDelayTime
+    case darwinDelaySetTargetFeedback
+    case darwinDelaySetLowPassCutoff
+    case darwinDelaySetWetDryMix
+    case darwinDistortionSetWetDryMix
+    case darwinDistortionSetPreGain
+    case darwinDistortionSetPreset
+    case darwinReverbSetPreset
+    case darwinReverbSetWetDryMix
 
     static func parse(_ value: String) throws -> SwiftPlayerCommand {
         return SwiftPlayerCommand(rawValue: value)!

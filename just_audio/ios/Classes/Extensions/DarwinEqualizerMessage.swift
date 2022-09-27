@@ -14,14 +14,15 @@ extension [String: Any?] {
                 return nil
             }
 
-            let enabled = self["enabled"] as! Bool
+            // Leaving below line for reference
+            // let enabled = self["enabled"] as! Bool
             let parameters = self["parameters"] as! [String: Any]
 
             let rawBands = parameters["bands"] as! [[String: Any]]
             let frequenciesAndBands = rawBands.map { map in
                 let frequency = map["centerFrequency"] as! Double
                 let gain = map["gain"] as! Double
-                return (Int(frequency), Float(gain * 2.8)) // Magic Simo constant
+                return (Int(frequency), Util.gainFrom(Float(gain)))
             }
 
             let frequencies = frequenciesAndBands.map { frequency, _ in

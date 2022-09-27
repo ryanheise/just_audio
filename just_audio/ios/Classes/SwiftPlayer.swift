@@ -6,14 +6,14 @@ import kMusicSwift
 /**
  TODOS
  - expose missing feature from kmusicswift
- - handle effects on load
- - add effects on audiosource on dart layer
  - handle effects on audiosource
+ - map effects & equalizer to flutter plugin
  */
 @available(iOS 13.0, *)
 internal class SwiftPlayer: NSObject {
     let playerId: String
-    //let audioEffects: [AudioEffectMessage]
+    var globalAudioEffects: [String: AudioEffect]
+    var audioSourcesAudioEffects: [String: AudioEffect] = [:]
 
     let methodChannel: FlutterMethodChannel
     let eventChannel: BetterEventChannel
@@ -22,57 +22,40 @@ internal class SwiftPlayer: NSObject {
     var player: JustAudioPlayer!
     private var engine: AVAudioEngine!
     private var equalizer: Equalizer?
+    private var shouldWriteOutputToFile: Bool = false
 
     var cancellables: [AnyCancellable] = []
 
     class Builder {
-        private var registrar: FlutterPluginRegistrar!
         private var playerId: String!
-        private var loadConfiguration: LoadControlMessage!
-        private var audioEffects: [AudioEffectMessage]!
-        private var methodChannel: FlutterMethodChannel!
-        private var eventChannel: BetterEventChannel!
-        private var dataChannel: BetterEventChannel!
+        private var audioEffects: [AudioEffect]!
         private var engine: AVAudioEngine!
         private var equalizer: Equalizer?
-
-        func withRegistrar(_ registrar: FlutterPluginRegistrar) -> Builder {
-            self.registrar = registrar
-            return self
-        }
+        private var messenger: FlutterBinaryMessenger!
+        private var shouldWriteOutputToFile: Bool = false
 
         func withPlayerId(_ playerId: String) -> Builder {
             self.playerId = playerId
             return self
         }
 
-        func withLoadConfiguration(_ loadConfiguration: LoadControlMessage) -> Builder {
-            self.loadConfiguration = loadConfiguration
+        func withMessenger(messenger: FlutterBinaryMessenger) -> Builder {
+            self.messenger = messenger
             return self
         }
 
-        func withAudioEffects(_ audioEffects: [AudioEffectMessage]) -> Builder {
+        func withAudioEffects(_ audioEffects: [AudioEffect]) -> Builder {
             self.audioEffects = audioEffects
-            return self
-        }
-
-        func withMethodChannel(_ methodChannel: FlutterMethodChannel) -> Builder {
-            self.methodChannel = methodChannel
-            return self
-        }
-
-        func withEventChannel(_ eventChannel: BetterEventChannel) -> Builder {
-            self.eventChannel = eventChannel
-            return self
-        }
-
-        func withDataChannel(_ dataChannel: BetterEventChannel) -> Builder {
-            self.dataChannel = dataChannel
             return self
         }
 
         func withAudioEngine(_ engine: AVAudioEngine) -> Builder {
             self.engine = engine
+            return self
+        }
+
+        func withShouldWriteOutputToFile(_ shouldWriteOutputToFile: Bool) -> Builder {
+            self.shouldWriteOutputToFile = shouldWriteOutputToFile
             return self
         }
 
@@ -83,39 +66,39 @@ internal class SwiftPlayer: NSObject {
 
         func build() -> SwiftPlayer {
             return SwiftPlayer(
-                registrar: registrar,
+                messenger: messenger,
                 playerId: playerId,
-                //loadConfiguration: loadConfiguration,
-                //audioEffects: audioEffects,
+                shouldWriteOutputToFile: shouldWriteOutputToFile,
+                audioEffects: audioEffects,
                 engine: engine,
-                methodChannel: methodChannel,
-                eventChannel: eventChannel,
-                dataChannel: dataChannel,
                 equalizer: equalizer
             )
         }
     }
 
     private init(
-        registrar _: FlutterPluginRegistrar,
+        messenger: FlutterBinaryMessenger,
         playerId: String,
-        //loadConfiguration _: LoadControlMessage,
-        //audioEffects: [AudioEffectMessage],
+        shouldWriteOutputToFile: Bool,
+        audioEffects: [AudioEffect],
         engine: AVAudioEngine,
-        methodChannel: FlutterMethodChannel,
-        eventChannel: BetterEventChannel,
-        dataChannel: BetterEventChannel,
         equalizer: Equalizer?
     ) {
         self.playerId = playerId
-        //self.audioEffects = audioEffects
+        var effects: [String: AudioEffect] = [:]
+
+        self.globalAudioEffects = audioEffects.reduce(into: effects) { partialResult, audioEffect in
+            partialResult[UUID().uuidString] = audioEffect
+        }
+       
         self.engine = engine
 
-        self.methodChannel = methodChannel
-        self.eventChannel = eventChannel
-        self.dataChannel = dataChannel
+        methodChannel = FlutterMethodChannel(name: playerId.methodsChannel, binaryMessenger: messenger)
+        eventChannel = BetterEventChannel(name: playerId.eventsChannel, messenger: messenger)
+        dataChannel = BetterEventChannel(name: playerId.dataChannel, messenger: messenger)
 
         self.equalizer = equalizer
+        self.shouldWriteOutputToFile = shouldWriteOutputToFile
 
         super.init()
 
@@ -129,37 +112,18 @@ internal class SwiftPlayer: NSObject {
             let command = try SwiftPlayerCommand.parse(call.method)
 
             let request = call.arguments as! [String: Any]
-            
+
             print("\ncommand: \(String(describing: call.method))")
             print("\nrequest: \(String(describing: call.arguments))")
 
             // ensure inner instance
             if player == nil {
-                player = JustAudioPlayer(engine: engine)
-
-                if let safeEqualizer = equalizer {
-                    try player.setEqualizer(safeEqualizer)
-                }
-
-                subscribeToPlayerEvents()
+                try initPlayer()
             }
 
             switch command {
             case .load:
                 try onLoad(request: request)
-                
-                // TODO trigger change state in ready in player
-                /*let event = EventChannelMessage(
-                    processingState: .ready,
-                    elapsedTime: 0,
-                    bufferedPosition: 0,
-                    duration: 0,
-                    currentIndex: 0
-                )
-                
-                eventChannel.sendEvent(event.toMap())
-                */
-                
             case .play:
                 try player.play()
             case .pause:
@@ -221,8 +185,92 @@ internal class SwiftPlayer: NSObject {
                 try onAudioEffectSetEnabled(request)
             case .darwinEqualizerBandSetGain:
                 try onEqualizerBandSetGain(request)
+            case .darwinWriteOutputToFile:
+                try player.writeOutputToFile()
+            case .darwinStopWriteOutputToFile:
+                player.stopWritingOutputFile()
+            case .darwinDelaySetTargetDelayTime:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+                
+                guard let effect = effect as? DelayAudioEffect else {
+                    return
+                }
+                
+                let targetDelayTime = request["targetDelayTime"] as! Double
+                effect.setDelayTime(targetDelayTime)
+                
+            case .darwinDelaySetTargetFeedback:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinDelaySetLowPassCutoff:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinDelaySetWetDryMix:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinDistortionSetWetDryMix:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinDistortionSetPreGain:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinDistortionSetPreset:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinReverbSetPreset:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
+            case .darwinReverbSetWetDryMix:
+                guard let effectId = request["id"] as? String else{
+                    return
+                }
+                
+                guard let effect = getEffectById(effectId) else {
+                    return
+                }
             }
-            
+
             result([:])
 
         } catch let error as SwiftJustAudioPluginError {
@@ -246,21 +294,71 @@ internal class SwiftPlayer: NSObject {
             cancellable.cancel()
         }
     }
+    
+    private func getEffectByRequest() {
+        guard let effectId = request["id"] as? String else{
+            return
+        }
+        
+        guard let effect = getEffectById(effectId) else {
+            return
+        }
+        
+        guard let effect = effect as? DelayAudioEffect else {
+            return
+        }
+    }
+    
+    private func getEffectById(_ id:String) -> AudioEffect? {
+        guard let effect = globalAudioEffects[id] else {
+            return audioSourcesAudioEffects[id]
+        }
+        
+        return effect
+    }
+}
+
+// MARK: - SwiftPlayer init player extension
+@available(iOS 13.0, *)
+extension SwiftPlayer {
+    func initPlayer() throws {
+        player = JustAudioPlayer(engine: engine)
+
+        if let safeEqualizer = equalizer {
+            try player.setEqualizer(safeEqualizer)
+        }
+
+        globalAudioEffects.forEach { _, audioEffect in
+            player.addAudioEffect(audioEffect)
+        }
+
+        if shouldWriteOutputToFile {
+            try player.writeOutputToFile()
+        }
+
+        subscribeToPlayerEvents()
+    }
 }
 
 // MARK: - SwiftPlayer handle extensions
-
 @available(iOS 13.0, *)
 extension SwiftPlayer {
     func onLoad(request: [String: Any?]) throws {
-        player.addAudioSource(try request.audioSequence)
+        let audioSequence = try request.audioSequence
+        player.addAudioSource(audioSequence)
+
+        let effects = audioSequence.sequence.map { audioSource in
+            audioSource.effects
+        }.flatMap { $0 }
+
+        audioSourcesAudioEffects = effects.reduce(into: audioSourcesAudioEffects) { partialResult, audioEffect in
+            partialResult[UUID().uuidString] = audioEffect
+        }
 
         try onSetShuffleOrder(request: request)
-
-        // TODO: (? not sure is needed ?): result(["duration": duration.microseconds])
     }
 
-    func onSetShuffleOrder(request: [String: Any]) throws {
+    func onSetShuffleOrder(request: [String: Any?]) throws {
         guard let shuffleOrder = request["shuffleOrder"] as? [Int] else {
             return
         }
@@ -269,18 +367,27 @@ extension SwiftPlayer {
     }
 
     func onAudioEffectSetEnabled(_ request: [String: Any]) throws {
-        let type = request["type"] as! String
-
-        if type == "DarwinEqualizer" {
-            let enabled = request["enabled"] as! Bool
+        let rawType = request["type"] as! String
+        let enabled = request["enabled"] as! Bool
+        
+        if rawType == "DarwinEqualizer" {
+            
             if enabled {
                 try player.activateEqualizerPreset(at: 0)
             } else {
                 try player.resetGains()
             }
+            
+            return
         }
 
-        // TODO: handle other effects
+        let type = DarwinAudioEffect(rawValue: rawType)!
+        
+        let effect = try globalAudioEffects.values.first(where: { effect in
+            return try effect.type == type
+        })
+        
+        effect?.setBypass(enabled)
     }
 
     func onEqualizerBandSetGain(_ request: [String: Any]) throws {
@@ -291,7 +398,6 @@ extension SwiftPlayer {
 }
 
 // MARK: - SwiftPlayer streams
-
 @available(iOS 13.0, *)
 extension SwiftPlayer {
     func subscribeToPlayerEvents() {
@@ -322,7 +428,6 @@ extension SwiftPlayer {
             sideInfosPublishers
         )
         .map { outputAbsoluteInfo, playerInfoPublishers, sideInfosPublishers in
-
             DataChannelMessage(
                 outputAbsolutePath: outputAbsoluteInfo.0,
                 outputError: outputAbsoluteInfo.1,
@@ -341,7 +446,6 @@ extension SwiftPlayer {
         .store(in: &cancellables)
 
         // event channel
-
         let trackInfos = Publishers.CombineLatest3(
             safePlayer.$bufferPosition,
             safePlayer.$duration,
@@ -359,167 +463,17 @@ extension SwiftPlayer {
             safePlayer.$equalizer
         )
         .removeDuplicates { prev, curr in
-            return prev.1.0 == curr.1.0
+            prev.1.0 == curr.1.0
         }
         .map { trackInfos, mainInfos, _ in
 
             EventChannelMessage(processingState: mainInfos.0, elapsedTime: trackInfos.2, bufferedPosition: trackInfos.0, duration: trackInfos.1, currentIndex: mainInfos.1)
         }.removeDuplicates()
-            .throttle(for: 10.0, scheduler: RunLoop.main, latest: true)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { [weak self] event in
-               // print("===== Sending on event channel")
-               // print(event.toMap())
-                self?.eventChannel.sendEvent(event.toMap())
-            })
-            .store(in: &cancellables)
-    }
-}
-
-// Specify the decimal place to round to using an enum
-public enum RoundingPrecision {
-    case ones
-    case tenths
-    case hundredths
-    case millis
-    case micros
-}
-
-enum RoundingHelper {
-    // Round to the specific decimal place
-    static func preciseRound(_ value: Double,
-                             precision: RoundingPrecision = .ones) -> Int
-    {
-        switch precision {
-        case .ones:
-            return Int(round(value))
-        case .tenths:
-            return Int(round(value * 10) / 10.0)
-        case .hundredths:
-            return Int(round(value * 100) / 100.0)
-        case .millis:
-            return Int(round(value * 1000) / 1000.0)
-        case .micros:
-            return Int(round(value * 1_000_000) / 1_000_000)
-        }
-    }
-}
-
-class DataChannelMessage: Equatable {
-    static func == (lhs: DataChannelMessage, rhs: DataChannelMessage) -> Bool {
-        lhs.outputAbsolutePath == rhs.outputAbsolutePath &&
-            "\(String(describing: lhs.outputError))" == "\(String(describing: rhs.outputError))" &&
-
-            lhs.playing == rhs.playing &&
-            lhs.volume == rhs.volume &&
-            lhs.speed == rhs.speed &&
-
-            lhs.loopMode == rhs.loopMode &&
-            lhs.shuffleMode == rhs.shuffleMode
-    }
-
-    let outputAbsolutePath: String?
-    let outputError: Error?
-
-    let playing: Bool?
-    let volume: Float?
-    let speed: Float?
-
-    let loopMode: Int?
-    let shuffleMode: Int?
-
-    init(outputAbsolutePath: String?, outputError: Error?, playing: Bool, volume: Float?, speed: Float?, loopMode: LoopMode?, shuffleMode: Bool) {
-        self.outputAbsolutePath = outputAbsolutePath
-        self.outputError = outputError
-
-        self.playing = playing
-        self.volume = volume
-        self.speed = speed
-
-        self.shuffleMode = shuffleMode ? 1 : 0
-
-        switch loopMode {
-        case .off:
-            self.loopMode = 0
-        case .one:
-            self.loopMode = 1
-        case .all:
-            self.loopMode = 2
-        default:
-            self.loopMode = nil
-        }
-    }
-
-    func toMap() -> [String: Any?] {
-        return [
-            "outputAbsolutePath": outputAbsolutePath,
-            "outputError": outputError != nil ? "\(String(describing: outputError))" : nil,
-
-            "playing": playing,
-            "volume": volume,
-            "speed": speed,
-
-            "loopMode": loopMode,
-            "shuffleMode": shuffleMode,
-        ]
-    }
-}
-
-// TODO: expose equalizer infos
-class EventChannelMessage: Equatable {
-    static func == (lhs: EventChannelMessage, rhs: EventChannelMessage) -> Bool {
-        lhs.processingState == rhs.processingState &&
-            lhs.updatePosition == rhs.updatePosition &&
-            lhs.bufferedPosition == rhs.bufferedPosition &&
-            lhs.duration == rhs.duration &&
-            lhs.currentIndex == rhs.currentIndex
-    }
-
-    let processingState: Int
-    let updatePosition: Int
-    let bufferedPosition: Int
-    let duration: Int
-    let currentIndex: Int
-
-    init(processingState: ProcessingState?, elapsedTime: Double?, bufferedPosition: Double?, duration: Double?, currentIndex: Int?) {
-        switch processingState {
-        case .none?:
-            self.processingState = 0
-        case .loading:
-            self.processingState = 1
-        case .buffering:
-            self.processingState = 2
-        case .ready:
-            self.processingState = 3
-        case .completed:
-            self.processingState = 4
-        default:
-            self.processingState = 0
-        }
-
-        /*updatePosition = elapsedTime != nil
-            ? RoundingHelper.preciseRound(elapsedTime!, precision: .micros)
-            : 0*/
-        updatePosition = elapsedTime != nil ? Int(elapsedTime! * 1_000_000) : 0
-
-        self.bufferedPosition = bufferedPosition != nil ? Int(bufferedPosition! * 1_000_000) : 0
-
-        self.duration = duration != nil ? Int(duration! * 1_000_000) : 0
-        
-        self.currentIndex = currentIndex ?? 0
-        print("iOS: duration: \(self.duration) | position: \(updatePosition)")
-    }
-
-    func toMap() -> [String: Any?] {
-        
-        return [
-            "processingState": processingState,
-            "updatePosition": updatePosition,
-            "updateTime": Int(Date().timeIntervalSince1970 * 1000),
-            "bufferedPosition": bufferedPosition,
-            "icyMetadata": [:], // Currently not supported
-            "duration": duration,
-            "currentIndex": currentIndex,
-        ]
+        .throttle(for: 10.0, scheduler: RunLoop.main, latest: true)
+        .receive(on: DispatchQueue.main)
+        .sink(receiveValue: { [weak self] event in
+            self?.eventChannel.sendEvent(event.toMap())
+        })
+        .store(in: &cancellables)
     }
 }

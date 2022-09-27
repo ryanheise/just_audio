@@ -15,15 +15,19 @@ class MethodChannelJustAudio extends JustAudioPlatform {
   }
 
   @override
-  Future<DisposePlayerResponse> disposePlayer(DisposePlayerRequest request) async {
-    return DisposePlayerResponse.fromMap((await _mainChannel.invokeMethod<Map<dynamic, dynamic>>(
-        'disposePlayer', request.toMap()))!);
+  Future<DisposePlayerResponse> disposePlayer(
+      DisposePlayerRequest request) async {
+    return DisposePlayerResponse.fromMap(
+        (await _mainChannel.invokeMethod<Map<dynamic, dynamic>>(
+            'disposePlayer', request.toMap()))!);
   }
 
   @override
-  Future<DisposeAllPlayersResponse> disposeAllPlayers(DisposeAllPlayersRequest request) async {
-    return DisposeAllPlayersResponse.fromMap((await _mainChannel
-        .invokeMethod<Map<dynamic, dynamic>>('disposeAllPlayers', request.toMap()))!);
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
+    return DisposeAllPlayersResponse.fromMap(
+        (await _mainChannel.invokeMethod<Map<dynamic, dynamic>>(
+            'disposeAllPlayers', request.toMap()))!);
   }
 }
 
@@ -40,81 +44,85 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       EventChannel('com.ryanheise.just_audio.events.$id')
           .receiveBroadcastStream()
           .cast<Map<dynamic, dynamic>>()
-          .map((map) {
-            print(map);
-            return PlaybackEventMessage.fromMap(map);
-      });
+          .map((map) => PlaybackEventMessage.fromMap(map));
 
   @override
   Stream<PlayerDataMessage> get playerDataMessageStream =>
-      EventChannel('com.ryanheise.just_audio.data.$id').receiveBroadcastStream().map((dynamic map) {
-        // print(map);
-        return PlayerDataMessage.fromMap(map as Map<dynamic, dynamic>);
-      });
+      EventChannel('com.ryanheise.just_audio.data.$id')
+          .receiveBroadcastStream()
+          .map((dynamic map) =>
+              PlayerDataMessage.fromMap(map as Map<dynamic, dynamic>));
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
-    return LoadResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('load', request.toMap()))!);
+    return LoadResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('load', request.toMap()))!);
   }
 
   @override
   Future<PlayResponse> play(PlayRequest request) async {
-    return PlayResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('play', request.toMap()))!);
+    return PlayResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('play', request.toMap()))!);
   }
 
   @override
   Future<PauseResponse> pause(PauseRequest request) async {
-    return PauseResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('pause', request.toMap()))!);
+    return PauseResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('pause', request.toMap()))!);
   }
 
   @override
   Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async {
-    return SetVolumeResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setVolume', request.toMap()))!);
+    return SetVolumeResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setVolume', request.toMap()))!);
   }
 
   @override
   Future<SetSpeedResponse> setSpeed(SetSpeedRequest request) async {
-    return SetSpeedResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setSpeed', request.toMap()))!);
+    return SetSpeedResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setSpeed', request.toMap()))!);
   }
 
   @override
   Future<SetPitchResponse> setPitch(SetPitchRequest request) async {
-    return SetPitchResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setPitch', request.toMap()))!);
+    return SetPitchResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setPitch', request.toMap()))!);
   }
 
   @override
-  Future<SetSkipSilenceResponse> setSkipSilence(SetSkipSilenceRequest request) async {
+  Future<SetSkipSilenceResponse> setSkipSilence(
+      SetSkipSilenceRequest request) async {
     return SetSkipSilenceResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setSkipSilence', request.toMap()))!);
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setSkipSilence', request.toMap()))!);
   }
 
   @override
   Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async {
-    return SetLoopModeResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setLoopMode', request.toMap()))!);
+    return SetLoopModeResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setLoopMode', request.toMap()))!);
   }
 
   @override
-  Future<SetShuffleModeResponse> setShuffleMode(SetShuffleModeRequest request) async {
+  Future<SetShuffleModeResponse> setShuffleMode(
+      SetShuffleModeRequest request) async {
     return SetShuffleModeResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setShuffleMode', request.toMap()))!);
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setShuffleMode', request.toMap()))!);
   }
 
   @override
-  Future<SetShuffleOrderResponse> setShuffleOrder(SetShuffleOrderRequest request) async {
+  Future<SetShuffleOrderResponse> setShuffleOrder(
+      SetShuffleOrderRequest request) async {
     return SetShuffleOrderResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('setShuffleOrder', request.toMap()))!);
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setShuffleOrder', request.toMap()))!);
   }
 
   @override
-  Future<SetAutomaticallyWaitsToMinimizeStallingResponse> setAutomaticallyWaitsToMinimizeStalling(
-      SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
+  Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
+      setAutomaticallyWaitsToMinimizeStalling(
+          SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
     return SetAutomaticallyWaitsToMinimizeStallingResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'setAutomaticallyWaitsToMinimizeStalling', request.toMap()))!);
@@ -123,63 +131,72 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
       setCanUseNetworkResourcesForLiveStreamingWhilePaused(
-          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest request) async {
+          SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest
+              request) async {
     return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'setCanUseNetworkResourcesForLiveStreamingWhilePaused', request.toMap()))!);
+            'setCanUseNetworkResourcesForLiveStreamingWhilePaused',
+            request.toMap()))!);
   }
 
   @override
   Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
       SetPreferredPeakBitRateRequest request) async {
-    return SetPreferredPeakBitRateResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('setPreferredPeakBitRate', request.toMap()))!);
+    return SetPreferredPeakBitRateResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setPreferredPeakBitRate', request.toMap()))!);
   }
 
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
-    return SeekResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('seek', request.toMap()))!);
+    return SeekResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('seek', request.toMap()))!);
   }
 
   @override
   Future<SetAndroidAudioAttributesResponse> setAndroidAudioAttributes(
       SetAndroidAudioAttributesRequest request) async {
-    return SetAndroidAudioAttributesResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('setAndroidAudioAttributes', request.toMap()))!);
+    return SetAndroidAudioAttributesResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setAndroidAudioAttributes', request.toMap()))!);
   }
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
-    return DisposeResponse.fromMap(
-        (await _channel.invokeMethod<Map<dynamic, dynamic>>('dispose', request.toMap()))!);
+    return DisposeResponse.fromMap((await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('dispose', request.toMap()))!);
   }
 
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
       ConcatenatingInsertAllRequest request) async {
-    return ConcatenatingInsertAllResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('concatenatingInsertAll', request.toMap()))!);
+    return ConcatenatingInsertAllResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'concatenatingInsertAll', request.toMap()))!);
   }
 
   @override
   Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(
       ConcatenatingRemoveRangeRequest request) async {
-    return ConcatenatingRemoveRangeResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('concatenatingRemoveRange', request.toMap()))!);
+    return ConcatenatingRemoveRangeResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'concatenatingRemoveRange', request.toMap()))!);
   }
 
   @override
-  Future<ConcatenatingMoveResponse> concatenatingMove(ConcatenatingMoveRequest request) async {
-    return ConcatenatingMoveResponse.fromMap((await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'concatenatingMove', request.toMap()))!);
+  Future<ConcatenatingMoveResponse> concatenatingMove(
+      ConcatenatingMoveRequest request) async {
+    return ConcatenatingMoveResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'concatenatingMove', request.toMap()))!);
   }
 
   @override
   Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
       AudioEffectSetEnabledRequest request) async {
-    return AudioEffectSetEnabledResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('audioEffectSetEnabled', request.toMap()))!);
+    return AudioEffectSetEnabledResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'audioEffectSetEnabled', request.toMap()))!);
   }
 
   @override
@@ -219,9 +236,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       DarwinDistortionSetWetDryMixRequest request) async {
     return DarwinDistortionSetWetDryMixResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-          'darwinDistortionSetWetDryMix', request.toMap()
-        ))!
-    );
+            'darwinDistortionSetWetDryMix', request.toMap()))!);
   }
 
   @override
@@ -229,9 +244,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       DarwinDistortionSetPreGainRequest request) async {
     return DarwinDistortionSetPreGainResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDistortionSetPreGain', request.toMap()
-        ))!
-    );
+            'darwinDistortionSetPreGain', request.toMap()))!);
   }
 
   @override
@@ -239,9 +252,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
       DarwinDistortionSetPresetRequest request) async {
     return DarwinDistortionSetPresetResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
-            'darwinDistortionSetPreset', request.toMap()
-        ))!
-    );
+            'darwinDistortionSetPreset', request.toMap()))!);
   }
 
   @override
@@ -263,13 +274,15 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<AndroidEqualizerGetParametersResponse> androidEqualizerGetParameters(
       AndroidEqualizerGetParametersRequest request) async {
-    return AndroidEqualizerGetParametersResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('androidEqualizerGetParameters', request.toMap()))!);
+    return AndroidEqualizerGetParametersResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidEqualizerGetParameters', request.toMap()))!);
   }
 
   @override
-  Future<AndroidLoudnessEnhancerSetTargetGainResponse> androidLoudnessEnhancerSetTargetGain(
-      AndroidLoudnessEnhancerSetTargetGainRequest request) async {
+  Future<AndroidLoudnessEnhancerSetTargetGainResponse>
+      androidLoudnessEnhancerSetTargetGain(
+          AndroidLoudnessEnhancerSetTargetGainRequest request) async {
     return AndroidLoudnessEnhancerSetTargetGainResponse.fromMap(
         (await _channel.invokeMethod<Map<dynamic, dynamic>>(
             'androidLoudnessEnhancerSetTargetGain', request.toMap()))!);
@@ -278,14 +291,29 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<AndroidEqualizerBandSetGainResponse> androidEqualizerBandSetGain(
       AndroidEqualizerBandSetGainRequest request) async {
-    return AndroidEqualizerBandSetGainResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('androidEqualizerBandSetGain', request.toMap()))!);
+    return AndroidEqualizerBandSetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'androidEqualizerBandSetGain', request.toMap()))!);
   }
 
   @override
   Future<DarwinEqualizerBandSetGainResponse> darwinEqualizerBandSetGain(
       DarwinEqualizerBandSetGainRequest request) async {
-    return DarwinEqualizerBandSetGainResponse.fromMap((await _channel
-        .invokeMethod<Map<dynamic, dynamic>>('darwinEqualizerBandSetGain', request.toMap()))!);
+    return DarwinEqualizerBandSetGainResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'darwinEqualizerBandSetGain', request.toMap()))!);
+  }
+
+  @override
+  Future<DarwinWriteOutputToFileResponse> darwinWriteOutputToFile() async {
+    return DarwinWriteOutputToFileResponse.fromMap(
+        (await _channel.invokeMethod('darwinWriteOutputToFile'))!);
+  }
+
+  @override
+  Future<DarwinStopWriteOutputToFileResponse>
+      darwinStopWriteOutputToFile() async {
+    return DarwinStopWriteOutputToFileResponse.fromMap(
+        (await _channel.invokeMethod('darwinStopWriteOutputToFile'))!);
   }
 }

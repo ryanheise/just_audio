@@ -42,15 +42,20 @@ extension [String: Any?] {
         get throws {
             let type = FlutterAudioSourceType(rawValue: self["type"] as! String)!
 
+            var effects: [AudioEffect] = []
+            if let rawEffects = self["effects"] as? [[String: Any?]] {
+                effects = rawEffects.map { $0.audioEffect }
+            }
+
             switch type {
             case .progressive, .dash, .hls:
                 let uri = self["uri"] as! String
 
                 if try isLocal {
-                    return LocalAudioSource(at: uri)
+                    return LocalAudioSource(at: uri, effects: effects)
                 }
 
-                return RemoteAudioSource(at: uri)
+                return RemoteAudioSource(at: uri, effects: effects)
             case .silence:
                 throw SwiftJustAudioPluginError.notImplementedError(message: "SilenceAudio is not yet supported")
             case .concatenating:

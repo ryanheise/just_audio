@@ -12,6 +12,10 @@
 
 @implementation JustAudioPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-  [SwiftJustAudioPlugin registerWithRegistrar:registrar];
+    if (@available(iOS 13.0, *)) {
+        [SwiftJustAudioPlugin registerWithRegistrar:registrar];
+    } else {
+        // Fallback on earlier versions
+    }
 }
 @end

@@ -66,32 +66,29 @@ extension SwiftJustAudioPlugin {
         guard let id = request["id"] as? String else {
             return
         }
-        
-        //let initRequestMessage = InitRequestMessage.fromMap(map: request)
+
         let playerId = id
 
         guard !players.keys.contains(playerId) else {
             throw SwiftJustAudioPluginError.platformAlreadyExists
         }
 
-        let methodChannel = FlutterMethodChannel(name: String(format: "com.ryanheise.just_audio.methods.%@", playerId), binaryMessenger: registrar.messenger())
-        let eventChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.events.%@", playerId), messenger: registrar.messenger())
-        let dataChannel = BetterEventChannel(name: String(format: "com.ryanheise.just_audio.data.%@", playerId), messenger: registrar.messenger())
+        let effectsRaw: [[String: Any?]] = request.keys.contains("darwinAudioEffects") ? (request["darwinAudioEffects"] as! [[String: Any?]]) : []
+
+        var shouldWriteOutputToFile = false
+        if let audioLoadConfiguration = request["audioLoadConfiguration"] as? [String: Any] {
+            if let darwinLoadControl = audioLoadConfiguration["darwinLoadControl"] as? [String: Any] {
+                shouldWriteOutputToFile = (darwinLoadControl["writeFinalOutputToFile"] as? Bool) ?? false
+            }
+        }
 
         let player = SwiftPlayer.Builder()
-            //.withAudioEffects(initRequestMessage.audioEffects)
-            //.withLoadConfiguration(initRequestMessage.configuration)
+            .withAudioEffects(effectsRaw.map { $0.audioEffect })
             .withPlayerId(id)
-
+            .withMessenger(messenger: registrar.messenger())
             .withAudioEngine(engine)
-            .withRegistrar(registrar)
-
-            .withMethodChannel(methodChannel)
-            .withEventChannel(eventChannel)
-            .withDataChannel(dataChannel)
-
+            .withShouldWriteOutputToFile(shouldWriteOutputToFile)
             .withEqualizer(try request.equalizer)
-
             .build()
 
         players[playerId] = player
