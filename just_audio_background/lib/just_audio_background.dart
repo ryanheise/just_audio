@@ -347,8 +347,9 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<DisposeResponse> dispose(DisposeRequest request) {
-    return forwardRequest('dispose', request);
+  Future<DisposeResponse> dispose(DisposeRequest request) async {
+    await release();
+    return DisposeResponse();
   }
 
   @override
@@ -491,9 +492,6 @@ class _PlayerAudioHandler extends BaseAudioHandler
       case 'audioEffectSetEnabled':
         return await (await _player).audioEffectSetEnabled(
             extras!['request'] as AudioEffectSetEnabledRequest);
-      case 'dispose':
-        return await (await _player)
-            .dispose(extras!['request'] as DisposeRequest);
       case 'setCanUseNetworkResourcesForLiveStreamingWhilePaused':
         return await (await _player)
             .setCanUseNetworkResourcesForLiveStreamingWhilePaused(extras![
