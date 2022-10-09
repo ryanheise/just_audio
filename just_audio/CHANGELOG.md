@@ -2,6 +2,10 @@
 
 * 
 
+## 0.9.30
+
+* Upgrade ExoPlayer to 2.18.1.
+
 ## 0.9.29
 
 * Fix bug in ConcatenatingAudioSource.clear().
