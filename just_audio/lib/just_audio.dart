@@ -2783,11 +2783,25 @@ class LockCachingAudioSource extends StreamAudioSource {
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
     final httpClient = HttpClient();
+    final userAgent = _player?._userAgent;
+    if (userAgent != null) {
+      httpClient.userAgent = userAgent;
+    }
     final httpRequest = await httpClient.getUrl(uri);
     if (headers != null) {
+      final host = httpRequest.headers.value(HttpHeaders.hostHeader);
       httpRequest.headers.clear();
+      httpRequest.headers.set(HttpHeaders.contentLengthHeader, '0');
+      if (host != null) {
+        httpRequest.headers.set(HttpHeaders.hostHeader, host);
+      }
+      if (userAgent != null) {
+        httpRequest.headers.set(HttpHeaders.userAgentHeader, userAgent);
+      }
       headers!.forEach((name, value) => httpRequest.headers.set(name, value));
     }
+    // Match ExoPlayer's native behavior
+    httpRequest.maxRedirects = 20;
     final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
@@ -2902,14 +2916,27 @@ class LockCachingAudioSource extends StreamAudioSource {
         final start = request.start!;
         final end = request.end ?? sourceLength;
         final httpClient = HttpClient();
+        if (userAgent != null) {
+          httpClient.userAgent = userAgent;
+        }
         httpClient.getUrl(uri).then((httpRequest) async {
           if (headers != null) {
+            final host = httpRequest.headers.value(HttpHeaders.hostHeader);
             httpRequest.headers.clear();
+            httpRequest.headers.set(HttpHeaders.contentLengthHeader, '0');
+            if (host != null) {
+              httpRequest.headers.set(HttpHeaders.hostHeader, host);
+            }
+            if (userAgent != null) {
+              httpRequest.headers.set(HttpHeaders.userAgentHeader, userAgent);
+            }
             headers!
                 .forEach((name, value) => httpRequest.headers.set(name, value));
           }
           final rangeRequest = _HttpRangeRequest(start, end);
           httpRequest.headers.set(HttpHeaders.rangeHeader, rangeRequest.header);
+          // Match ExoPlayer's native behavior
+          httpRequest.maxRedirects = 20;
           final response = await httpRequest.close();
           if (response.statusCode != 206) {
             httpClient.close();
@@ -3140,7 +3167,7 @@ _ProxyHandler _proxyHandlerForUri(
     final originRequest = await client.getUrl(redirectedUri ?? uri);
 
     // Rewrite request headers
-    final host = originRequest.headers.value('host');
+    final host = originRequest.headers.value(HttpHeaders.hostHeader);
     originRequest.headers.clear();
 
     // Match ExoPlayer's native behavior
@@ -3157,9 +3184,9 @@ _ProxyHandler _proxyHandlerForUri(
       originRequest.headers.set(entry.key, entry.value);
     }
     if (host != null) {
-      originRequest.headers.set('host', host);
+      originRequest.headers.set(HttpHeaders.hostHeader, host);
     } else {
-      originRequest.headers.removeAll('host');
+      originRequest.headers.removeAll(HttpHeaders.hostHeader);
     }
 
     // Try to make normal request
@@ -3241,7 +3268,7 @@ _ProxyHandler _proxyHandlerForUri(
         // Rewrite headers
         final headers = <String, String?>{};
         request.headers.forEach((name, value) {
-          if (name.toLowerCase() != 'host') {
+          if (name.toLowerCase() != HttpHeaders.hostHeader) {
             headers[name] = value.join(",");
           }
         });
