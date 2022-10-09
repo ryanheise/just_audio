@@ -22,7 +22,7 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Player.PositionInfo;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.TracksInfo;
+import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.metadata.Metadata;
@@ -220,9 +220,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     @Override
-    public void onTracksInfoChanged(TracksInfo tracks) {
-        for (int i = 0; i < tracks.getTrackGroupInfos().size(); i++) {
-            TrackGroup trackGroup = tracks.getTrackGroupInfos().get(i).getTrackGroup();
+    public void onTracksChanged(Tracks tracks) {
+        for (int i = 0; i < tracks.getGroups().size(); i++) {
+            TrackGroup trackGroup = tracks.getGroups().get(i).getMediaTrackGroup();
 
             for (int j = 0; j < trackGroup.length; j++) {
                 Metadata metadata = trackGroup.getFormat(j).metadata;
