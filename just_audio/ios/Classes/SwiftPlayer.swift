@@ -3,13 +3,10 @@ import Combine
 import Flutter
 import kMusicSwift
 
-/**
- TODOS
- - expose missing feature from kmusicswift
- - TEST
- */
 @available(iOS 13.0, *)
 internal class SwiftPlayer: NSObject {
+    let errorsChannel: BetterEventChannel
+
     let playerId: String
     @Published var globalAudioEffects: [String: AudioEffect]
     @Published var audioSourcesAudioEffects: [String: AudioEffect] = [:]
@@ -26,20 +23,26 @@ internal class SwiftPlayer: NSObject {
     var cancellables: [AnyCancellable] = []
 
     class Builder {
+        private var messenger: FlutterBinaryMessenger!
+        private var errorsChannel: BetterEventChannel!
         private var playerId: String!
         private var audioEffects: [AudioEffect]!
         private var engine: AVAudioEngine!
         private var equalizer: Equalizer?
-        private var messenger: FlutterBinaryMessenger!
         private var shouldWriteOutputToFile: Bool = false
-
-        func withPlayerId(_ playerId: String) -> Builder {
-            self.playerId = playerId
-            return self
-        }
 
         func withMessenger(messenger: FlutterBinaryMessenger) -> Builder {
             self.messenger = messenger
+            return self
+        }
+
+        func withErrorsChannel(_ errorsChannel: BetterEventChannel) -> Builder {
+            self.errorsChannel = errorsChannel
+            return self
+        }
+
+        func withPlayerId(_ playerId: String) -> Builder {
+            self.playerId = playerId
             return self
         }
 
@@ -66,6 +69,7 @@ internal class SwiftPlayer: NSObject {
         func build() -> SwiftPlayer {
             return SwiftPlayer(
                 messenger: messenger,
+                errorsChannel: errorsChannel,
                 playerId: playerId,
                 shouldWriteOutputToFile: shouldWriteOutputToFile,
                 audioEffects: audioEffects,
@@ -77,12 +81,15 @@ internal class SwiftPlayer: NSObject {
 
     private init(
         messenger: FlutterBinaryMessenger,
+        errorsChannel: BetterEventChannel,
         playerId: String,
         shouldWriteOutputToFile: Bool,
         audioEffects: [AudioEffect],
         engine: AVAudioEngine,
         equalizer: Equalizer?
     ) {
+        self.errorsChannel = errorsChannel
+
         self.playerId = playerId
         let effects: [String: AudioEffect] = [:]
 
@@ -92,9 +99,9 @@ internal class SwiftPlayer: NSObject {
 
         self.engine = engine
 
-        methodChannel = FlutterMethodChannel(name: playerId.methodsChannel, binaryMessenger: messenger)
-        eventChannel = BetterEventChannel(name: playerId.eventsChannel, messenger: messenger)
-        dataChannel = BetterEventChannel(name: playerId.dataChannel, messenger: messenger)
+        methodChannel = FlutterMethodChannel(name: Util.methodsChannel(forPlayer: playerId), binaryMessenger: messenger)
+        eventChannel = BetterEventChannel(name: Util.eventsChannel(forPlayer: playerId), messenger: messenger)
+        dataChannel = BetterEventChannel(name: Util.dataChannel(forPlayer: playerId), messenger: messenger)
 
         self.equalizer = equalizer
         self.shouldWriteOutputToFile = shouldWriteOutputToFile
@@ -110,10 +117,11 @@ internal class SwiftPlayer: NSObject {
         do {
             let command = try SwiftPlayerCommand.parse(call.method)
 
-            let request = call.arguments as! [String: Any]
+            let request = call.arguments as? [String: Any] ?? [:]
 
-            print("\ncommand: \(String(describing: call.method))")
-            print("\nrequest: \(String(describing: call.arguments))")
+            // Uncomment for debug
+            // print("\ncommand: \(String(describing: call.method))")
+            // print("request: \(String(describing: call.arguments))")
 
             // ensure inner instance
             if player == nil {
@@ -160,9 +168,9 @@ internal class SwiftPlayer: NSObject {
 
                 let children = request["children"] as! [[String: Any?]]
 
-                // TODO: Check, not sure this is the correct behaviour
                 try children.forEach {
-                    player.addAudioSource(try $0.audioSequence)
+                    let (_, audioSequence) = try FlutterAudioSourceType.parseAudioSequenceFrom(map: $0)
+                    player.addAudioSource(audioSequence)
                 }
 
                 try onSetShuffleOrder(request: request)
@@ -262,10 +270,6 @@ internal class SwiftPlayer: NSObject {
         } catch let error as SwiftJustAudioPluginError {
             result(error.flutterError)
         } catch {
-            // TODO: remove once stable
-            print("\ncommand: \(String(describing: call.method))")
-            print("\nrequest: \(String(describing: call.arguments))")
-            print(error)
             result(FlutterError(code: "510", message: "\(error)", details: nil))
         }
     }
@@ -334,15 +338,12 @@ extension SwiftPlayer {
 @available(iOS 13.0, *)
 extension SwiftPlayer {
     func onLoad(request: [String: Any?]) throws {
-        let audioSequence = try request.audioSequence
+        let (effects, audioSequence) = try FlutterAudioSourceType.parseAudioSequenceFrom(map: request)
         player.addAudioSource(audioSequence)
 
-        let effects = audioSequence.sequence.map { audioSource in
-            audioSource.effects
-        }.flatMap { $0 }
-
-        audioSourcesAudioEffects = effects.reduce(into: audioSourcesAudioEffects) { partialResult, audioEffect in
-            partialResult[UUID().uuidString] = audioEffect
+        audioSourcesAudioEffects = effects.reduce(into: audioSourcesAudioEffects) { partialResult, audioEffectWithId in
+            let (id, effect) = audioEffectWithId
+            partialResult[id] = effect
         }
 
         try onSetShuffleOrder(request: request)
@@ -370,13 +371,18 @@ extension SwiftPlayer {
             return
         }
 
-        let type = DarwinAudioEffect(rawValue: rawType)!
+        guard let effect = getEffectById(request["id"] as! String) else {
+            return
+        }
 
-        let effect = try globalAudioEffects.values.first(where: { effect in
-            try effect.type == type
-        })
-
-        effect?.setBypass(enabled)
+        if let reverb = effect as? ReverbAudioEffect {
+            reverb.setBypass(false) // Don't know why, but bypassing the reverb causes no final output
+            if enabled == false {
+                reverb.setWetDryMix(0)
+            }
+        } else {
+            effect.setBypass(!enabled)
+        }
     }
 
     func onEqualizerBandSetGain(_ request: [String: Any]) throws {
@@ -428,7 +434,7 @@ extension SwiftPlayer {
                 shuffleMode: sideInfosPublishers.1
             )
         }
-        .removeDuplicates()
+        .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
         .receive(on: DispatchQueue.main)
         .sink(receiveValue: { [weak self] event in
             self?.dataChannel.sendEvent(event.toMap())
@@ -451,11 +457,6 @@ extension SwiftPlayer {
             trackInfos,
             mainInfos
         )
-        .removeDuplicates { prev, curr in
-            // do not emit until processing state changes
-            prev.1.0 == curr.1.0
-        }
-        .throttle(for: 10.0, scheduler: RunLoop.main, latest: true)
 
         let effectsDataSource = Publishers.CombineLatest3(
             safePlayer.$equalizer,
@@ -473,10 +474,9 @@ extension SwiftPlayer {
             let equalizerData = effectsData.0
             let globalEffects = effectsData.1
             let audioSourceEffects = effectsData.2
-
             return EventChannelMessage(
                 processingState: mainInfos.0,
-                elapsedTime: trackInfos.2,
+                elapsedTime: safePlayer.elapsedTime,
                 bufferedPosition: trackInfos.0,
                 duration: trackInfos.1,
                 currentIndex: mainInfos.1,
@@ -485,12 +485,13 @@ extension SwiftPlayer {
                 audioSourceEffects: audioSourceEffects
             )
         }
+        .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
         .receive(on: DispatchQueue.main)
         .sink(receiveValue: { [weak self] event in
             do {
                 self?.eventChannel.sendEvent(try event.toMap())
             } catch {
-                print(error)
+                self?.errorsChannel.sendEvent(error.toFlutterError("When the player emt a new event and fails to serialize it").toMap())
             }
 
         })

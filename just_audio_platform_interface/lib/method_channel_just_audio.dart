@@ -8,6 +8,20 @@ import 'just_audio_platform_interface.dart';
 class MethodChannelJustAudio extends JustAudioPlatform {
   static const _mainChannel = MethodChannel('com.ryanheise.just_audio.methods');
 
+  MethodChannelJustAudio() {
+    errorsStream.listen((exception) => throw exception);
+  }
+
+  Stream<PlatformException> get errorsStream =>
+      const EventChannel('com.ryanheise.just_audio.errors')
+          .receiveBroadcastStream()
+          .cast<Map<dynamic, dynamic>>()
+          .map((map) => PlatformException(
+                code: map['code'] as String,
+                message: map['message'] as String?,
+                details: map['details'] as String?,
+              ));
+
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     await _mainChannel.invokeMethod<void>('init', request.toMap());
@@ -200,61 +214,63 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future darwinDelaySetTargetDelayTime(
+  Future<void> darwinDelaySetTargetDelayTime(
       DarwinDelaySetDelayTimeRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDelaySetTargetDelayTime', request.toMap());
   }
 
   @override
-  Future darwinDelaySetTargetFeedback(
+  Future<void> darwinDelaySetTargetFeedback(
       DarwinDelaySetFeedbackRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDelaySetTargetFeedback', request.toMap());
   }
 
   @override
-  Future darwinDelaySetLowPassCutoff(
+  Future<void> darwinDelaySetLowPassCutoff(
       DarwinDelaySetLowPassCutoffRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDelaySetLowPassCutoff', request.toMap());
   }
 
   @override
-  Future darwinDelaySetWetDryMix(DarwinDelaySetWetDryMixRequest request) async {
+  Future<void> darwinDelaySetWetDryMix(
+      DarwinDelaySetWetDryMixRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDelaySetWetDryMix', request.toMap());
   }
 
   @override
-  Future darwinDistortionSetWetDryMix(
+  Future<void> darwinDistortionSetWetDryMix(
       DarwinDistortionSetWetDryMixRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDistortionSetWetDryMix', request.toMap());
   }
 
   @override
-  Future darwinDistortionSetPreGain(
+  Future<void> darwinDistortionSetPreGain(
       DarwinDistortionSetPreGainRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDistortionSetPreGain', request.toMap());
   }
 
   @override
-  Future darwinDistortionSetPreset(
+  Future<void> darwinDistortionSetPreset(
       DarwinDistortionSetPresetRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinDistortionSetPreset', request.toMap());
   }
 
   @override
-  Future darwinReverbSetPreset(DarwinReverbSetPresetRequest request) async {
+  Future<void> darwinReverbSetPreset(
+      DarwinReverbSetPresetRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinReverbSetPreset', request.toMap());
   }
 
   @override
-  Future darwinReverbSetWetDryMix(
+  Future<void> darwinReverbSetWetDryMix(
       DarwinReverbSetWetDryMixRequest request) async {
     await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'darwinReverbSetWetDryMix', request.toMap());
@@ -300,7 +316,7 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future darwinStopWriteOutputToFile() async {
+  Future<void> darwinStopWriteOutputToFile() async {
     await _channel.invokeMethod<void>('darwinStopWriteOutputToFile', null);
   }
 }

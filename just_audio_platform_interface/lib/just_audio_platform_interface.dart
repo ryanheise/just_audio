@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ffi';
 
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -202,49 +201,54 @@ abstract class AudioPlayerPlatform {
         "audioEffectSetEnabled() has not been implemented.");
   }
 
-  Future darwinDelaySetTargetDelayTime(DarwinDelaySetDelayTimeRequest request) {
+  Future<void> darwinDelaySetTargetDelayTime(
+      DarwinDelaySetDelayTimeRequest request) {
     throw UnimplementedError(
         "darwinDelaySetTargetDelayTime() has not been implemented.");
   }
 
-  Future darwinDelaySetTargetFeedback(DarwinDelaySetFeedbackRequest request) {
+  Future<void> darwinDelaySetTargetFeedback(
+      DarwinDelaySetFeedbackRequest request) {
     throw UnimplementedError(
         "darwinDelaySetTargetFeedback() has not been implemented.");
   }
 
-  Future darwinDelaySetLowPassCutoff(
+  Future<void> darwinDelaySetLowPassCutoff(
       DarwinDelaySetLowPassCutoffRequest request) {
     throw UnimplementedError(
         "darwinDelaySetLowPassCutoff() has not been implemented.");
   }
 
-  Future darwinDelaySetWetDryMix(DarwinDelaySetWetDryMixRequest request) {
+  Future<void> darwinDelaySetWetDryMix(DarwinDelaySetWetDryMixRequest request) {
     throw UnimplementedError(
         "darwinDelaySetLowPassCutoff() has not been implemented.");
   }
 
-  Future darwinDistortionSetWetDryMix(
+  Future<void> darwinDistortionSetWetDryMix(
       DarwinDistortionSetWetDryMixRequest request) {
     throw UnimplementedError(
         "darwinDistortionSetWetDryMix() has not been implemented.");
   }
 
-  Future darwinDistortionSetPreGain(DarwinDistortionSetPreGainRequest request) {
+  Future<void> darwinDistortionSetPreGain(
+      DarwinDistortionSetPreGainRequest request) {
     throw UnimplementedError(
         "darwinDistortionSetPreGain() has not been implemented.");
   }
 
-  Future darwinDistortionSetPreset(DarwinDistortionSetPresetRequest request) {
+  Future<void> darwinDistortionSetPreset(
+      DarwinDistortionSetPresetRequest request) {
     throw UnimplementedError(
         "darwinDistortionSetPreset() has not been implemented.");
   }
 
-  Future darwinReverbSetWetDryMix(DarwinReverbSetWetDryMixRequest request) {
+  Future<void> darwinReverbSetWetDryMix(
+      DarwinReverbSetWetDryMixRequest request) {
     throw UnimplementedError(
         "darwinReverbSetWetDryMix() has not been implemented.");
   }
 
-  Future darwinReverbSetPreset(DarwinReverbSetPresetRequest request) {
+  Future<void> darwinReverbSetPreset(DarwinReverbSetPresetRequest request) {
     throw UnimplementedError(
         "darwinReverbSetPreset() has not been implemented.");
   }
@@ -283,7 +287,7 @@ abstract class AudioPlayerPlatform {
         "darwinWriteOutputToFile() has not been implemented.");
   }
 
-  Future darwinStopWriteOutputToFile() {
+  Future<void> darwinStopWriteOutputToFile() {
     throw UnimplementedError(
         "darwinStopWriteOutputToFile() has not been implemented.");
   }
@@ -1158,13 +1162,14 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'progressive',
         'id': id,
+        'type': 'progressive',
         'uri': uri,
         'headers': headers,
         'effects': effects?.map((audioEffectMessage) {
-          audioEffectMessage.toMap();
-        }).toList(),
+              return audioEffectMessage.toMap();
+            }).toList() ??
+            <Map<dynamic, dynamic>>[],
       };
 }
 
@@ -1181,13 +1186,14 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'dash',
         'id': id,
+        'type': 'dash',
         'uri': uri,
         'headers': headers,
         'effects': effects?.map((audioEffectMessage) {
-          return audioEffectMessage.toMap();
-        }).toList(),
+              return audioEffectMessage.toMap();
+            }).toList() ??
+            <Map<dynamic, dynamic>>[],
       };
 }
 
@@ -1204,13 +1210,14 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'hls',
         'id': id,
+        'type': 'hls',
         'uri': uri,
         'headers': headers,
         'effects': effects?.map((audioEffectMessage) {
-          return audioEffectMessage.toMap();
-        }).toList(),
+              return audioEffectMessage.toMap();
+            }).toList() ??
+            <Map<dynamic, dynamic>>[],
       };
 }
 
@@ -1226,8 +1233,8 @@ class SilenceAudioSourceMessage extends IndexedAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'silence',
         'id': id,
+        'type': 'silence',
         'duration': duration.inMicroseconds,
       };
 }
@@ -1248,8 +1255,8 @@ class ConcatenatingAudioSourceMessage extends AudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'concatenating',
         'id': id,
+        'type': 'concatenating',
         'children': children.map((child) => child.toMap()).toList(),
         'useLazyPreparation': useLazyPreparation,
         'shuffleOrder': shuffleOrder,
@@ -1275,8 +1282,8 @@ class ClippingAudioSourceMessage extends IndexedAudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'clipping',
         'id': id,
+        'type': 'clipping',
         'child': child.toMap(),
         'start': start?.inMicroseconds,
         'end': end?.inMicroseconds,
@@ -1302,8 +1309,8 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'type': 'looping',
         'id': id,
+        'type': 'looping',
         'child': child.toMap(),
         'count': count,
         'effects': effects?.map((audioEffectMessage) {
@@ -1315,20 +1322,20 @@ class LoopingAudioSourceMessage extends AudioSourceMessage {
 /// Information communicated to the platform implementation when setting the
 /// enabled status of an audio effect.
 class AudioEffectSetEnabledRequest {
+  final String? id;
   final String type;
   final bool enabled;
-  final String? id;
 
   AudioEffectSetEnabledRequest({
+    this.id,
     required this.type,
     required this.enabled,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'id': id,
         'type': type,
         'enabled': enabled,
-        'id': id,
       };
 }
 
@@ -1342,146 +1349,155 @@ class AudioEffectSetEnabledResponse {
 /// Information communicated to the platform implementation when setting the
 /// delay time on the delay audio effect.
 class DarwinDelaySetDelayTimeRequest {
+  final String id;
+
   /// The target delay time.
   final double targetDelayTime;
-  final String? id;
 
   DarwinDelaySetDelayTimeRequest({
+    required this.id,
     required this.targetDelayTime,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'targetDelayTime': targetDelayTime,
         'id': id,
+        'targetDelayTime': targetDelayTime,
       };
 }
 
 class DarwinDelaySetFeedbackRequest {
+  final String id;
+
   /// The target feedback.
   final double feedback;
-  final String? id;
 
   DarwinDelaySetFeedbackRequest({
+    required this.id,
     required this.feedback,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'feedback': feedback,
         'id': id,
+        'feedback': feedback,
       };
 }
 
 class DarwinDelaySetLowPassCutoffRequest {
+  final String id;
+
   /// The target lowPassCutoff.
   final double lowPassCutoff;
-  final String? id;
 
   DarwinDelaySetLowPassCutoffRequest({
+    required this.id,
     required this.lowPassCutoff,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'lowPassCutoff': lowPassCutoff,
         'id': id,
+        'lowPassCutoff': lowPassCutoff,
       };
 }
 
 class DarwinDelaySetWetDryMixRequest {
+  final String id;
+
   /// The target wet dry mix.
   final double wetDryMix;
-  final String? id;
 
   DarwinDelaySetWetDryMixRequest({
+    required this.id,
     required this.wetDryMix,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'wetDryMix': wetDryMix,
         'id': id,
+        'wetDryMix': wetDryMix,
       };
 }
 
 class DarwinReverbSetPresetRequest {
+  final String id;
+
   /// The target reverb preset.
   final DarwinReverbPreset preset;
-  final String? id;
 
   DarwinReverbSetPresetRequest({
+    required this.id,
     required this.preset,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'preset': preset.index,
         'id': id,
+        'preset': preset.index,
       };
 }
 
 class DarwinReverbSetWetDryMixRequest {
+  final String id;
+
   /// The target wet dry mix.
   final double wetDryMix;
-  final String? id;
 
   DarwinReverbSetWetDryMixRequest({
+    required this.id,
     required this.wetDryMix,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'wetDryMix': wetDryMix,
         'id': id,
+        'wetDryMix': wetDryMix,
       };
 }
 
 class DarwinDistortionSetPreGainRequest {
+  final String id;
+
   /// The target pre-gain.
   final double preGain;
-  final String? id;
 
   DarwinDistortionSetPreGainRequest({
+    required this.id,
     required this.preGain,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'preGain': preGain,
         'id': id,
+        'preGain': preGain,
       };
 }
 
 class DarwinDistortionSetWetDryMixRequest {
+  final String id;
+
   /// The target wet dry mix.
   final double wetDryMix;
-  final String? id;
 
   DarwinDistortionSetWetDryMixRequest({
+    required this.id,
     required this.wetDryMix,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'wetDryMix': wetDryMix,
         'id': id,
+        'wetDryMix': wetDryMix,
       };
 }
 
 class DarwinDistortionSetPresetRequest {
+  final String id;
+
   /// The target preset.
   final DarwinDistortionPreset preset;
-  final String? id;
 
   DarwinDistortionSetPresetRequest({
+    required this.id,
     required this.preset,
-    this.id,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-        'preset': preset,
         'id': id,
+        'preset': preset.index,
       };
 }
 
@@ -1605,22 +1621,31 @@ abstract class AudioEffectMessage {
   Map<dynamic, dynamic> toMap();
 }
 
-class DarwinDelayMessage extends AudioEffectMessage {
+abstract class DarwinAudioEffectMessage extends AudioEffectMessage {
+  final String id;
+
+  DarwinAudioEffectMessage({required this.id, required bool enabled})
+      : super(enabled: enabled);
+}
+
+class DarwinDelayMessage extends DarwinAudioEffectMessage {
   final double delayTime;
   final double feedback;
   final double lowPassCutoff;
   final double wetDryMix;
 
   DarwinDelayMessage({
+    required String id,
     required bool enabled,
     required this.delayTime,
     required this.feedback,
     required this.lowPassCutoff,
     required this.wetDryMix,
-  }) : super(enabled: enabled);
+  }) : super(id: id, enabled: enabled);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'id': id,
         'type': 'DarwinDelay',
         'enabled': enabled,
         'delayTime': delayTime,
@@ -1646,18 +1671,20 @@ enum DarwinReverbPreset {
   largeHall2,
 }
 
-class DarwinReverbMessage extends AudioEffectMessage {
+class DarwinReverbMessage extends DarwinAudioEffectMessage {
   final double wetDryMix;
   final DarwinReverbPreset? preset;
 
   DarwinReverbMessage({
     required bool enabled,
+    required String id,
     required this.wetDryMix,
     this.preset,
-  }) : super(enabled: enabled);
+  }) : super(enabled: enabled, id: id);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'id': id,
         'type': 'DarwinReverb',
         'enabled': enabled,
         'wetDryMix': wetDryMix,
@@ -1690,20 +1717,22 @@ enum DarwinDistortionPreset {
   speechWaves
 }
 
-class DarwinDistortionMessage extends AudioEffectMessage {
+class DarwinDistortionMessage extends DarwinAudioEffectMessage {
   final double preGain;
   final double wetDryMix;
   final DarwinDistortionPreset? preset;
 
   DarwinDistortionMessage({
+    required String id,
     required bool enabled,
     required this.preGain,
     required this.wetDryMix,
     this.preset,
-  }) : super(enabled: enabled);
+  }) : super(id: id, enabled: enabled);
 
   @override
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'id': id,
         'type': 'DarwinDistortion',
         'enabled': enabled,
         'preGain': preGain,
@@ -1824,7 +1853,7 @@ class AndroidEqualizerMessage extends AudioEffectMessage {
 
 abstract class DarwinAudioEffectState {
   final String id;
-  final Bool enable;
+  final bool enable;
 
   DarwinAudioEffectState({
     required this.id,
@@ -1835,11 +1864,11 @@ abstract class DarwinAudioEffectState {
     final type = map["type"] as String;
 
     if (type == "DarwinReverb") {
-      DarwinAudioEffectReverbState.fromMap(map);
+      return DarwinAudioEffectReverbState.fromMap(map);
     } else if (type == "DarwinDistortion") {
-      DarwinAudioEffectDistortionState.fromMap(map);
+      return DarwinAudioEffectDistortionState.fromMap(map);
     } else if (type == "DarwinDelay") {
-      DarwinAudioEffectDelayState.fromMap(map);
+      return DarwinAudioEffectDelayState.fromMap(map);
     }
 
     throw ArgumentError(["Unknown effect type $type"]);
@@ -1847,12 +1876,12 @@ abstract class DarwinAudioEffectState {
 }
 
 class DarwinAudioEffectReverbState extends DarwinAudioEffectState {
-  final Float wetDryMix;
+  final double wetDryMix;
   final DarwinReverbPreset preset;
 
   DarwinAudioEffectReverbState({
     required String id,
-    required Bool enable,
+    required bool enable,
     required this.wetDryMix,
     required this.preset,
   }) : super(id: id, enable: enable);
@@ -1860,22 +1889,22 @@ class DarwinAudioEffectReverbState extends DarwinAudioEffectState {
   static DarwinAudioEffectReverbState fromMap(Map<dynamic, dynamic> map) {
     return DarwinAudioEffectReverbState(
       id: map["id"] as String,
-      enable: map["enable"] as Bool,
-      wetDryMix: map["wetDryMix"] as Float,
+      enable: map["enable"] as bool,
+      wetDryMix: map["wetDryMix"] as double,
       preset: DarwinReverbPreset.values[(map["preset"] as int)],
     );
   }
 }
 
 class DarwinAudioEffectDelayState extends DarwinAudioEffectState {
-  final Float wetDryMix;
-  final Float lowPassCutoff;
-  final Float feedback;
-  final Double delayTime;
+  final double wetDryMix;
+  final double lowPassCutoff;
+  final double feedback;
+  final double delayTime;
 
   DarwinAudioEffectDelayState({
     required String id,
-    required Bool enable,
+    required bool enable,
     required this.wetDryMix,
     required this.lowPassCutoff,
     required this.feedback,
@@ -1885,23 +1914,23 @@ class DarwinAudioEffectDelayState extends DarwinAudioEffectState {
   static DarwinAudioEffectDelayState fromMap(Map<dynamic, dynamic> map) {
     return DarwinAudioEffectDelayState(
       id: map["id"] as String,
-      enable: map["enable"] as Bool,
-      wetDryMix: map["wetDryMix"] as Float,
-      lowPassCutoff: map["lowPassCutoff"] as Float,
-      feedback: map["feedback"] as Float,
-      delayTime: map["delayTime"] as Double,
+      enable: map["enable"] as bool,
+      wetDryMix: map["wetDryMix"] as double,
+      lowPassCutoff: map["lowPassCutoff"] as double,
+      feedback: map["feedback"] as double,
+      delayTime: map["delayTime"] as double,
     );
   }
 }
 
 class DarwinAudioEffectDistortionState extends DarwinAudioEffectState {
-  final Float wetDryMix;
-  final Float preGain;
+  final double wetDryMix;
+  final double preGain;
   final DarwinDistortionPreset preset;
 
   DarwinAudioEffectDistortionState({
     required String id,
-    required Bool enable,
+    required bool enable,
     required this.wetDryMix,
     required this.preGain,
     required this.preset,
@@ -1910,9 +1939,9 @@ class DarwinAudioEffectDistortionState extends DarwinAudioEffectState {
   static DarwinAudioEffectDistortionState fromMap(Map<dynamic, dynamic> map) {
     return DarwinAudioEffectDistortionState(
       id: map["id"] as String,
-      enable: map["enable"] as Bool,
-      wetDryMix: map["wetDryMix"] as Float,
-      preGain: map["preGain"] as Float,
+      enable: map["enable"] as bool,
+      wetDryMix: map["wetDryMix"] as double,
+      preGain: map["preGain"] as double,
       preset: DarwinDistortionPreset.values[(map["preset"] as int)],
     );
   }

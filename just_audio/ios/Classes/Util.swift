@@ -32,4 +32,16 @@ struct Util {
         // Equalize the level between iOS and android
         return value * 2.8
     }
+
+    static func methodsChannel(forPlayer playerId: String) -> String {
+        return String(format: "com.ryanheise.just_audio.methods.%@", playerId)
+    }
+
+    static func eventsChannel(forPlayer playerId: String) -> String {
+        return String(format: "com.ryanheise.just_audio.events.%@", playerId)
+    }
+
+    static func dataChannel(forPlayer playerId: String) -> String {
+        return String(format: "com.ryanheise.just_audio.data.%@", playerId)
+    }
 }

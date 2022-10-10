@@ -16,7 +16,14 @@ import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 
 export 'package:just_audio_platform_interface/just_audio_platform_interface.dart'
-    show DarwinEqualizerParametersMessage, DarwinEqualizerBandMessage;
+    show
+        DarwinEqualizerParametersMessage,
+        DarwinEqualizerBandMessage,
+        DarwinDistortionPreset,
+        DarwinDistortionMessage,
+        DarwinReverbPreset,
+        DarwinReverbMessage,
+        DarwinDelayMessage;
 
 const _uuid = Uuid();
 
@@ -905,6 +912,7 @@ class AudioPlayer {
     if (_disposed) return;
 
     await (await _platform).darwinStopWriteOutputToFile();
+    _outputAbsolutePathSubject.add(null);
   }
 
   /// Tells the player to record all the output to a file.
@@ -915,6 +923,7 @@ class AudioPlayer {
     if (_disposed) return null;
 
     final response = await (await _platform).darwinWriteOutputToFile();
+    _outputAbsolutePathSubject.add(response.outputFileFullPath);
     return response.outputFileFullPath;
   }
 
@@ -2152,8 +2161,12 @@ abstract class AudioSource {
   ///
   /// If headers are set, just_audio will create a cleartext local HTTP proxy on
   /// your device to forward HTTP requests with headers included.
-  static UriAudioSource uri(Uri uri,
-      {Map<String, String>? headers, dynamic tag, List<AudioEffect>? effects}) {
+  static UriAudioSource uri(
+    Uri uri, {
+    Map<String, String>? headers,
+    dynamic tag,
+    List<AudioEffect>? effects,
+  }) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
@@ -2189,6 +2202,8 @@ abstract class AudioSource {
 
   List<int> get shuffleIndices;
 
+  List<AudioEffect>? get effects;
+
   @override
   int get hashCode => _id.hashCode;
 
@@ -2223,12 +2238,13 @@ abstract class UriAudioSource extends IndexedAudioSource {
   final Map<String, String>? headers;
   Uri? _overrideUri;
 
-  UriAudioSource(this.uri,
-      {this.headers,
-      List<AudioEffect>? effects,
-      dynamic tag,
-      Duration? duration})
-      : super(tag: tag, duration: duration, effects: effects);
+  UriAudioSource(
+    this.uri, {
+    this.headers,
+    List<AudioEffect>? effects,
+    dynamic tag,
+    Duration? duration,
+  }) : super(tag: tag, duration: duration, effects: effects);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
   /// of the copied asset on the filesystem, otherwise it gives us the original
@@ -2245,6 +2261,12 @@ abstract class UriAudioSource extends IndexedAudioSource {
         (headers != null || player._userAgent != null)) {
       await player._proxy.ensureRunning();
       _overrideUri = player._proxy.addUriAudioSource(this);
+    }
+
+    if (effects != null) {
+      for (final effect in effects!) {
+        effect._setup(player);
+      }
     }
   }
 
@@ -2310,22 +2332,24 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
-  ProgressiveAudioSource(Uri uri,
-      {Map<String, String>? headers,
-      List<AudioEffect>? effects,
-      dynamic tag,
-      Duration? duration})
-      : super(uri,
+  ProgressiveAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    List<AudioEffect>? effects,
+    dynamic tag,
+    Duration? duration,
+  }) : super(uri,
             headers: headers, effects: effects, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id,
-      uri: _effectiveUri.toString(),
-      headers: headers,
-      tag: tag,
-      effects:
-          effects?.map((audioEffect) => audioEffect._toMessage()).toList());
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        effects:
+            effects?.map((audioEffect) => audioEffect._toMessage()).toList(),
+      );
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
@@ -2343,22 +2367,24 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class DashAudioSource extends UriAudioSource {
-  DashAudioSource(Uri uri,
-      {Map<String, String>? headers,
-      List<AudioEffect>? effects,
-      dynamic tag,
-      Duration? duration})
-      : super(uri,
+  DashAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    List<AudioEffect>? effects,
+    dynamic tag,
+    Duration? duration,
+  }) : super(uri,
             headers: headers, effects: effects, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
-      id: _id,
-      uri: _effectiveUri.toString(),
-      headers: headers,
-      tag: tag,
-      effects:
-          effects?.map((audioEffect) => audioEffect._toMessage()).toList());
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        effects:
+            effects?.map((audioEffect) => audioEffect._toMessage()).toList(),
+      );
 }
 
 /// An [AudioSource] representing an HLS stream. The following URI schemes are
@@ -2375,22 +2401,24 @@ class DashAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class HlsAudioSource extends UriAudioSource {
-  HlsAudioSource(Uri uri,
-      {Map<String, String>? headers,
-      List<AudioEffect>? effects,
-      dynamic tag,
-      Duration? duration})
-      : super(uri,
+  HlsAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    List<AudioEffect>? effects,
+    dynamic tag,
+    Duration? duration,
+  }) : super(uri,
             headers: headers, effects: effects, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
-      id: _id,
-      uri: _effectiveUri.toString(),
-      headers: headers,
-      tag: tag,
-      effects:
-          effects?.map((audioEffect) => audioEffect._toMessage()).toList());
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        effects:
+            effects?.map((audioEffect) => audioEffect._toMessage()).toList(),
+      );
 }
 
 /// An [AudioSource] for a period of silence.
@@ -2628,10 +2656,15 @@ class ConcatenatingAudioSource extends AudioSource {
 
   @override
   AudioSourceMessage _toMessage() => ConcatenatingAudioSourceMessage(
-      id: _id,
-      children: children.map((child) => child._toMessage()).toList(),
-      useLazyPreparation: useLazyPreparation,
-      shuffleOrder: _shuffleOrder.indices);
+        id: _id,
+        children: children.map((child) => child._toMessage()).toList(),
+        useLazyPreparation: useLazyPreparation,
+        shuffleOrder: _shuffleOrder.indices,
+      );
+
+  @override
+  List<AudioEffect>? get effects =>
+      children.expand((element) => element.effects ?? <AudioEffect>[]).toList();
 }
 
 /// An [AudioSource] that clips the audio of a [UriAudioSource] between a
@@ -2679,8 +2712,11 @@ class LoopingAudioSource extends AudioSource {
   final int count;
   final List<AudioEffect>? effects;
 
-  LoopingAudioSource({required this.child, required this.count, this.effects})
-      : super();
+  LoopingAudioSource({
+    required this.child,
+    required this.count,
+    this.effects,
+  });
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -3652,6 +3688,7 @@ class AudioPipeline {
 /// effect, in addition to being part of an [AudioPipeline] attached to an
 /// [AudioPlayer] you must also enable the effect via [setEnabled].
 abstract class AudioEffect {
+  final String id = const Uuid().v4();
   AudioPlayer? _player;
   final _enabledSubject = BehaviorSubject.seeded(false);
 
@@ -3684,7 +3721,7 @@ abstract class AudioEffect {
     _enabledSubject.add(enabled);
     if (_active) {
       await (await _player!._platform).audioEffectSetEnabled(
-          AudioEffectSetEnabledRequest(type: _type, enabled: enabled));
+          AudioEffectSetEnabledRequest(id: id, type: _type, enabled: enabled));
     }
   }
 
@@ -3699,48 +3736,61 @@ mixin DarwinAudioEffect on AudioEffect {}
 
 /// A Darwin [AudioEffect] that delays the audio signal
 class DarwinDelay extends AudioEffect with DarwinAudioEffect {
-  final _targetDelayTimeSubject = BehaviorSubject.seeded(0.0);
-  final _targetFeedbackSubject = BehaviorSubject.seeded(0.0);
-  final _targetLowPassCutoffSubject = BehaviorSubject.seeded(0.0);
-  final _targetWetDryMixSubject = BehaviorSubject.seeded(0.0);
+  final _secondsDelayTimeSubject = BehaviorSubject.seeded(1.0);
+  final _feedbackPercentSubject = BehaviorSubject.seeded(50.0);
+  final _lowPassCutoffHzSubject = BehaviorSubject.seeded(15000.0);
+  final _wetDryMixPercentSubject = BehaviorSubject.seeded(100.0);
 
-  double get delayTime => _targetDelayTimeSubject.nvalue!;
+  /// Time taken by the delayed input signal to reach the output
+  /// Range: 0 -> 2
+  /// Default: 1
+  /// Unit: seconds
+  double get secondsDelayTime => _secondsDelayTimeSubject.nvalue!;
 
-  Stream<double> get targetDelayTime => _targetDelayTimeSubject.stream;
+  Stream<double> get secondsDelayTimeStream => _secondsDelayTimeSubject.stream;
 
-  double get feedback => _targetFeedbackSubject.nvalue!;
+  /// Amount of the output signal fed back into the delay line
+  /// Range:  -100 -> 100
+  /// Default: 50
+  double get feedbackPercent => _feedbackPercentSubject.nvalue!;
 
-  Stream<double> get targetFeedback => _targetFeedbackSubject.stream;
+  Stream<double> get feedbackPercentStream => _feedbackPercentSubject.stream;
 
-  double get lowPassCutoff => _targetLowPassCutoffSubject.nvalue!;
+  /// Cutoff frequency above which high frequency content is rolled off
+  /// Range: 10 -> (samplerate/2)
+  /// Default: 15000
+  double get lowPassCutoffHz => _lowPassCutoffHzSubject.nvalue!;
 
-  Stream<double> get targetLowPassCutoff => _targetLowPassCutoffSubject.stream;
+  Stream<double> get lowPassCutoffHzStream => _lowPassCutoffHzSubject.stream;
 
-  double get wetDryMix => _targetWetDryMixSubject.nvalue!;
+  /// Blend of the wet and dry signals
+  /// Range:  0 (all dry) -> 100 (all wet)
+  /// Default: 100
+  double get wetDryMixPercent => _wetDryMixPercentSubject.nvalue!;
 
-  Stream<double> get targetWetDryMix => _targetWetDryMixSubject.stream;
+  Stream<double> get wetDryMixStream => _wetDryMixPercentSubject.stream;
 
   DarwinDelay({
     bool? enabled,
     double? delayTime,
-    double? feedback,
-    double? lowPassCutoff,
-    double? wetDryMix,
+    double? feedbackPercent,
+    double? lowPassCutoffHz,
+    double? wetDryMixPercent,
   }) {
     if (enabled != null) {
       _enabledSubject.add(enabled);
     }
     if (delayTime != null) {
-      _targetDelayTimeSubject.add(delayTime);
+      _secondsDelayTimeSubject.add(delayTime);
     }
-    if (feedback != null) {
-      _targetFeedbackSubject.add(feedback);
+    if (feedbackPercent != null) {
+      _feedbackPercentSubject.add(feedbackPercent);
     }
-    if (lowPassCutoff != null) {
-      _targetLowPassCutoffSubject.add(lowPassCutoff);
+    if (lowPassCutoffHz != null) {
+      _lowPassCutoffHzSubject.add(lowPassCutoffHz);
     }
-    if (wetDryMix != null) {
-      _targetWetDryMixSubject.add(wetDryMix);
+    if (wetDryMixPercent != null) {
+      _wetDryMixPercentSubject.add(wetDryMixPercent);
     }
   }
 
@@ -3748,65 +3798,68 @@ class DarwinDelay extends AudioEffect with DarwinAudioEffect {
   String get _type => 'DarwinDelay';
 
   Future<void> setDelayTime(double targetDelayTime) async {
-    _targetDelayTimeSubject.add(targetDelayTime);
+    _secondsDelayTimeSubject.add(targetDelayTime);
     if (_active) {
       await (await _player!._platform).darwinDelaySetTargetDelayTime(
-          DarwinDelaySetDelayTimeRequest(targetDelayTime: targetDelayTime));
+          DarwinDelaySetDelayTimeRequest(
+              id: id, targetDelayTime: targetDelayTime));
     }
   }
 
-  Future<void> setFeedback(double feedback) async {
-    _targetFeedbackSubject.add(feedback);
+  Future<void> setFeedbackPercent(double feedback) async {
+    _feedbackPercentSubject.add(feedback);
     if (_active) {
       await (await _player!._platform).darwinDelaySetTargetFeedback(
-          DarwinDelaySetFeedbackRequest(feedback: feedback));
+          DarwinDelaySetFeedbackRequest(id: id, feedback: feedback));
     }
   }
 
-  Future<void> setLowPassCutoff(double lowPassCutoff) async {
-    _targetLowPassCutoffSubject.add(lowPassCutoff);
+  Future<void> setLowPassCutoffHz(double lowPassCutoff) async {
+    _lowPassCutoffHzSubject.add(lowPassCutoff);
     if (_active) {
       await (await _player!._platform).darwinDelaySetLowPassCutoff(
-          DarwinDelaySetLowPassCutoffRequest(lowPassCutoff: lowPassCutoff));
+          DarwinDelaySetLowPassCutoffRequest(
+              id: id, lowPassCutoff: lowPassCutoff));
     }
   }
 
-  Future<void> setWetDryMix(double wetDryMix) async {
-    _targetWetDryMixSubject.add(wetDryMix);
+  Future<void> setWetDryMixPercent(double wetDryMix) async {
+    _wetDryMixPercentSubject.add(wetDryMix);
     if (_active) {
       await (await _player!._platform).darwinDelaySetWetDryMix(
-          DarwinDelaySetWetDryMixRequest(wetDryMix: wetDryMix));
+          DarwinDelaySetWetDryMixRequest(id: id, wetDryMix: wetDryMix));
     }
   }
 
   @override
   AudioEffectMessage _toMessage() => DarwinDelayMessage(
-      enabled: enabled,
-      delayTime: delayTime,
-      feedback: feedback,
-      lowPassCutoff: lowPassCutoff,
-      wetDryMix: wetDryMix);
+        id: id,
+        enabled: enabled,
+        delayTime: secondsDelayTime,
+        feedback: feedbackPercent,
+        lowPassCutoff: lowPassCutoffHz,
+        wetDryMix: wetDryMixPercent,
+      );
 }
 
 /// A Darwin [AudioEffect] that delays the audio signal
 class DarwinDistortion extends AudioEffect with DarwinAudioEffect {
-  final _targetPresetSubject =
+  final _presetSubject =
       BehaviorSubject.seeded(DarwinDistortionPreset.drumsBitBrush);
-  final _targetWetDryMixSubject = BehaviorSubject.seeded(0.0);
-  final _targetPreGainSubject = BehaviorSubject.seeded(0.0);
+  final _wetDryMixSubject = BehaviorSubject.seeded(0.0);
+  final _preGainSubject = BehaviorSubject.seeded(0.0);
 
-  double get wetDryMix => _targetWetDryMixSubject.nvalue!;
+  double get wetDryMix => _wetDryMixSubject.nvalue!;
 
-  double get preGain => _targetPreGainSubject.nvalue!;
+  double get preGain => _preGainSubject.nvalue!;
 
-  DarwinDistortionPreset get preset => _targetPresetSubject.nvalue!;
+  DarwinDistortionPreset get preset => _presetSubject.nvalue!;
 
-  Stream<double> get targetWetDryMix => _targetWetDryMixSubject.stream;
+  Stream<double> get wetDryMixStream => _wetDryMixSubject.stream;
 
-  Stream<double> get targetPreGainMix => _targetPreGainSubject.stream;
+  Stream<double> get preGainMixStream => _preGainSubject.stream;
 
-  Stream<DarwinDistortionPreset> get targetPreset =>
-      _targetPresetSubject.stream;
+  Stream<DarwinDistortionPreset> get presetStream => _presetSubject.stream;
 
   DarwinDistortion({
     bool? enabled,
@@ -3818,61 +3871,65 @@ class DarwinDistortion extends AudioEffect with DarwinAudioEffect {
       _enabledSubject.add(enabled);
     }
     if (preset != null) {
-      _targetPresetSubject.add(preset);
+      _presetSubject.add(preset);
     }
     if (wetDryMix != null) {
-      _targetWetDryMixSubject.add(wetDryMix);
+      _wetDryMixSubject.add(wetDryMix);
     }
     if (preGain != null) {
-      _targetPreGainSubject.add(preGain);
+      _preGainSubject.add(preGain);
     }
   }
 
   @override
   String get _type => 'DarwinDistortion';
 
-  Future<void> setPreset(DarwinDistortionPreset targetPreset) async {
-    _targetPresetSubject.add(targetPreset);
+  Future<void> setPreset(DarwinDistortionPreset preset) async {
+    _presetSubject.add(preset);
     if (_active) {
       await (await _player!._platform).darwinDistortionSetPreset(
-          DarwinDistortionSetPresetRequest(preset: targetPreset));
+          DarwinDistortionSetPresetRequest(id: id, preset: preset));
     }
   }
 
   Future<void> setWetDryMix(double wetDryMix) async {
-    _targetWetDryMixSubject.add(wetDryMix);
+    _wetDryMixSubject.add(wetDryMix);
     if (_active) {
       await (await _player!._platform).darwinDistortionSetWetDryMix(
-          DarwinDistortionSetWetDryMixRequest(wetDryMix: wetDryMix));
+          DarwinDistortionSetWetDryMixRequest(id: id, wetDryMix: wetDryMix));
     }
   }
 
   Future<void> setPreGain(double preGain) async {
-    _targetPreGainSubject.add(preGain);
+    _preGainSubject.add(preGain);
     if (_active) {
       await (await _player!._platform).darwinDistortionSetPreGain(
-          DarwinDistortionSetPreGainRequest(preGain: preGain));
+          DarwinDistortionSetPreGainRequest(id: id, preGain: preGain));
     }
   }
 
   @override
   AudioEffectMessage _toMessage() => DarwinDistortionMessage(
-      enabled: enabled, wetDryMix: wetDryMix, preset: preset, preGain: preGain);
+        id: id,
+        enabled: enabled,
+        wetDryMix: wetDryMix,
+        preset: preset,
+        preGain: preGain,
+      );
 }
 
 /// A Darwin [AudioEffect] that delays the audio signal
 class DarwinReverb extends AudioEffect with DarwinAudioEffect {
-  final _targetPresetSubject =
-      BehaviorSubject.seeded(DarwinReverbPreset.mediumHall);
-  final _targetWetDryMixSubject = BehaviorSubject.seeded(0.0);
+  final _presetSubject = BehaviorSubject.seeded(DarwinReverbPreset.mediumHall);
+  final _wetDryMixSubject = BehaviorSubject.seeded(0.0);
 
-  double get wetDryMix => _targetWetDryMixSubject.nvalue!;
+  double get wetDryMix => _wetDryMixSubject.nvalue!;
 
-  DarwinReverbPreset get preset => _targetPresetSubject.nvalue!;
+  DarwinReverbPreset get preset => _presetSubject.nvalue!;
 
-  Stream<double> get targetWetDryMix => _targetWetDryMixSubject.stream;
+  Stream<double> get wetDryMixStream => _wetDryMixSubject.stream;
 
-  Stream<DarwinReverbPreset> get targetPreset => _targetPresetSubject.stream;
+  Stream<DarwinReverbPreset> get presetStream => _presetSubject.stream;
 
   DarwinReverb({
     bool? enabled,
@@ -3883,35 +3940,45 @@ class DarwinReverb extends AudioEffect with DarwinAudioEffect {
       _enabledSubject.add(enabled);
     }
     if (preset != null) {
-      _targetPresetSubject.add(preset);
+      _presetSubject.add(preset);
     }
     if (wetDryMix != null) {
-      _targetWetDryMixSubject.add(wetDryMix);
+      _wetDryMixSubject.add(wetDryMix);
     }
   }
 
   @override
   String get _type => 'DarwinReverb';
 
-  Future<void> setPreset(DarwinReverbPreset targetPreset) async {
-    _targetPresetSubject.add(targetPreset);
+  Future<void> setPreset(DarwinReverbPreset preset) async {
+    _presetSubject.add(preset);
     if (_active) {
-      await (await _player!._platform).darwinReverbSetPreset(
-          DarwinReverbSetPresetRequest(preset: targetPreset));
+      await (await _player!._platform)
+          .darwinReverbSetPreset(DarwinReverbSetPresetRequest(
+        id: id,
+        preset: preset,
+      ));
     }
   }
 
   Future<void> setWetDryMix(double wetDryMix) async {
-    _targetWetDryMixSubject.add(wetDryMix);
+    _wetDryMixSubject.add(wetDryMix);
     if (_active) {
-      await (await _player!._platform).darwinReverbSetWetDryMix(
-          DarwinReverbSetWetDryMixRequest(wetDryMix: wetDryMix));
+      await (await _player!._platform)
+          .darwinReverbSetWetDryMix(DarwinReverbSetWetDryMixRequest(
+        id: id,
+        wetDryMix: wetDryMix,
+      ));
     }
   }
 
   @override
   AudioEffectMessage _toMessage() => DarwinReverbMessage(
-      enabled: enabled, wetDryMix: wetDryMix, preset: preset);
+        id: id,
+        enabled: enabled,
+        wetDryMix: wetDryMix,
+        preset: preset,
+      );
 }
 
 /// A Darwin [AudioEffect] that distortion

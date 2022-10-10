@@ -26,3 +26,19 @@ enum SwiftJustAudioPluginError: Error {
         }
     }
 }
+
+extension Error {
+    func toFlutterError(_ details: String?) -> FlutterError {
+        return FlutterError(code: "500", message: localizedDescription, details: details)
+    }
+}
+
+extension FlutterError {
+    func toMap() -> [String: Any?] {
+        return [
+            "code": code,
+            "message": message,
+            "description": description,
+        ]
+    }
+}

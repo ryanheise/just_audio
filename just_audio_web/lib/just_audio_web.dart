@@ -17,6 +17,9 @@ class JustAudioPlugin extends JustAudioPlatform {
   }
 
   @override
+  Stream<PlatformException> get errorsStream => const Stream.empty();
+
+  @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     if (players.containsKey(request.id)) {
       throw PlatformException(

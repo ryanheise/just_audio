@@ -4,12 +4,12 @@ PODS:
   - Flutter (1.0.0)
   - just_audio (0.0.1):
     - Flutter
-    - kMusicSwift
-  - kMusicSwift (0.1.4):
-    - SwiftAudioPlayerKuama (~> 7.6.3)
+    - kMusicSwift (~> 0.2.0)
+  - kMusicSwift (0.2.0):
+    - SwiftAudioPlayerKuama (~> 7.7.0)
   - path_provider_ios (0.0.1):
     - Flutter
-  - SwiftAudioPlayerKuama (7.6.3)
+  - SwiftAudioPlayerKuama (7.7.0)
 
 DEPENDENCIES:
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
@@ -35,10 +35,10 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   audio_session: 4f3e461722055d21515cf3261b64c973c062f345
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
-  just_audio: d6ba673680c69bce1f70abcafdfd686b32b2efba
-  kMusicSwift: 4c9f6710b9dd4d43bb4f50b88e80f4fa982f63c4
+  just_audio: 59d9cd52fae537a8d5e1d91e435a119109b91bc2
+  kMusicSwift: d1e5f19f614d78a4b3c32eb15c85323bb02fa52d
   path_provider_ios: 14f3d2fd28c4fdb42f44e0f751d12861c43cee02
-  SwiftAudioPlayerKuama: 90edf9b57052ffd7fa3977da66c22380621e394a
+  SwiftAudioPlayerKuama: ca5918634af482ccead7f5c002df7abc34e597cf
 
 PODFILE CHECKSUM: e5ee00144d04e7b168ba7ea28a9753540e444f3d
 

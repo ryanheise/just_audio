@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_example/common.dart';
+import 'package:just_audio_example/widgets.dart';
 import 'package:rxdart/rxdart.dart';
 
 void main() => runApp(const MyApp());
@@ -47,7 +48,11 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // AAC example: https://dl.espressif.com/dl/audio/ff-16b-2c-44100hz.aac
       await _player.setAudioSource(
         ConcatenatingAudioSource(
-          children: [AudioSource.uri(Uri.parse("asset:///audio/nature.mp3"))],
+          children: [
+            // AudioSource.uri(Uri.parse("asset:///audio/nature.mp3")),
+            AudioSource.uri(Uri.parse(
+                "asset:///audio/assets_mp3_dua_lipa_dont_start_now.mp3")),
+          ],
         ),
       );
     } catch (e) {
@@ -75,14 +80,15 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   /// Collects the data useful for displaying in a seek bar, using a handy
-  /// feature of rx_dart to combine the 3 streams of interest into one.
-  Stream<PositionData> get _positionDataStream =>
-      Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
-          _player.positionStream,
-          _player.bufferedPositionStream,
-          _player.durationStream,
-          (position, bufferedPosition, duration) => PositionData(
-              position, bufferedPosition, duration ?? Duration.zero));
+  /// feature of rx_dart to combine the 4 streams of interest into one.
+  late final Stream<PositionData> _positionDataStream = Rx.combineLatest4<
+          PlayerState, Duration, Duration, Duration?, PositionData>(
+      _player.playerStateStream,
+      _player.positionStream,
+      _player.bufferedPositionStream,
+      _player.durationStream, (state, position, bufferedPosition, duration) {
+    return PositionData(position, bufferedPosition, duration ?? Duration.zero);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -100,13 +106,18 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
               // each time the position, buffered position or duration changes.
               StreamBuilder<PositionData>(
                 stream: _positionDataStream,
+                initialData: PositionData(
+                  _player.position,
+                  _player.bufferedPosition,
+                  _player.duration ?? Duration.zero,
+                ),
                 builder: (context, snapshot) {
-                  final positionData = snapshot.data;
+                  final positionData = snapshot.requireData;
+
                   return SeekBar(
-                    duration: positionData?.duration ?? Duration.zero,
-                    position: positionData?.position ?? Duration.zero,
-                    bufferedPosition:
-                        positionData?.bufferedPosition ?? Duration.zero,
+                    duration: positionData.duration,
+                    position: positionData.position,
+                    bufferedPosition: positionData.bufferedPosition,
                     onChangeEnd: _player.seek,
                   );
                 },
@@ -210,34 +221,40 @@ class ControlButtons extends StatelessWidget {
             ),
           ],
         ),
-        IconButton(
-          icon: Icon(
-              player.shuffleModeEnabled ? Icons.shuffle : Icons.shuffle_on),
-          iconSize: 64.0,
-          onPressed: () =>
-              player.setShuffleModeEnabled(!player.shuffleModeEnabled),
-        ),
-        IconButton(
-          icon: const Icon(Icons.loop),
-          iconSize: 64.0,
-          onPressed: () {
-            switch (player.loopMode) {
-              case LoopMode.off:
-                player.setLoopMode(LoopMode.one);
-                break;
-              case LoopMode.one:
-                player.setLoopMode(LoopMode.all);
-                break;
-              case LoopMode.all:
-                player.setLoopMode(LoopMode.off);
-                break;
-            }
+        ValueStreamBuilder<bool>(
+          stream: player.shuffleModeEnabledStream,
+          initialValue: player.shuffleModeEnabled,
+          builder: (context, isShuffleModeEnable) {
+            return DebugLabel(
+              label: '$isShuffleModeEnable',
+              child: IconButton(
+                icon: isShuffleModeEnable
+                    ? const Icon(Icons.shuffle_on_rounded)
+                    : const Icon(Icons.shuffle),
+                iconSize: 64.0,
+                onPressed: () =>
+                    player.setShuffleModeEnabled(!isShuffleModeEnable),
+              ),
+            );
           },
         ),
-        IconButton(
-          icon: const Icon(Icons.shuffle_sharp),
-          iconSize: 64.0,
+        ValueStreamBuilder<LoopMode>(
+          stream: player.loopModeStream,
+          initialValue: player.loopMode,
+          builder: (context, loopMode) {
+            return DebugLabel(
+              label: loopMode.name,
+              child: IconButton(
+                icon: const Icon(Icons.loop),
+                iconSize: 64.0,
+                onPressed: () => player.setLoopMode(loopMode.next),
+              ),
+            );
+          },
+        ),
+        TextButton(
           onPressed: player.shuffle,
+          child: const Text('Shuffle indices'),
         ),
       ],
     );

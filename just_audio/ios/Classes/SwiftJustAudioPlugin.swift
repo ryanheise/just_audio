@@ -1,27 +1,19 @@
 import AVFAudio
 import Flutter
+import kMusicSwift
 import UIKit
-
-/**
- TODOS
- - [do we really need mappings???]
- - expose missing feature from kmusicswift
- - hook effects on load
- - check if we need to map responses
- - expose streams
- - add effects on audiosource on dart layer
- - add effects on audiosource mapping
- */
 
 @available(iOS 13.0, *)
 public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
     var players: [String: SwiftPlayer] = [:]
     let registrar: FlutterPluginRegistrar
     let engine: AVAudioEngine!
+    let errorsChannel: BetterEventChannel
 
     init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
         engine = AVAudioEngine()
+        errorsChannel = BetterEventChannel(name: "com.ryanheise.just_audio.errors", messenger: self.registrar.messenger())
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -48,11 +40,6 @@ public class SwiftJustAudioPlugin: NSObject, FlutterPlugin {
         } catch let error as SwiftJustAudioPluginError {
             result(error.flutterError)
         } catch {
-            // TODO: remove
-            print("command: \(String(describing: call.method))")
-            print("request: \(String(describing: call.arguments))")
-            print(error)
-
             result(FlutterError(code: "500", message: error.localizedDescription, details: nil))
         }
     }
@@ -74,15 +61,15 @@ extension SwiftJustAudioPlugin {
         }
 
         var effectsRaw: [[String: Any?]] = request.keys.contains("darwinAudioEffects") ? (request["darwinAudioEffects"] as! [[String: Any?]]) : []
-        
-        var equalizerRaw = effectsRaw.filter({ rawEffect in
-            return (rawEffect["type"] as! String) == "DarwinEqualizer"
-        }).first
-        
+
+        let equalizerRaw = effectsRaw.filter { rawEffect in
+            (rawEffect["type"] as! String) == "DarwinEqualizer"
+        }.first
+
         // exclude equalizer
-        effectsRaw = effectsRaw.filter({ rawEffect in
-            return (rawEffect["type"] as! String) != "DarwinEqualizer"
-        })
+        effectsRaw = effectsRaw.filter { rawEffect in
+            (rawEffect["type"] as! String) != "DarwinEqualizer"
+        }
 
         var shouldWriteOutputToFile = false
         if let audioLoadConfiguration = request["audioLoadConfiguration"] as? [String: Any] {
@@ -91,13 +78,19 @@ extension SwiftJustAudioPlugin {
             }
         }
 
+        let equalizer = equalizerRaw != nil ? try Equalizer.parse(from: equalizerRaw!) : nil
+
         let player = SwiftPlayer.Builder()
-            .withAudioEffects(effectsRaw.map { $0.audioEffect })
+            .withErrorsChannel(errorsChannel)
+            .withAudioEffects(effectsRaw.map {
+                let (_, audioEffect) = DarwinAudioEffect.parseEffectFrom(map: $0)
+                return audioEffect
+            })
             .withPlayerId(id)
             .withMessenger(messenger: registrar.messenger())
             .withAudioEngine(engine)
             .withShouldWriteOutputToFile(shouldWriteOutputToFile)
-            .withEqualizer(try equalizerRaw?.equalizer)
+            .withEqualizer(equalizer)
             .build()
 
         players[playerId] = player

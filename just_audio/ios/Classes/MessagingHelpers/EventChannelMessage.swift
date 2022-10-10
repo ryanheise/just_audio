@@ -6,7 +6,6 @@
 //
 import kMusicSwift
 
-// TODO: expose equalizer infos
 class EventChannelMessage: Equatable {
     let processingState: Int
     let updatePosition: Int
@@ -85,54 +84,8 @@ class EventChannelMessage: Equatable {
     }
 }
 
-extension Equalizer {
-    func toMap() -> [String: Any?] {
-        return [
-            "minDecibels": frequencies.first,
-            "maxDecibels": frequencies.last,
-            "bands": activePreset?.mapWithIndex { index, band in
-                [
-                    "index": index,
-                    "gain": band,
-                    "centerFrequency": self.frequencies[index],
-                ]
-            } ?? [],
-            "activePreset": activePreset,
-        ]
-    }
-}
-
-public extension Array {
+internal extension Array {
     func mapWithIndex<T>(f: (Int, Element) -> T) -> [T] {
         return zip(startIndex ..< endIndex, self).map(f)
-    }
-}
-
-extension AudioEffect {
-    func toMap(_ id: String) throws -> [String: Any?] {
-        var result: [String: Any?] = [
-            "id": id,
-            "enable": !bypass,
-            "type": try type,
-        ]
-
-        switch self {
-        case let effect as ReverbAudioEffect:
-            result["wetDryMix"] = effect.wetDryMix
-            result["preset"] = effect.preset
-        case let effect as DelayAudioEffect:
-            result["delayTime"] = effect.delayTime
-            result["feedback"] = effect.feedback
-            result["lowPassCutoff"] = effect.lowPassCutoff
-            result["wetDryMix"] = effect.wetDryMix
-        case let effect as DistortionAudioEffect:
-            result["wetDryMix"] = effect.wetDryMix
-            result["preset"] = effect.preset
-            result["preGain"] = effect.preGain
-        default:
-            print("Unknown type of audio effect, \(self)")
-        }
-
-        return result
     }
 }
