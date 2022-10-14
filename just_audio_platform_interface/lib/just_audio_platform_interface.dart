@@ -984,7 +984,7 @@ class DarwinLoadControlMessage {
   /// (iOS/macOS) If set to true, a file in the user's document directory will be written,
   /// it will contain all the final output reproduced by the player (Final means after all effects
   /// have been applied to the audio).
-  final bool writeFinalOutputToFile;
+  final bool shouldWriteFinalOutputToFile;
 
   /// (iOS/macOS) If specified, limits the download bandwidth in bits per
   /// second.
@@ -995,7 +995,7 @@ class DarwinLoadControlMessage {
     required this.preferredForwardBufferDuration,
     required this.canUseNetworkResourcesForLiveStreamingWhilePaused,
     required this.preferredPeakBitRate,
-    required this.writeFinalOutputToFile,
+    required this.shouldWriteFinalOutputToFile,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -1006,7 +1006,7 @@ class DarwinLoadControlMessage {
         'canUseNetworkResourcesForLiveStreamingWhilePaused':
             canUseNetworkResourcesForLiveStreamingWhilePaused,
         'preferredPeakBitRate': preferredPeakBitRate,
-        'writeFinalOutputToFile': writeFinalOutputToFile,
+        'writeFinalOutputToFile': shouldWriteFinalOutputToFile,
       };
 }
 
