@@ -7,7 +7,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:meta/meta.dart' show experimental;
 import 'package:path/path.dart' as p;
@@ -1566,7 +1565,7 @@ class PlaybackEvent {
       );
 
   @override
-  int get hashCode => hashValues(
+  int get hashCode => Object.hash(
         processingState,
         updateTime,
         updatePosition,
@@ -1631,7 +1630,7 @@ class PlayerState {
   String toString() => 'playing=$playing,processingState=$processingState';
 
   @override
-  int get hashCode => hashValues(playing, processingState);
+  int get hashCode => Object.hash(playing, processingState);
 
   @override
   bool operator ==(Object other) =>
@@ -1656,7 +1655,7 @@ class IcyInfo {
   String toString() => 'title=$title,url=$url';
 
   @override
-  int get hashCode => hashValues(title, url);
+  int get hashCode => Object.hash(title, url);
 
   @override
   bool operator ==(Object other) =>
@@ -1725,7 +1724,7 @@ class IcyMetadata {
   IcyMetadata({required this.info, required this.headers});
 
   @override
-  int get hashCode => hashValues(info, headers);
+  int get hashCode => Object.hash(info, headers);
 
   @override
   bool operator ==(Object other) =>
