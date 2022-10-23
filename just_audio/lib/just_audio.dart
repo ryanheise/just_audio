@@ -2782,8 +2782,8 @@ class LockCachingAudioSource extends StreamAudioSource {
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
     final httpClient = _createHttpClient(userAgent: _player?._userAgent);
-    final request = await _getUrl(httpClient, uri, headers: headers);
-    final response = await request.close();
+    final httpRequest = await _getUrl(httpClient, uri, headers: headers);
+    final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
       throw Exception('HTTP Status Error: ${response.statusCode}');
@@ -3125,10 +3125,10 @@ _ProxyHandler _proxyHandlerForUri(
   // Keep redirected [Uri] to speed-up requests
   Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
+    final client = _createHttpClient(userAgent: userAgent);
     // Try to make normal request
     String? host;
     try {
-      final client = _createHttpClient(userAgent: userAgent);
       final requestHeaders = <String, String>{if (headers != null) ...headers};
       request.headers
           .forEach((name, value) => requestHeaders[name] = value.join(', '));
