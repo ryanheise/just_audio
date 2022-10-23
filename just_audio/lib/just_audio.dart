@@ -7,7 +7,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:meta/meta.dart' show experimental;
 import 'package:path/path.dart' as p;
@@ -1566,7 +1565,7 @@ class PlaybackEvent {
       );
 
   @override
-  int get hashCode => hashValues(
+  int get hashCode => Object.hash(
         processingState,
         updateTime,
         updatePosition,
@@ -1631,7 +1630,7 @@ class PlayerState {
   String toString() => 'playing=$playing,processingState=$processingState';
 
   @override
-  int get hashCode => hashValues(playing, processingState);
+  int get hashCode => Object.hash(playing, processingState);
 
   @override
   bool operator ==(Object other) =>
@@ -1656,7 +1655,7 @@ class IcyInfo {
   String toString() => 'title=$title,url=$url';
 
   @override
-  int get hashCode => hashValues(title, url);
+  int get hashCode => Object.hash(title, url);
 
   @override
   bool operator ==(Object other) =>
@@ -1725,7 +1724,7 @@ class IcyMetadata {
   IcyMetadata({required this.info, required this.headers});
 
   @override
-  int get hashCode => hashValues(info, headers);
+  int get hashCode => Object.hash(info, headers);
 
   @override
   bool operator ==(Object other) =>
@@ -2714,6 +2713,13 @@ class LockCachingAudioSource extends StreamAudioSource {
     _downloadProgressSubject.add((await cacheFile.exists()) ? 1.0 : 0.0);
   }
 
+  /// Returns a [UriAudioSource] resolving directly to the cache file if it
+  /// exists, otherwise returns `this`. This can be
+  Future<IndexedAudioSource> resolve() async {
+    final file = await cacheFile;
+    return await file.exists() ? AudioSource.uri(Uri.file(file.path)) : this;
+  }
+
   /// Emits the current download progress as a double value from 0.0 (nothing
   /// downloaded) to 1.0 (download complete).
   Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
@@ -2782,12 +2788,8 @@ class LockCachingAudioSource extends StreamAudioSource {
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
-    final httpClient = HttpClient();
-    final httpRequest = await httpClient.getUrl(uri);
-    if (headers != null) {
-      httpRequest.headers.clear();
-      headers!.forEach((name, value) => httpRequest.headers.set(name, value));
-    }
+    final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+    final httpRequest = await _getUrl(httpClient, uri, headers: headers);
     final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
@@ -2901,15 +2903,13 @@ class LockCachingAudioSource extends StreamAudioSource {
         _requests.remove(request);
         final start = request.start!;
         final end = request.end ?? sourceLength;
-        final httpClient = HttpClient();
-        httpClient.getUrl(uri).then((httpRequest) async {
-          if (headers != null) {
-            httpRequest.headers.clear();
-            headers!
-                .forEach((name, value) => httpRequest.headers.set(name, value));
-          }
-          final rangeRequest = _HttpRangeRequest(start, end);
-          httpRequest.headers.set(HttpHeaders.rangeHeader, rangeRequest.header);
+        final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+
+        final rangeRequest = _HttpRangeRequest(start, end);
+        _getUrl(httpClient, uri, headers: {
+          if (headers != null) ...headers!,
+          HttpHeaders.rangeHeader: rangeRequest.header,
+        }).then((httpRequest) async {
           final response = await httpRequest.close();
           if (response.statusCode != 206) {
             httpClient.close();
@@ -3132,38 +3132,16 @@ _ProxyHandler _proxyHandlerForUri(
   // Keep redirected [Uri] to speed-up requests
   Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    final client = HttpClient();
-
-    if (userAgent != null) {
-      client.userAgent = userAgent;
-    }
-    final originRequest = await client.getUrl(redirectedUri ?? uri);
-
-    // Rewrite request headers
-    final host = originRequest.headers.value('host');
-    originRequest.headers.clear();
-
-    // Match ExoPlayer's native behavior
-    originRequest.maxRedirects = 20;
-
-    // Make sure that we send the userAgent header also on the first request
-    if (userAgent != null) {
-      originRequest.headers.set(HttpHeaders.userAgentHeader, userAgent);
-    }
-    request.headers.forEach((name, value) {
-      originRequest.headers.set(name, value);
-    });
-    for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
-      originRequest.headers.set(entry.key, entry.value);
-    }
-    if (host != null) {
-      originRequest.headers.set('host', host);
-    } else {
-      originRequest.headers.removeAll('host');
-    }
-
+    final client = _createHttpClient(userAgent: userAgent);
     // Try to make normal request
+    String? host;
     try {
+      final requestHeaders = <String, String>{if (headers != null) ...headers};
+      request.headers
+          .forEach((name, value) => requestHeaders[name] = value.join(', '));
+      final originRequest =
+          await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
+      host = originRequest.headers.value(HttpHeaders.hostHeader);
       final originResponse = await originRequest.close();
       if (originResponse.redirects.isNotEmpty) {
         redirectedUri = originResponse.redirects.last.location;
@@ -3241,7 +3219,7 @@ _ProxyHandler _proxyHandlerForUri(
         // Rewrite headers
         final headers = <String, String?>{};
         request.headers.forEach((name, value) {
-          if (name.toLowerCase() != 'host') {
+          if (name.toLowerCase() != HttpHeaders.hostHeader) {
             headers[name] = value.join(",");
           }
         });
@@ -3807,4 +3785,32 @@ enum PositionDiscontinuityReason {
   /// The position discontinuity occurred because the player reached the end of
   /// the current item and auto-advanced to the next item.
   autoAdvance,
+}
+
+Future<HttpClientRequest> _getUrl(HttpClient client, Uri uri,
+    {Map<String, String>? headers}) async {
+  final request = await client.getUrl(uri);
+  if (headers != null) {
+    final host = request.headers.value(HttpHeaders.hostHeader);
+    request.headers.clear();
+    request.headers.set(HttpHeaders.contentLengthHeader, '0');
+    headers.forEach((name, value) => request.headers.set(name, value));
+    if (host != null) {
+      request.headers.set(HttpHeaders.hostHeader, host);
+    }
+    if (client.userAgent != null) {
+      request.headers.set(HttpHeaders.userAgentHeader, client.userAgent!);
+    }
+  }
+  // Match ExoPlayer's native behavior
+  request.maxRedirects = 20;
+  return request;
+}
+
+HttpClient _createHttpClient({String? userAgent}) {
+  final client = HttpClient();
+  if (userAgent != null) {
+    client.userAgent = userAgent;
+  }
+  return client;
 }

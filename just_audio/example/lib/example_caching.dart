@@ -48,7 +48,9 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       print('A stream error occurred: $e');
     });
     try {
-      //await _audioSource.clearCache();
+      // Use resolve() if you want to obtain a UriAudioSource pointing directly
+      // to the cache file.
+      // await _player.setAudioSource(await _audioSource.resolve());
       await _player.setAudioSource(_audioSource);
     } catch (e) {
       print("Error loading audio source: $e");
