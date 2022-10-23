@@ -2,6 +2,7 @@
 
 * Upgrade ExoPlayer to 2.18.1.
 * Fix bug using headers with LockCachingAudioSource.
+* Add LockCachingAudioSource.resolve().
 
 ## 0.9.29
 

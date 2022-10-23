@@ -2713,6 +2713,13 @@ class LockCachingAudioSource extends StreamAudioSource {
     _downloadProgressSubject.add((await cacheFile.exists()) ? 1.0 : 0.0);
   }
 
+  /// Returns a [UriAudioSource] resolving directly to the cache file if it
+  /// exists, otherwise returns `this`. This can be
+  Future<IndexedAudioSource> resolve() async {
+    final file = await cacheFile;
+    return await file.exists() ? AudioSource.uri(Uri.file(file.path)) : this;
+  }
+
   /// Emits the current download progress as a double value from 0.0 (nothing
   /// downloaded) to 1.0 (download complete).
   Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
