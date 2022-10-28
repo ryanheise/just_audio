@@ -1,7 +1,15 @@
+## 0.9.30
+
+* Upgrade ExoPlayer to 2.18.1.
+* Fix bug using headers with LockCachingAudioSource.
+* Add LockCachingAudioSource.resolve().
+
 ## 0.9.29
 
 * Fix bug in ConcatenatingAudioSource.clear().
 * Fix bug where proxy drains origin faster than it feeds client.
+* Fix bug where User Agent was not set on redirects (@mikel-snipd)
+* Fix bug where StreamAudioSource requests are not closed when proxy is disposed (@mikel-snipd)
 
 ## 0.9.28
 
