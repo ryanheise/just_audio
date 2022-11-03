@@ -692,15 +692,25 @@ class AudioPlayer {
   /// setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
   ///     initialPosition: Duration.zero, preload: true);
   /// ```
+  /// The [package] argument must be non-null if an asset from package is being
+  /// fetched.
   ///
   /// See [setAudioSource] for a detailed explanation of the options.
   Future<Duration?> setAsset(
     String assetPath, {
+    String? package,
     bool preload = true,
     Duration? initialPosition,
-  }) =>
-      setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
-          initialPosition: initialPosition, preload: preload);
+  }) {
+    final keyName =
+        package == null ? assetPath : 'packages/$package/$assetPath';
+
+    return setAudioSource(
+      AudioSource.uri(Uri.parse('asset:///$keyName')),
+      initialPosition: initialPosition,
+      preload: preload,
+    );
+  }
 
   /// Sets the source from which this audio player should fetch audio.
   ///
