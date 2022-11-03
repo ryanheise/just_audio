@@ -1,3 +1,7 @@
+## 0.9.31
+
+* Add AudioPlayer.setAsset() a package argument (@ewertonls)
+
 ## 0.9.30
 
 * Upgrade ExoPlayer to 2.18.1.
