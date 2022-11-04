@@ -1,6 +1,7 @@
 ## 0.9.31
 
-* Add AudioPlayer.setAsset() a package argument (@ewertonls)
+* Add a package parameter to AudioPlayer.setAsset() (@ewertonls).
+* Add AudioSource.asset(), AudioSource.file().
 
 ## 0.9.30
 
