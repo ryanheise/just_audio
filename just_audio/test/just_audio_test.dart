@@ -82,6 +82,27 @@ void runTests() {
     await player.dispose();
   });
 
+  test('assets', () async {
+    final player = AudioPlayer();
+    void expectAsset(String uri) {
+      final audioSource = player.audioSource;
+      expect(audioSource is UriAudioSource && audioSource.uri.toString() == uri,
+          equals(true));
+    }
+
+    await player.setAsset('audio/foo.mp3', preload: false);
+    expectAsset('asset:///audio/foo.mp3');
+    await player.setAsset('audio/foo.mp3', package: 'bar', preload: false);
+    expectAsset('asset:///packages/bar/audio/foo.mp3');
+    await player.setAudioSource(AudioSource.asset('audio/foo.mp3'),
+        preload: false);
+    expectAsset('asset:///audio/foo.mp3');
+    await player.setAudioSource(
+        AudioSource.asset('audio/foo.mp3', package: 'bar'),
+        preload: false);
+    expectAsset('asset:///packages/bar/audio/foo.mp3');
+  });
+
   test('idle-state', () async {
     final player = AudioPlayer();
     player.play();
