@@ -690,6 +690,8 @@ class AudioPlayer {
   /// Convenience method to set the audio source to a file, preloaded by
   /// default, with an initial position of zero by default.
   ///
+  /// This is equivalent to:
+  ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.file(filePath)),
   ///     initialPosition: Duration.zero, preload: true);
@@ -701,25 +703,34 @@ class AudioPlayer {
     Duration? initialPosition,
     bool preload = true,
   }) =>
-      setAudioSource(AudioSource.uri(Uri.file(filePath)),
+      setAudioSource(AudioSource.file(filePath),
           initialPosition: initialPosition, preload: preload);
 
   /// Convenience method to set the audio source to an asset, preloaded by
   /// default, with an initial position of zero by default.
+  ///
+  /// For assets within the same package, this is equivalent to:
   ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
   ///     initialPosition: Duration.zero, preload: true);
   /// ```
   ///
+  /// If the asset is to be loaded from a different package, the [package]
+  /// parameter must be given to specify the package name.
+  ///
   /// See [setAudioSource] for a detailed explanation of the options.
   Future<Duration?> setAsset(
     String assetPath, {
+    String? package,
     bool preload = true,
     Duration? initialPosition,
   }) =>
-      setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
-          initialPosition: initialPosition, preload: preload);
+      setAudioSource(
+        AudioSource.asset(assetPath, package: package),
+        initialPosition: initialPosition,
+        preload: preload,
+      );
 
   /// Sets the source from which this audio player should fetch audio.
   ///
@@ -2229,6 +2240,34 @@ abstract class AudioSource {
     } else {
       return ProgressiveAudioSource(uri, headers: headers, tag: tag);
     }
+  }
+
+  /// Convenience method to create an audio source for a file.
+  ///
+  /// This is equivalent to:
+  ///
+  /// ```
+  /// AudioSource.uri(Uri.file(filePath));
+  /// ```
+  static UriAudioSource file(String filePath, {dynamic tag}) {
+    return AudioSource.uri(Uri.file(filePath));
+  }
+
+  /// Convenience method to create an audio source for an asset.
+  ///
+  /// For assets within the same package, this is equivalent to:
+  ///
+  /// ```
+  /// AudioSource.uri(Uri.parse('asset:///$assetPath'));
+  /// ```
+  ///
+  /// If the asset is to be loaded from a different package, the [package]
+  /// parameter must be given to specify the package name.
+  static UriAudioSource asset(String assetPath,
+      {String? package, dynamic tag}) {
+    final keyName =
+        package == null ? assetPath : 'packages/$package/$assetPath';
+    return AudioSource.uri(Uri.parse('asset:///$keyName'));
   }
 
   AudioSource() : _id = _uuid.v4();
