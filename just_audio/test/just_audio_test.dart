@@ -422,10 +422,7 @@ void runTests() {
     //final socket = await Socket.connect(uri.host, uri.port);
     socket.write('GET ${uri.path} HTTP/1.0\n\n');
     await socket.flush();
-    final responseText = await socket
-        .transform(Converter.castFrom<List<int>, String, Uint8List, String>(
-            utf8.decoder))
-        .join();
+    final responseText = await utf8.decoder.bind(socket).join();
     await socket.close();
     expect(responseText, equals('Hello'));
     await server.stop();
