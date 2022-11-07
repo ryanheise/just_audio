@@ -6,6 +6,7 @@
 
 * Add a package parameter to AudioPlayer.setAsset() (@ewertonls).
 * Add AudioSource.asset(), AudioSource.file().
+* Fix tests for dart-sdk 2.5 (@ewertonls).
 
 ## 0.9.30
 
