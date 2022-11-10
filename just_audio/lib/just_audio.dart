@@ -1416,6 +1416,10 @@ class AudioPlayer {
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
         if (checkInterruption()) return platform;
+        for (var audioEffect in _audioPipeline._audioEffects) {
+          await audioEffect._activate(platform);
+          if (checkInterruption()) return platform;
+        }
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
         }
@@ -1444,17 +1448,7 @@ class AudioPlayer {
       return platform;
     }
 
-    Future<void> initAudioEffects() async {
-      for (var audioEffect in _audioPipeline._audioEffects) {
-        await audioEffect._activate();
-        if (checkInterruption()) return;
-      }
-    }
-
     _platform = setPlatform();
-    if (_active) {
-      initAudioEffects().catchError((dynamic e) async {});
-    }
     return durationCompleter.future;
   }
 
@@ -3596,7 +3590,7 @@ abstract class AudioEffect {
   }
 
   /// Called when [_player] is connected to the platform.
-  Future<void> _activate() async {}
+  Future<void> _activate(AudioPlayerPlatform platform) async {}
 
   /// Whether the effect is enabled. When `true`, and if the effect is part
   /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
@@ -3703,8 +3697,8 @@ class AndroidEqualizerBand {
   }
 
   /// Restores the gain after reactivating.
-  Future<void> _restore() async {
-    await (await _player._platform).androidEqualizerBandSetGain(
+  Future<void> _restore(AudioPlayerPlatform platform) async {
+    await (platform).androidEqualizerBandSetGain(
         AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
   }
 
@@ -3738,9 +3732,9 @@ class AndroidEqualizerParameters {
   });
 
   /// Restore platform state after reactivating.
-  Future<void> _restore() async {
+  Future<void> _restore(AudioPlayerPlatform platform) async {
     for (var band in bands) {
-      await band._restore();
+      await band._restore(platform);
     }
   }
 
@@ -3767,13 +3761,13 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
   String get _type => 'AndroidEqualizer';
 
   @override
-  Future<void> _activate() async {
-    await super._activate();
+  Future<void> _activate(AudioPlayerPlatform platform) async {
+    await super._activate(platform);
     if (_parametersCompleter.isCompleted) {
-      await (await parameters)._restore();
+      await (await parameters)._restore(platform);
       return;
     }
-    final response = await (await _player!._platform)
+    final response = await platform
         .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
     _parameters =
         AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
