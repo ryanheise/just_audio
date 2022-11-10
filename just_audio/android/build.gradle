@@ -27,7 +27,7 @@ project.getTasks().withType(JavaCompile) {
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 31
 
     defaultConfig {
         minSdkVersion 16
@@ -45,8 +45,9 @@ android {
 }
 
 dependencies {
-    implementation 'com.google.android.exoplayer:exoplayer-core:2.15.0'
-    implementation 'com.google.android.exoplayer:exoplayer-dash:2.15.0'
-    implementation 'com.google.android.exoplayer:exoplayer-hls:2.15.0'
-    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:2.15.0'
+    def exoplayer_version = "2.18.1"
+    implementation "com.google.android.exoplayer:exoplayer-core:$exoplayer_version"
+    implementation "com.google.android.exoplayer:exoplayer-dash:$exoplayer_version"
+    implementation "com.google.android.exoplayer:exoplayer-hls:$exoplayer_version"
+    implementation "com.google.android.exoplayer:exoplayer-smoothstreaming:$exoplayer_version"
 }

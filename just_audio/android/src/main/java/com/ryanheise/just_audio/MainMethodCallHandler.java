@@ -34,7 +34,7 @@ public class MainMethodCallHandler implements MethodCallHandler {
                 break;
             }
             List<Object> rawAudioEffects = call.argument("androidAudioEffects");
-            players.put(id, new AudioPlayer(applicationContext, messenger, id, call.argument("audioLoadConfiguration"), rawAudioEffects));
+            players.put(id, new AudioPlayer(applicationContext, messenger, id, call.argument("audioLoadConfiguration"), rawAudioEffects, call.argument("androidOffloadSchedulingEnabled")));
             result.success(null);
             break;
         }
@@ -48,6 +48,11 @@ public class MainMethodCallHandler implements MethodCallHandler {
             result.success(new HashMap<String, Object>());
             break;
         }
+        case "disposeAllPlayers": {
+            dispose();
+            result.success(new HashMap<String, Object>());
+            break;
+        }
         default:
             result.notImplemented();
             break;
@@ -58,5 +63,6 @@ public class MainMethodCallHandler implements MethodCallHandler {
         for (AudioPlayer player : new ArrayList<AudioPlayer>(players.values())) {
             player.dispose();
         }
+        players.clear();
     }
 }

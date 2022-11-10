@@ -3,7 +3,7 @@ description: A common platform interface for the just_audio plugin. Different pl
 homepage: https://github.com/ryanheise/just_audio/tree/master/just_audio_platform_interface
 # NOTE: We strongly prefer non-breaking changes, even at the expense of a
 # less-clean API. See https://flutter.dev/go/platform-interface-breaking-changes
-version: 4.0.0
+version: 4.2.0
 
 dependencies:
   flutter:
@@ -11,10 +11,10 @@ dependencies:
   plugin_platform_interface: ^2.0.0
 
 dev_dependencies:
+  flutter_lints: ^2.0.1
   flutter_test:
     sdk: flutter
   mockito: ^5.0.0
-  pedantic: ^1.10.0
 
 environment:
   sdk: ">=2.12.0 <3.0.0"

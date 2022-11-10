@@ -1,3 +1,69 @@
+## 0.9.31
+
+* Add a package parameter to AudioPlayer.setAsset() (@ewertonls).
+* Add AudioSource.asset(), AudioSource.file().
+* Fix tests for dart-sdk 2.5 (@ewertonls).
+
+## 0.9.30
+
+* Upgrade ExoPlayer to 2.18.1.
+* Fix bug using headers with LockCachingAudioSource.
+* Add LockCachingAudioSource.resolve().
+
+## 0.9.29
+
+* Fix bug in ConcatenatingAudioSource.clear().
+* Fix bug where proxy drains origin faster than it feeds client.
+* Fix bug where User Agent was not set on redirects (@mikel-snipd)
+* Fix bug where StreamAudioSource requests are not closed when proxy is disposed (@mikel-snipd)
+
+## 0.9.28
+
+* Recursively apply headers to HLS fragments.
+* Add positionDiscontinuityStream.
+
+## 0.9.27
+
+* Support offload scheduling on Android.
+* Fix iOS/macOS documentation for non-HTTP URLS and proxy usage.
+
+## 0.9.26
+
+* Auto-correct invalid HTTP headers in proxy.
+
+## 0.9.25
+
+* Fix compile issue with Android SDK 33.
+
+## 0.9.24
+
+* Bump Android compileSdkVersion to 31.
+
+## 0.9.23
+
+* Fallback to constant bitrate seeking on Android.
+
+## 0.9.22
+
+* Migrate to Flutter 3, Xcode 13, ExoPlayer 2.17.1.
+* Add just_audio_mpv and just_audio_windows to example.
+
+## 0.9.21
+
+* Handle and report network disconnections in StreamAudioSource.
+* Fix iOS/macOS bug starting with empty playlist.
+* Migrate from pedantic to flutter_lints.
+* Accept Longs in AndroidLivePlaybackSpeedControl where appropriate (@aam).
+
+## 0.9.20
+
+* Fix initial position on iOS/macOS when switching sources (@addie9000).
+
+## 0.9.19
+
+* Dispose players on iOS/macOS hot restart.
+* Fix initialIndex out of bounds bug on iOS/macOS.
+
 ## 0.9.18
 
 * Fix null duration bug on LockCachingAudioSource.

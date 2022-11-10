@@ -13,7 +13,7 @@ import 'package:just_audio_example/main.dart';
 void main() {
   testWidgets('Verify Playlist', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(MyApp());
+    await tester.pumpWidget(const MyApp());
 
     expect(
       find.byWidgetPredicate(

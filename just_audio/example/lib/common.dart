@@ -9,19 +9,20 @@ class SeekBar extends StatefulWidget {
   final ValueChanged<Duration>? onChanged;
   final ValueChanged<Duration>? onChangeEnd;
 
-  SeekBar({
+  const SeekBar({
+    Key? key,
     required this.duration,
     required this.position,
     required this.bufferedPosition,
     this.onChanged,
     this.onChangeEnd,
-  });
+  }) : super(key: key);
 
   @override
-  _SeekBarState createState() => _SeekBarState();
+  SeekBarState createState() => SeekBarState();
 }
 
-class _SeekBarState extends State<SeekBar> {
+class SeekBarState extends State<SeekBar> {
   double? _dragValue;
   late SliderThemeData _sliderThemeData;
 
@@ -156,12 +157,12 @@ void showSliderDialog({
       title: Text(title, textAlign: TextAlign.center),
       content: StreamBuilder<double>(
         stream: stream,
-        builder: (context, snapshot) => Container(
+        builder: (context, snapshot) => SizedBox(
           height: 100.0,
           child: Column(
             children: [
               Text('${snapshot.data?.toStringAsFixed(1)}$valueSuffix',
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontFamily: 'Fixed',
                       fontWeight: FontWeight.bold,
                       fontSize: 24.0)),
@@ -179,3 +180,5 @@ void showSliderDialog({
     ),
   );
 }
+
+T? ambiguate<T>(T? value) => value;
