@@ -502,6 +502,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
       ? shuffleIndices
       : List.generate(sequence.length, (i) => i);
   List<int> get shuffleIndicesInv {
+    final effectiveIndices = this.effectiveIndices;
     final inv = List.filled(effectiveIndices.length, 0);
     for (var i = 0; i < effectiveIndices.length; i++) {
       inv[effectiveIndices[i]] = i;
