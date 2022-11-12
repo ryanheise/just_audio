@@ -464,6 +464,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
       ConcatenatingInsertAllRequest request) async {
     final cat = _source!.findCat(request.id)!;
     cat.children.insertAll(request.index, request.children);
+    _updateShuffleIndices();
+    _broadcastStateIfActive();
     _updateQueue();
     return await (await _player).concatenatingInsertAll(request);
   }
@@ -472,6 +474,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
       ConcatenatingRemoveRangeRequest request) async {
     final cat = _source!.findCat(request.id)!;
     cat.children.removeRange(request.startIndex, request.endIndex);
+    _updateShuffleIndices();
+    _broadcastStateIfActive();
     _updateQueue();
     return await (await _player).concatenatingRemoveRange(request);
   }
@@ -481,6 +485,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
     final cat = _source!.findCat(request.id)!;
     cat.children
         .insert(request.newIndex, cat.children.removeAt(request.currentIndex));
+    _updateShuffleIndices();
+    _broadcastStateIfActive();
     _updateQueue();
     return await (await _player).concatenatingMove(request);
   }
@@ -499,7 +505,6 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   Future<void> _updateQueue() async {
     queue.add(sequence.map((source) => source.tag as MediaItem).toList());
-    _updateShuffleIndices();
   }
 
   void _updateShuffleIndices() {
@@ -620,6 +625,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     _shuffleMode = shuffleMode;
+    _updateShuffleIndices();
     _broadcastStateIfActive();
     (await _player).setShuffleMode(SetShuffleModeRequest(
         shuffleMode: ShuffleModeMessage.values[
