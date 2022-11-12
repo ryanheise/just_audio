@@ -341,6 +341,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
   _Seeker? _seeker;
   AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
   AudioServiceShuffleMode _shuffleMode = AudioServiceShuffleMode.none;
+  List<int> _shuffleIndices = [];
+  List<int> _shuffleIndicesInv = [];
+  List<int> _effectiveIndices = [];
+  List<int> _effectiveIndicesInv = [];
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
   int? get index => _justAudioEvent.currentIndex;
@@ -449,6 +453,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<SetShuffleOrderResponse> customSetShuffleOrder(
       SetShuffleOrderRequest request) async {
     _source = request.audioSourceMessage;
+    _updateShuffleIndices();
     _broadcastStateIfActive();
     return await (await _player).setShuffleOrder(SetShuffleOrderRequest(
       audioSourceMessage: _source!,
@@ -494,26 +499,28 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   Future<void> _updateQueue() async {
     queue.add(sequence.map((source) => source.tag as MediaItem).toList());
+    _updateShuffleIndices();
+  }
+
+  void _updateShuffleIndices() {
+    _shuffleIndices = _source?.shuffleIndices ?? [];
+    _effectiveIndices = _shuffleMode != AudioServiceShuffleMode.none
+        ? _shuffleIndices
+        : List.generate(sequence.length, (i) => i);
+    _shuffleIndicesInv = List.filled(_effectiveIndices.length, 0);
+    for (var i = 0; i < _effectiveIndices.length; i++) {
+      _shuffleIndicesInv[_effectiveIndices[i]] = i;
+    }
+    _effectiveIndicesInv = _shuffleMode != AudioServiceShuffleMode.none
+        ? _shuffleIndicesInv
+        : List.generate(sequence.length, (i) => i);
   }
 
   List<IndexedAudioSourceMessage> get sequence => _source?.sequence ?? [];
-  List<int> get shuffleIndices => _source?.shuffleIndices ?? [];
-  List<int> get effectiveIndices => _shuffleMode != AudioServiceShuffleMode.none
-      ? shuffleIndices
-      : List.generate(sequence.length, (i) => i);
-  List<int> get shuffleIndicesInv {
-    final effectiveIndices = this.effectiveIndices;
-    final inv = List.filled(effectiveIndices.length, 0);
-    for (var i = 0; i < effectiveIndices.length; i++) {
-      inv[effectiveIndices[i]] = i;
-    }
-    return inv;
-  }
-
-  List<int> get effectiveIndicesInv =>
-      _shuffleMode != AudioServiceShuffleMode.none
-          ? shuffleIndicesInv
-          : List.generate(sequence.length, (i) => i);
+  List<int> get shuffleIndices => _shuffleIndices;
+  List<int> get effectiveIndices => _effectiveIndices;
+  List<int> get shuffleIndicesInv => _shuffleIndicesInv;
+  List<int> get effectiveIndicesInv => _effectiveIndicesInv;
   int get nextIndex => getRelativeIndex(1);
   int get previousIndex => getRelativeIndex(-1);
   bool get hasNext => nextIndex != -1;
@@ -521,9 +528,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   int getRelativeIndex(int offset) {
     if (_repeatMode == AudioServiceRepeatMode.one) return index!;
-    final effectiveIndices = this.effectiveIndices;
     if (effectiveIndices.isEmpty) return -1;
-    final effectiveIndicesInv = this.effectiveIndicesInv;
     if (index! >= effectiveIndicesInv.length) return -1;
     final invPos = effectiveIndicesInv[index!];
     var newInvPos = invPos + offset;
