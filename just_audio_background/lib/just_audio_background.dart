@@ -433,6 +433,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   Future<LoadResponse> customLoad(LoadRequest request) async {
     _source = request.audioSourceMessage;
+    _updateShuffleIndices();
     _updateQueue();
     final response = await (await _player).load(LoadRequest(
       audioSourceMessage: _source!,
