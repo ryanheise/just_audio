@@ -212,12 +212,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public void onMetadata(Metadata metadata) {
         for (int i = 0; i < metadata.length(); i++) {
             final Metadata.Entry entry = metadata.get(i);
+            System.out.println("XXXX AudioPlayer.onMetadata() - entry is of type " + entry.getClass().getSimpleName());
             if (entry instanceof IcyInfo) {
                 icyInfo = (IcyInfo) entry;
-                System.out.println("AudioPlayer.onMetadata() - icyInfo: " + icyInfo.toString());
+                System.out.println("XXXX AudioPlayer.onMetadata() - icyInfo: " + icyInfo.toString());
                 broadcastImmediatePlaybackEvent();
-            } else {
-                System.out.println("AudioPlayer.onMetadata() - entry is of type " + entry.getClass().simpleName());
             }
         }
     }
@@ -231,6 +230,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 Metadata metadata = trackGroup.getFormat(j).metadata;
 
                 if (metadata != null) {
+                    System.out.println("XXXX AudioPlayer.onTracksChanged IS NOT NULL");
                     for (int k = 0; k < metadata.length(); k++) {
                         final Metadata.Entry entry = metadata.get(k);
                         if (entry instanceof IcyHeaders) {
@@ -238,6 +238,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             broadcastImmediatePlaybackEvent();
                         }
                     }
+                } else {
+                    System.out.println("XXXX AudioPlayer.onTracksChanged has NULL METADATA!!!");
                 }
             }
         }
