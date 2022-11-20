@@ -214,7 +214,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             final Metadata.Entry entry = metadata.get(i);
             if (entry instanceof IcyInfo) {
                 icyInfo = (IcyInfo) entry;
+                System.out.println("AudioPlayer.onMetadata() - icyInfo: " + icyInfo.toString());
                 broadcastImmediatePlaybackEvent();
+            } else {
+                System.out.println("AudioPlayer.onMetadata() - entry is of type " + entry.getClass().simpleName());
             }
         }
     }
