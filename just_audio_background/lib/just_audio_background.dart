@@ -238,7 +238,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
       playerDataController.stream;
 
   @override
-  Future<LoadResponse> load(LoadRequest request) async =>
+  Future<LoadResponse> load(LoadRequest request) =>
       _playerAudioHandler.customLoad(request);
 
   @override
@@ -289,7 +289,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
 
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
-          ConcatenatingInsertAllRequest request) async =>
+          ConcatenatingInsertAllRequest request) =>
       _playerAudioHandler.customConcatenatingInsertAll(request);
 
   @override
@@ -299,18 +299,18 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
 
   @override
   Future<ConcatenatingMoveResponse> concatenatingMove(
-          ConcatenatingMoveRequest request) async =>
+          ConcatenatingMoveRequest request) =>
       _playerAudioHandler.customConcatenatingMove(request);
 
   @override
   Future<SetAndroidAudioAttributesResponse> setAndroidAudioAttributes(
-          SetAndroidAudioAttributesRequest request) async =>
+          SetAndroidAudioAttributesRequest request) =>
       _playerAudioHandler.customSetAndroidAudioAttributes(request);
 
   @override
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
       setAutomaticallyWaitsToMinimizeStalling(
-              SetAutomaticallyWaitsToMinimizeStallingRequest request) async =>
+              SetAutomaticallyWaitsToMinimizeStallingRequest request) =>
           _playerAudioHandler
               .customSetAutomaticallyWaitsToMinimizeStalling(request);
 }
@@ -351,7 +351,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   List<MediaItem>? get currentQueue => queue.nvalue;
 
   _PlayerAudioHandler(String playerId) {
-    unawaited(_init(playerId));
+    _init(playerId);
   }
 
   Future<void> _init(String playerId) async {
@@ -492,7 +492,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
               SetAutomaticallyWaitsToMinimizeStallingRequest request) async =>
           (await _player).setAutomaticallyWaitsToMinimizeStalling(request);
 
-  Future<void> _updateQueue() async {
+  void _updateQueue() {
     queue.add(sequence.map((source) => source.tag as MediaItem).toList());
   }
 
@@ -597,10 +597,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> rewind() => _seekRelative(-AudioService.config.rewindInterval);
 
   @override
-  Future<void> seekForward(bool begin) async => _seekContinuously(begin, 1);
+  Future<void> seekForward(bool begin) => _seekContinuously(begin, 1);
 
   @override
-  Future<void> seekBackward(bool begin) async => _seekContinuously(begin, -1);
+  Future<void> seekBackward(bool begin) => _seekContinuously(begin, -1);
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
@@ -677,14 +677,14 @@ class _PlayerAudioHandler extends BaseAudioHandler
     }
   }
 
-  Future<void> _broadcastStateIfActive() async {
+  void _broadcastStateIfActive() {
     if (_justAudioEvent.processingState != ProcessingStateMessage.idle) {
       _broadcastState();
     }
   }
 
   /// Broadcasts the current state to all clients.
-  Future<void> _broadcastState() async {
+  void _broadcastState() {
     final controls = [
       if (hasPrevious) MediaControl.skipToPrevious,
       if (_playing) MediaControl.pause else MediaControl.play,
