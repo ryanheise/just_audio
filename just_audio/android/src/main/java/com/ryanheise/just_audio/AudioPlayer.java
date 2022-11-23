@@ -212,10 +212,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public void onMetadata(Metadata metadata) {
         for (int i = 0; i < metadata.length(); i++) {
             final Metadata.Entry entry = metadata.get(i);
-            System.out.println("XXXX AudioPlayer.onMetadata() - entry is of type " + entry.getClass().getSimpleName());
+
+            System.out.println("XXXX AudioPlayer.onMetadata() - entry " + i + " is of type " + entry.getClass().getSimpleName());
+
             if (entry instanceof IcyInfo) {
                 icyInfo = (IcyInfo) entry;
-                System.out.println("XXXX AudioPlayer.onMetadata() - icyInfo: " + icyInfo.toString());
+
+                System.out.println("XXXX AudioPlayer.onMetadata() - icyInfo (" + i + "): " + icyInfo.toString());
+
                 broadcastImmediatePlaybackEvent();
             }
         }
@@ -225,21 +229,25 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public void onTracksChanged(Tracks tracks) {
         for (int i = 0; i < tracks.getGroups().size(); i++) {
             TrackGroup trackGroup = tracks.getGroups().get(i).getMediaTrackGroup();
-
             for (int j = 0; j < trackGroup.length; j++) {
                 Metadata metadata = trackGroup.getFormat(j).metadata;
-
                 if (metadata != null) {
-                    System.out.println("XXXX AudioPlayer.onTracksChanged IS NOT NULL");
                     for (int k = 0; k < metadata.length(); k++) {
                         final Metadata.Entry entry = metadata.get(k);
+
+                        System.out.println("XXXX AudioPlayer.onTracksChanged() - Metadata.Entry (" + k + "): " + entry.toString());
+
                         if (entry instanceof IcyHeaders) {
                             icyHeaders = (IcyHeaders) entry;
+                            if (icyHeaders.metadataInterval == -1) {
+
+                                System.out.println("XXXX AudioPlayer.onMetadata() C.LENGTH_UNSET = " + C.LENGTH_UNSET);
+                            }
                             broadcastImmediatePlaybackEvent();
                         }
                     }
                 } else {
-                    System.out.println("XXXX AudioPlayer.onTracksChanged has NULL METADATA!!!");
+                    System.out.println("XXXX AudioPlayer.onTracksChanged() has NULL METADATA");
                 }
             }
         }
