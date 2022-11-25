@@ -48,14 +48,14 @@ info), it makes sense that `broadcastImmediatePlaybackEvent()` is called.
 1. Why, then, isn't `onMetadata()` being called for **WETF**?
 
 ### 25-Nov-2022 (Mike Relac) - Proposed solution
-Since a valid header with a `metadataInterval` value of `C_LENGTH_UNSET` doesn't
+Since a valid header with a `metadataInterval` value of `C.LENGTH_UNSET` doesn't
 generate a call to `onMetadata()`, in `onTracksChanged()` simply set the `icyInfo`
  instance variable to null to clear the stale data
 https://github.com/ryanheise/just_audio/blob/9526090986af4fd9f193862052c317fd8faa67da/just_audio/android/src/main/java/com/ryanheise/just_audio/AudioPlayer.java#L233-L236
 ```
                          if (entry instanceof IcyHeaders) {
                             icyHeaders = (IcyHeaders) entry;
-                            if (icyHeaders.metadataInterval == -1) {
+                            if (icyHeaders.metadataInterval == C.LENGTH_UNSET) {
                                 icyInfo = null;
                             }
                             broadcastImmediatePlaybackEvent();

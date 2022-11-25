@@ -239,7 +239,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
                         if (entry instanceof IcyHeaders) {
                             icyHeaders = (IcyHeaders) entry;
-                            if (icyHeaders.metadataInterval == -1) {
+                            if (icyHeaders.metadataInterval == C.LENGTH_UNSET) {
 
                                 System.out.println("XXXX AudioPlayer.onMetadata() C.LENGTH_UNSET = " + C.LENGTH_UNSET + ". Setting icyInfo to NULL.");
                                 icyInfo = null;
