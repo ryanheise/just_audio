@@ -15,7 +15,7 @@ dependencies:
   just_audio_web: ^0.4.7
   # just_audio_web:
   #   path: ../just_audio_web
-  audio_session: ^0.1.10
+  audio_session: ^0.1.11
   rxdart: '>=0.26.0 <0.28.0'
   path: ^1.8.0
   path_provider: ^2.0.0
