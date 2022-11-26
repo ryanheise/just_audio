@@ -4,8 +4,6 @@
 //
 // flutter run -t lib/example_radio.dart
 
-import 'dart:async';
-
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -45,19 +43,9 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       print('A stream error occurred: $e');
     });
     // Try to load audio from a source and catch any errors.
-    _setStation(0);
-  }
-
-  int _currentIndex = 0;
-  Future<void> _setStation(int index) async {
-    setState(() => _currentIndex = index);
-    print('XXXX _currentIndex = $_currentIndex');
-    final String station = stations[_currentIndex];
-    final String stationUrl = stationUrls[_currentIndex];
     try {
-      print('XXXX loading station $station');
-      print('XXXX url: $stationUrl');
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(stationUrl)));
+      await _player.setAudioSource(AudioSource.uri(
+          Uri.parse("https://stream-uk1.radioparadise.com/aac-320")));
     } catch (e) {
       print("Error loading audio source: $e");
     }
@@ -84,8 +72,6 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final String station = stations[_currentIndex];
-    final String stationUrl = stationUrls[_currentIndex];
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
@@ -104,11 +90,8 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     final url = metadata?.info?.url;
                     return Column(
                       children: [
-                        SelectableText('Station: $station'),
-                        SelectableText('StationUrl: $stationUrl'),
-                        if (url == null) const Text('ArtworkUrl: null'),
-                        if (url != null) Text('ArtworkUrl: $url'),
                         if (url != null)
+                          // Handle invalid urls
                           Image.network(
                             url,
                             errorBuilder: (context, error, stackTrace) =>
@@ -124,8 +107,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   },
                 ),
                 // Display play/pause button and volume/speed sliders.
-                ControlButtons(_player, _currentIndex),
-                Flexible(child: _buildListview()),
+                ControlButtons(_player),
               ],
             ),
           ),
@@ -133,29 +115,13 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ),
     );
   }
-
-  Widget _buildListview() {
-    return ListView.builder(
-        itemCount: stations.length,
-        itemBuilder: (context, index) {
-          return ListTile(
-              selected: _currentIndex == index,
-              selectedTileColor: Colors.grey.shade400,
-              tileColor: Colors.grey.shade200,
-              key: ValueKey(index),
-              title: Text(stations[index]),
-              onTap: () => _setStation(index));
-        });
-  }
 }
 
 /// Displays the play/pause button and volume/speed sliders.
 class ControlButtons extends StatelessWidget {
   final AudioPlayer player;
-  final int? currentIndex;
 
-  const ControlButtons(this.player, this.currentIndex, {Key? key})
-      : super(key: key);
+  const ControlButtons(this.player, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -181,26 +147,16 @@ class ControlButtons extends StatelessWidget {
                 child: const CircularProgressIndicator(),
               );
             } else if (playing != true) {
-              return Column(
-                children: [
-                  if (currentIndex != null)
-                    IconButton(
-                      icon: const Icon(Icons.play_arrow),
-                      iconSize: 64.0,
-                      onPressed: player.play,
-                    ),
-                ],
+              return IconButton(
+                icon: const Icon(Icons.play_arrow),
+                iconSize: 64.0,
+                onPressed: player.play,
               );
             } else if (processingState != ProcessingState.completed) {
-              return Column(
-                children: [
-                  if (currentIndex != null)
-                    IconButton(
-                      icon: const Icon(Icons.pause),
-                      iconSize: 64.0,
-                      onPressed: player.pause,
-                    ),
-                ],
+              return IconButton(
+                icon: const Icon(Icons.pause),
+                iconSize: 64.0,
+                onPressed: player.pause,
               );
             } else {
               return IconButton(
@@ -215,27 +171,3 @@ class ControlButtons extends StatelessWidget {
     );
   }
 }
-
-final stations = [
-  'radioparadise',
-  'WETF',
-  'KCSM',
-  'WBGO',
-  'WDCB',
-  'WICN',
-  'WZUM',
-  'KEXP',
-  'WXPN',
-];
-
-final stationUrls = [
-  'https://stream-uk1.radioparadise.com/aac-320',
-  'https://ssl-proxy.icastcenter.com/get.php?type=Icecast&server=199.180.72.2&port=9007&mount=/stream&data=mp3',
-  'https://ice5.securenetsystems.net/KCSM',
-  'https://wbgo.streamguys1.com/wbgo128',
-  'https://wdcb-ice.streamguys1.com/wdcb128',
-  'https://wicn-ice.streamguys1.com/live-mp3',
-  'https://pubmusic.streamguys1.com/wzum-aac',
-  'https://kexp-mp3-128.streamguys1.com/kexp128.mp3?awparams=companionAds%3Afalse',
-  'https://wxpnhi.xpn.org/xpnhi',
-];
