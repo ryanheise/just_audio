@@ -357,11 +357,11 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> _init(String playerId) async {
     final player = await _platform.init(InitRequest(id: playerId));
     _playerCompleter.complete(player);
-    final playbackEventMessageStream = player.playbackEventMessageStream
-      ..listen((event) {
-        _justAudioEvent = event;
-        _broadcastState();
-      });
+    final playbackEventMessageStream = player.playbackEventMessageStream;
+    playbackEventMessageStream.listen((event) {
+      _justAudioEvent = event;
+      _broadcastState();
+    });
     playbackEventMessageStream
         .map((event) => event.icyMetadata)
         .distinct()
