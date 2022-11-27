@@ -90,13 +90,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     final url = metadata?.info?.url;
                     return Column(
                       children: [
-                        if (url != null)
-                          // Handle invalid urls
-                          Image.network(
-                            url,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Text('Invalid artwork url: "$url"'),
-                          ),
+                        if (url != null) Image.network(url),
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(title,
