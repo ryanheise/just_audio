@@ -447,7 +447,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
     _source = request.audioSourceMessage;
     _updateShuffleIndices();
     _broadcastStateIfActive();
-    return (await _player).setShuffleOrder(SetShuffleOrderRequest(
+    return await (await _player).setShuffleOrder(SetShuffleOrderRequest(
       audioSourceMessage: _source!,
     ));
   }
