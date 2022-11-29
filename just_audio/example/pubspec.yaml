@@ -8,10 +8,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audio_session: ^0.1.7
-  rxdart: '^0.27.0'
-  just_audio_mpv: ^0.1.4
-  just_audio_windows: ^0.1.0
+  audio_session: ^0.1.11
+  rxdart: ^0.27.7
+  just_audio_mpv: ^0.1.6
+  just_audio_windows: ^0.2.0
   # Other platform implementations below:
   # just_audio_libwinmedia: ^0.0.4
   just_audio:

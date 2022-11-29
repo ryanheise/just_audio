@@ -87,8 +87,8 @@ await player.setLoopMode(LoopMode.all);        // Set playlist to loop (off|all|
 await player.setShuffleModeEnabled(true);      // Shuffle playlist order (true|false)
 
 // Update the playlist
-await playlist.add(newChild);
-await playlist.insert(3, newChild);
+await playlist.add(newChild1);
+await playlist.insert(3, newChild2);
 await playlist.removeAt(3);
 ```
 
@@ -128,7 +128,7 @@ Note: `LockCachingAudioSource` is implemented via a local HTTP proxy which on An
 // Feed your own stream of bytes into the player
 class MyCustomSource extends StreamAudioSource {
   final List<int> bytes;
-  MySource(this.bytes);
+  MyCustomSource(this.bytes);
   
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
@@ -236,7 +236,7 @@ To allow your application to access audio files on the Internet, add the followi
     <uses-permission android:name="android.permission.INTERNET"/>
 ```
 
-If you wish to connect to non-HTTPS URLS, also add the following attribute to the `application` element:
+If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, also add the following attribute to the `application` element:
 
 ```xml
     <application ... android:usesCleartextTraffic="true">
@@ -284,14 +284,12 @@ post_install do |installer|
 end
 ```
 
-If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
 <dict>
     <key>NSAllowsArbitraryLoads</key>
-    <true/>
-    <key>NSAllowsArbitraryLoadsForMedia</key>
     <true/>
 </dict>
 ```
@@ -307,14 +305,12 @@ To allow your macOS application to access audio files on the Internet, add the f
     <true/>
 ```
 
-If you wish to connect to non-HTTPS URLS, add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
 <dict>
     <key>NSAllowsArbitraryLoads</key>
-    <true/>
-    <key>NSAllowsArbitraryLoadsForMedia</key>
     <true/>
 </dict>
 ```
