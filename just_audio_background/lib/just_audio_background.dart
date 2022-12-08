@@ -238,9 +238,8 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
       playerDataController.stream;
 
   @override
-  Future<LoadResponse> load(LoadRequest request) async {
-    return _playerAudioHandler.customLoad(request);
-  }
+  Future<LoadResponse> load(LoadRequest request) =>
+      _playerAudioHandler.customLoad(request);
 
   @override
   Future<PlayResponse> play(PlayRequest request) async {
@@ -285,41 +284,35 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
       _playerAudioHandler.customSetShuffleOrder(request);
 
   @override
-  Future<SeekResponse> seek(SeekRequest request) async {
-    return await _playerAudioHandler.customPlayerSeek(request);
-  }
+  Future<SeekResponse> seek(SeekRequest request) =>
+      _playerAudioHandler.customPlayerSeek(request);
 
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
-      ConcatenatingInsertAllRequest request) async {
-    return _playerAudioHandler.customConcatenatingInsertAll(request);
-  }
+          ConcatenatingInsertAllRequest request) =>
+      _playerAudioHandler.customConcatenatingInsertAll(request);
 
   @override
   Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(
-      ConcatenatingRemoveRangeRequest request) async {
-    return await _playerAudioHandler.customConcatenatingRemoveRange(request);
-  }
+          ConcatenatingRemoveRangeRequest request) =>
+      _playerAudioHandler.customConcatenatingRemoveRange(request);
 
   @override
   Future<ConcatenatingMoveResponse> concatenatingMove(
-      ConcatenatingMoveRequest request) async {
-    return await _playerAudioHandler.customConcatenatingMove(request);
-  }
+          ConcatenatingMoveRequest request) =>
+      _playerAudioHandler.customConcatenatingMove(request);
 
   @override
   Future<SetAndroidAudioAttributesResponse> setAndroidAudioAttributes(
-      SetAndroidAudioAttributesRequest request) async {
-    return await _playerAudioHandler.customSetAndroidAudioAttributes(request);
-  }
+          SetAndroidAudioAttributesRequest request) =>
+      _playerAudioHandler.customSetAndroidAudioAttributes(request);
 
   @override
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
       setAutomaticallyWaitsToMinimizeStalling(
-          SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
-    return await _playerAudioHandler
-        .customSetAutomaticallyWaitsToMinimizeStalling(request);
-  }
+              SetAutomaticallyWaitsToMinimizeStallingRequest request) =>
+          _playerAudioHandler
+              .customSetAutomaticallyWaitsToMinimizeStalling(request);
 }
 
 class _PlayerAudioHandler extends BaseAudioHandler
@@ -443,13 +436,11 @@ class _PlayerAudioHandler extends BaseAudioHandler
     return LoadResponse(duration: response.duration);
   }
 
-  Future<SetVolumeResponse> customSetVolume(SetVolumeRequest request) async {
-    return await (await _player).setVolume(request);
-  }
+  Future<SetVolumeResponse> customSetVolume(SetVolumeRequest request) async =>
+      (await _player).setVolume(request);
 
-  Future<SeekResponse> customPlayerSeek(SeekRequest request) async {
-    return await (await _player).seek(request);
-  }
+  Future<SeekResponse> customPlayerSeek(SeekRequest request) async =>
+      (await _player).seek(request);
 
   Future<SetShuffleOrderResponse> customSetShuffleOrder(
       SetShuffleOrderRequest request) async {
@@ -468,7 +459,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
     _updateShuffleIndices();
     _broadcastStateIfActive();
     _updateQueue();
-    return await (await _player).concatenatingInsertAll(request);
+    return (await _player).concatenatingInsertAll(request);
   }
 
   Future<ConcatenatingRemoveRangeResponse> customConcatenatingRemoveRange(
@@ -478,7 +469,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
     _updateShuffleIndices();
     _broadcastStateIfActive();
     _updateQueue();
-    return await (await _player).concatenatingRemoveRange(request);
+    return (await _player).concatenatingRemoveRange(request);
   }
 
   Future<ConcatenatingMoveResponse> customConcatenatingMove(
@@ -489,22 +480,19 @@ class _PlayerAudioHandler extends BaseAudioHandler
     _updateShuffleIndices();
     _broadcastStateIfActive();
     _updateQueue();
-    return await (await _player).concatenatingMove(request);
+    return (await _player).concatenatingMove(request);
   }
 
   Future<SetAndroidAudioAttributesResponse> customSetAndroidAudioAttributes(
-      SetAndroidAudioAttributesRequest request) async {
-    return await (await _player).setAndroidAudioAttributes(request);
-  }
+          SetAndroidAudioAttributesRequest request) async =>
+      (await _player).setAndroidAudioAttributes(request);
 
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
       customSetAutomaticallyWaitsToMinimizeStalling(
-          SetAutomaticallyWaitsToMinimizeStallingRequest request) async {
-    return await (await _player)
-        .setAutomaticallyWaitsToMinimizeStalling(request);
-  }
+              SetAutomaticallyWaitsToMinimizeStallingRequest request) async =>
+          (await _player).setAutomaticallyWaitsToMinimizeStalling(request);
 
-  Future<void> _updateQueue() async {
+  void _updateQueue() {
     queue.add(sequence.map((source) => source.tag as MediaItem).toList());
   }
 
@@ -593,7 +581,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> seek(Duration position) async =>
-      await (await _player).seek(SeekRequest(position: position));
+      (await _player).seek(SeekRequest(position: position));
 
   @override
   Future<void> setSpeed(double speed) async {
@@ -609,10 +597,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> rewind() => _seekRelative(-AudioService.config.rewindInterval);
 
   @override
-  Future<void> seekForward(bool begin) async => _seekContinuously(begin, 1);
+  Future<void> seekForward(bool begin) => _seekContinuously(begin, 1);
 
   @override
-  Future<void> seekBackward(bool begin) async => _seekContinuously(begin, -1);
+  Future<void> seekBackward(bool begin) => _seekContinuously(begin, -1);
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
@@ -680,7 +668,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   /// Begins or stops a continuous seek in [direction]. After it begins it will
   /// continue seeking forward or backward by 10 seconds within the audio, at
   /// intervals of 1 second in app time.
-  void _seekContinuously(bool begin, int direction) {
+  Future<void> _seekContinuously(bool begin, int direction) async {
     _seeker?.stop();
     if (begin) {
       _seeker = _Seeker(this, Duration(seconds: 10 * direction),
@@ -689,14 +677,14 @@ class _PlayerAudioHandler extends BaseAudioHandler
     }
   }
 
-  Future<void> _broadcastStateIfActive() async {
+  void _broadcastStateIfActive() {
     if (_justAudioEvent.processingState != ProcessingStateMessage.idle) {
       _broadcastState();
     }
   }
 
   /// Broadcasts the current state to all clients.
-  Future<void> _broadcastState() async {
+  void _broadcastState() {
     final controls = [
       if (hasPrevious) MediaControl.skipToPrevious,
       if (_playing) MediaControl.pause else MediaControl.play,
@@ -713,7 +701,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
       androidCompactActionIndices: List.generate(controls.length, (i) => i)
           .where((i) => controls[i].action != MediaAction.stop)
           .toList(),
-      processingState: {
+      processingState: const {
         ProcessingStateMessage.idle: AudioProcessingState.idle,
         ProcessingStateMessage.loading: AudioProcessingState.loading,
         ProcessingStateMessage.buffering: AudioProcessingState.buffering,
@@ -743,7 +731,7 @@ class _Seeker {
     this.duration,
   );
 
-  void start() async {
+  Future<void> start() async {
     _running = true;
     while (_running) {
       Duration newPosition = handler.currentPosition + positionInterval;
@@ -816,14 +804,14 @@ extension AudioSourceExtension on AudioSourceMessage {
     if (self is ConcatenatingAudioSourceMessage) {
       var offset = 0;
       final childIndicesList = <List<int>>[];
-      for (var child in self.children) {
+      for (final child in self.children) {
         final childIndices =
             child.shuffleIndices.map((i) => i + offset).toList();
         childIndicesList.add(childIndices);
         offset += childIndices.length;
       }
       final indices = <int>[];
-      for (var index in self.shuffleOrder) {
+      for (final index in self.shuffleOrder) {
         indices.addAll(childIndicesList[index]);
       }
       return indices;
@@ -837,6 +825,7 @@ extension AudioSourceExtension on AudioSourceMessage {
   }
 }
 
+@immutable
 class TrackInfo {
   final int? index;
   final Duration? duration;
@@ -848,7 +837,7 @@ class TrackInfo {
       other is TrackInfo && index == other.index && duration == other.duration;
 
   @override
-  int get hashCode => "$index,$duration".hashCode;
+  int get hashCode => Object.hash(index, duration);
 
   @override
   String toString() => '($index, $duration)';
