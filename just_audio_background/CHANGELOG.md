@@ -1,5 +1,6 @@
 ## 0.0.1-beta.9
 
+* Fix currentIndex stutter.
 * Performance and lint fixes (@Zekfad).
 
 ## 0.0.1-beta.8

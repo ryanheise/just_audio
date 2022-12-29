@@ -160,7 +160,6 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
   final eventController = StreamController<PlaybackEventMessage>.broadcast();
   final playerDataController = StreamController<PlayerDataMessage>.broadcast();
   bool? _playing;
-  int? _index;
   IcyMetadataMessage? _icyMetadata;
   int? _androidAudioSessionId;
   late final _PlayerAudioHandler _playerAudioHandler;
@@ -180,11 +179,6 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
         case 'androidAudioSessionId':
           _androidAudioSessionId = event['value'] as int?;
           broadcastPlaybackEvent();
-          break;
-        case 'currentIndex':
-          _index = event['value'] as int?;
-          // The event is broadcast in response to the next mediaItem update
-          // which happens immediately after this.
           break;
       }
     });
@@ -218,7 +212,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
       bufferedPosition: playbackState.bufferedPosition,
       icyMetadata: _icyMetadata,
       duration: _playerAudioHandler.currentMediaItem?.duration,
-      currentIndex: _index,
+      currentIndex: playbackState.queueIndex,
       androidAudioSessionId: _androidAudioSessionId,
     ));
     if (playbackState.playing != _playing) {
@@ -404,10 +398,6 @@ class _PlayerAudioHandler extends BaseAudioHandler
                   currentQueue![index!].copyWith(duration: track.duration);
               queue.add(currentQueue!);
             }
-            customEvent.add({
-              'type': 'currentIndex',
-              'value': track.index,
-            });
             mediaItem.add(currentMediaItem!);
           }
         });
