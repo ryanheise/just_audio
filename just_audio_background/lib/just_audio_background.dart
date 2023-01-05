@@ -11,6 +11,7 @@ export 'package:audio_service/audio_service.dart' show MediaItem;
 
 late SwitchAudioHandler _audioHandler;
 late JustAudioPlatform _platform;
+late NotificationConfigBuilder _notificationConfigBuilder;
 
 /// Provides the [init] method to initialise just_audio for background playback.
 class JustAudioBackground {
@@ -48,6 +49,7 @@ class JustAudioBackground {
     Duration rewindInterval = const Duration(seconds: 10),
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
+    NotificationConfigBuilder? notificationConfigBuilder,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
@@ -69,6 +71,7 @@ class JustAudioBackground {
       rewindInterval: rewindInterval,
       preloadArtwork: preloadArtwork,
       androidBrowsableRootExtras: androidBrowsableRootExtras,
+      notificationConfigBuilder: notificationConfigBuilder,
     );
   }
 }
@@ -91,7 +94,10 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     Duration rewindInterval = const Duration(seconds: 10),
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
+    NotificationConfigBuilder? notificationConfigBuilder,
   }) async {
+    _notificationConfigBuilder = notificationConfigBuilder
+      ?? _PlayerAudioHandler._defaultNotificationConfigBuilder;
     _platform = JustAudioPlatform.instance;
     JustAudioPlatform.instance = _JustAudioBackgroundPlugin();
     _audioHandler = await AudioService.init(
@@ -165,7 +171,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
   late final _PlayerAudioHandler _playerAudioHandler;
 
   _JustAudioPlayer({required String id}) : super(id) {
-    _playerAudioHandler = _PlayerAudioHandler(id);
+    _playerAudioHandler = _PlayerAudioHandler._(id);
     _audioHandler.inner = _playerAudioHandler;
     _audioHandler.playbackState.listen((playbackState) {
       broadcastPlaybackEvent();
@@ -310,7 +316,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
 }
 
 class _PlayerAudioHandler extends BaseAudioHandler
-    with QueueHandler, SeekHandler {
+    with QueueHandler, SeekHandler, PlayerStateSnapshot {
   final _playerCompleter = Completer<AudioPlayerPlatform>();
   PlaybackEventMessage _justAudioEvent = PlaybackEventMessage(
     processingState: ProcessingStateMessage.idle,
@@ -344,8 +350,30 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   List<MediaItem>? get currentQueue => queue.nvalue;
 
-  _PlayerAudioHandler(String playerId) {
+  _PlayerAudioHandler._(String playerId) {
     _init(playerId);
+  }
+
+  /// Default notification builder
+  /// Showing skip, play/pause and stop buttons if applicable.
+  /// Stop button is hidden from android compact view.
+  static NotificationConfig _defaultNotificationConfigBuilder(PlayerStateSnapshot state) {
+    final controls = [
+      if (state.hasPrevious) MediaControl.skipToPrevious,
+      if (state.playing) MediaControl.pause else MediaControl.play,
+      MediaControl.stop,
+      if (state.hasNext) MediaControl.skipToNext,
+    ];
+    return NotificationConfig(
+      controls: controls,
+      systemActions: const {
+        MediaAction.seek,
+        MediaAction.seekForward,
+        MediaAction.seekBackward,
+      },
+      androidCompactActionIndices: List.generate(controls.length, (i) => i)
+        ..removeAt(controls.indexOf(MediaControl.stop))
+    );
   }
 
   Future<void> _init(String playerId) async {
@@ -506,10 +534,13 @@ class _PlayerAudioHandler extends BaseAudioHandler
   List<int> get effectiveIndices => _effectiveIndices;
   List<int> get shuffleIndicesInv => _shuffleIndicesInv;
   List<int> get effectiveIndicesInv => _effectiveIndicesInv;
+
+  @override
   int get nextIndex => getRelativeIndex(1);
+  @override
   int get previousIndex => getRelativeIndex(-1);
-  bool get hasNext => nextIndex != -1;
-  bool get hasPrevious => previousIndex != -1;
+  @override
+  bool get playing => _playing;
 
   int getRelativeIndex(int offset) {
     if (_repeatMode == AudioServiceRepeatMode.one) return index!;
@@ -676,22 +707,11 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   /// Broadcasts the current state to all clients.
   void _broadcastState() {
-    final controls = [
-      if (hasPrevious) MediaControl.skipToPrevious,
-      if (_playing) MediaControl.pause else MediaControl.play,
-      MediaControl.stop,
-      if (hasNext) MediaControl.skipToNext,
-    ];
+    final notificationConfig = _notificationConfigBuilder(this);
     playbackState.add(playbackState.nvalue!.copyWith(
-      controls: controls,
-      systemActions: {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-      },
-      androidCompactActionIndices: List.generate(controls.length, (i) => i)
-          .where((i) => controls[i].action != MediaAction.stop)
-          .toList(),
+      controls: notificationConfig.controls,
+      systemActions: notificationConfig.systemActions,
+      androidCompactActionIndices: notificationConfig.androidCompactActionIndices,
       processingState: const {
         ProcessingStateMessage.idle: AudioProcessingState.idle,
         ProcessingStateMessage.loading: AudioProcessingState.loading,
@@ -839,3 +859,42 @@ extension _ValueStreamExtension<T> on ValueStream<T> {
   /// Backwards compatible version of valueOrNull.
   T? get nvalue => hasValue ? value : null;
 }
+
+/// Notification config, used to set system notification properties.
+@immutable
+class NotificationConfig {
+  const NotificationConfig({
+    this.controls = const [],
+    this.systemActions = const {},
+    this.androidCompactActionIndices,
+  });
+
+  /// Not supported starting with Android 13 (API level 33)
+  /// 
+  /// More info: https://developer.android.com/about/versions/13/behavior-changes-13#playback-controls
+  final List<int>? androidCompactActionIndices;
+  final List<MediaControl> controls;
+  final Set<MediaAction> systemActions;
+}
+
+
+/// Snapshot of current player state.
+/// Used to provide data to [NotificationConfigBuilder].
+abstract class PlayerStateSnapshot {
+  /// -1 if no next index available
+  int get nextIndex;
+  /// -1 if no previous index available
+  int get previousIndex;
+  /// Whether player is currently in playing state.
+  bool get playing;
+  /// Whether player is currently paused.
+  bool get paused => !playing;
+  /// Whether playback queue has next entry.
+  bool get hasNext => nextIndex != -1;
+  /// Whether playback queue has previous entry.
+  bool get hasPrevious => previousIndex != -1;
+}
+
+/// Notification config builder.
+/// Used to control available actions in system notification.
+typedef NotificationConfigBuilder = NotificationConfig Function(PlayerStateSnapshot state);
