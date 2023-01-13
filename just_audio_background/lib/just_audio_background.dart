@@ -711,7 +711,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   /// Broadcasts the current state to all clients.
   void _broadcastState() {
-    final notificationConfig = _notificationConfigBuilder(PlayerStateSnapshot(
+    final notificationConfig = _notificationConfigBuilder(PlayerStateSnapshot._(
       nextIndex: nextIndex,
       previousIndex: previousIndex,
       playing: playing,
@@ -891,7 +891,7 @@ class NotificationConfig {
 /// Used to provide data to [NotificationConfigBuilder].
 @immutable
 class PlayerStateSnapshot {
-  const PlayerStateSnapshot({
+  const PlayerStateSnapshot._({
     required this.nextIndex,
     required this.previousIndex,
     required this.playing,
