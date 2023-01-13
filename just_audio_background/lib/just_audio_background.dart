@@ -171,7 +171,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
   late final _PlayerAudioHandler _playerAudioHandler;
 
   _JustAudioPlayer({required String id}) : super(id) {
-    _playerAudioHandler = _PlayerAudioHandler._(id);
+    _playerAudioHandler = _PlayerAudioHandler(id);
     _audioHandler.inner = _playerAudioHandler;
     _audioHandler.playbackState.listen((playbackState) {
       broadcastPlaybackEvent();
@@ -316,7 +316,7 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
 }
 
 class _PlayerAudioHandler extends BaseAudioHandler
-    with QueueHandler, SeekHandler, PlayerStateSnapshot {
+    with QueueHandler, SeekHandler {
   final _playerCompleter = Completer<AudioPlayerPlatform>();
   PlaybackEventMessage _justAudioEvent = PlaybackEventMessage(
     processingState: ProcessingStateMessage.idle,
@@ -350,7 +350,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   List<MediaItem>? get currentQueue => queue.nvalue;
 
-  _PlayerAudioHandler._(String playerId) {
+  _PlayerAudioHandler(String playerId) {
     _init(playerId);
   }
 
@@ -535,12 +535,16 @@ class _PlayerAudioHandler extends BaseAudioHandler
   List<int> get shuffleIndicesInv => _shuffleIndicesInv;
   List<int> get effectiveIndicesInv => _effectiveIndicesInv;
 
-  @override
+  /// -1 if no next index available
   int get nextIndex => getRelativeIndex(1);
-  @override
+  /// -1 if no previous index available
   int get previousIndex => getRelativeIndex(-1);
-  @override
+  /// Whether player is currently in playing state.
   bool get playing => _playing;
+  /// Whether playback queue has next entry.
+  bool get hasNext => nextIndex != -1;
+  /// Whether playback queue has previous entry.
+  bool get hasPrevious => previousIndex != -1;
 
   int getRelativeIndex(int offset) {
     if (_repeatMode == AudioServiceRepeatMode.one) return index!;
@@ -707,7 +711,12 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   /// Broadcasts the current state to all clients.
   void _broadcastState() {
-    final notificationConfig = _notificationConfigBuilder(this);
+    final notificationConfig = _notificationConfigBuilder(PlayerStateSnapshot(
+      nextIndex: nextIndex,
+      previousIndex: previousIndex,
+      playing: playing,
+    ));
+
     playbackState.add(playbackState.nvalue!.copyWith(
       controls: notificationConfig.controls,
       systemActions: notificationConfig.systemActions,
@@ -880,15 +889,20 @@ class NotificationConfig {
 
 /// Snapshot of current player state.
 /// Used to provide data to [NotificationConfigBuilder].
-abstract class PlayerStateSnapshot {
+@immutable
+class PlayerStateSnapshot {
+  const PlayerStateSnapshot({
+    required this.nextIndex,
+    required this.previousIndex,
+    required this.playing,
+  });
+
   /// -1 if no next index available
-  int get nextIndex;
+  final int nextIndex;
   /// -1 if no previous index available
-  int get previousIndex;
+  final int previousIndex;
   /// Whether player is currently in playing state.
-  bool get playing;
-  /// Whether player is currently paused.
-  bool get paused => !playing;
+  final bool playing;
   /// Whether playback queue has next entry.
   bool get hasNext => nextIndex != -1;
   /// Whether playback queue has previous entry.
