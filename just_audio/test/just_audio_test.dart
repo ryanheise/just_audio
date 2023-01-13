@@ -84,9 +84,11 @@ void runTests() {
 
   test('assets', () async {
     final player = AudioPlayer();
-    void expectAsset(String uri) {
+    void expectAsset(String uri, {dynamic tag}) {
       final audioSource = player.audioSource;
       expect(audioSource is UriAudioSource && audioSource.uri.toString() == uri,
+          equals(true));
+      expect(audioSource is UriAudioSource && audioSource.tag == tag,
           equals(true));
     }
 
@@ -98,9 +100,9 @@ void runTests() {
         preload: false);
     expectAsset('asset:///audio/foo.mp3');
     await player.setAudioSource(
-        AudioSource.asset('audio/foo.mp3', package: 'bar'),
+        AudioSource.asset('audio/foo.mp3', package: 'bar', tag: 'asset-tag'),
         preload: false);
-    expectAsset('asset:///packages/bar/audio/foo.mp3');
+    expectAsset('asset:///packages/bar/audio/foo.mp3', tag: 'asset-tag');
   });
 
   test('idle-state', () async {
