@@ -1,3 +1,7 @@
+## 0.0.1-beta.10
+
+* Fix bug where AudioPlayer constructor parameters were ignored.
+
 ## 0.0.1-beta.9
 
 * Fix currentIndex stutter.
