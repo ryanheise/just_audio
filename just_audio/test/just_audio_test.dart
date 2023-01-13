@@ -82,6 +82,29 @@ void runTests() {
     await player.dispose();
   });
 
+  test('assets', () async {
+    final player = AudioPlayer();
+    void expectAsset(String uri, {dynamic tag}) {
+      final audioSource = player.audioSource;
+      expect(audioSource is UriAudioSource && audioSource.uri.toString() == uri,
+          equals(true));
+      expect(audioSource is UriAudioSource && audioSource.tag == tag,
+          equals(true));
+    }
+
+    await player.setAsset('audio/foo.mp3', preload: false);
+    expectAsset('asset:///audio/foo.mp3');
+    await player.setAsset('audio/foo.mp3', package: 'bar', preload: false);
+    expectAsset('asset:///packages/bar/audio/foo.mp3');
+    await player.setAudioSource(AudioSource.asset('audio/foo.mp3'),
+        preload: false);
+    expectAsset('asset:///audio/foo.mp3');
+    await player.setAudioSource(
+        AudioSource.asset('audio/foo.mp3', package: 'bar', tag: 'asset-tag'),
+        preload: false);
+    expectAsset('asset:///packages/bar/audio/foo.mp3', tag: 'asset-tag');
+  });
+
   test('idle-state', () async {
     final player = AudioPlayer();
     player.play();
@@ -401,10 +424,7 @@ void runTests() {
     //final socket = await Socket.connect(uri.host, uri.port);
     socket.write('GET ${uri.path} HTTP/1.0\n\n');
     await socket.flush();
-    final responseText = await socket
-        .transform(Converter.castFrom<List<int>, String, Uint8List, String>(
-            utf8.decoder))
-        .join();
+    final responseText = await utf8.decoder.bind(socket).join();
     await socket.close();
     expect(responseText, equals('Hello'));
     await server.stop();

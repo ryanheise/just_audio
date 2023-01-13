@@ -1,3 +1,14 @@
+## 0.9.32
+
+* Fix ignored tag parameter in AudioSource.asset().
+* Fix ignored tag parameter in AudioSource.file().
+
+## 0.9.31
+
+* Add a package parameter to AudioPlayer.setAsset() (@ewertonls).
+* Add AudioSource.asset(), AudioSource.file().
+* Fix tests for dart-sdk 2.5 (@ewertonls).
+
 ## 0.9.30
 
 * Upgrade ExoPlayer to 2.18.1.

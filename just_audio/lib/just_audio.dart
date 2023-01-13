@@ -671,6 +671,8 @@ class AudioPlayer {
   /// Convenience method to set the audio source to a file, preloaded by
   /// default, with an initial position of zero by default.
   ///
+  /// This is equivalent to:
+  ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.file(filePath)),
   ///     initialPosition: Duration.zero, preload: true);
@@ -682,25 +684,34 @@ class AudioPlayer {
     Duration? initialPosition,
     bool preload = true,
   }) =>
-      setAudioSource(AudioSource.uri(Uri.file(filePath)),
+      setAudioSource(AudioSource.file(filePath),
           initialPosition: initialPosition, preload: preload);
 
   /// Convenience method to set the audio source to an asset, preloaded by
   /// default, with an initial position of zero by default.
+  ///
+  /// For assets within the same package, this is equivalent to:
   ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
   ///     initialPosition: Duration.zero, preload: true);
   /// ```
   ///
+  /// If the asset is to be loaded from a different package, the [package]
+  /// parameter must be given to specify the package name.
+  ///
   /// See [setAudioSource] for a detailed explanation of the options.
   Future<Duration?> setAsset(
     String assetPath, {
+    String? package,
     bool preload = true,
     Duration? initialPosition,
   }) =>
-      setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
-          initialPosition: initialPosition, preload: preload);
+      setAudioSource(
+        AudioSource.asset(assetPath, package: package),
+        initialPosition: initialPosition,
+        preload: preload,
+      );
 
   /// Sets the source from which this audio player should fetch audio.
   ///
@@ -1415,6 +1426,10 @@ class AudioPlayer {
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
         if (checkInterruption()) return platform;
+        for (var audioEffect in _audioPipeline._audioEffects) {
+          await audioEffect._activate(platform);
+          if (checkInterruption()) return platform;
+        }
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
         }
@@ -1443,17 +1458,7 @@ class AudioPlayer {
       return platform;
     }
 
-    Future<void> initAudioEffects() async {
-      for (var audioEffect in _audioPipeline._audioEffects) {
-        await audioEffect._activate();
-        if (checkInterruption()) return;
-      }
-    }
-
     _platform = setPlatform();
-    if (_active) {
-      initAudioEffects().catchError((dynamic e) async {});
-    }
     return durationCompleter.future;
   }
 
@@ -2120,6 +2125,34 @@ abstract class AudioSource {
     } else {
       return ProgressiveAudioSource(uri, headers: headers, tag: tag);
     }
+  }
+
+  /// Convenience method to create an audio source for a file.
+  ///
+  /// This is equivalent to:
+  ///
+  /// ```
+  /// AudioSource.uri(Uri.file(filePath));
+  /// ```
+  static UriAudioSource file(String filePath, {dynamic tag}) {
+    return AudioSource.uri(Uri.file(filePath), tag: tag);
+  }
+
+  /// Convenience method to create an audio source for an asset.
+  ///
+  /// For assets within the same package, this is equivalent to:
+  ///
+  /// ```
+  /// AudioSource.uri(Uri.parse('asset:///$assetPath'));
+  /// ```
+  ///
+  /// If the asset is to be loaded from a different package, the [package]
+  /// parameter must be given to specify the package name.
+  static UriAudioSource asset(String assetPath,
+      {String? package, dynamic tag}) {
+    final keyName =
+        package == null ? assetPath : 'packages/$package/$assetPath';
+    return AudioSource.uri(Uri.parse('asset:///$keyName'), tag: tag);
   }
 
   AudioSource() : _id = _uuid.v4();
@@ -3576,7 +3609,7 @@ abstract class AudioEffect {
   }
 
   /// Called when [_player] is connected to the platform.
-  Future<void> _activate() async {}
+  Future<void> _activate(AudioPlayerPlatform platform) async {}
 
   /// Whether the effect is enabled. When `true`, and if the effect is part
   /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
@@ -3683,8 +3716,8 @@ class AndroidEqualizerBand {
   }
 
   /// Restores the gain after reactivating.
-  Future<void> _restore() async {
-    await (await _player._platform).androidEqualizerBandSetGain(
+  Future<void> _restore(AudioPlayerPlatform platform) async {
+    await (platform).androidEqualizerBandSetGain(
         AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
   }
 
@@ -3718,9 +3751,9 @@ class AndroidEqualizerParameters {
   });
 
   /// Restore platform state after reactivating.
-  Future<void> _restore() async {
+  Future<void> _restore(AudioPlayerPlatform platform) async {
     for (var band in bands) {
-      await band._restore();
+      await band._restore(platform);
     }
   }
 
@@ -3747,13 +3780,13 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
   String get _type => 'AndroidEqualizer';
 
   @override
-  Future<void> _activate() async {
-    await super._activate();
+  Future<void> _activate(AudioPlayerPlatform platform) async {
+    await super._activate(platform);
     if (_parametersCompleter.isCompleted) {
-      await (await parameters)._restore();
+      await (await parameters)._restore(platform);
       return;
     }
-    final response = await (await _player!._platform)
+    final response = await platform
         .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
     _parameters =
         AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
