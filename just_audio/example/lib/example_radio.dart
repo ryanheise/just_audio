@@ -94,7 +94,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(title,
-                              style: Theme.of(context).textTheme.headline6),
+                              style: Theme.of(context).textTheme.titleLarge),
                         ),
                       ],
                     );

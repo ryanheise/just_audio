@@ -181,7 +181,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                           ),
                         ),
                         Text(metadata.album,
-                            style: Theme.of(context).textTheme.headline6),
+                            style: Theme.of(context).textTheme.titleLarge),
                         Text(metadata.title),
                       ],
                     );
@@ -235,7 +235,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   Expanded(
                     child: Text(
                       "Playlist",
-                      style: Theme.of(context).textTheme.headline6,
+                      style: Theme.of(context).textTheme.titleLarge,
                       textAlign: TextAlign.center,
                     ),
                   ),
