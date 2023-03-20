@@ -1,3 +1,9 @@
+## 0.9.32
+
+* Fix ignored tag parameter in AudioSource.asset().
+* Fix ignored tag parameter in AudioSource.file().
+* Fix nested URIs in HLS from EXT-X-MEDIA when using headers.
+
 ## 0.9.31
 
 * Add a package parameter to AudioPlayer.setAsset() (@ewertonls).

@@ -2115,7 +2115,7 @@ abstract class AudioSource {
   /// AudioSource.uri(Uri.file(filePath));
   /// ```
   static UriAudioSource file(String filePath, {dynamic tag}) {
-    return AudioSource.uri(Uri.file(filePath));
+    return AudioSource.uri(Uri.file(filePath), tag: tag);
   }
 
   /// Convenience method to create an audio source for an asset.
@@ -2132,7 +2132,7 @@ abstract class AudioSource {
       {String? package, dynamic tag}) {
     final keyName =
         package == null ? assetPath : 'packages/$package/$assetPath';
-    return AudioSource.uri(Uri.parse('asset:///$keyName'));
+    return AudioSource.uri(Uri.parse('asset:///$keyName'), tag: tag);
   }
 
   AudioSource() : _id = _uuid.v4();
@@ -3197,6 +3197,8 @@ _ProxyHandler _proxyHandlerForUri(
         // TODO: Handle other playlist formats similarly?
         final m3u8 = await originResponse.transform(utf8.decoder).join();
         for (var line in const LineSplitter().convert(m3u8)) {
+          line = line.replaceAllMapped(
+              RegExp(r'#EXT-X-MEDIA:.*?URI="(.*?)".*'), (m) => m[1]!);
           line = line.replaceAll(RegExp(r'#.*$'), '').trim();
           if (line.isEmpty) continue;
           try {
