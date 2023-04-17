@@ -3216,6 +3216,8 @@ _ProxyHandler _proxyHandlerForUri(
         // TODO: Handle other playlist formats similarly?
         final m3u8 = await originResponse.transform(utf8.decoder).join();
         for (var line in const LineSplitter().convert(m3u8)) {
+          line = line.replaceAllMapped(
+              RegExp(r'#EXT-X-MEDIA:.*?URI="(.*?)".*'), (m) => m[1]!);
           line = line.replaceAll(RegExp(r'#.*$'), '').trim();
           if (line.isEmpty) continue;
           try {
