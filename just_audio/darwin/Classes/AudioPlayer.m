@@ -46,6 +46,19 @@
     BOOL _justAdvanced;
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
+static NSString *redirectScheme = @"rdtp";
+static NSString *customPlaylistScheme = @"cplp";
+static NSString *customKeyScheme = @"ckey";
+static NSString *httpsScheme = @"http";
+static NSString *m3u8Ext = @".m3u8";
+static NSString *mp3Ext = @".mp3";
+static NSString *extInfo = @"#EXTINF:";
+static int redirectErrorCode = 302;
+static int badRequestErrorCode = 400;
+
+AVAssetResourceLoadingRequest* currentResourceLoadingRequest = nil;
+AVAssetResourceLoader* currentResourceLoader = nil;
+static dispatch_queue_t serialQueue = nil;
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration {
     self = [super init];
@@ -61,6 +74,8 @@
     _dataEventChannel = [[BetterEventChannel alloc]
         initWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.data.%@", _playerId]
            messenger:[registrar messenger]];
+    serialQueue = dispatch_queue_create("com.suamusica.player.queue", DISPATCH_QUEUE_SERIAL);
+
     _index = 0;
     _processingState = none;
     _loopMode = loopOff;
@@ -111,6 +126,7 @@
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     @try {
+        NSLog(@"handleMethodCall %@", call.method);
         NSDictionary *request = (NSDictionary *)call.arguments;
         if ([@"load" isEqualToString:call.method]) {
             CMTime initialPosition = request[@"initialPosition"] == (id)[NSNull null] ? kCMTimeInvalid : CMTimeMake([request[@"initialPosition"] longLongValue], 1000000);
@@ -167,7 +183,7 @@
             result(FlutterMethodNotImplemented);
         }
     } @catch (id exception) {
-        //NSLog(@"Error in handleMethodCall");
+        NSLog(@"Error in handleMethodCall");
         FlutterError *flutterError = [FlutterError errorWithCode:@"error" message:@"Error in handleMethodCall" details:nil];
         result(flutterError);
     }
@@ -447,12 +463,22 @@
 
 - (AudioSource *)decodeAudioSource:(NSDictionary *)data {
     NSString *type = data[@"type"];
+    NSLog(@"decodeAudioSource: ");
+
     if ([@"progressive" isEqualToString:type]) {
         return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"dash" isEqualToString:type]) {
         return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
     } else if ([@"hls" isEqualToString:type]) {
-        return [[UriAudioSource alloc] initWithId:data[@"id"] uri:data[@"uri"] loadControl:_loadControl];
+            NSLog(@"decodeAudioSource: hls %@", data[@"uri"]);
+            NSURLComponents *components = [NSURLComponents componentsWithURL:[NSURL URLWithString:data[@"uri"]] resolvingAgainstBaseURL:YES];
+            components.scheme = customPlaylistScheme;
+            NSLog(@"decodeAudioSource: newUrl: %@", components.URL.absoluteString);
+        NSURL *_url = [NSURL URLWithString: components.URL.absoluteString];
+
+        AVURLAsset * _asset = [AVURLAsset URLAssetWithURL:_url options:nil];
+        [[_asset resourceLoader] setDelegate:(id)self queue:serialQueue];
+        return [[UriAudioSource alloc] initWithIdAsset:data[@"id"] uri:components.URL.absoluteString loadControl:_loadControl asset:_asset];
     } else if ([@"concatenating" isEqualToString:type]) {
         return [[ConcatenatingAudioSource alloc] initWithId:data[@"id"]
                                                audioSources:[self decodeAudioSources:data[@"children"]]
@@ -571,6 +597,188 @@
     _updateTime = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
 }
 
+- (BOOL)resourceLoader:(AVAssetResourceLoader *)resourceLoader    shouldWaitForLoadingOfRequestedResource:(AVAssetResourceLoadingRequest *)loadingRequest{
+     NSLog(@"loadingRequest.URL: %@", [[loadingRequest request] URL]);
+    NSString* scheme = [[[loadingRequest request] URL] scheme];
+//    if (currentResourceLoader != resourceLoader) {
+//        return NO;
+//    }
+    
+    if ([self isRedirectSchemeValid:scheme]) {
+        return [self handleRedirectRequest:loadingRequest];
+    }
+    
+    if ([self isCustomPlaylistSchemeValid:scheme]) {
+        dispatch_async (serialQueue,  ^ {
+            [self handleCustomPlaylistRequest:loadingRequest];
+        });
+        return YES;
+    }
+    
+    return NO;
+}
+
+/*!
+ *  The delegate handler, handles the received request:
+ *
+ *  1) Verifies its a redirect request, otherwise report an error.
+ *  2) Generates the new URL
+ *  3) Create a reponse with the new URL and report success.
+ */
+- (BOOL) handleRedirectRequest:(AVAssetResourceLoadingRequest *)loadingRequest
+{
+            NSLog(@"handleRedirectRequest");
+
+    NSURLRequest *redirect = nil;
+    [self setCurrentResourceLoadingRequest:loadingRequest];
+    
+    redirect = [self generateRedirectURL:(NSURLRequest *)[loadingRequest request]];
+    if (redirect)
+    {
+        [loadingRequest setRedirect:redirect];
+        NSHTTPCookieStorage *cookiesStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+        NSDictionary * headers = [NSHTTPCookie requestHeaderFieldsWithCookies:[cookiesStorage cookies]];
+        NSHTTPURLResponse *response = [[NSHTTPURLResponse alloc] initWithURL:[redirect URL] statusCode:redirectErrorCode HTTPVersion:nil headerFields:headers];
+        [loadingRequest setResponse:response];
+        [loadingRequest finishLoading];
+    } else
+    {
+        [self reportError:loadingRequest withErrorCode:badRequestErrorCode];
+    }
+    return YES;
+}
+
+- (BOOL) isRedirectSchemeValid:(NSString *)scheme
+{
+    return ([redirectScheme isEqualToString:scheme]);
+}
+
+-(NSString*) replaceScheme: (NSString*) oldScheme
+                 newScheme: (NSString*) newScheme
+                   fromUrl: (NSString*) url {
+    NSURLComponents *components = [NSURLComponents componentsWithString: url];
+    if ([components.scheme rangeOfString: oldScheme].location != NSNotFound) {
+        components.scheme = newScheme;
+        return components.URL.absoluteString;
+    }
+    
+    return url;
+}
+
+
+/*!
+ *  Handles the custom play list scheme:
+ *
+ *  1) Verifies its a custom playlist request, otherwise report an error.
+ *  2) Generates the play list.
+ *  3) Create a reponse with the new URL and report success.
+ */
+- (BOOL) handleCustomPlaylistRequest:(AVAssetResourceLoadingRequest *)loadingRequest
+{
+                NSLog(@"handleCustomPlaylistRequest");
+
+    [self setCurrentResourceLoadingRequest:loadingRequest];
+    NSString* url = [[[loadingRequest request] URL] absoluteString];
+    __block NSString *requestUrl = [self replaceScheme:customPlaylistScheme newScheme:httpsScheme fromUrl:url];
+    __block NSString *playlistRequest = [self replaceScheme:customPlaylistScheme newScheme:redirectScheme fromUrl:url];
+    
+    NSHTTPCookieStorage *cookiesStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    NSDictionary *headers = [NSHTTPCookie requestHeaderFieldsWithCookies:[cookiesStorage cookies]];
+    
+    NSMutableURLRequest *request = [[NSMutableURLRequest alloc] init];
+    [request setHTTPMethod:@"GET"];
+    [request setURL:[NSURL URLWithString:requestUrl]];
+    [request setAllHTTPHeaderFields:headers];
+    
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    
+    NSLog(@"Player: ==> requestURL: %@", [[request URL] absoluteString]);
+    NSURLSession *session = [NSURLSession sharedSession];
+    [[session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable _data, NSURLResponse * _Nullable _response, NSError * _Nullable error) {
+        NSHTTPURLResponse *responseCode = (NSHTTPURLResponse *) _response;
+        
+        if([responseCode statusCode] != 200) {
+            NSLog(@"Player: Error getting %@, HTTP status code %li", requestUrl, (long)[responseCode statusCode]);
+            [self reportError:loadingRequest withErrorCode:badRequestErrorCode];
+            dispatch_semaphore_signal(sema);
+        }
+        
+        NSString* file = [[NSString alloc] initWithData:_data encoding:NSUTF8StringEncoding];
+        NSMutableArray<NSString *>* lines = [file componentsSeparatedByString:@"\n"].mutableCopy;
+        
+        NSMutableArray<NSString *>* splittedUrl = [playlistRequest componentsSeparatedByString:@"/"].mutableCopy;
+        if ([[splittedUrl lastObject] rangeOfString:m3u8Ext].location != NSNotFound) {
+            [splittedUrl removeLastObject];
+        }
+        __block NSString* baseUrl = [splittedUrl componentsJoinedByString:@"/"];
+        NSLog(@"Player: ==> baseURL: %@", baseUrl);
+        
+        for (int i = 0; i < [lines count]; i++) {
+            NSString* line = lines[i];
+            if ([line rangeOfString:extInfo].location != NSNotFound) {
+                i++;
+                NSString* treatedUrl = [lines[i] stringByReplacingOccurrencesOfString:@" " withString:@"+"];
+                lines[i] = [NSString stringWithFormat:@"%@/%@", baseUrl, treatedUrl];
+            }
+        }
+        NSString* _file = [lines componentsJoinedByString:@"\n"];
+        NSLog(@"Player: %@", _file);
+        
+        NSData* data = [_file dataUsingEncoding:NSUTF8StringEncoding];
+        if (data)
+        {
+            [loadingRequest.dataRequest respondWithData:data];
+            [loadingRequest finishLoading];
+        } else
+        {
+            [self reportError:loadingRequest withErrorCode:badRequestErrorCode];
+        }
+        dispatch_semaphore_signal(sema);
+    }] resume];
+    
+    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+
+    return YES;
+}
+
+-(NSURLRequest* ) generateRedirectURL:(NSURLRequest *)sourceURL
+{
+    NSHTTPCookieStorage *cookiesStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    NSDictionary * headers = [NSHTTPCookie requestHeaderFieldsWithCookies:[cookiesStorage cookies]];
+    NSMutableURLRequest *redirect = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[[[sourceURL URL] absoluteString] stringByReplacingOccurrencesOfString:redirectScheme withString:httpsScheme]]];
+    [redirect setAllHTTPHeaderFields:headers];
+    NSLog(@"Player: ==> Redirect.URL: %@", [[redirect URL] absoluteString]);
+    return redirect;
+}
+
+- (void) reportError:(AVAssetResourceLoadingRequest *) loadingRequest withErrorCode:(int) error
+{
+    NSLog(@"Player: reportError.error: %d",error);
+    [loadingRequest finishLoadingWithError:[NSError errorWithDomain: NSURLErrorDomain code:error userInfo: nil]];
+}
+
+- (void)resourceLoader:(AVAssetResourceLoader *)resourceLoader didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
+     NSLog(@"resourceLoader");
+    if (currentResourceLoadingRequest != nil && currentResourceLoadingRequest.request == loadingRequest.request) {
+        [self setCurrentResourceLoadingRequest:nil];
+    }
+}
+
+- (BOOL) isCustomPlaylistSchemeValid:(NSString *)scheme
+{
+    return ([customPlaylistScheme isEqualToString:scheme]);
+}
+
+-(void)setCurrentResourceLoadingRequest: (AVAssetResourceLoadingRequest*) resourceLoadingRequest {
+    NSLog(@"===> set.resourceLoading: %@", resourceLoadingRequest);
+    if (currentResourceLoadingRequest != nil) {
+        if (!currentResourceLoadingRequest.cancelled && !currentResourceLoadingRequest.finished) {
+            [currentResourceLoadingRequest finishLoading];
+        }
+    }
+    currentResourceLoadingRequest = resourceLoadingRequest;
+}
+
 - (void)load:(NSDictionary *)source initialPosition:(CMTime)initialPosition initialIndex:(NSNumber *)initialIndex result:(FlutterResult)result {
     if (_playing) {
         [_player pause];
@@ -602,6 +810,7 @@
         }
         NSString *type = source[@"child"][@"type"];
         NSString *uri = nil;
+
         if ([@"progressive" isEqualToString:type] || [@"dash" isEqualToString:type] || [@"hls" isEqualToString:type]) {
             uri = source[@"child"][@"uri"];
         }
@@ -622,6 +831,7 @@
     } else {
         _audioSource = [self decodeAudioSource:source];
     }
+    
     _indexedAudioSources = [[NSMutableArray alloc] init];
     [_audioSource buildSequence:_indexedAudioSources treeIndex:0];
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
@@ -680,10 +890,6 @@
     }
     [_player setVolume:_volume];
     [self broadcastPlaybackEvent];
-    /* NSLog(@"load:"); */
-    /* for (int i = 0; i < [_indexedAudioSources count]; i++) { */
-    /*     NSLog(@"- %@", _indexedAudioSources[i].sourceId); */
-    /* } */
 }
 
 - (void)updateOrder {
@@ -707,16 +913,16 @@
 
 - (void)onItemStalled:(NSNotification *)notification {
     //IndexedPlayerItem *playerItem = (IndexedPlayerItem *)notification.object;
-    //NSLog(@"onItemStalled");
+    NSLog(@"onItemStalled");
 }
 
 - (void)onFailToComplete:(NSNotification *)notification {
     //IndexedPlayerItem *playerItem = (IndexedPlayerItem *)notification.object;
-    //NSLog(@"onFailToComplete");
+    NSLog(@"onFailToComplete");
 }
 
 - (void)onComplete:(NSNotification *)notification {
-    //NSLog(@"onComplete");
+    NSLog(@"onComplete");
 
     IndexedPlayerItem *endedPlayerItem = (IndexedPlayerItem *)notification.object;
     IndexedAudioSource *endedSource = endedPlayerItem.audioSource;
@@ -745,6 +951,7 @@
                       ofObject:(id)object
                         change:(NSDictionary<NSString *,id> *)change
                        context:(void *)context {
+                NSLog(@"observeValueForKeyPath %@ %@", keyPath, change);
 
     if ([keyPath isEqualToString:@"status"]) {
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)object;
@@ -798,7 +1005,7 @@
                 break;
             }
             case AVPlayerItemStatusFailed: {
-                //NSLog(@"AVPlayerItemStatusFailed");
+                NSLog(@"AVPlayerItemStatusFailed");
                 [self sendErrorForItem:playerItem];
                 break;
             }

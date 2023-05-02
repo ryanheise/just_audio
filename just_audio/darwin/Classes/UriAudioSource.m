@@ -22,17 +22,21 @@
     return self;
 }
 
+- (instancetype)initWithIdAsset:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl asset:(AVURLAsset *)asset {
+    self = [super initWithId:sid];
+    NSAssert(self, @"super init cannot be nil");
+    _uri = uri;
+    _loadControl = loadControl;
+    _playerItem = [self createPlayerItemAsset:asset];
+    _playerItem2 = nil;
+    return self;
+}
+
 - (NSString *)uri {
     return _uri;
 }
 
-- (IndexedPlayerItem *)createPlayerItem:(NSString *)uri {
-    IndexedPlayerItem *item;
-    if ([uri hasPrefix:@"file://"]) {
-        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByRemovingPercentEncoding] substringFromIndex:7]]];
-    } else {
-        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:uri]];
-    }
+- (IndexedPlayerItem *)_setPlayerItem:(IndexedPlayerItem *)item{
     if (@available(macOS 10.13, iOS 11.0, *)) {
         // This does the best at reducing distortion on voice with speeds below 1.0
         item.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmTimeDomain;
@@ -51,7 +55,25 @@
         }
     }
 
+    NSLog(@"_setPlayerItem %@", item);
+
     return item;
+}
+- (IndexedPlayerItem *)createPlayerItemAsset:(AVURLAsset *)asset{
+    IndexedPlayerItem *item = [[IndexedPlayerItem alloc] initWithAsset:asset];
+    return [self _setPlayerItem:item];
+}
+
+- (IndexedPlayerItem *)createPlayerItem:(NSString *)uri{
+    IndexedPlayerItem *item;
+    NSLog(@"createPlayerItem %@", uri);
+
+    if ([uri hasPrefix:@"file://"]) {
+        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByRemovingPercentEncoding] substringFromIndex:7]]];
+    } else {
+        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:uri]];
+    }
+    return [self _setPlayerItem:item];
 }
 
 // Not used. XXX: Remove?

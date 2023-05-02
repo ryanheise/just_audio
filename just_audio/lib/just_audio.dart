@@ -3174,12 +3174,13 @@ _ProxyHandler _proxyHandlerForUri(
           .forEach((name, value) => requestHeaders[name] = value.join(', '));
       final originRequest =
           await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
+      print(redirectedUri ?? uri);
       host = originRequest.headers.value(HttpHeaders.hostHeader);
       final originResponse = await originRequest.close();
       if (originResponse.redirects.isNotEmpty) {
         redirectedUri = originResponse.redirects.last.location;
       }
-
+      // print(originResponse.headers);
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
         final filteredValue = value
@@ -3202,7 +3203,7 @@ _ProxyHandler _proxyHandlerForUri(
           line = line.replaceAll(RegExp(r'#.*$'), '').trim();
           if (line.isEmpty) continue;
           try {
-            final rawNestedUri = Uri.parse(line);
+            final rawNestedUri = Uri.parse(line.replaceAll(' ', '+'));
             if (rawNestedUri.hasScheme) {
               // Don't propagate headers
               server.addUriAudioSource(AudioSource.uri(rawNestedUri));
