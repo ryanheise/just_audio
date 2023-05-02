@@ -19,7 +19,9 @@ class MyApp extends StatefulWidget {
 }
 
 class MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  final _player = AudioPlayer();
+  final _player = AudioPlayer(
+      userAgent:
+          'Mozilla/5.0 (Linux; Android 12; SM-S906N Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/80.0.3987.119 Mobile Safari/537.36');
 
   @override
   void initState() {
@@ -37,15 +39,27 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.speech());
     // Listen to errors during playback.
-    _player.playbackEventStream.listen((event) {},
-        onError: (Object e, StackTrace stackTrace) {
+    _player.playbackEventStream.listen((event) {
+      // print(event);
+    }, onError: (Object e, StackTrace stackTrace) {
       print('A stream error occurred: $e');
     });
     // Try to load audio from a source and catch any errors.
     try {
       // AAC example: https://dl.espressif.com/dl/audio/ff-16b-2c-44100hz.aac
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
+      await _player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(
+              // "https://playertest.longtailvideo.com/adaptive/wowzaid3/playlist.m3u8"
+              // "https://ios-stream.suamusica.com.br/287038/3983745/stream/xz.m3u8"
+              "https://ios-stream.suamusica.com.br/18608921/3977564/stream/01+-+VENDADA+-+LARISSA+GOMES.m3u8"),
+          headers: {
+            'Cookie':
+                'CloudFront-Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly8qLnN1YW11c2ljYS5jb20uYnIqIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNjgzMDc5MDI3fX19XX0_;CloudFront-Signature=C5H61noiG4cQvZCD41UX4MkCedFa0xYo6GVhgKgUmueRzi~p42HrVgR9gzomfGqsBmS5lxzCXccSv8loitCqwD2tgYrIHtvZib7D2o4iG-f7SynL-3hF5EV~jUUDv6b6-Q74YMBXsvz5Nv1C1n81Lwr4Qb1e48HPVa89yJvvA~PCLyc6yGcTlWE19AfzcvWHOfg4TjKKEdw8QGS4CCf7sSaSx2moFcZX-WpyxZYZHFHiYmDQ78egkI3yBp3J8kfvAZ2XFNokK-n4ABUOIvMYxXdGUfOuKJ~gIMcTMvD6ixwu1vazoVpbaVwJx9qECbjKe9L4bYw2blsPxeENGeGwyQ__;CloudFront-Key-Pair-Id=APKAIORXYQDPHCKBDXYQ',
+            'Accept-Encoding': 'identity'
+          },
+        ),
+      );
     } catch (e) {
       print("Error loading audio source: $e");
     }
