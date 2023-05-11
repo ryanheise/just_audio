@@ -27,6 +27,12 @@ project.getTasks().withType(JavaCompile) {
 apply plugin: 'com.android.library'
 
 android {
+    // add support for both AGP v8 and older versions
+    // https://github.com/flutter/flutter/issues/125621#issuecomment-1525995461
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.ryanheise.just_audio'
+    }
+
     compileSdkVersion 31
 
     defaultConfig {
