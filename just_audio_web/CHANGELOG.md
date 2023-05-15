@@ -1,3 +1,7 @@
+## 0.4.8
+
+* Update minimum flutter version to 3.0.
+
 ## 0.4.7
 
 * Fix bug handling simultaneous play requests.
