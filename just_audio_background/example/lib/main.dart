@@ -145,7 +145,7 @@ class MyAppState extends State<MyApp> {
                           ),
                         ),
                         Text(metadata.album!,
-                            style: Theme.of(context).textTheme.headline6),
+                            style: Theme.of(context).textTheme.titleLarge),
                         Text(metadata.title),
                       ],
                     );
@@ -199,7 +199,7 @@ class MyAppState extends State<MyApp> {
                   Expanded(
                     child: Text(
                       "Playlist",
-                      style: Theme.of(context).textTheme.headline6,
+                      style: Theme.of(context).textTheme.titleLarge,
                       textAlign: TextAlign.center,
                     ),
                   ),
