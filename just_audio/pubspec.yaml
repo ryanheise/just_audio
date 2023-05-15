@@ -3,19 +3,24 @@ description: A feature-rich audio player for Flutter. Loop, clip and concatenate
 version: 0.10.1
 repository: https://github.com/ryanheise/just_audio/tree/minor/just_audio
 issue_tracker: https://github.com/ryanheise/just_audio/issues
+topics:
+  - audio
+  - sound
+  - player
+  - background
 
 environment:
-  sdk: ">=2.12.0 <3.0.0"
-  flutter: ">=1.12.13+hotfix.5"
+  sdk: ">=2.14.0 <4.0.0"
+  flutter: ">=3.0.0"
 
 dependencies:
-  just_audio_platform_interface: ^4.2.0
+  just_audio_platform_interface: ^4.2.1
   # just_audio_platform_interface:
   #   path: ../just_audio_platform_interface
-  just_audio_web: ^0.4.7
+  just_audio_web: ^0.4.8
   # just_audio_web:
   #   path: ../just_audio_web
-  audio_session: ^0.1.11
+  audio_session: ^0.1.14
   rxdart: '>=0.26.0 <0.28.0'
   path: ^1.8.0
   path_provider: ^2.0.0

@@ -101,7 +101,7 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
 class Html5AudioPlayer extends JustAudioPlayer {
   final _audioElement = AudioElement();
   late final _playPauseQueue = _PlayPauseQueue(_audioElement);
-  Completer? _durationCompleter;
+  Completer<dynamic>? _durationCompleter;
   AudioSourcePlayer? _audioSourcePlayer;
   LoopModeMessage _loopMode = LoopModeMessage.off;
   bool _shuffleModeEnabled = false;
@@ -585,10 +585,10 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   final Uri uri;
 
   /// The headers to include in the request (unsupported).
-  final Map? headers;
+  final Map<String, String>? headers;
   double? _resumePos;
   Duration? _duration;
-  Completer? _completer;
+  Completer<dynamic>? _completer;
   int? _initialPos;
 
   UriAudioSourcePlayer(
@@ -679,22 +679,22 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
 
 /// A player for a [ProgressiveAudioSourceMessage].
 class ProgressiveAudioSourcePlayer extends UriAudioSourcePlayer {
-  ProgressiveAudioSourcePlayer(
-      Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
+  ProgressiveAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id,
+      Uri uri, Map<String, String>? headers)
       : super(html5AudioPlayer, id, uri, headers);
 }
 
 /// A player for a [DashAudioSourceMessage].
 class DashAudioSourcePlayer extends UriAudioSourcePlayer {
-  DashAudioSourcePlayer(
-      Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
+  DashAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id, Uri uri,
+      Map<String, String>? headers)
       : super(html5AudioPlayer, id, uri, headers);
 }
 
 /// A player for a [HlsAudioSourceMessage].
 class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
-  HlsAudioSourcePlayer(
-      Html5AudioPlayer html5AudioPlayer, String id, Uri uri, Map? headers)
+  HlsAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id, Uri uri,
+      Map<String, String>? headers)
       : super(html5AudioPlayer, id, uri, headers);
 }
 
