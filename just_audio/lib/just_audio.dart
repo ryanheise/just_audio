@@ -96,10 +96,11 @@ class AudioPlayer {
   StreamSubscription<PlayerDataMessage>? _playerDataSubscription;
 
   /// The subscription to the event channel for waveform data.
-  StreamSubscription? _visualizerWaveformSubscription;
+  StreamSubscription<VisualizerWaveformCaptureMessage>?
+      _visualizerWaveformSubscription;
 
   /// The subscription to the event channel for FFT data.
-  StreamSubscription? _visualizerFftSubscription;
+  StreamSubscription<VisualizerFftCaptureMessage>? _visualizerFftSubscription;
 
   final String _id;
   final _proxy = _ProxyHttpServer();
