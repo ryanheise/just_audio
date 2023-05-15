@@ -1,6 +1,7 @@
 ## 0.0.1-beta.10
 
 * Fix bug where AudioPlayer constructor parameters were ignored.
+* Update minimum flutter version to 3.0.
 
 ## 0.0.1-beta.9
 

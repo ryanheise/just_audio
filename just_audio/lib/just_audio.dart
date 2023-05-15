@@ -86,13 +86,13 @@ class AudioPlayer {
   /// implementation. When switching between active and inactive modes, this is
   /// used to cancel the subscription to the previous platform's events and
   /// subscribe to the new platform's events.
-  StreamSubscription? _playbackEventSubscription;
+  StreamSubscription<PlaybackEventMessage>? _playbackEventSubscription;
 
   /// The subscription to the data event channel of the current platform
   /// implementation. When switching between active and inactive modes, this is
   /// used to cancel the subscription to the previous platform's events and
   /// subscribe to the new platform's events.
-  StreamSubscription? _playerDataSubscription;
+  StreamSubscription<PlayerDataMessage>? _playerDataSubscription;
 
   final String _id;
   final _proxy = _ProxyHttpServer();
@@ -614,8 +614,8 @@ class AudioPlayer {
     }
 
     Timer? currentTimer;
-    StreamSubscription? durationSubscription;
-    StreamSubscription? playbackEventSubscription;
+    StreamSubscription<Duration?>? durationSubscription;
+    StreamSubscription<PlaybackEvent>? playbackEventSubscription;
     void yieldPosition(Timer timer) {
       if (controller.isClosed) {
         timer.cancel();
@@ -1992,13 +1992,13 @@ class _ProxyHttpServer {
   String _requestKey(Uri uri) => '${uri.path}?${uri.query}';
 
   /// Start the server if it is not already running.
-  Future ensureRunning() async {
+  Future<dynamic> ensureRunning() async {
     if (_running) return;
     return await start();
   }
 
   /// Starts the server.
-  Future start() async {
+  Future<dynamic> start() async {
     _running = true;
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
@@ -2015,7 +2015,7 @@ class _ProxyHttpServer {
   }
 
   /// Stops the server
-  Future stop() async {
+  Future<dynamic> stop() async {
     if (!_running) return;
     _running = false;
     return await _server.close();
@@ -2841,7 +2841,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     final mimeFile = await _mimeFile;
     await mimeFile.writeAsString(mimeType);
     final inProgressResponses = <_InProgressCacheResponse>[];
-    late StreamSubscription subscription;
+    late StreamSubscription<List<int>> subscription;
     var percentProgress = 0;
     void updateProgress(int newPercentProgress) {
       if (newPercentProgress != percentProgress) {
