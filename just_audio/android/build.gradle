@@ -28,7 +28,7 @@ apply plugin: 'com.android.library'
 
 android {
     compileSdkVersion 31
-    namespace 'com.ryanheise.audio_session'
+    namespace 'com.ryanheise.just_audio'
 
     defaultConfig {
         minSdkVersion 16
