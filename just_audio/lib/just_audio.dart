@@ -142,13 +142,14 @@ class AudioPlayer {
 
   /// Creates an [AudioPlayer].
   ///
-  /// If [userAgent] is specified, it will be included in the header of all HTTP
-  /// requests on Android, iOS and macOS to identify your agent to the server.
-  /// If set, just_audio will create a cleartext local HTTP proxy on your device
-  /// to forward HTTP requests with headers included. If [userAgent] is not
-  /// specified, this will default to Apple's Core Audio user agent on iOS/macOS
-  /// and to just_audio's own user agent on Android. On Web, the browser will
-  /// override any specified user-agent string with its own.
+  /// Apps requesting remote URLs should specify a `[userAgent]` string with
+  /// this constructor which will be included in the `user-agent` header on all
+  /// HTTP requests (except on web where the browser's user agent will be sent).
+  /// This header helps to identify to the server which app is submitting the
+  /// request. If unspecified, it will default to Apple's Core Audio user agent
+  /// on iOS/macOS, or just_audio's user agent on Android. Note: this feature
+  /// is implemented via a local HTTP proxy which requires non-HTTPS support to
+  /// be enabled. See the README page for setup instructions.
   ///
   /// The player will automatically pause/duck and resume/unduck when audio
   /// interruptions occur (e.g. a phone call) or when headphones are unplugged.
