@@ -25,7 +25,8 @@ apply plugin: 'com.android.application'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
-    compileSdkVersion 31
+    namespace 'com.ryanheise.just_audio_example'
+    compileSdkVersion 33
 
     lintOptions {
         disable 'InvalidPackage'
