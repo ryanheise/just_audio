@@ -236,10 +236,27 @@ To allow your application to access audio files on the Internet, add the followi
     <uses-permission android:name="android.permission.INTERNET"/>
 ```
 
-If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, also add the following attribute to the `application` element:
+If you wish to connect to non-HTTPS URLs (typically HTTP), also add the following attribute to the `application` element:
 
 ```xml
     <application ... android:usesCleartextTraffic="true">
+```
+
+Note that just_audio's proxy (used to implement features such as headers, caching and stream audio sources) runs on a `localhost` HTTP server, and this also requires cleartext access to be enabled. You can either enable this via the option above which also enables access to any non-HTTPS URL, or you can instead limit cleartext access to just `localhost` URLs by defining a network security config. To use this approach, create the file `android/app/src/main/res/xml/network_security_config.xml`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+	<domain-config cleartextTrafficPermitted="true">
+		<domain includeSubdomains="false">127.0.0.1</domain>
+	</domain-config>
+</network-security-config>
+```
+
+Then reference this network security config in your `AndroidManifest.xml` file by adding the following attribute to the `application` element:
+
+```xml
+    <application ... android:networkSecurityConfig="@xml/network_security_config">
 ```
 
 If you need access to the player's AudioSession ID, you can listen to `AudioPlayer.androidAudioSessionIdStream`. Note that the AudioSession ID will change whenever you set new AudioAttributes.
@@ -284,7 +301,7 @@ post_install do |installer|
 end
 ```
 
-If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLs, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
@@ -305,7 +322,7 @@ To allow your macOS application to access audio files on the Internet, add the f
     <true/>
 ```
 
-If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLs, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
