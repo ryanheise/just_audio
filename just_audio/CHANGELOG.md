@@ -1,3 +1,7 @@
+## 0.9.35
+
+* Fix exception on calling LockCachingAudioSource clearCache after the player is stopped (@Akalanka47000).
+
 ## 0.9.34
 
 * Support AGP 8 (@josephcrowell).

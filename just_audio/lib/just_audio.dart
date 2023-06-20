@@ -1254,6 +1254,10 @@ class AudioPlayer {
     final currentIndex = this.currentIndex;
     final audioSource = _audioSource;
 
+    if (!active && audioSource is LockCachingAudioSource && audioSource._downloading) {
+      audioSource._downloading = false;
+    }
+
     void subscribeToEvents(AudioPlayerPlatform platform) {
       _playerDataSubscription =
           platform.playerDataMessageStream.listen((message) {
