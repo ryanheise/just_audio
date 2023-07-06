@@ -4,7 +4,6 @@
 //
 //  Created by Mac on 24/09/22.
 //
-import kMusicSwift
 
 enum FlutterAudioSourceType: String {
     case progressive
@@ -66,8 +65,8 @@ enum FlutterAudioSourceType: String {
             let (effects, audioSource) = try FlutterAudioSourceType.parseAudioSourceFrom(map: map["child"] as! [String: Any?])
             return (effects, try ClippingAudioSource(
                 with: audioSource,
-                from: Double(map["start"] as! Int),
-                to: Double(map["end"] as! Int)
+                from: Double(map["start"] as! Int / (1000 * 1000)), // provided in  microseconds
+                to: Double(map["end"] as! Int / (1000 * 1000)) // provided in  microseconds
             ))
         case .looping:
             let (effects, audioSource) = try FlutterAudioSourceType.parseAudioSourceFrom(map: map["child"] as! [String: Any?])

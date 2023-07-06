@@ -30,8 +30,8 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ![TargetPlatform.windows, TargetPlatform.linux]
             .contains(defaultTargetPlatform))
       ClippingAudioSource(
-        start: const Duration(seconds: 60),
-        end: const Duration(seconds: 90),
+        start: const Duration(seconds: 0),
+        end: const Duration(seconds: 30),
         child: AudioSource.uri(Uri.parse(
             "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
         tag: AudioMetadata(

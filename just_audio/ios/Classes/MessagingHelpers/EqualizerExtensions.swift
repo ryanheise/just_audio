@@ -4,7 +4,6 @@
 //
 //  Created by Mac on 24/09/22.
 //
-import kMusicSwift
 
 extension Equalizer {
     /// returns an equalizer with an activated preset

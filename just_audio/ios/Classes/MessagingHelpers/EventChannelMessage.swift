@@ -4,7 +4,6 @@
 //
 //  Created by Mac on 27/09/22.
 //
-import kMusicSwift
 
 class EventChannelMessage: Equatable {
     let processingState: Int
@@ -43,7 +42,11 @@ class EventChannelMessage: Equatable {
 
         updatePosition = elapsedTime != nil ? Int(elapsedTime! * 1_000_000) : 0
 
-        self.bufferedPosition = bufferedPosition != nil ? Int(bufferedPosition! * 1_000_000) : 0
+        if let bufferedPosition, !bufferedPosition.isNaN, bufferedPosition.isFinite {
+            self.bufferedPosition = Int(bufferedPosition * 1_000_000)
+        } else {
+            self.bufferedPosition = 0
+        }
 
         self.duration = duration != nil ? Int(duration! * 1_000_000) : 0
 

@@ -1,7 +1,6 @@
 import AVFoundation
 import Combine
 import Flutter
-import kMusicSwift
 
 @available(iOS 13.0, *)
 internal class SwiftPlayer: NSObject {
@@ -137,7 +136,8 @@ internal class SwiftPlayer: NSObject {
                 player.pause()
             case .seek:
                 let time = Util.timeFrom(microseconds: request["position"] as! Int64)
-                player.seek(second: time.seconds)
+                let index = request["index"] as? Int
+                player.seek(second: time.seconds, index: index)
             case .setVolume:
                 try player.setVolume(Float(request["volume"] as! Double))
             case .setSpeed:

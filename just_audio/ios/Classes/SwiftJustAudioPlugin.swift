@@ -1,6 +1,5 @@
 import AVFAudio
 import Flutter
-import kMusicSwift
 import UIKit
 
 @available(iOS 13.0, *)
