@@ -3756,7 +3756,6 @@ class AndroidEqualizerParameters {
 /// An [AudioEffect] for Android that can adjust the gain for different
 /// frequency bands of an [AudioPlayer]'s audio signal.
 class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
-  AndroidEqualizerParameters? _parameters;
   final Completer<AndroidEqualizerParameters> _parametersCompleter =
       Completer<AndroidEqualizerParameters>();
 
@@ -3772,9 +3771,9 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
     }
     final response = await platform
         .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
-    _parameters =
+    final receivedParameters =
         AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
-    _parametersCompleter.complete(_parameters);
+    _parametersCompleter.complete(receivedParameters);
   }
 
   /// The parameter values of this equalizer.
