@@ -2,6 +2,10 @@
 
 * 
 
+## 0.9.35
+
+* Fix nullable completer argument type (@srawlins).
+
 ## 0.9.34
 
 * Support AGP 8 (@josephcrowell).
