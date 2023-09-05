@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/services.dart';
@@ -53,13 +52,18 @@ void runTests() {
   }
 
   setUp(() {
-    audioSessionChannel.setMockMethodCallHandler((MethodCall methodCall) async {
+    _ambiguate(TestDefaultBinaryMessengerBinding.instance)!
+        .defaultBinaryMessenger
+        .setMockMethodCallHandler(audioSessionChannel,
+            (MethodCall methodCall) async {
       return null;
     });
   });
 
   tearDown(() {
-    audioSessionChannel.setMockMethodCallHandler(null);
+    _ambiguate(TestDefaultBinaryMessengerBinding.instance)!
+        .defaultBinaryMessenger
+        .setMockMethodCallHandler(audioSessionChannel, null);
   });
 
   test('init', () async {
@@ -81,6 +85,29 @@ void runTests() {
     //expect(player.shuffleModeEnabled, equals(false));
     expect(player.automaticallyWaitsToMinimizeStalling, equals(true));
     await player.dispose();
+  });
+
+  test('assets', () async {
+    final player = AudioPlayer();
+    void expectAsset(String uri, {dynamic tag}) {
+      final audioSource = player.audioSource;
+      expect(audioSource is UriAudioSource && audioSource.uri.toString() == uri,
+          equals(true));
+      expect(audioSource is UriAudioSource && audioSource.tag == tag,
+          equals(true));
+    }
+
+    await player.setAsset('audio/foo.mp3', preload: false);
+    expectAsset('asset:///audio/foo.mp3');
+    await player.setAsset('audio/foo.mp3', package: 'bar', preload: false);
+    expectAsset('asset:///packages/bar/audio/foo.mp3');
+    await player.setAudioSource(AudioSource.asset('audio/foo.mp3'),
+        preload: false);
+    expectAsset('asset:///audio/foo.mp3');
+    await player.setAudioSource(
+        AudioSource.asset('audio/foo.mp3', package: 'bar', tag: 'asset-tag'),
+        preload: false);
+    expectAsset('asset:///packages/bar/audio/foo.mp3', tag: 'asset-tag');
   });
 
   test('idle-state', () async {
@@ -324,7 +351,7 @@ void runTests() {
     stopwatch.start();
 
     var completer = Completer<dynamic>();
-    late StreamSubscription subscription;
+    late StreamSubscription<Duration> subscription;
     subscription = player.positionStream.listen((position) {
       if (position >= position1) {
         subscription.cancel();
@@ -402,10 +429,7 @@ void runTests() {
     //final socket = await Socket.connect(uri.host, uri.port);
     socket.write('GET ${uri.path} HTTP/1.0\n\n');
     await socket.flush();
-    final responseText = await socket
-        .transform(Converter.castFrom<List<int>, String, Uint8List, String>(
-            utf8.decoder))
-        .join();
+    final responseText = await utf8.decoder.bind(socket).join();
     await socket.close();
     expect(responseText, equals('Hello'));
     await server.stop();
@@ -1072,7 +1096,7 @@ void runTests() {
       playing: false,
     );
     var completer = Completer<dynamic>();
-    late StreamSubscription subscription;
+    late StreamSubscription<Duration> subscription;
     subscription = player.positionStream.listen((position) {
       expectDuration(position, Duration.zero);
       subscription.cancel();
@@ -1151,7 +1175,7 @@ void runTests() {
     );
     expect(player.currentIndex, 0);
     var completer = Completer<dynamic>();
-    late StreamSubscription subscription;
+    late StreamSubscription<Duration> subscription;
     subscription = player.positionStream.listen((position) {
       expectDuration(position, Duration.zero);
       subscription.cancel();
@@ -1727,7 +1751,7 @@ class MockWebServer {
   late HttpServer _server;
   int get port => _server.port;
 
-  Future start() async {
+  Future<void> start() async {
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
       final response = request.response;
@@ -1750,7 +1774,9 @@ class MockWebServer {
     });
   }
 
-  Future stop() => _server.close();
+  Future<void> stop() => _server.close();
 }
 
 class MyHttpOverrides extends HttpOverrides {}
+
+T? _ambiguate<T>(T? value) => value;

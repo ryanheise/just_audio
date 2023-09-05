@@ -236,10 +236,27 @@ To allow your application to access audio files on the Internet, add the followi
     <uses-permission android:name="android.permission.INTERNET"/>
 ```
 
-If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, also add the following attribute to the `application` element:
+If you wish to connect to non-HTTPS URLs (typically HTTP), also add the following attribute to the `application` element:
 
 ```xml
     <application ... android:usesCleartextTraffic="true">
+```
+
+Note that just_audio's proxy (used to implement features such as headers, caching and stream audio sources) runs on a `localhost` HTTP server, and this also requires cleartext access to be enabled. You can either enable this via the option above which also enables access to any non-HTTPS URL, or you can instead limit cleartext access to just `localhost` URLs by defining a network security config. To use this approach, create the file `android/app/src/main/res/xml/network_security_config.xml`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+	<domain-config cleartextTrafficPermitted="true">
+		<domain includeSubdomains="false">127.0.0.1</domain>
+	</domain-config>
+</network-security-config>
+```
+
+Then reference this network security config in your `AndroidManifest.xml` file by adding the following attribute to the `application` element:
+
+```xml
+    <application ... android:networkSecurityConfig="@xml/network_security_config">
 ```
 
 If you need access to the player's AudioSession ID, you can listen to `AudioPlayer.androidAudioSessionIdStream`. Note that the AudioSession ID will change whenever you set new AudioAttributes.
@@ -284,7 +301,7 @@ post_install do |installer|
 end
 ```
 
-If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLs, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
@@ -305,7 +322,7 @@ To allow your macOS application to access audio files on the Internet, add the f
     <true/>
 ```
 
-If you wish to connect to non-HTTPS URLS, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
+If you wish to connect to non-HTTPS URLs, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
 ```xml
 <key>NSAppTransportSecurity</key>
@@ -349,7 +366,33 @@ dependencies:
 
 For issues with the Linux implementation, please open an issue on the respective implementation's GitHub issues page.
 
-### Mixing and matching audio plugins
+## Troubleshooting
+
+Most problems you encounter when playing an audio file will likely relate to the audio file format, the server headers, or the file name.
+
+### Audio file formats/encodings
+
+Different platforms support different audio formats and encodings. For a list, see this [StackOverflow](https://stackoverflow.com/questions/73557707/which-audio-formats-extensions-work-on-ios-and-android-with-the-just-audio-flu) answer.
+
+Different audio formats have different seeking support. If you have control over the encoding of the audio files your app needs to play, then it is recommended to encode audio as M4A because this is capable of embedding an accurate seek table. With MP3, there are multiple different methods of encoding that permit seeking, although all such methods are approximate. When your app needs to play from arbitrary audio sources requested by the user, you are at the mercy of the source audio format.
+
+Different audio formats may or may not embed duration metadata, and the absence of this metadata is a common reason why just_audio may sometimes return a null duration. This behaviour is platform specific, however, and Android can sometimes infer the missing duration by decoding the entire file and measuring the duration.
+
+### Server headers
+
+A server that hosts audio content should return appropriate HTTP response headers to the client. This includes an appropriate `Content-Length` header and a correct `Content-Type` header so that the player knows which decoder to use to read the data.
+
+Servers should also support range requests. These allow just_audio to make requests for a part of the whole file within a given byte range as opposed to always requesting the whole file. If the user seeks to a position near the end of the audio file that hasn't been downloaded yet (and if there is a seek table), just_audio will try to make a range request for the end of the file.
+
+Range requests can also impact on just_audio's ability to determine an audio file's duration. In many cases, certain audio formats embed metadata (which includes the audio duration) at the END of the audio file, and range requests allow just_audio to jump to the end of the file to fetch the metadata first, without having to wait for the entire file to download, and then inform you up front what the audio file duration is. If just_audio returns a null duration when the audio file has duration metadata, this may suggest that the server does not support range requests.
+
+If you host audio files on your own server, remember to correctly configure the headers described above.
+
+### File names
+
+When playing audio from a local file, just_audio cannot use any `Content-Type` header to figure out which decoder to use to read the file. Instead, the file name extension will generally be used to determine the file type. For example, if a file name ends with `.mp3`, the MP3 decoder will be used to read it, while if the file name ends with `.wav`, the WAV decoder will be used. If the file name has an `.mp3` extension but the actual file content is not in the MP3 format, then just_audio may potentially fail to read it. iOS enforces this fairly strictly, while Android is more likely to be forgiving by taking a peek at the data to make an educated guess as to what the data format really is. In general, however, it is recommended to use correct file name extensions for any audio file that is under your control.
+
+## Mixing and matching audio plugins
 
 The flutter plugin ecosystem contains a wide variety of useful audio plugins. In order to allow these to work together in a single app, just_audio "just" plays audio. By focusing on a single responsibility, different audio plugins can safely work together without overlapping responsibilities causing runtime conflicts.
 

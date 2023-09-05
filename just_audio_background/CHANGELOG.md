@@ -1,3 +1,17 @@
+## 0.0.1-beta.10
+
+* Fix bug where AudioPlayer constructor parameters were ignored.
+* Update minimum flutter version to 3.0.
+
+## 0.0.1-beta.9
+
+* Fix currentIndex stutter.
+* Performance and lint fixes (@Zekfad).
+
+## 0.0.1-beta.8
+
+* Fix performance issues when shuffleMode is enabled (@agersant)
+
 ## 0.0.1-beta.7
 
 * Fix build when targeting Android 13.

@@ -1,6 +1,44 @@
-## 0.9.29
+## 0.9.36
 
 * Added support for HLS title and artist metadata.
+
+## 0.9.35
+
+* Fix nullable completer argument type (@srawlins).
+
+## 0.9.34
+
+* Support AGP 8 (@josephcrowell).
+* Update AGP to 7.3.0.
+
+## 0.9.33
+
+* Update minimum flutter version to 3.0.
+
+## 0.9.32
+
+* Fix ignored tag parameter in AudioSource.asset().
+* Fix ignored tag parameter in AudioSource.file().
+* Fix nested URIs in HLS from EXT-X-MEDIA when using headers.
+
+## 0.9.31
+
+* Add a package parameter to AudioPlayer.setAsset() (@ewertonls).
+* Add AudioSource.asset(), AudioSource.file().
+* Fix tests for dart-sdk 2.5 (@ewertonls).
+
+## 0.9.30
+
+* Upgrade ExoPlayer to 2.18.1.
+* Fix bug using headers with LockCachingAudioSource.
+* Add LockCachingAudioSource.resolve().
+
+## 0.9.29
+
+* Fix bug in ConcatenatingAudioSource.clear().
+* Fix bug where proxy drains origin faster than it feeds client.
+* Fix bug where User Agent was not set on redirects (@mikel-snipd)
+* Fix bug where StreamAudioSource requests are not closed when proxy is disposed (@mikel-snipd)
 
 ## 0.9.28
 

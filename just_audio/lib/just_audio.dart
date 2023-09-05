@@ -7,7 +7,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:meta/meta.dart' show experimental;
 import 'package:path/path.dart' as p;
@@ -87,13 +86,13 @@ class AudioPlayer {
   /// implementation. When switching between active and inactive modes, this is
   /// used to cancel the subscription to the previous platform's events and
   /// subscribe to the new platform's events.
-  StreamSubscription? _playbackEventSubscription;
+  StreamSubscription<PlaybackEventMessage>? _playbackEventSubscription;
 
   /// The subscription to the data event channel of the current platform
   /// implementation. When switching between active and inactive modes, this is
   /// used to cancel the subscription to the previous platform's events and
   /// subscribe to the new platform's events.
-  StreamSubscription? _playerDataSubscription;
+  StreamSubscription<PlayerDataMessage>? _playerDataSubscription;
 
   final String _id;
   final _proxy = _ProxyHttpServer();
@@ -143,13 +142,14 @@ class AudioPlayer {
 
   /// Creates an [AudioPlayer].
   ///
-  /// If [userAgent] is specified, it will be included in the header of all HTTP
-  /// requests on Android, iOS and macOS to identify your agent to the server.
-  /// If set, just_audio will create a cleartext local HTTP proxy on your device
-  /// to forward HTTP requests with headers included. If [userAgent] is not
-  /// specified, this will default to Apple's Core Audio user agent on iOS/macOS
-  /// and to just_audio's own user agent on Android. On Web, the browser will
-  /// override any specified user-agent string with its own.
+  /// Apps requesting remote URLs should specify a `[userAgent]` string with
+  /// this constructor which will be included in the `user-agent` header on all
+  /// HTTP requests (except on web where the browser's user agent will be sent).
+  /// This header helps to identify to the server which app is submitting the
+  /// request. If unspecified, it will default to Apple's Core Audio user agent
+  /// on iOS/macOS, or just_audio's user agent on Android. Note: this feature
+  /// is implemented via a local HTTP proxy which requires non-HTTPS support to
+  /// be enabled. See the README page for setup instructions.
   ///
   /// The player will automatically pause/duck and resume/unduck when audio
   /// interruptions occur (e.g. a phone call) or when headphones are unplugged.
@@ -615,8 +615,8 @@ class AudioPlayer {
     }
 
     Timer? currentTimer;
-    StreamSubscription? durationSubscription;
-    StreamSubscription? playbackEventSubscription;
+    StreamSubscription<Duration?>? durationSubscription;
+    StreamSubscription<PlaybackEvent>? playbackEventSubscription;
     void yieldPosition(Timer timer) {
       if (controller.isClosed) {
         timer.cancel();
@@ -672,6 +672,8 @@ class AudioPlayer {
   /// Convenience method to set the audio source to a file, preloaded by
   /// default, with an initial position of zero by default.
   ///
+  /// This is equivalent to:
+  ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.file(filePath)),
   ///     initialPosition: Duration.zero, preload: true);
@@ -683,25 +685,34 @@ class AudioPlayer {
     Duration? initialPosition,
     bool preload = true,
   }) =>
-      setAudioSource(AudioSource.uri(Uri.file(filePath)),
+      setAudioSource(AudioSource.file(filePath),
           initialPosition: initialPosition, preload: preload);
 
   /// Convenience method to set the audio source to an asset, preloaded by
   /// default, with an initial position of zero by default.
+  ///
+  /// For assets within the same package, this is equivalent to:
   ///
   /// ```
   /// setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
   ///     initialPosition: Duration.zero, preload: true);
   /// ```
   ///
+  /// If the asset is to be loaded from a different package, the [package]
+  /// parameter must be given to specify the package name.
+  ///
   /// See [setAudioSource] for a detailed explanation of the options.
   Future<Duration?> setAsset(
     String assetPath, {
+    String? package,
     bool preload = true,
     Duration? initialPosition,
   }) =>
-      setAudioSource(AudioSource.uri(Uri.parse('asset:///$assetPath')),
-          initialPosition: initialPosition, preload: preload);
+      setAudioSource(
+        AudioSource.asset(assetPath, package: package),
+        initialPosition: initialPosition,
+        preload: preload,
+      );
 
   /// Sets the source from which this audio player should fetch audio.
   ///
@@ -1406,6 +1417,10 @@ class AudioPlayer {
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
         if (checkInterruption()) return platform;
+        for (var audioEffect in _audioPipeline._audioEffects) {
+          await audioEffect._activate(platform);
+          if (checkInterruption()) return platform;
+        }
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
         }
@@ -1434,17 +1449,7 @@ class AudioPlayer {
       return platform;
     }
 
-    Future<void> initAudioEffects() async {
-      for (var audioEffect in _audioPipeline._audioEffects) {
-        await audioEffect._activate();
-        if (checkInterruption()) return;
-      }
-    }
-
     _platform = setPlatform();
-    if (_active) {
-      initAudioEffects().catchError((dynamic e) async {});
-    }
     return durationCompleter.future;
   }
 
@@ -1566,7 +1571,7 @@ class PlaybackEvent {
       );
 
   @override
-  int get hashCode => hashValues(
+  int get hashCode => Object.hash(
         processingState,
         updateTime,
         updatePosition,
@@ -1631,7 +1636,7 @@ class PlayerState {
   String toString() => 'playing=$playing,processingState=$processingState';
 
   @override
-  int get hashCode => hashValues(playing, processingState);
+  int get hashCode => Object.hash(playing, processingState);
 
   @override
   bool operator ==(Object other) =>
@@ -1658,7 +1663,7 @@ class IcyInfo {
   String toString() => 'title=$title,artist=$artist,url=$url';
 
   @override
-  int get hashCode => hashValues(title, artist, url);
+  int get hashCode => Object.hash(title, artist, url);
 
   @override
   bool operator ==(Object other) =>
@@ -1728,7 +1733,7 @@ class IcyMetadata {
   IcyMetadata({required this.info, required this.headers});
 
   @override
-  int get hashCode => hashValues(info, headers);
+  int get hashCode => Object.hash(info, headers);
 
   @override
   bool operator ==(Object other) =>
@@ -1959,11 +1964,12 @@ class _ProxyHttpServer {
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
-    if (source._player?._userAgent != null) {
-      headers['user-agent'] = source._player!._userAgent!;
-    }
     final path = _requestKey(uri);
-    _handlerMap[path] = _proxyHandlerForUri(uri, headers);
+    _handlerMap[path] = _proxyHandlerForUri(
+      uri,
+      headers: headers,
+      userAgent: source._player?._userAgent,
+    );
     return uri.replace(
       scheme: 'http',
       host: InternetAddress.loopbackIPv4.address,
@@ -1990,13 +1996,13 @@ class _ProxyHttpServer {
   String _requestKey(Uri uri) => '${uri.path}?${uri.query}';
 
   /// Start the server if it is not already running.
-  Future ensureRunning() async {
+  Future<dynamic> ensureRunning() async {
     if (_running) return;
     return await start();
   }
 
   /// Starts the server.
-  Future start() async {
+  Future<dynamic> start() async {
     _running = true;
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
@@ -2013,7 +2019,7 @@ class _ProxyHttpServer {
   }
 
   /// Stops the server
-  Future stop() async {
+  Future<dynamic> stop() async {
     if (!_running) return;
     _running = false;
     return await _server.close();
@@ -2103,6 +2109,34 @@ abstract class AudioSource {
     } else {
       return ProgressiveAudioSource(uri, headers: headers, tag: tag);
     }
+  }
+
+  /// Convenience method to create an audio source for a file.
+  ///
+  /// This is equivalent to:
+  ///
+  /// ```
+  /// AudioSource.uri(Uri.file(filePath));
+  /// ```
+  static UriAudioSource file(String filePath, {dynamic tag}) {
+    return AudioSource.uri(Uri.file(filePath), tag: tag);
+  }
+
+  /// Convenience method to create an audio source for an asset.
+  ///
+  /// For assets within the same package, this is equivalent to:
+  ///
+  /// ```
+  /// AudioSource.uri(Uri.parse('asset:///$assetPath'));
+  /// ```
+  ///
+  /// If the asset is to be loaded from a different package, the [package]
+  /// parameter must be given to specify the package name.
+  static UriAudioSource asset(String assetPath,
+      {String? package, dynamic tag}) {
+    final keyName =
+        package == null ? assetPath : 'packages/$package/$assetPath';
+    return AudioSource.uri(Uri.parse('asset:///$keyName'), tag: tag);
   }
 
   AudioSource() : _id = _uuid.v4();
@@ -2494,6 +2528,7 @@ class ConcatenatingAudioSource extends AudioSource {
 
   /// (Untested) Removes all [AudioSource]s.
   Future<void> clear() async {
+    final end = children.length;
     children.clear();
     _shuffleOrder.clear();
     if (_player != null) {
@@ -2502,7 +2537,7 @@ class ConcatenatingAudioSource extends AudioSource {
           ConcatenatingRemoveRangeRequest(
               id: _id,
               startIndex: 0,
-              endIndex: children.length,
+              endIndex: end,
               shuffleOrder: List.of(_shuffleOrder.indices)));
     }
   }
@@ -2715,6 +2750,13 @@ class LockCachingAudioSource extends StreamAudioSource {
     _downloadProgressSubject.add((await cacheFile.exists()) ? 1.0 : 0.0);
   }
 
+  /// Returns a [UriAudioSource] resolving directly to the cache file if it
+  /// exists, otherwise returns `this`. This can be
+  Future<IndexedAudioSource> resolve() async {
+    final file = await cacheFile;
+    return await file.exists() ? AudioSource.uri(Uri.file(file.path)) : this;
+  }
+
   /// Emits the current download progress as a double value from 0.0 (nothing
   /// downloaded) to 1.0 (download complete).
   Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
@@ -2783,12 +2825,8 @@ class LockCachingAudioSource extends StreamAudioSource {
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
-    final httpClient = HttpClient();
-    final httpRequest = await httpClient.getUrl(uri);
-    if (headers != null) {
-      httpRequest.headers.clear();
-      headers!.forEach((name, value) => httpRequest.headers.set(name, value));
-    }
+    final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+    final httpRequest = await _getUrl(httpClient, uri, headers: headers);
     final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
@@ -2807,7 +2845,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     final mimeFile = await _mimeFile;
     await mimeFile.writeAsString(mimeType);
     final inProgressResponses = <_InProgressCacheResponse>[];
-    late StreamSubscription subscription;
+    late StreamSubscription<List<int>> subscription;
     var percentProgress = 0;
     void updateProgress(int newPercentProgress) {
       if (newPercentProgress != percentProgress) {
@@ -2902,15 +2940,13 @@ class LockCachingAudioSource extends StreamAudioSource {
         _requests.remove(request);
         final start = request.start!;
         final end = request.end ?? sourceLength;
-        final httpClient = HttpClient();
-        httpClient.getUrl(uri).then((httpRequest) async {
-          if (headers != null) {
-            httpRequest.headers.clear();
-            headers!
-                .forEach((name, value) => httpRequest.headers.set(name, value));
-          }
-          final rangeRequest = _HttpRangeRequest(start, end);
-          httpRequest.headers.set(HttpHeaders.rangeHeader, rangeRequest.header);
+        final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+
+        final rangeRequest = _HttpRangeRequest(start, end);
+        _getUrl(httpClient, uri, headers: {
+          if (headers != null) ...headers!,
+          HttpHeaders.rangeHeader: rangeRequest.header,
+        }).then((httpRequest) async {
           final response = await httpRequest.close();
           if (response.statusCode != 206) {
             httpClient.close();
@@ -3104,12 +3140,16 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     }
 
     final completer = Completer<void>();
-    stream.listen((event) {
+    final subscription = stream.listen((event) {
       request.response.add(event);
     }, onError: (Object e, StackTrace st) {
       source._player?._playbackEventSubject.addError(e, st);
     }, onDone: () {
       completer.complete();
+    });
+
+    request.response.done.then((dynamic value) {
+      subscription.cancel();
     });
 
     await completer.future;
@@ -3121,28 +3161,28 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
-_ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
+_ProxyHandler _proxyHandlerForUri(
+  Uri uri, {
+  Map<String, String>? headers,
+  String? userAgent,
+}) {
+  // Keep redirected [Uri] to speed-up requests
+  Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    final originRequest = await HttpClient().getUrl(uri);
-
-    // Rewrite request headers
-    final host = originRequest.headers.value('host');
-    originRequest.headers.clear();
-    request.headers.forEach((name, value) {
-      originRequest.headers.set(name, value);
-    });
-    for (var entry in headers?.entries ?? <MapEntry<String, String>>[]) {
-      originRequest.headers.set(entry.key, entry.value);
-    }
-    if (host != null) {
-      originRequest.headers.set('host', host);
-    } else {
-      originRequest.headers.removeAll('host');
-    }
-
+    final client = _createHttpClient(userAgent: userAgent);
     // Try to make normal request
+    String? host;
     try {
+      final requestHeaders = <String, String>{if (headers != null) ...headers};
+      request.headers
+          .forEach((name, value) => requestHeaders[name] = value.join(', '));
+      final originRequest =
+          await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
+      host = originRequest.headers.value(HttpHeaders.hostHeader);
       final originResponse = await originRequest.close();
+      if (originResponse.redirects.isNotEmpty) {
+        redirectedUri = originResponse.redirects.last.location;
+      }
 
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
@@ -3161,6 +3201,8 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
         // TODO: Handle other playlist formats similarly?
         final m3u8 = await originResponse.transform(utf8.decoder).join();
         for (var line in const LineSplitter().convert(m3u8)) {
+          line = line.replaceAllMapped(
+              RegExp(r'#EXT-X-MEDIA:.*?URI="(.*?)".*'), (m) => m[1]!);
           line = line.replaceAll(RegExp(r'#.*$'), '').trim();
           if (line.isEmpty) continue;
           try {
@@ -3184,8 +3226,16 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
         }
         request.response.add(utf8.encode(m3u8));
       } else {
-        await originResponse.pipe(request.response);
+        request.response.bufferOutput = false;
+        var done = false;
+        request.response.done.then((dynamic _) => done = true);
+        await for (var chunk in originResponse) {
+          if (done) break;
+          request.response.add(chunk);
+          await request.response.flush();
+        }
       }
+      await request.response.flush();
       await request.response.close();
     } on HttpException {
       // We likely are dealing with a streaming protocol
@@ -3208,7 +3258,7 @@ _ProxyHandler _proxyHandlerForUri(Uri uri, Map<String, String>? headers) {
         // Rewrite headers
         final headers = <String, String?>{};
         request.headers.forEach((name, value) {
-          if (name.toLowerCase() != 'host') {
+          if (name.toLowerCase() != HttpHeaders.hostHeader) {
             headers[name] = value.join(",");
           }
         });
@@ -3546,7 +3596,7 @@ abstract class AudioEffect {
   }
 
   /// Called when [_player] is connected to the platform.
-  Future<void> _activate() async {}
+  Future<void> _activate(AudioPlayerPlatform platform) async {}
 
   /// Whether the effect is enabled. When `true`, and if the effect is part
   /// of an [AudioPipeline] attached to an [AudioPlayer], the effect will modify
@@ -3653,8 +3703,8 @@ class AndroidEqualizerBand {
   }
 
   /// Restores the gain after reactivating.
-  Future<void> _restore() async {
-    await (await _player._platform).androidEqualizerBandSetGain(
+  Future<void> _restore(AudioPlayerPlatform platform) async {
+    await (platform).androidEqualizerBandSetGain(
         AndroidEqualizerBandSetGainRequest(bandIndex: index, gain: gain));
   }
 
@@ -3688,9 +3738,9 @@ class AndroidEqualizerParameters {
   });
 
   /// Restore platform state after reactivating.
-  Future<void> _restore() async {
+  Future<void> _restore(AudioPlayerPlatform platform) async {
     for (var band in bands) {
-      await band._restore();
+      await band._restore(platform);
     }
   }
 
@@ -3709,7 +3759,6 @@ class AndroidEqualizerParameters {
 /// An [AudioEffect] for Android that can adjust the gain for different
 /// frequency bands of an [AudioPlayer]'s audio signal.
 class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
-  AndroidEqualizerParameters? _parameters;
   final Completer<AndroidEqualizerParameters> _parametersCompleter =
       Completer<AndroidEqualizerParameters>();
 
@@ -3717,17 +3766,17 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
   String get _type => 'AndroidEqualizer';
 
   @override
-  Future<void> _activate() async {
-    await super._activate();
+  Future<void> _activate(AudioPlayerPlatform platform) async {
+    await super._activate(platform);
     if (_parametersCompleter.isCompleted) {
-      await (await parameters)._restore();
+      await (await parameters)._restore(platform);
       return;
     }
-    final response = await (await _player!._platform)
+    final response = await platform
         .androidEqualizerGetParameters(AndroidEqualizerGetParametersRequest());
-    _parameters =
+    final receivedParameters =
         AndroidEqualizerParameters._fromMessage(_player!, response.parameters);
-    _parametersCompleter.complete(_parameters);
+    _parametersCompleter.complete(receivedParameters);
   }
 
   /// The parameter values of this equalizer.
@@ -3774,4 +3823,32 @@ enum PositionDiscontinuityReason {
   /// The position discontinuity occurred because the player reached the end of
   /// the current item and auto-advanced to the next item.
   autoAdvance,
+}
+
+Future<HttpClientRequest> _getUrl(HttpClient client, Uri uri,
+    {Map<String, String>? headers}) async {
+  final request = await client.getUrl(uri);
+  if (headers != null) {
+    final host = request.headers.value(HttpHeaders.hostHeader);
+    request.headers.clear();
+    request.headers.set(HttpHeaders.contentLengthHeader, '0');
+    headers.forEach((name, value) => request.headers.set(name, value));
+    if (host != null) {
+      request.headers.set(HttpHeaders.hostHeader, host);
+    }
+    if (client.userAgent != null) {
+      request.headers.set(HttpHeaders.userAgentHeader, client.userAgent!);
+    }
+  }
+  // Match ExoPlayer's native behavior
+  request.maxRedirects = 20;
+  return request;
+}
+
+HttpClient _createHttpClient({String? userAgent}) {
+  final client = HttpClient();
+  if (userAgent != null) {
+    client.userAgent = userAgent;
+  }
+  return client;
 }
