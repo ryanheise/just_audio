@@ -5,6 +5,7 @@
 ## 0.9.35
 
 * Fix nullable completer argument type (@srawlins).
+* Support uuid 4.0.0 (@Pante).
 
 ## 0.9.34
 
