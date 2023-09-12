@@ -34,6 +34,9 @@ abstract class JustAudioPlatform extends PlatformInterface {
     _instance = instance;
   }
 
+  /// True if the platform can handle [MappingAudioSourceMessage]s.
+  bool get supportsMappingAudioSource => false;
+
   /// Creates a new platform player and returns a nested platform interface for
   /// communicating with that player.
   Future<AudioPlayerPlatform> init(InitRequest request) {
@@ -63,8 +66,12 @@ abstract class JustAudioPlatform extends PlatformInterface {
 /// [AudioPlayerPlatform] methods.
 abstract class AudioPlayerPlatform {
   final String id;
+  final AudioSourceMessageGetter getAudioSourceMessage;
 
-  AudioPlayerPlatform(this.id);
+  AudioPlayerPlatform(
+    this.id, {
+    this.getAudioSourceMessage = _unimplementedGetAudioServiceMessage,
+  });
 
   /// A broadcast stream of playback events.
   Stream<PlaybackEventMessage> get playbackEventMessageStream {
@@ -222,7 +229,13 @@ abstract class AudioPlayerPlatform {
     throw UnimplementedError(
         "androidEqualizerBandSetGain() has not been implemented.");
   }
+
+  static Never _unimplementedGetAudioServiceMessage(String id) =>
+      throw UnimplementedError(
+          'getAudioServiceMessage() has not been implemented.');
 }
+
+typedef AudioSourceMessageGetter = AudioSourceMessage Function(String id);
 
 /// A data update communicated from the platform implementation to the Flutter
 /// plugin. Each field should trigger a state update in the frontend plugin if
@@ -385,6 +398,7 @@ class IcyHeadersMessage {
 /// player instance.
 class InitRequest {
   final String id;
+  AudioSourceMessageGetter getAudioSourceMessage;
   final AudioLoadConfigurationMessage? audioLoadConfiguration;
   final List<AudioEffectMessage> androidAudioEffects;
   final List<AudioEffectMessage> darwinAudioEffects;
@@ -392,6 +406,7 @@ class InitRequest {
 
   InitRequest({
     required this.id,
+    required this.getAudioSourceMessage,
     this.audioLoadConfiguration,
     this.androidAudioEffects = const [],
     this.darwinAudioEffects = const [],
@@ -1113,6 +1128,26 @@ class SilenceAudioSourceMessage extends IndexedAudioSourceMessage {
         'type': 'silence',
         'id': id,
         'duration': duration.inMicroseconds,
+      };
+}
+
+/// Information about a mapping audio source to be communicated with the
+/// platform implementation.
+class MappingAudioSourceMessage extends IndexedAudioSourceMessage {
+  /// The closure can only be used by platform implementations that pass by
+  /// reference.
+  final Future<IndexedAudioSourceMessage?> Function() createAudioSourceMessage;
+
+  MappingAudioSourceMessage({
+    required String id,
+    required this.createAudioSourceMessage,
+    dynamic tag,
+  }) : super(id: id, tag: tag);
+
+  @override
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'type': 'mapping',
+        'id': id,
       };
 }
 

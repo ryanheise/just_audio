@@ -442,6 +442,7 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 | looping/shuffling              | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | compose audio                  | ✅      | ✅  | ✅    | ✅  |         | ✅    |
 | gapless playback               | ✅      | ✅  | ✅    |     | ✅      | ✅    |
+| mapping audio sources          | ✅      |     |       | ✅  |         |       |
 | report player errors           | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | handle phonecall interruptions | ✅      | ✅  |       |     |         |       |
 | buffering/loading options      | ✅      | ✅  | ✅    |     |         |       |

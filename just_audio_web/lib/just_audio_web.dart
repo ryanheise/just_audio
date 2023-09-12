@@ -17,13 +17,19 @@ class JustAudioPlugin extends JustAudioPlatform {
   }
 
   @override
+  bool get supportsMappingAudioSource => true;
+
+  @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     if (players.containsKey(request.id)) {
       throw PlatformException(
           code: "error",
           message: "Platform player ${request.id} already exists");
     }
-    final player = Html5AudioPlayer(id: request.id);
+    final player = Html5AudioPlayer(
+      id: request.id,
+      getAudioServiceMessage: request.getAudioSourceMessage,
+    );
     players[request.id] = player;
     return player;
   }
@@ -57,7 +63,13 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
   double _speed = 1.0;
 
   /// Creates a platform player with the given [id].
-  JustAudioPlayer({required String id}) : super(id);
+  JustAudioPlayer({
+    required String id,
+    required AudioSourceMessageGetter getAudioServiceMessage,
+  }) : super(
+          id,
+          getAudioSourceMessage: getAudioServiceMessage,
+        );
 
   @mustCallSuper
   Future<void> release() async {
@@ -108,7 +120,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
   final Map<String, AudioSourcePlayer> _audioSourcePlayers = {};
 
   /// Creates an [Html5AudioPlayer] with the given [id].
-  Html5AudioPlayer({required String id}) : super(id: id) {
+  Html5AudioPlayer(
+      {required String id,
+      required AudioSourceMessageGetter getAudioServiceMessage})
+      : super(
+          id: id,
+          getAudioServiceMessage: getAudioServiceMessage,
+        ) {
     _audioElement.addEventListener('durationchange', (event) {
       _durationCompleter?.complete();
       broadcastPlaybackEvent();
@@ -498,6 +516,17 @@ class Html5AudioPlayer extends JustAudioPlayer {
     } else if (audioSourceMessage is HlsAudioSourceMessage) {
       return HlsAudioSourcePlayer(this, audioSourceMessage.id,
           Uri.parse(audioSourceMessage.uri), audioSourceMessage.headers);
+    } else if (audioSourceMessage is MappingAudioSourceMessage) {
+      return MappingAudioSourcePlayer(
+        this,
+        audioSourceMessage.id,
+        () async {
+          final innerMessage =
+              await audioSourceMessage.createAudioSourceMessage();
+          if (innerMessage == null) return null;
+          return decodeAudioSource(innerMessage) as IndexedAudioSourcePlayer;
+        },
+      );
     } else if (audioSourceMessage is ConcatenatingAudioSourceMessage) {
       return ConcatenatingAudioSourcePlayer(
           this,
@@ -696,6 +725,64 @@ class HlsAudioSourcePlayer extends UriAudioSourcePlayer {
   HlsAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id, Uri uri,
       Map<String, String>? headers)
       : super(html5AudioPlayer, id, uri, headers);
+}
+
+/// A player for a [MappingAudioSourceMessage].
+class MappingAudioSourcePlayer extends IndexedAudioSourcePlayer {
+  final Future<IndexedAudioSourcePlayer?> Function() _generateInnerPlayer;
+  IndexedAudioSourcePlayer? _innerPlayer;
+
+  MappingAudioSourcePlayer(
+      Html5AudioPlayer html5AudioPlayer, String id, this._generateInnerPlayer)
+      : super(html5AudioPlayer, id);
+
+  @override
+  Future<Duration?> load([int? initialPosition]) async =>
+      (_innerPlayer = (await _generateInnerPlayer()) ??
+              ProgressiveAudioSourcePlayer(
+                html5AudioPlayer,
+                id,
+                Uri(
+                  scheme: 'data',
+                  path:
+                      // 0 seconds, single channel, 44.1kHz. https://www.skypack.dev/view/wav-dummy
+                      'audio/wav;base64,UklGRgAAACRXQVZFZm10IBAAAAABAAEARKwAAESsAAABAAgAZGF0YQAAAAA=',
+                ),
+                null,
+              ))
+          .load(initialPosition);
+
+  @override
+  List<IndexedAudioSourcePlayer> get sequence => [this];
+
+  @override
+  List<int> get shuffleIndices => [0];
+
+  @override
+  Future<void> play() => _innerPlayer!.play();
+
+  @override
+  Future<void> pause() => _innerPlayer!.pause();
+
+  @override
+  Future<void> seek(int position) => _innerPlayer!.seek(position);
+
+  @override
+  Future<void> complete() => _innerPlayer!.complete();
+
+  @override
+  Future<void> timeUpdated(double seconds) async =>
+      _innerPlayer?.timeUpdated(seconds);
+
+  @override
+  Duration? get duration => _innerPlayer?.duration;
+
+  @override
+  Duration get position => _innerPlayer?.position ?? Duration.zero;
+
+  @override
+  Duration get bufferedPosition =>
+      _innerPlayer?.bufferedPosition ?? Duration.zero;
 }
 
 /// A player for a [ConcatenatingAudioSourceMessage].

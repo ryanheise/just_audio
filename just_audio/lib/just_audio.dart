@@ -1340,6 +1340,11 @@ class AudioPlayer {
       final platform = active
           ? await (_nativePlatform = _pluginPlatform.init(InitRequest(
               id: _id,
+              getAudioSourceMessage: (id) {
+                assert(_audioSources.containsKey(id),
+                    'Audio source with ID $id does not exist!');
+                return _audioSources[id]!._toMessage();
+              },
               audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
               androidAudioEffects: (_isAndroid() || _isUnitTest())
                   ? _audioPipeline.androidAudioEffects
@@ -2179,6 +2184,9 @@ abstract class IndexedAudioSource extends AudioSource {
   void _shuffle({int? initialIndex}) {}
 
   @override
+  IndexedAudioSourceMessage _toMessage();
+
+  @override
   List<IndexedAudioSource> get sequence => [this];
 
   @override
@@ -2279,7 +2287,7 @@ class ProgressiveAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
       id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
@@ -2303,7 +2311,7 @@ class DashAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() => DashAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => DashAudioSourceMessage(
       id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
@@ -2326,7 +2334,7 @@ class HlsAudioSource extends UriAudioSource {
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => HlsAudioSourceMessage(
       id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
 }
 
@@ -2346,8 +2354,52 @@ class SilenceAudioSource extends IndexedAudioSource {
   }) : super(tag: tag, duration: duration);
 
   @override
-  AudioSourceMessage _toMessage() =>
+  IndexedAudioSourceMessage _toMessage() =>
       SilenceAudioSourceMessage(id: _id, duration: duration);
+}
+
+/// An [AudioSource] that maps to another [AudioSource] when it is first loaded.
+///
+/// This is useful, for example, inside a [ConcatenatingAudioSource], if an
+/// audio URL cannot be loaded until just before it is played.
+///
+/// Note that [AudioSource]s are not currently disposed of until the
+/// [AudioPlayer] completes. It is recommended to keep the [identifier] and
+/// [createAudioSource] values light - the [identifier], for example, could be a
+/// basic [Object] that points to a value in a map stored elsewhere.
+///
+/// NOTE: This is officially supported on Android and the Web only. Check
+/// [supportedOnCurrentPlatform] before using.
+class MappingAudioSource<T> extends IndexedAudioSource {
+  /// An identifier representing the [AudioSource] to be created.
+  final T identifier;
+
+  /// A function that creates the [AudioSource] to be played.
+  ///
+  /// If `null` is returned, a silent, instant sound will be used instead.
+  final Future<IndexedAudioSource?> Function(T identifier) createAudioSource;
+
+  MappingAudioSource(
+    this.identifier,
+    this.createAudioSource, {
+    dynamic tag,
+    Duration? duration,
+  })  : assert(supportedOnCurrentPlatform),
+        super(tag: tag, duration: duration);
+
+  Future<IndexedAudioSource?>? _audioSourceFuture;
+
+  @override
+  IndexedAudioSourceMessage _toMessage() => MappingAudioSourceMessage(
+        id: _id,
+        createAudioSourceMessage: () => (_audioSourceFuture ??=
+                createAudioSource(identifier).then((audioSource) =>
+                    audioSource?._setup(_player!).then((_) => audioSource)))
+            .then((audioSource) => audioSource?._toMessage()),
+      );
+
+  static bool get supportedOnCurrentPlatform =>
+      JustAudioPlatform.instance.supportsMappingAudioSource;
 }
 
 /// An [AudioSource] representing a concatenation of multiple audio sources to
@@ -2597,7 +2649,7 @@ class ClippingAudioSource extends IndexedAudioSource {
   }
 
   @override
-  AudioSourceMessage _toMessage() => ClippingAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => ClippingAudioSourceMessage(
       id: _id,
       child: child._toMessage() as UriAudioSourceMessage,
       start: start,
@@ -2669,7 +2721,7 @@ abstract class StreamAudioSource extends IndexedAudioSource {
   Future<StreamAudioResponse> request([int? start, int? end]);
 
   @override
-  AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
+  IndexedAudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
       id: _id, uri: _uri.toString(), headers: null, tag: tag);
 }
 
