@@ -16,7 +16,10 @@ enum ProcessingState {
 	loading,
 	buffering,
 	ready,
-	completed
+	completed,
+	playing,
+	stopped,
+	paused
 };
 
 enum LoopMode {

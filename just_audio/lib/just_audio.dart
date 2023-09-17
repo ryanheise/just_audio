@@ -1616,6 +1616,15 @@ enum ProcessingState {
 
   /// The player has reached the end of the audio.
   completed,
+
+  // The player is playing
+  playing,
+
+  // The player has been stopped
+  stopped,
+
+  // The player has been paused
+  paused
 }
 
 /// Encapsulates the playing and processing states. These two states vary

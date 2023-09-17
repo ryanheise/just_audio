@@ -314,6 +314,9 @@ enum ProcessingStateMessage {
   buffering,
   ready,
   completed,
+  playing,
+  stopped,
+  paused
 }
 
 /// Icy metadata communicated from the platform implementation.

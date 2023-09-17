@@ -1041,6 +1041,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         loading,
         buffering,
         ready,
-        completed
+        completed,
+        stopped,
+        paussed
     }
 }
