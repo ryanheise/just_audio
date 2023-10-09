@@ -1,3 +1,7 @@
+## 0.9.36
+
+* Add setAllowsExternalPlayback on iOS/macOS.
+
 ## 0.9.35
 
 * Fix nullable completer argument type (@srawlins).

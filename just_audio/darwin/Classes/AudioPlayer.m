@@ -39,6 +39,7 @@
     FlutterResult _playResult;
     id _timeObserver;
     BOOL _automaticallyWaitsToMinimizeStalling;
+    BOOL _allowsExternalPlayback;
     LoadControl *_loadControl;
     BOOL _playing;
     float _speed;
@@ -81,6 +82,7 @@
     _loadResult = nil;
     _playResult = nil;
     _automaticallyWaitsToMinimizeStalling = YES;
+    _allowsExternalPlayback = NO;
     _loadControl = nil;
     if (loadConfiguration != (id)[NSNull null]) {
         NSDictionary *map = loadConfiguration[@"darwinLoadControl"];
@@ -146,6 +148,9 @@
             result(@{});
         } else if ([@"setPreferredPeakBitRate" isEqualToString:call.method]) {
             [self setPreferredPeakBitRate:(NSNumber *)request[@"bitRate"]];
+            result(@{});
+        } else if ([@"setAllowsExternalPlayback" isEqualToString:call.method]) {
+            [self setAllowsExternalPlayback:(BOOL)([request[@"allowsExternalPlayback"] intValue] == 1)];
             result(@{});
         } else if ([@"seek" isEqualToString:call.method]) {
             CMTime position = request[@"position"] == (id)[NSNull null] ? kCMTimePositiveInfinity : CMTimeMake([request[@"position"] longLongValue], 1000000);
@@ -641,6 +646,9 @@
                       forKeyPath:@"timeControlStatus"
                          options:NSKeyValueObservingOptionNew
                          context:nil];
+        }
+        if (@available(macOS 10.11, iOS 6.0, *)) {
+            _player.allowsExternalPlayback = _allowsExternalPlayback;
         }
         [_player addObserver:self
                   forKeyPath:@"currentItem"
@@ -1154,6 +1162,15 @@
     if (!_indexedAudioSources) return;
     for (int i = 0; i < [_indexedAudioSources count]; i++) {
         [_indexedAudioSources[i] applyPreferredPeakBitRate];
+    }
+}
+
+- (void)setAllowsExternalPlayback:(BOOL)allowsExternalPlayback {
+    _allowsExternalPlayback = allowsExternalPlayback;
+    if (@available(macOS 10.11, iOS 6.0, *)) {
+        if (_player) {
+            _player.allowsExternalPlayback = allowsExternalPlayback;
+        }
     }
 }
 

@@ -1,3 +1,7 @@
+## 4.2.2
+
+* Add setAllowsExternalPlayback on iOS/macOS.
+
 ## 4.2.1
 
 * Update minimum flutter version to 3.0.

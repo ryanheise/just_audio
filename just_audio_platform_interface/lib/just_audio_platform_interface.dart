@@ -154,6 +154,14 @@ abstract class AudioPlayerPlatform {
         "setPreferredPeakBitRate() has not been implemented.");
   }
 
+  /// On iOS and macOS, sets the allowsExternalPlayback option, and does nothing
+  /// on other platforms.
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(
+      SetAllowsExternalPlaybackRequest request) {
+    throw UnimplementedError(
+        "setAllowsExternalPlayback() has not been implemented.");
+  }
+
   /// Seeks to the given index and position.
   Future<SeekResponse> seek(SeekRequest request) {
     throw UnimplementedError("seek() has not been implemented.");
@@ -698,6 +706,25 @@ class SetPreferredPeakBitRateRequest {
 class SetPreferredPeakBitRateResponse {
   static SetPreferredPeakBitRateResponse fromMap(Map<dynamic, dynamic> map) =>
       SetPreferredPeakBitRateResponse();
+}
+
+/// Information communicated to the platform implementation when setting the
+/// automaticallyWaitsToMinimizeStalling option.
+class SetAllowsExternalPlaybackRequest {
+  final bool allowsExternalPlayback;
+
+  SetAllowsExternalPlaybackRequest({required this.allowsExternalPlayback});
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'allowsExternalPlayback': allowsExternalPlayback,
+      };
+}
+
+/// Information returned by the platform implementation after setting the
+/// automaticallyWaitsToMinimizeStalling option.
+class SetAllowsExternalPlaybackResponse {
+  static SetAllowsExternalPlaybackResponse fromMap(Map<dynamic, dynamic> map) =>
+      SetAllowsExternalPlaybackResponse();
 }
 
 /// Information communicated to the platform implementation when seeking to a
