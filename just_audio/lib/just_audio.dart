@@ -131,6 +131,7 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
   double _preferredPeakBitRate = 0;
+  bool _allowsExternalPlayback = false;
   bool _playInterrupted = false;
   bool _platformLoading = false;
   AndroidAudioAttributes? _androidAudioAttributes;
@@ -549,6 +550,10 @@ class AudioPlayer {
 
   /// The preferred peak bit rate (in bits per second) of bandwidth usage on iOS/macOS.
   double get preferredPeakBitRate => _preferredPeakBitRate;
+
+  /// Whether the player allows external playback on iOS/macOS, defaults to
+  /// false.
+  bool get allowsExternalPlayback => _allowsExternalPlayback;
 
   /// The current position of the player.
   Duration get position => _getPositionFor(_playbackEvent);
@@ -1098,6 +1103,16 @@ class AudioPlayer {
     _preferredPeakBitRate = preferredPeakBitRate;
     await (await _platform).setPreferredPeakBitRate(
         SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
+  }
+
+  /// Sets allowsExternalPlayback on iOS/macOS, defaults to false.
+  Future<void> setAllowsExternalPlayback(
+      final bool allowsExternalPlayback) async {
+    if (_disposed) return;
+    _allowsExternalPlayback = allowsExternalPlayback;
+    await (await _platform).setAllowsExternalPlayback(
+        SetAllowsExternalPlaybackRequest(
+            allowsExternalPlayback: allowsExternalPlayback));
   }
 
   /// Seeks to a particular [position]. If a composition of multiple
