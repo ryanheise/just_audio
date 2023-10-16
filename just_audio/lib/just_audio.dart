@@ -1367,6 +1367,7 @@ class AudioPlayer {
                       .toList()
                   : [],
               androidOffloadSchedulingEnabled: _androidOffloadSchedulingEnabled,
+              userAgent: _userAgent,
             )))
           : (_idlePlatform =
               _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream));
@@ -1800,7 +1801,7 @@ class AudioLoadConfiguration {
   /// Speed control for live streams on Android.
   final AndroidLivePlaybackSpeedControl? androidLivePlaybackSpeedControl;
 
-  AudioLoadConfiguration({
+  const AudioLoadConfiguration({
     this.darwinLoadControl,
     this.androidLoadControl,
     this.androidLivePlaybackSpeedControl,
@@ -1833,7 +1834,7 @@ class DarwinLoadControl {
   /// second.
   final double? preferredPeakBitRate;
 
-  DarwinLoadControl({
+  const DarwinLoadControl({
     this.automaticallyWaitsToMinimizeStalling = true,
     this.preferredForwardBufferDuration,
     this.canUseNetworkResourcesForLiveStreamingWhilePaused = false,
@@ -1878,7 +1879,7 @@ class AndroidLoadControl {
   /// (Android) The back buffer duration.
   final Duration backBufferDuration;
 
-  AndroidLoadControl({
+  const AndroidLoadControl({
     this.minBufferDuration = const Duration(seconds: 50),
     this.maxBufferDuration = const Duration(seconds: 50),
     this.bufferForPlaybackDuration = const Duration(milliseconds: 2500),
@@ -1931,7 +1932,7 @@ class AndroidLivePlaybackSpeedControl {
   /// achievable during playback.
   final double minPossibleLiveOffsetSmoothingFactor;
 
-  AndroidLivePlaybackSpeedControl({
+  const AndroidLivePlaybackSpeedControl({
     this.fallbackMinPlaybackSpeed = 0.97,
     this.fallbackMaxPlaybackSpeed = 1.03,
     this.minUpdateInterval = const Duration(seconds: 1),
@@ -1953,6 +1954,54 @@ class AndroidLivePlaybackSpeedControl {
             targetLiveOffsetIncrementOnRebuffer,
         minPossibleLiveOffsetSmoothingFactor:
             minPossibleLiveOffsetSmoothingFactor,
+      );
+}
+
+class ProgressiveAudioSourceOptions {
+  final AndroidExtractorOptions? androidExtractorOptions;
+  // final DarwinAssetOptions? darwinAssetOptions;
+
+  const ProgressiveAudioSourceOptions({
+    this.androidExtractorOptions,
+    // this.darwinAssetOptions,
+  });
+
+  ProgressiveAudioSourceOptionsMessage _toMessage() =>
+      ProgressiveAudioSourceOptionsMessage(
+        androidExtractorOptions: androidExtractorOptions?._toMessage(),
+        // darwinAssetOptions: darwinAssetOptions?._toMessage(),
+      );
+}
+
+// class DarwinAssetOptions {
+//   final bool preferPreciseDurationAndTiming;
+//
+//   const DarwinAssetOptions({this.preferPreciseDurationAndTiming = false});
+//
+//   DarwinAssetOptionsMessage _toMessage() => DarwinAssetOptionsMessage(
+//         preferPreciseDurationAndTiming: preferPreciseDurationAndTiming,
+//       );
+// }
+
+class AndroidExtractorOptions {
+  static const flagMp3EnableIndexSeeking = 1 << 2;
+  static const flagMp3DisableId3Metadata = 1 << 3;
+
+  final bool constantBitrateSeekingEnabled;
+  final bool constantBitrateSeekingAlwaysEnabled;
+  final int mp3Flags;
+
+  const AndroidExtractorOptions({
+    this.constantBitrateSeekingEnabled = true,
+    this.constantBitrateSeekingAlwaysEnabled = false,
+    this.mp3Flags = 0,
+  });
+
+  AndroidExtractorOptionsMessage _toMessage() => AndroidExtractorOptionsMessage(
+        constantBitrateSeekingEnabled: constantBitrateSeekingEnabled,
+        constantBitrateSeekingAlwaysEnabled:
+            constantBitrateSeekingAlwaysEnabled,
+        mp3Flags: mp3Flags,
       );
 }
 
@@ -2221,6 +2270,8 @@ abstract class UriAudioSource extends IndexedAudioSource {
       _overrideUri = await _loadAsset(uri.pathSegments.join('/'));
     } else if (uri.scheme != 'file' &&
         !kIsWeb &&
+        !_isAndroid() &&
+        // !_isDarwin() &&
         (headers != null || player._userAgent != null)) {
       await player._proxy.ensureRunning();
       _overrideUri = player._proxy.addUriAudioSource(this);
@@ -2289,13 +2340,24 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
-  ProgressiveAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+  final ProgressiveAudioSourceOptions? options;
+
+  ProgressiveAudioSource(
+    super.uri, {
+    super.headers,
+    super.tag,
+    super.duration,
+    this.options,
+  });
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: headers,
+        tag: tag,
+        options: options?._toMessage(),
+      );
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
@@ -2413,7 +2475,7 @@ class ConcatenatingAudioSource extends AudioSource {
         localInitialIndex = ci;
       }
       final childInitialIndex =
-          initialIndexWithinThisChild ? (initialIndex! - si) : null;
+          initialIndexWithinThisChild ? (initialIndex - si) : null;
       child._shuffle(initialIndex: childInitialIndex);
       si += childLength;
     }

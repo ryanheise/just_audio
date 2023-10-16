@@ -92,6 +92,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
     private boolean offloadSchedulingEnabled;
+    private String userAgent;
     private LivePlaybackSpeedControl livePlaybackSpeedControl;
     private List<Object> rawAudioEffects;
     private List<AudioEffect> audioEffects = new ArrayList<AudioEffect>();
@@ -134,10 +135,18 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
     };
 
-    public AudioPlayer(final Context applicationContext, final BinaryMessenger messenger, final String id, Map<?, ?> audioLoadConfiguration, List<Object> rawAudioEffects, Boolean offloadSchedulingEnabled) {
+    public AudioPlayer(
+        final Context applicationContext,
+        final BinaryMessenger messenger,
+        final String id, Map<?, ?> audioLoadConfiguration,
+        List<Object> rawAudioEffects,
+        Boolean offloadSchedulingEnabled,
+        String userAgent
+    ) {
         this.context = applicationContext;
         this.rawAudioEffects = rawAudioEffects;
         this.offloadSchedulingEnabled = offloadSchedulingEnabled != null ? offloadSchedulingEnabled : false;
+        this.userAgent = userAgent != null ? userAgent : Util.getUserAgent(context, "just_audio");
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
         eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
@@ -593,20 +602,20 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         String id = (String)map.get("id");
         switch ((String)map.get("type")) {
         case "progressive":
-            return new ProgressiveMediaSource.Factory(buildDataSourceFactory(), extractorsFactory)
+            return new ProgressiveMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")), extractorsFactory)
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setTag(id)
                             .build());
         case "dash":
-            return new DashMediaSource.Factory(buildDataSourceFactory())
+            return new DashMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")))
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setMimeType(MimeTypes.APPLICATION_MPD)
                             .setTag(id)
                             .build());
         case "hls":
-            return new HlsMediaSource.Factory(buildDataSourceFactory())
+            return new HlsMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")))
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setMimeType(MimeTypes.APPLICATION_M3U8)
@@ -687,11 +696,13 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         audioEffectsMap.clear();
     }
 
-    private DataSource.Factory buildDataSourceFactory() {
-        String userAgent = Util.getUserAgent(context, "just_audio");
-        DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
+    private DataSource.Factory buildDataSourceFactory(Map<?, ?> headers) {
+        DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
             .setUserAgent(userAgent)
             .setAllowCrossProtocolRedirects(true);
+        if (headers != null) {
+            httpDataSourceFactory.setDefaultRequestProperties(castToStringMap(headers));
+        }
         return new DefaultDataSource.Factory(context, httpDataSourceFactory);
     }
 
@@ -1034,6 +1045,15 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             map.put((String)args[i], args[i + 1]);
         }
         return map;
+    }
+
+    static Map<String, String> castToStringMap(Map<?, ?> map) {
+        if (map == null) return null;
+        Map<String, String> map2 = new HashMap<>();
+        for (Object key : map.keySet()) {
+            map2.put((String)key, (String)map.get(key));
+        }
+        return map2;
     }
 
     enum ProcessingState {
