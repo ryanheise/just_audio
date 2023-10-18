@@ -397,7 +397,6 @@ class InitRequest {
   final List<AudioEffectMessage> androidAudioEffects;
   final List<AudioEffectMessage> darwinAudioEffects;
   final bool? androidOffloadSchedulingEnabled;
-  final String? userAgent;
 
   InitRequest({
     required this.id,
@@ -405,7 +404,6 @@ class InitRequest {
     this.androidAudioEffects = const [],
     this.darwinAudioEffects = const [],
     this.androidOffloadSchedulingEnabled,
-    this.userAgent,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -418,7 +416,6 @@ class InitRequest {
             .map((audioEffect) => audioEffect.toMap())
             .toList(),
         'androidOffloadSchedulingEnabled': androidOffloadSchedulingEnabled,
-        'userAgent': userAgent,
       };
 }
 
@@ -1042,32 +1039,32 @@ class AndroidLivePlaybackSpeedControlMessage {
 /// implementation.
 class ProgressiveAudioSourceOptionsMessage {
   final AndroidExtractorOptionsMessage? androidExtractorOptions;
-  // final DarwinAssetOptionsMessage? darwinAssetOptions;
+  final DarwinAssetOptionsMessage? darwinAssetOptions;
 
   const ProgressiveAudioSourceOptionsMessage({
     this.androidExtractorOptions,
-    // this.darwinAssetOptions,
+    this.darwinAssetOptions,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
         'androidExtractorOptions': androidExtractorOptions?.toMap(),
-        // 'darwinAssetOptions': darwinAssetOptions?.toMap(),
+        'darwinAssetOptions': darwinAssetOptions?.toMap(),
       };
 }
 
 /// Options for loading audio assets on iOS/macOS to be communicated with the
 /// platform implementation.
-// class DarwinAssetOptionsMessage {
-//   final bool preferPreciseDurationAndTiming;
-//
-//   const DarwinAssetOptionsMessage({
-//     required this.preferPreciseDurationAndTiming,
-//   });
-//
-//   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
-//         'preferPreciseDurationAndTiming': preferPreciseDurationAndTiming,
-//       };
-// }
+class DarwinAssetOptionsMessage {
+  final bool preferPreciseDurationAndTiming;
+
+  const DarwinAssetOptionsMessage({
+    required this.preferPreciseDurationAndTiming,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'preferPreciseDurationAndTiming': preferPreciseDurationAndTiming,
+      };
+}
 
 /// Options for extracting media files on Android to be communicated with the
 /// platform implementation.

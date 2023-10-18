@@ -2,8 +2,7 @@
 
 * Add setAllowsExternalPlayback on iOS/macOS.
 * Support index-based seeking on Android.
-* userAgent works without proxy on Android.
-* headers work without proxy on Android.
+* Add option to send headers/userAgent without proxy.
 
 ## 0.9.35
 

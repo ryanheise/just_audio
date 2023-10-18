@@ -58,6 +58,9 @@ class AudioPlayer {
   /// The user agent to set on all HTTP requests.
   final String? _userAgent;
 
+  /// Whether to use the proxy server to send request headers.
+  final bool _useProxyForRequestHeaders;
+
   final AudioLoadConfiguration? _audioLoadConfiguration;
 
   final bool _androidOffloadSchedulingEnabled;
@@ -143,14 +146,22 @@ class AudioPlayer {
 
   /// Creates an [AudioPlayer].
   ///
-  /// Apps requesting remote URLs should specify a `[userAgent]` string with
-  /// this constructor which will be included in the `user-agent` header on all
-  /// HTTP requests (except on web where the browser's user agent will be sent).
-  /// This header helps to identify to the server which app is submitting the
-  /// request. If unspecified, it will default to Apple's Core Audio user agent
-  /// on iOS/macOS, or just_audio's user agent on Android. Note: this feature
-  /// is implemented via a local HTTP proxy which requires non-HTTPS support to
-  /// be enabled. See the README page for setup instructions.
+  /// Apps requesting remote URLs should set the [userAgent] parameter which
+  /// will be set as the `user-agent` header on all requests (except on web
+  /// where the browser's user agent will be used) to identify the client. If
+  /// unspecified, a platform-specific default will be supplied.
+  ///
+  /// Request headers including `user-agent` are sent by default via a local
+  /// HTTP proxy which requires non-HTTPS support to be enabled (see the README
+  /// page for setup instructions). Alternatively, you can set
+  /// [useProxyForRequestHeaders] to `false` to allow supported platforms to
+  /// send the request headers directly without use of the proxy. On iOS/macOS,
+  /// this will use the `AVURLAssetHTTPUserAgentKey` on iOS 16 and above, and
+  /// macOS 13 and above, if `user-agent` is the only header used. Otherwise,
+  /// the `AVURLAssetHTTPHeaderFieldsKey` key will be used. On Android, this
+  /// will use ExoPlayer's `setUserAgent` and `setDefaultRequestProperties`.
+  /// For Linux/Windows federated platform implementations, refer to the
+  /// documentation for that implementation's support.
   ///
   /// The player will automatically pause/duck and resume/unduck when audio
   /// interruptions occur (e.g. a phone call) or when headphones are unplugged.
@@ -173,6 +184,7 @@ class AudioPlayer {
     AudioLoadConfiguration? audioLoadConfiguration,
     AudioPipeline? audioPipeline,
     bool androidOffloadSchedulingEnabled = false,
+    bool useProxyForRequestHeaders = true,
   })  : _id = _uuid.v4(),
         _userAgent = userAgent,
         _androidApplyAudioAttributes =
@@ -180,7 +192,8 @@ class AudioPlayer {
         _handleAudioSessionActivation = handleAudioSessionActivation,
         _audioLoadConfiguration = audioLoadConfiguration,
         _audioPipeline = audioPipeline ?? AudioPipeline(),
-        _androidOffloadSchedulingEnabled = androidOffloadSchedulingEnabled {
+        _androidOffloadSchedulingEnabled = androidOffloadSchedulingEnabled,
+        _useProxyForRequestHeaders = useProxyForRequestHeaders {
     _audioPipeline._setup(this);
     if (_audioLoadConfiguration?.darwinLoadControl != null) {
       _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
@@ -1367,7 +1380,6 @@ class AudioPlayer {
                       .toList()
                   : [],
               androidOffloadSchedulingEnabled: _androidOffloadSchedulingEnabled,
-              userAgent: _userAgent,
             )))
           : (_idlePlatform =
               _IdleAudioPlayer(id: _id, sequenceStream: sequenceStream));
@@ -1959,29 +1971,29 @@ class AndroidLivePlaybackSpeedControl {
 
 class ProgressiveAudioSourceOptions {
   final AndroidExtractorOptions? androidExtractorOptions;
-  // final DarwinAssetOptions? darwinAssetOptions;
+  final DarwinAssetOptions? darwinAssetOptions;
 
   const ProgressiveAudioSourceOptions({
     this.androidExtractorOptions,
-    // this.darwinAssetOptions,
+    this.darwinAssetOptions,
   });
 
   ProgressiveAudioSourceOptionsMessage _toMessage() =>
       ProgressiveAudioSourceOptionsMessage(
         androidExtractorOptions: androidExtractorOptions?._toMessage(),
-        // darwinAssetOptions: darwinAssetOptions?._toMessage(),
+        darwinAssetOptions: darwinAssetOptions?._toMessage(),
       );
 }
 
-// class DarwinAssetOptions {
-//   final bool preferPreciseDurationAndTiming;
-//
-//   const DarwinAssetOptions({this.preferPreciseDurationAndTiming = false});
-//
-//   DarwinAssetOptionsMessage _toMessage() => DarwinAssetOptionsMessage(
-//         preferPreciseDurationAndTiming: preferPreciseDurationAndTiming,
-//       );
-// }
+class DarwinAssetOptions {
+  final bool preferPreciseDurationAndTiming;
+
+  const DarwinAssetOptions({this.preferPreciseDurationAndTiming = false});
+
+  DarwinAssetOptionsMessage _toMessage() => DarwinAssetOptionsMessage(
+        preferPreciseDurationAndTiming: preferPreciseDurationAndTiming,
+      );
+}
 
 class AndroidExtractorOptions {
   static const flagMp3EnableIndexSeeking = 1 << 2;
@@ -2208,6 +2220,8 @@ abstract class AudioSource {
     player._registerAudioSource(this);
   }
 
+  String? get _userAgent => _player?._userAgent;
+
   void _shuffle({int? initialIndex});
 
   @mustCallSuper
@@ -2263,6 +2277,15 @@ abstract class UriAudioSource extends IndexedAudioSource {
   /// [uri].
   Uri get _effectiveUri => _overrideUri ?? uri;
 
+  Map<String, String>? get _mergedHeaders =>
+      headers == null && _userAgent == null
+          ? null
+          : {
+              if (headers != null)
+                for (var key in headers!.keys) key: headers![key]!,
+              if (_userAgent != null) 'User-Agent': _userAgent!,
+            };
+
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
@@ -2270,8 +2293,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       _overrideUri = await _loadAsset(uri.pathSegments.join('/'));
     } else if (uri.scheme != 'file' &&
         !kIsWeb &&
-        !_isAndroid() &&
-        // !_isDarwin() &&
+        player._useProxyForRequestHeaders &&
         (headers != null || player._userAgent != null)) {
       await player._proxy.ensureRunning();
       _overrideUri = player._proxy.addUriAudioSource(this);
@@ -2354,7 +2376,7 @@ class ProgressiveAudioSource extends UriAudioSource {
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
         id: _id,
         uri: _effectiveUri.toString(),
-        headers: headers,
+        headers: _mergedHeaders,
         tag: tag,
         options: options?._toMessage(),
       );
@@ -2381,7 +2403,11 @@ class DashAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: _mergedHeaders,
+        tag: tag,
+      );
 }
 
 /// An [AudioSource] representing an HLS stream. The following URI schemes are
@@ -2404,7 +2430,11 @@ class HlsAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: _mergedHeaders,
+        tag: tag,
+      );
 }
 
 /// An [AudioSource] for a period of silence.

@@ -140,13 +140,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         final BinaryMessenger messenger,
         final String id, Map<?, ?> audioLoadConfiguration,
         List<Object> rawAudioEffects,
-        Boolean offloadSchedulingEnabled,
-        String userAgent
+        Boolean offloadSchedulingEnabled
     ) {
         this.context = applicationContext;
         this.rawAudioEffects = rawAudioEffects;
         this.offloadSchedulingEnabled = offloadSchedulingEnabled != null ? offloadSchedulingEnabled : false;
-        this.userAgent = userAgent != null ? userAgent : Util.getUserAgent(context, "just_audio");
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
         eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
@@ -697,11 +695,22 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private DataSource.Factory buildDataSourceFactory(Map<?, ?> headers) {
+        final Map<String, String> stringHeaders = castToStringMap(headers);
+        String userAgent = null;
+        if (stringHeaders != null) {
+            userAgent = stringHeaders.removeKey("User-Agent");
+            if (userAgent == null) {
+                userAgent = stringHeaders.removeKey("user-agent");
+            }
+        }
+        if (userAgent == null) {
+            userAgent = Util.getUserAgent(context, "just_audio");
+        }
         DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
             .setUserAgent(userAgent)
             .setAllowCrossProtocolRedirects(true);
-        if (headers != null) {
-            httpDataSourceFactory.setDefaultRequestProperties(castToStringMap(headers));
+        if (stringHeaders != null && stringHeaders.size() > 0) {
+            httpDataSourceFactory.setDefaultRequestProperties(stringHeaders);
         }
         return new DefaultDataSource.Factory(context, httpDataSourceFactory);
     }
