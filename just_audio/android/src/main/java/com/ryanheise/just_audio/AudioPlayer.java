@@ -698,9 +698,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         final Map<String, String> stringHeaders = castToStringMap(headers);
         String userAgent = null;
         if (stringHeaders != null) {
-            userAgent = stringHeaders.removeKey("User-Agent");
+            userAgent = stringHeaders.remove("User-Agent");
             if (userAgent == null) {
-                userAgent = stringHeaders.removeKey("user-agent");
+                userAgent = stringHeaders.remove("user-agent");
             }
         }
         if (userAgent == null) {
