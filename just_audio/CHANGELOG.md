@@ -1,3 +1,7 @@
+## 0.9.36
+
+* Fix bug where user supplied headers are overwritten by defaults (@ctedgar).
+
 ## 0.9.35
 
 * Fix nullable completer argument type (@srawlins).
