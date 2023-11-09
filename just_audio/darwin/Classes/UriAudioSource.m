@@ -18,7 +18,7 @@
     NSAssert(self, @"super init cannot be nil");
     _uri = uri;
     _loadControl = loadControl;
-    _headers = headers ? [headers mutableCopy] : nil;
+    _headers = headers != (id)[NSNull null] ? [headers mutableCopy] : nil;
     _playerItem = [self createPlayerItem:uri];
     _playerItem2 = nil;
     return self;
