@@ -906,7 +906,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private long getDuration() {
-        if (processingState == ProcessingState.none || processingState == ProcessingState.loading) {
+        if (processingState == ProcessingState.none || processingState == ProcessingState.loading || player == null) {
             return C.TIME_UNSET;
         } else {
             return player.getDuration();
