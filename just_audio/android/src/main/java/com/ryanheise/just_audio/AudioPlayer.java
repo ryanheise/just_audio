@@ -77,8 +77,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private long updatePosition;
     private long updateTime;
     private long bufferedPosition;
-    private Long start;
-    private Long end;
     private Long seekPos;
     private long initialPos;
     private Integer initialIndex;
@@ -92,7 +90,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
     private boolean offloadSchedulingEnabled;
-    private String userAgent;
     private LivePlaybackSpeedControl livePlaybackSpeedControl;
     private List<Object> rawAudioEffects;
     private List<AudioEffect> audioEffects = new ArrayList<AudioEffect>();
@@ -101,7 +98,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Map<String, Object> pendingPlaybackEvent;
 
     private ExoPlayer player;
-    private DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
     private Integer audioSessionId;
     private MediaSource mediaSource;
     private Integer currentIndex;
@@ -138,7 +134,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public AudioPlayer(
         final Context applicationContext,
         final BinaryMessenger messenger,
-        final String id, Map<?, ?> audioLoadConfiguration,
+        final String id,
+        Map<?, ?> audioLoadConfiguration,
         List<Object> rawAudioEffects,
         Boolean offloadSchedulingEnabled
     ) {
@@ -150,7 +147,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
         dataEventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.data." + id);
         processingState = ProcessingState.none;
-        extractorsFactory.setConstantBitrateSeekingEnabled(true);
         if (audioLoadConfiguration != null) {
             Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
             if (loadControlMap != null) {
@@ -595,12 +591,31 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         return mediaSource;
     }
 
+    private DefaultExtractorsFactory buildExtractorsFactory(Map<?, ?> options) {
+        DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
+        boolean constantBitrateSeekingEnabled = true;
+        boolean constantBitrateSeekingAlwaysEnabled = false;
+        int mp3Flags = 0;
+        if (options != null) {
+            Map<?, ?> androidExtractorOptions = (Map<?, ?>)options.get("androidExtractorOptions");
+            if (androidExtractorOptions != null) {
+                constantBitrateSeekingEnabled = (Boolean)androidExtractorOptions.get("constantBitrateSeekingEnabled");
+                constantBitrateSeekingAlwaysEnabled = (Boolean)androidExtractorOptions.get("constantBitrateSeekingAlwaysEnabled");
+                mp3Flags = (Integer)androidExtractorOptions.get("mp3Flags");
+            }
+        }
+        extractorsFactory.setConstantBitrateSeekingEnabled(constantBitrateSeekingEnabled);
+        extractorsFactory.setConstantBitrateSeekingAlwaysEnabled(constantBitrateSeekingAlwaysEnabled);
+        extractorsFactory.setMp3ExtractorFlags(mp3Flags);
+        return extractorsFactory;
+    }
+
     private MediaSource decodeAudioSource(final Object json) {
         Map<?, ?> map = (Map<?, ?>)json;
         String id = (String)map.get("id");
         switch ((String)map.get("type")) {
         case "progressive":
-            return new ProgressiveMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")), extractorsFactory)
+            return new ProgressiveMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")), buildExtractorsFactory(mapGet(map, "options")))
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setTag(id)
