@@ -105,7 +105,7 @@ final duration = await player.setUrl('https://foo.com/bar.mp3',
     headers: {'header1': 'value1', 'header2': 'value2'});
 ```
 
-Note: headers are implemented via a local HTTP proxy which on Android, iOS and macOS requires non-HTTPS support to be enabled. See [Platform Specific Configuration](#platform-specific-configuration).
+Note: By default, headers are implemented via a local HTTP proxy which on Android, iOS and macOS requires non-HTTPS support to be enabled. See [Platform Specific Configuration](#platform-specific-configuration). To use the platform's native implementation of headers instead of the proxy, pass `useProxyForRequestHeaders: false` into the `AudioPlayer` constructor. On iOS/macOS, this will use the undocumented `AVURLAssetHTTPHeaderFieldsKey` API which may present issues for App Store submission.
 
 ### Working with caches
 

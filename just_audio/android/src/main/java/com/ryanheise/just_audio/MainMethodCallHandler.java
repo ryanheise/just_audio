@@ -34,7 +34,17 @@ public class MainMethodCallHandler implements MethodCallHandler {
                 break;
             }
             List<Object> rawAudioEffects = call.argument("androidAudioEffects");
-            players.put(id, new AudioPlayer(applicationContext, messenger, id, call.argument("audioLoadConfiguration"), rawAudioEffects, call.argument("androidOffloadSchedulingEnabled")));
+            players.put(
+                id,
+                new AudioPlayer(
+                    applicationContext,
+                    messenger,
+                    id,
+                    call.argument("audioLoadConfiguration"),
+                    rawAudioEffects,
+                    call.argument("androidOffloadSchedulingEnabled")
+                )
+            );
             result.success(null);
             break;
         }

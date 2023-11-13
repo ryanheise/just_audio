@@ -58,6 +58,9 @@ class AudioPlayer {
   /// The user agent to set on all HTTP requests.
   final String? _userAgent;
 
+  /// Whether to use the proxy server to send request headers.
+  final bool _useProxyForRequestHeaders;
+
   final AudioLoadConfiguration? _audioLoadConfiguration;
 
   final bool _androidOffloadSchedulingEnabled;
@@ -131,6 +134,7 @@ class AudioPlayer {
   bool _automaticallyWaitsToMinimizeStalling = true;
   bool _canUseNetworkResourcesForLiveStreamingWhilePaused = false;
   double _preferredPeakBitRate = 0;
+  bool _allowsExternalPlayback = false;
   bool _playInterrupted = false;
   bool _platformLoading = false;
   AndroidAudioAttributes? _androidAudioAttributes;
@@ -142,14 +146,22 @@ class AudioPlayer {
 
   /// Creates an [AudioPlayer].
   ///
-  /// Apps requesting remote URLs should specify a `[userAgent]` string with
-  /// this constructor which will be included in the `user-agent` header on all
-  /// HTTP requests (except on web where the browser's user agent will be sent).
-  /// This header helps to identify to the server which app is submitting the
-  /// request. If unspecified, it will default to Apple's Core Audio user agent
-  /// on iOS/macOS, or just_audio's user agent on Android. Note: this feature
-  /// is implemented via a local HTTP proxy which requires non-HTTPS support to
-  /// be enabled. See the README page for setup instructions.
+  /// Apps requesting remote URLs should set the [userAgent] parameter which
+  /// will be set as the `user-agent` header on all requests (except on web
+  /// where the browser's user agent will be used) to identify the client. If
+  /// unspecified, a platform-specific default will be supplied.
+  ///
+  /// Request headers including `user-agent` are sent by default via a local
+  /// HTTP proxy which requires non-HTTPS support to be enabled (see the README
+  /// page for setup instructions). Alternatively, you can set
+  /// [useProxyForRequestHeaders] to `false` to allow supported platforms to
+  /// send the request headers directly without use of the proxy. On iOS/macOS,
+  /// this will use the `AVURLAssetHTTPUserAgentKey` on iOS 16 and above, and
+  /// macOS 13 and above, if `user-agent` is the only header used. Otherwise,
+  /// the `AVURLAssetHTTPHeaderFieldsKey` key will be used. On Android, this
+  /// will use ExoPlayer's `setUserAgent` and `setDefaultRequestProperties`.
+  /// For Linux/Windows federated platform implementations, refer to the
+  /// documentation for that implementation's support.
   ///
   /// The player will automatically pause/duck and resume/unduck when audio
   /// interruptions occur (e.g. a phone call) or when headphones are unplugged.
@@ -172,6 +184,7 @@ class AudioPlayer {
     AudioLoadConfiguration? audioLoadConfiguration,
     AudioPipeline? audioPipeline,
     bool androidOffloadSchedulingEnabled = false,
+    bool useProxyForRequestHeaders = true,
   })  : _id = _uuid.v4(),
         _userAgent = userAgent,
         _androidApplyAudioAttributes =
@@ -179,7 +192,8 @@ class AudioPlayer {
         _handleAudioSessionActivation = handleAudioSessionActivation,
         _audioLoadConfiguration = audioLoadConfiguration,
         _audioPipeline = audioPipeline ?? AudioPipeline(),
-        _androidOffloadSchedulingEnabled = androidOffloadSchedulingEnabled {
+        _androidOffloadSchedulingEnabled = androidOffloadSchedulingEnabled,
+        _useProxyForRequestHeaders = useProxyForRequestHeaders {
     _audioPipeline._setup(this);
     if (_audioLoadConfiguration?.darwinLoadControl != null) {
       _automaticallyWaitsToMinimizeStalling = _audioLoadConfiguration!
@@ -549,6 +563,10 @@ class AudioPlayer {
 
   /// The preferred peak bit rate (in bits per second) of bandwidth usage on iOS/macOS.
   double get preferredPeakBitRate => _preferredPeakBitRate;
+
+  /// Whether the player allows external playback on iOS/macOS, defaults to
+  /// false.
+  bool get allowsExternalPlayback => _allowsExternalPlayback;
 
   /// The current position of the player.
   Duration get position => _getPositionFor(_playbackEvent);
@@ -1098,6 +1116,16 @@ class AudioPlayer {
     _preferredPeakBitRate = preferredPeakBitRate;
     await (await _platform).setPreferredPeakBitRate(
         SetPreferredPeakBitRateRequest(bitRate: preferredPeakBitRate));
+  }
+
+  /// Sets allowsExternalPlayback on iOS/macOS, defaults to false.
+  Future<void> setAllowsExternalPlayback(
+      final bool allowsExternalPlayback) async {
+    if (_disposed) return;
+    _allowsExternalPlayback = allowsExternalPlayback;
+    await (await _platform).setAllowsExternalPlayback(
+        SetAllowsExternalPlaybackRequest(
+            allowsExternalPlayback: allowsExternalPlayback));
   }
 
   /// Seeks to a particular [position]. If a composition of multiple
@@ -1785,7 +1813,7 @@ class AudioLoadConfiguration {
   /// Speed control for live streams on Android.
   final AndroidLivePlaybackSpeedControl? androidLivePlaybackSpeedControl;
 
-  AudioLoadConfiguration({
+  const AudioLoadConfiguration({
     this.darwinLoadControl,
     this.androidLoadControl,
     this.androidLivePlaybackSpeedControl,
@@ -1818,7 +1846,7 @@ class DarwinLoadControl {
   /// second.
   final double? preferredPeakBitRate;
 
-  DarwinLoadControl({
+  const DarwinLoadControl({
     this.automaticallyWaitsToMinimizeStalling = true,
     this.preferredForwardBufferDuration,
     this.canUseNetworkResourcesForLiveStreamingWhilePaused = false,
@@ -1863,7 +1891,7 @@ class AndroidLoadControl {
   /// (Android) The back buffer duration.
   final Duration backBufferDuration;
 
-  AndroidLoadControl({
+  const AndroidLoadControl({
     this.minBufferDuration = const Duration(seconds: 50),
     this.maxBufferDuration = const Duration(seconds: 50),
     this.bufferForPlaybackDuration = const Duration(milliseconds: 2500),
@@ -1916,7 +1944,7 @@ class AndroidLivePlaybackSpeedControl {
   /// achievable during playback.
   final double minPossibleLiveOffsetSmoothingFactor;
 
-  AndroidLivePlaybackSpeedControl({
+  const AndroidLivePlaybackSpeedControl({
     this.fallbackMinPlaybackSpeed = 0.97,
     this.fallbackMaxPlaybackSpeed = 1.03,
     this.minUpdateInterval = const Duration(seconds: 1),
@@ -1938,6 +1966,54 @@ class AndroidLivePlaybackSpeedControl {
             targetLiveOffsetIncrementOnRebuffer,
         minPossibleLiveOffsetSmoothingFactor:
             minPossibleLiveOffsetSmoothingFactor,
+      );
+}
+
+class ProgressiveAudioSourceOptions {
+  final AndroidExtractorOptions? androidExtractorOptions;
+  final DarwinAssetOptions? darwinAssetOptions;
+
+  const ProgressiveAudioSourceOptions({
+    this.androidExtractorOptions,
+    this.darwinAssetOptions,
+  });
+
+  ProgressiveAudioSourceOptionsMessage _toMessage() =>
+      ProgressiveAudioSourceOptionsMessage(
+        androidExtractorOptions: androidExtractorOptions?._toMessage(),
+        darwinAssetOptions: darwinAssetOptions?._toMessage(),
+      );
+}
+
+class DarwinAssetOptions {
+  final bool preferPreciseDurationAndTiming;
+
+  const DarwinAssetOptions({this.preferPreciseDurationAndTiming = false});
+
+  DarwinAssetOptionsMessage _toMessage() => DarwinAssetOptionsMessage(
+        preferPreciseDurationAndTiming: preferPreciseDurationAndTiming,
+      );
+}
+
+class AndroidExtractorOptions {
+  static const flagMp3EnableIndexSeeking = 1 << 2;
+  static const flagMp3DisableId3Metadata = 1 << 3;
+
+  final bool constantBitrateSeekingEnabled;
+  final bool constantBitrateSeekingAlwaysEnabled;
+  final int mp3Flags;
+
+  const AndroidExtractorOptions({
+    this.constantBitrateSeekingEnabled = true,
+    this.constantBitrateSeekingAlwaysEnabled = false,
+    this.mp3Flags = 0,
+  });
+
+  AndroidExtractorOptionsMessage _toMessage() => AndroidExtractorOptionsMessage(
+        constantBitrateSeekingEnabled: constantBitrateSeekingEnabled,
+        constantBitrateSeekingAlwaysEnabled:
+            constantBitrateSeekingAlwaysEnabled,
+        mp3Flags: mp3Flags,
       );
 }
 
@@ -2144,6 +2220,8 @@ abstract class AudioSource {
     player._registerAudioSource(this);
   }
 
+  String? get _userAgent => _player?._userAgent;
+
   void _shuffle({int? initialIndex});
 
   @mustCallSuper
@@ -2199,6 +2277,15 @@ abstract class UriAudioSource extends IndexedAudioSource {
   /// [uri].
   Uri get _effectiveUri => _overrideUri ?? uri;
 
+  Map<String, String>? get _mergedHeaders =>
+      headers == null && _userAgent == null
+          ? null
+          : {
+              if (headers != null)
+                for (var key in headers!.keys) key: headers![key]!,
+              if (_userAgent != null) 'User-Agent': _userAgent!,
+            };
+
   @override
   Future<void> _setup(AudioPlayer player) async {
     await super._setup(player);
@@ -2206,6 +2293,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
       _overrideUri = await _loadAsset(uri.pathSegments.join('/'));
     } else if (uri.scheme != 'file' &&
         !kIsWeb &&
+        player._useProxyForRequestHeaders &&
         (headers != null || player._userAgent != null)) {
       await player._proxy.ensureRunning();
       _overrideUri = player._proxy.addUriAudioSource(this);
@@ -2274,13 +2362,24 @@ abstract class UriAudioSource extends IndexedAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class ProgressiveAudioSource extends UriAudioSource {
-  ProgressiveAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+  final ProgressiveAudioSourceOptions? options;
+
+  ProgressiveAudioSource(
+    super.uri, {
+    super.headers,
+    super.tag,
+    super.duration,
+    this.options,
+  });
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: _mergedHeaders,
+        tag: tag,
+        options: options?._toMessage(),
+      );
 }
 
 /// An [AudioSource] representing a DASH stream. The following URI schemes are
@@ -2304,7 +2403,11 @@ class DashAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: _mergedHeaders,
+        tag: tag,
+      );
 }
 
 /// An [AudioSource] representing an HLS stream. The following URI schemes are
@@ -2327,7 +2430,11 @@ class HlsAudioSource extends UriAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
-      id: _id, uri: _effectiveUri.toString(), headers: headers, tag: tag);
+        id: _id,
+        uri: _effectiveUri.toString(),
+        headers: _mergedHeaders,
+        tag: tag,
+      );
 }
 
 /// An [AudioSource] for a period of silence.
@@ -2398,7 +2505,7 @@ class ConcatenatingAudioSource extends AudioSource {
         localInitialIndex = ci;
       }
       final childInitialIndex =
-          initialIndexWithinThisChild ? (initialIndex! - si) : null;
+          initialIndexWithinThisChild ? (initialIndex - si) : null;
       child._shuffle(initialIndex: childInitialIndex);
       si += childLength;
     }

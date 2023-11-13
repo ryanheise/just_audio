@@ -1,3 +1,7 @@
+## 0.0.1-beta.11
+
+* Pass through missing API methods.
+
 ## 0.0.1-beta.10
 
 * Fix bug where AudioPlayer constructor parameters were ignored.
