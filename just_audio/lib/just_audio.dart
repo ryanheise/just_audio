@@ -3280,7 +3280,7 @@ _ProxyHandler _proxyHandlerForUri(
       final requestHeaders = <String, String>{};
       request.headers
           .forEach((name, value) => requestHeaders[name] = value.join(', '));
-      //write supplied headers last (to ensure supplied headers aren't overwritten)
+      // write supplied headers last (to ensure supplied headers aren't overwritten)
       headers?.forEach((name, value) => requestHeaders[name] = value);
       final originRequest =
           await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
