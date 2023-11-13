@@ -1,3 +1,7 @@
+## 0.4.9
+
+* Fix bug to ensure play exceptions pass through (@idy).
+
 ## 0.4.8
 
 * Update minimum flutter version to 3.0.
