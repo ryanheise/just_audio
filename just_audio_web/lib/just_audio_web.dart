@@ -967,11 +967,10 @@ class _PlayPauseQueue {
         } else {
           audioElement.pause();
         }
-      } catch (err) {
-        request.completer.completeError(err);
-        continue;
+        request.completer.complete();
+      } catch (e, st) {
+        request.completer.completeError(e, st);
       }
-      request.completer.complete();
     }
   }
 }
