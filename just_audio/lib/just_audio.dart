@@ -3407,9 +3407,11 @@ _ProxyHandler _proxyHandlerForUri(
     // Try to make normal request
     String? host;
     try {
-      final requestHeaders = <String, String>{if (headers != null) ...headers};
+      final requestHeaders = <String, String>{};
       request.headers
           .forEach((name, value) => requestHeaders[name] = value.join(', '));
+      // write supplied headers last (to ensure supplied headers aren't overwritten)
+      headers?.forEach((name, value) => requestHeaders[name] = value);
       final originRequest =
           await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
       host = originRequest.headers.value(HttpHeaders.hostHeader);
