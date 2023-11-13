@@ -1293,7 +1293,7 @@ void runTests() {
   });
 
   test('loadConfiguration', () async {
-    final audioLoadConfiguration = AudioLoadConfiguration(
+    const audioLoadConfiguration = AudioLoadConfiguration(
       darwinLoadControl: DarwinLoadControl(),
       androidLoadControl: AndroidLoadControl(),
       androidLivePlaybackSpeedControl: AndroidLivePlaybackSpeedControl(),
