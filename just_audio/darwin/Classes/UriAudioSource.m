@@ -10,13 +10,17 @@
     IndexedPlayerItem *_playerItem2;
     /* CMTime _duration; */
     LoadControl *_loadControl;
+    NSMutableDictionary *_headers;
+    NSDictionary *_options;
 }
 
-- (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl {
+- (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl headers:(NSDictionary *)headers options:(NSDictionary *)options {
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _uri = uri;
     _loadControl = loadControl;
+    _headers = headers != (id)[NSNull null] ? [headers mutableCopy] : nil;
+    _options = options;
     _playerItem = [self createPlayerItem:uri];
     _playerItem2 = nil;
     return self;
@@ -31,7 +35,38 @@
     if ([uri hasPrefix:@"file://"]) {
         item = [[IndexedPlayerItem alloc] initWithURL:[NSURL fileURLWithPath:[[uri stringByRemovingPercentEncoding] substringFromIndex:7]]];
     } else {
-        item = [[IndexedPlayerItem alloc] initWithURL:[NSURL URLWithString:uri]];
+        NSMutableDictionary *assetOptions = [[NSMutableDictionary alloc] init];
+        if (_headers) {
+            // Use user-agent key if it is the only header and the API is supported.
+            if ([_headers count] == 1) {
+                if (@available(macOS 13.0, iOS 16.0, *)) {
+                    NSString *userAgent = _headers[@"User-Agent"];
+                    if (userAgent) {
+                        [_headers removeObjectForKey:@"User-Agent"];
+                    } else {
+                        userAgent = _headers[@"user-agent"];
+                        if (userAgent) {
+                            [_headers removeObjectForKey:@"user-agent"];
+                        }
+                    }
+                    if (userAgent) {
+                        assetOptions[AVURLAssetHTTPUserAgentKey] = userAgent;
+                    }
+                }
+            }
+            if ([_headers count] > 0) {
+                assetOptions[@"AVURLAssetHTTPHeaderFieldsKey"] = _headers;
+            }
+        }
+        if (_options != (id)[NSNull null]) {
+            NSDictionary *darwinOptions = _options[@"darwinAssetOptions"];
+            if (darwinOptions != (id)[NSNull null]) {
+                assetOptions[AVURLAssetPreferPreciseDurationAndTimingKey] = darwinOptions[@"preferPreciseDurationAndTiming"];
+            }
+        }
+
+        AVURLAsset *asset = [AVURLAsset URLAssetWithURL:[NSURL URLWithString:uri] options:assetOptions];
+        item = [[IndexedPlayerItem alloc] initWithAsset:asset];
     }
     if (@available(macOS 10.13, iOS 11.0, *)) {
         // This does the best at reducing distortion on voice with speeds below 1.0

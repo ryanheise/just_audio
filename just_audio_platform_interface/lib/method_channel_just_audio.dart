@@ -148,6 +148,14 @@ class MethodChannelAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(
+      SetAllowsExternalPlaybackRequest request) async {
+    return SetAllowsExternalPlaybackResponse.fromMap(
+        (await _channel.invokeMethod<Map<dynamic, dynamic>>(
+            'setAllowsExternalPlayback', request.toMap()))!);
+  }
+
+  @override
   Future<SeekResponse> seek(SeekRequest request) async {
     return SeekResponse.fromMap((await _channel
         .invokeMethod<Map<dynamic, dynamic>>('seek', request.toMap()))!);

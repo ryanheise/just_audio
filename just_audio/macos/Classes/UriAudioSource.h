@@ -6,6 +6,6 @@
 
 @property (readonly, nonatomic) NSString *uri;
 
-- (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl;
+- (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl headers:(NSDictionary *)headers options:(NSDictionary *)options;
 
 @end
