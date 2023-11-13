@@ -961,10 +961,15 @@ class _PlayPauseQueue {
 
   Future<void> _run() async {
     await for (var request in _queue.stream) {
-      if (request.playing) {
-        await audioElement.play();
-      } else {
-        audioElement.pause();
+      try {
+        if (request.playing) {
+          await audioElement.play();
+        } else {
+          audioElement.pause();
+        }
+      } catch (err) {
+        request.completer.completeError(err);
+        continue;
       }
       request.completer.complete();
     }
