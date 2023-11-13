@@ -3,6 +3,7 @@
 * Add setAllowsExternalPlayback on iOS/macOS.
 * Support index-based seeking on Android/iOS/macOS.
 * Add option to send headers/userAgent without proxy.
+* Fix bug where user supplied headers are overwritten by defaults (@ctedgar).
 
 ## 0.9.35
 
