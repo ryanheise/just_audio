@@ -16,6 +16,7 @@ import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.LivePlaybackSpeedControl;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.MediaMetadata;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -29,6 +30,9 @@ import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
 import com.google.android.exoplayer2.metadata.icy.IcyInfo;
+import com.google.android.exoplayer2.metadata.id3.CommentFrame;
+import com.google.android.exoplayer2.metadata.id3.TextInformationFrame;
+import com.google.android.exoplayer2.metadata.id3.UrlLinkFrame;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
@@ -86,6 +90,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
     private IcyInfo icyInfo;
     private IcyHeaders icyHeaders;
+    private Metadata metadata;
     private int errorCount;
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
@@ -231,6 +236,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 Metadata metadata = trackGroup.getFormat(j).metadata;
 
                 if (metadata != null) {
+                    this.metadata = metadata;
+                    broadcastImmediatePlaybackEvent();
+
                     for (int k = 0; k < metadata.length(); k++) {
                         final Metadata.Entry entry = metadata.get(k);
                         if (entry instanceof IcyHeaders) {
@@ -835,6 +843,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         event.put("updateTime", updateTime);
         event.put("bufferedPosition", 1000 * Math.max(updatePosition, bufferedPosition));
         event.put("icyMetadata", collectIcyMetadata());
+        event.put("mediaMetadata", collectMediaMetadata());
         event.put("duration", duration);
         event.put("currentIndex", currentIndex);
         event.put("androidAudioSessionId", audioSessionId);
@@ -889,6 +898,93 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             icyData.put("headers", headers);
         }
         return icyData;
+    }
+
+    private Map<String, Object> collectMediaMetadata() {
+        final Map<String, Object> data = new HashMap<>();
+
+        if (metadata != null) {
+            MediaMetadata mediaMetadata = new MediaMetadata.Builder().populateFromMetadata(metadata).build();
+
+            if (mediaMetadata.albumArtist != null)
+                data.put("albumArtist", mediaMetadata.albumArtist.toString());
+            if (mediaMetadata.albumTitle != null)
+                data.put("albumTitle", mediaMetadata.albumTitle.toString());
+            if (mediaMetadata.artist != null)
+                data.put("artist", mediaMetadata.artist.toString());
+            if (mediaMetadata.artworkData != null)
+                data.put("artworkData", mediaMetadata.artworkData);
+            if (mediaMetadata.artworkDataType != null)
+                data.put("artworkDataType", mediaMetadata.artworkDataType);
+            if (mediaMetadata.artworkUri != null)
+                data.put("artworkUri", mediaMetadata.artworkUri.toString());
+            if (mediaMetadata.compilation != null)
+                data.put("compilation", mediaMetadata.compilation.toString());
+            if (mediaMetadata.composer != null)
+                data.put("composer", mediaMetadata.composer.toString());
+            if (mediaMetadata.conductor != null)
+                data.put("conductor", mediaMetadata.conductor.toString());
+            if (mediaMetadata.description != null)
+                data.put("description", mediaMetadata.description.toString());
+            if (mediaMetadata.discNumber != null)
+                data.put("discNumber", mediaMetadata.discNumber);
+            if (mediaMetadata.displayTitle != null)
+                data.put("displayTitle", mediaMetadata.displayTitle.toString());
+            if (mediaMetadata.genre != null)
+                data.put("genre", mediaMetadata.genre.toString());
+            if (mediaMetadata.isBrowsable != null)
+                data.put("isBrowsable", mediaMetadata.isBrowsable);
+            if (mediaMetadata.isPlayable != null)
+                data.put("isPlayable", mediaMetadata.isPlayable);
+            if (mediaMetadata.mediaType != null)
+                data.put("mediaType", mediaMetadata.mediaType);
+            if (mediaMetadata.recordingDay != null)
+                data.put("recordingDay", mediaMetadata.recordingDay);
+            if (mediaMetadata.recordingMonth != null)
+                data.put("recordingMonth", mediaMetadata.recordingMonth);
+            if (mediaMetadata.recordingYear != null)
+                data.put("recordingYear", mediaMetadata.recordingYear);
+            if (mediaMetadata.releaseDay != null)
+                data.put("releaseDay", mediaMetadata.releaseDay);
+            if (mediaMetadata.releaseMonth != null)
+                data.put("releaseMonth", mediaMetadata.releaseMonth);
+            if (mediaMetadata.releaseYear != null)
+                data.put("releaseYear", mediaMetadata.releaseYear);
+            if (mediaMetadata.station != null)
+                data.put("station", mediaMetadata.station.toString());
+            if (mediaMetadata.subtitle != null)
+                data.put("subtitle", mediaMetadata.subtitle.toString());
+            if (mediaMetadata.title != null)
+                data.put("title", mediaMetadata.title.toString());
+            if (mediaMetadata.totalDiscCount != null)
+                data.put("totalDiscCount", mediaMetadata.totalDiscCount);
+            if (mediaMetadata.totalTrackCount != null)
+                data.put("totalTrackCount", mediaMetadata.totalTrackCount);
+            if (mediaMetadata.trackNumber != null)
+                data.put("trackNumber", mediaMetadata.trackNumber);
+            if (mediaMetadata.writer != null)
+                data.put("writer", mediaMetadata.writer.toString());
+
+            // Some information may not be added in MediaMetadata but is actually present
+            for (int i = 0; i < metadata.length(); i++) {
+                final Metadata.Entry entry = metadata.get(i);
+
+                if (entry instanceof TextInformationFrame) {
+                    TextInformationFrame frame = (TextInformationFrame) entry;
+                    if (frame.id.equals("TCON") && !frame.values.isEmpty()) {
+                        data.put("genre", frame.values.get(0));
+                    }
+                } else if (entry instanceof UrlLinkFrame) {
+                    UrlLinkFrame frame = (UrlLinkFrame) entry;
+                    data.put("url", frame.url);
+                } else if (entry instanceof CommentFrame) {
+                    CommentFrame frame = (CommentFrame) entry;
+                    data.put("comment", frame.text);
+                }
+            }
+        }
+
+        return data;
     }
 
     private long getCurrentPosition() {

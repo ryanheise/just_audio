@@ -117,6 +117,7 @@ class AudioPlayer {
   final _skipSilenceEnabledSubject = BehaviorSubject.seeded(false);
   final _bufferedPositionSubject = BehaviorSubject<Duration>();
   final _icyMetadataSubject = BehaviorSubject<IcyMetadata?>();
+  final _mediaMetadataSubject = BehaviorSubject<MediaMetadata?>();
   final _playerStateSubject = BehaviorSubject<PlayerState>();
   final _sequenceSubject = BehaviorSubject<List<IndexedAudioSource>?>();
   final _shuffleIndicesSubject = BehaviorSubject<List<int>?>();
@@ -210,6 +211,10 @@ class AudioPlayer {
         .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     _icyMetadataSubject.addStream(playbackEventStream
         .map((event) => event.icyMetadata)
+        .distinct()
+        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+    _mediaMetadataSubject.addStream(playbackEventStream
+        .map((event) => event.mediaMetadata)
         .distinct()
         .handleError((Object err, StackTrace stackTrace) {/* noop */}));
     playbackEventStream.pairwise().listen((pair) {
@@ -433,6 +438,14 @@ class AudioPlayer {
 
   /// A stream of ICY metadata received through the audio source.
   Stream<IcyMetadata?> get icyMetadataStream => _icyMetadataSubject.stream;
+
+  /// The latest Media metadata received through the audio source, or `null` if
+  /// no metadata is available.
+  MediaMetadata? get mediaMetadata => _playbackEvent.mediaMetadata;
+
+  /// A stream of Media metadata received through the audio source.
+  Stream<MediaMetadata?> get mediaMetadataStream =>
+      _mediaMetadataSubject.stream;
 
   /// The current player state containing only the processing and playing
   /// states.
@@ -1333,6 +1346,9 @@ class AudioPlayer {
           icyMetadata: message.icyMetadata == null
               ? null
               : IcyMetadata._fromMessage(message.icyMetadata!),
+          mediaMetadata: message.mediaMetadata == null
+              ? null
+              : MediaMetadata._fromMessage(message.mediaMetadata!),
           currentIndex: index,
           androidAudioSessionId: message.androidAudioSessionId,
         );
@@ -1558,6 +1574,9 @@ class PlaybackEvent {
   /// The latest ICY metadata received through the audio stream if available.
   final IcyMetadata? icyMetadata;
 
+  /// The latest Media metadata received through the audio stream if available.
+  final MediaMetadata? mediaMetadata;
+
   /// The index of the currently playing item, or `null` if no item is selected.
   final int? currentIndex;
 
@@ -1571,6 +1590,7 @@ class PlaybackEvent {
     this.bufferedPosition = Duration.zero,
     this.duration,
     this.icyMetadata,
+    this.mediaMetadata,
     this.currentIndex,
     this.androidAudioSessionId,
   }) : updateTime = updateTime ?? DateTime.now();
@@ -1583,6 +1603,7 @@ class PlaybackEvent {
     Duration? bufferedPosition,
     Duration? duration,
     IcyMetadata? icyMetadata,
+    MediaMetadata? mediaMetadata,
     int? currentIndex,
     int? androidAudioSessionId,
   }) =>
@@ -1593,6 +1614,7 @@ class PlaybackEvent {
         bufferedPosition: bufferedPosition ?? this.bufferedPosition,
         duration: duration ?? this.duration,
         icyMetadata: icyMetadata ?? this.icyMetadata,
+        mediaMetadata: mediaMetadata ?? this.mediaMetadata,
         currentIndex: currentIndex ?? this.currentIndex,
         androidAudioSessionId:
             androidAudioSessionId ?? this.androidAudioSessionId,
@@ -1606,6 +1628,7 @@ class PlaybackEvent {
         bufferedPosition,
         duration,
         icyMetadata,
+        mediaMetadata,
         currentIndex,
         androidAudioSessionId,
       );
@@ -1620,6 +1643,7 @@ class PlaybackEvent {
       bufferedPosition == other.bufferedPosition &&
       duration == other.duration &&
       icyMetadata == other.icyMetadata &&
+      mediaMetadata == other.mediaMetadata &&
       currentIndex == other.currentIndex &&
       androidAudioSessionId == other.androidAudioSessionId;
 
@@ -1766,6 +1790,208 @@ class IcyMetadata {
       other is IcyMetadata &&
       other.info == info &&
       other.headers == headers;
+}
+
+class MediaMetadata {
+  final String? albumArtist;
+  final String? albumTitle;
+  final String? artist;
+  final Uint8List? artworkData;
+  final int? artworkDataType;
+  final Uri? artworkUri;
+  final String? compilation;
+  final String? composer;
+  final String? conductor;
+  final String? description;
+  final int? discNumber;
+  final String? displayTitle;
+  final String? genre;
+  final bool? isBrowsable;
+  final bool? isPlayable;
+  final int? mediaType;
+  final int? recordingDay;
+  final int? recordingMonth;
+  final int? recordingYear;
+  final int? releaseDay;
+  final int? releaseMonth;
+  final int? releaseYear;
+  final String? station;
+  final String? subtitle;
+  final String? title;
+  final int? totalDiscCount;
+  final int? totalTrackCount;
+  final int? trackNumber;
+  final String? writer;
+
+  MediaMetadata({
+    required this.albumArtist,
+    required this.albumTitle,
+    required this.artist,
+    required this.artworkData,
+    required this.artworkDataType,
+    required this.artworkUri,
+    required this.compilation,
+    required this.composer,
+    required this.conductor,
+    required this.description,
+    required this.discNumber,
+    required this.displayTitle,
+    required this.genre,
+    required this.isBrowsable,
+    required this.isPlayable,
+    required this.mediaType,
+    required this.recordingDay,
+    required this.recordingMonth,
+    required this.recordingYear,
+    required this.releaseDay,
+    required this.releaseMonth,
+    required this.releaseYear,
+    required this.station,
+    required this.subtitle,
+    required this.title,
+    required this.totalDiscCount,
+    required this.totalTrackCount,
+    required this.trackNumber,
+    required this.writer,
+  });
+
+  static MediaMetadata _fromMessage(Map<dynamic, dynamic> json) {
+    return MediaMetadata(
+      albumArtist: json['albumArtist'] as String?,
+      albumTitle: json['albumTitle'] as String?,
+      artist: json['artist'] as String?,
+      artworkData: json['artworkData'] as Uint8List?,
+      artworkDataType: json['artworkDataType'] as int?,
+      artworkUri: json['artworkUri'] as Uri?,
+      compilation: json['compilation'] as String?,
+      composer: json['composer'] as String?,
+      conductor: json['conductor'] as String?,
+      description: json['description'] as String?,
+      discNumber: json['discNumber'] as int?,
+      displayTitle: json['displayTitle'] as String?,
+      genre: json['genre'] as String?,
+      isBrowsable: json['isBrowsable'] as bool?,
+      isPlayable: json['isPlayable'] as bool?,
+      mediaType: json['mediaType'] as int?,
+      recordingDay: json['recordingDay'] as int?,
+      recordingMonth: json['recordingMonth'] as int?,
+      recordingYear: json['recordingYear'] as int?,
+      releaseDay: json['releaseDay'] as int?,
+      releaseMonth: json['releaseMonth'] as int?,
+      releaseYear: json['releaseYear'] as int?,
+      station: json['station'] as String?,
+      subtitle: json['subtitle'] as String?,
+      title: json['title'] as String?,
+      totalDiscCount: json['totalDiscCount'] as int?,
+      totalTrackCount: json['totalTrackCount'] as int?,
+      trackNumber: json['trackNumber'] as int?,
+      writer: json['writer'] as String?,
+    );
+  }
+
+  @override
+  String toString() {
+    return [
+      if (albumArtist != null) 'albumArtist: $albumArtist',
+      if (albumTitle != null) 'albumTitle: $albumTitle',
+      if (artist != null) 'artist: $artist',
+      if (artworkData != null) 'artworkData: ${artworkData!.lengthInBytes} B',
+      if (artworkDataType != null) 'artworkDataType: $artworkDataType',
+      if (artworkUri != null) 'artworkUri: $artworkUri',
+      if (compilation != null) 'compilation: $compilation',
+      if (composer != null) 'composer: $composer',
+      if (conductor != null) 'conductor: $conductor',
+      if (description != null) 'description: $description',
+      if (discNumber != null) 'discNumber: $discNumber',
+      if (displayTitle != null) 'displayTitle: $displayTitle',
+      if (genre != null) 'genre: $genre',
+      if (isBrowsable != null) 'isBrowsable: $isBrowsable',
+      if (isPlayable != null) 'isPlayable: $isPlayable',
+      if (mediaType != null) 'mediaType: $mediaType',
+      if (recordingDay != null) 'recordingDay: $recordingDay',
+      if (recordingMonth != null) 'recordingMonth: $recordingMonth',
+      if (recordingYear != null) 'recordingYear: $recordingYear',
+      if (releaseDay != null) 'releaseDay: $releaseDay',
+      if (releaseMonth != null) 'releaseMonth: $releaseMonth',
+      if (releaseYear != null) 'releaseYear: $releaseYear',
+      if (station != null) 'station: $station',
+      if (subtitle != null) 'subtitle: $subtitle',
+      if (title != null) 'title: $title',
+      if (totalDiscCount != null) 'totalDiscCount: $totalDiscCount',
+      if (totalTrackCount != null) 'totalTrackCount: $totalTrackCount',
+      if (trackNumber != null) 'trackNumber: $trackNumber',
+      if (writer != null) 'writer: $writer',
+    ].join(', ');
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      albumArtist,
+      albumTitle,
+      artist,
+      artworkDataType,
+      artworkUri,
+      compilation,
+      composer,
+      conductor,
+      description,
+      discNumber,
+      displayTitle,
+      genre,
+      isBrowsable,
+      isPlayable,
+      mediaType,
+      recordingDay,
+      recordingMonth,
+      recordingYear,
+      Object.hash(
+        releaseDay,
+        releaseMonth,
+        releaseYear,
+        station,
+        subtitle,
+        title,
+        totalDiscCount,
+        totalTrackCount,
+        trackNumber,
+        writer,
+      ),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is MediaMetadata &&
+      other.albumArtist == albumArtist &&
+      other.albumTitle == albumTitle &&
+      other.artist == artist &&
+      other.artworkDataType == artworkDataType &&
+      other.artworkUri == artworkUri &&
+      other.compilation == compilation &&
+      other.composer == composer &&
+      other.conductor == conductor &&
+      other.description == description &&
+      other.discNumber == discNumber &&
+      other.displayTitle == displayTitle &&
+      other.genre == genre &&
+      other.isBrowsable == isBrowsable &&
+      other.isPlayable == isPlayable &&
+      other.mediaType == mediaType &&
+      other.recordingDay == recordingDay &&
+      other.recordingMonth == recordingMonth &&
+      other.recordingYear == recordingYear &&
+      other.releaseDay == releaseDay &&
+      other.releaseMonth == releaseMonth &&
+      other.releaseYear == releaseYear &&
+      other.station == station &&
+      other.subtitle == subtitle &&
+      other.title == title &&
+      other.totalDiscCount == totalDiscCount &&
+      other.totalTrackCount == totalTrackCount &&
+      other.trackNumber == trackNumber &&
+      other.writer == writer;
 }
 
 /// Encapsulates the [sequence] and [currentIndex] state and ensures
@@ -3505,6 +3731,7 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
       updateTime: updateTime,
       bufferedPosition: Duration.zero,
       icyMetadata: null,
+      mediaMetadata: null,
       duration: _getDurationAtIndex(_index),
       currentIndex: _index,
       androidAudioSessionId: null,
