@@ -688,7 +688,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         case "AndroidLoudnessEnhancer":
             if (Build.VERSION.SDK_INT < 19)
                 throw new RuntimeException("AndroidLoudnessEnhancer requires minSdkVersion >= 19");
-            int targetGain = (int)Math.round((((Double)map.get("targetGain")) * 1000.0));
+            int targetGain = (int)Math.round((((Double)map.get("targetGain")) * 100.0)); // target gain needs to be provided in milliBel, the user provides the value in deciBel
             LoudnessEnhancer loudnessEnhancer = new LoudnessEnhancer(audioSessionId);
             loudnessEnhancer.setTargetGain(targetGain);
             return loudnessEnhancer;
@@ -796,7 +796,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void loudnessEnhancerSetTargetGain(double targetGain) {
-        int targetGainMillibels = (int)Math.round(targetGain * 1000.0);
+        int targetGainMillibels = (int)Math.round(targetGain * 100.0); // target gain needs to be provided in milliBel, the user provides the value in deciBel
         ((LoudnessEnhancer)audioEffectsMap.get("AndroidLoudnessEnhancer")).setTargetGain(targetGainMillibels);
     }
 
@@ -806,23 +806,23 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         for (short i = 0; i < equalizer.getNumberOfBands(); i++) {
             rawBands.add(mapOf(
                 "index", i,
-                "lowerFrequency", (double)equalizer.getBandFreqRange(i)[0] / 1000.0,
-                "upperFrequency", (double)equalizer.getBandFreqRange(i)[1] / 1000.0,
-                "centerFrequency", (double)equalizer.getCenterFreq(i) / 1000.0,
-                "gain", equalizer.getBandLevel(i) / 1000.0
+                "lowerFrequency", (double)equalizer.getBandFreqRange(i)[0] / 1000.0, // returns a value in milliHertz, we want Hertz
+                "upperFrequency", (double)equalizer.getBandFreqRange(i)[1] / 1000.0, // returns a value in milliHertz, we want Hertz
+                "centerFrequency", (double)equalizer.getCenterFreq(i) / 1000.0, // returns a value in milliHertz, we want Hertz
+                "gain", equalizer.getBandLevel(i) / 100.0 // returns a value in milliBel, we want deciBel
             ));
         }
         return mapOf(
             "parameters", mapOf(
-                "minDecibels", equalizer.getBandLevelRange()[0] / 1000.0,
-                "maxDecibels", equalizer.getBandLevelRange()[1] / 1000.0,
+                "minDecibels", equalizer.getBandLevelRange()[0] / 100.0, // returns a value in milliBel, we want deciBel
+                "maxDecibels", equalizer.getBandLevelRange()[1] / 100.0, // returns a value in milliBel, we want deciBel
                 "bands", rawBands
             )
         );
     }
 
     private void equalizerBandSetGain(int bandIndex, double gain) {
-        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 1000.0)));
+        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 100.0))); // target gain needs to be provided in milliBel, the user provides the value in deciBel
     }
 
     /// Creates an event based on the current state.
