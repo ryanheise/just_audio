@@ -1,3 +1,8 @@
+## 4.2.2
+
+* Add setAllowsExternalPlayback on iOS/macOS.
+* Support index-based seeking on Android/iOS/macOS.
+
 ## 4.2.1
 
 - Added support for HLS title and artist metadata.

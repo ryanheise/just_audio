@@ -98,6 +98,7 @@ await playlist.removeAt(3);
 // Setting the HTTP user agent
 final player = AudioPlayer(
   userAgent: 'myradioapp/1.0 (Linux;Android 11) https://myradioapp.com',
+  useProxyForRequestHeaders: true, // default
 );
 
 // Setting request headers
@@ -105,7 +106,9 @@ final duration = await player.setUrl('https://foo.com/bar.mp3',
     headers: {'header1': 'value1', 'header2': 'value2'});
 ```
 
-Note: headers are implemented via a local HTTP proxy which on Android, iOS and macOS requires non-HTTPS support to be enabled. See [Platform Specific Configuration](#platform-specific-configuration).
+Note: By default, headers are implemented via a local HTTP proxy which on Android, iOS and macOS requires non-HTTPS support to be enabled. See [Platform Specific Configuration](#platform-specific-configuration).
+
+Alternatively, settings `useProxyForRequestHeaders: false` will use the platform's native headers implementation without a proxy. Although note that iOS doesn't offer an official native API for setting headers, and so this will use the undocumented `AVURLAssetHTTPHeaderFieldsKey` API (or in the case of the user-agent header on iOS 16 and above, the official `AVURLAssetHTTPUserAgentKey` API).
 
 ### Working with caches
 

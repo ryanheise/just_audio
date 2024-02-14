@@ -1,10 +1,18 @@
-## 0.9.36
+## 0.9.37
 
 * Added support for HLS title and artist metadata.
+
+## 0.9.36
+
+* Add setAllowsExternalPlayback on iOS/macOS.
+* Support index-based seeking on Android/iOS/macOS.
+* Add option to send headers/userAgent without proxy.
+* Fix bug where user supplied headers are overwritten by defaults (@ctedgar).
 
 ## 0.9.35
 
 * Fix nullable completer argument type (@srawlins).
+* Support uuid 4.0.0 (@Pante).
 
 ## 0.9.34
 
