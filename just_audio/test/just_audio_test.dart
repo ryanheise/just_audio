@@ -397,9 +397,13 @@ void runTests() {
     await server.start();
     final player = AudioPlayer();
     // This simulates an actual URL
+    var headers = {
+      'custom-header': 'Hello',
+      'accept-encoding': 'custom-encoding',
+    };
     final uri = Uri.parse(
         'http://${InternetAddress.loopbackIPv4.address}:${server.port}/proxy/foo.mp3');
-    await player.setUrl('$uri', headers: {'custom-header': 'Hello'});
+    await player.setUrl('$uri', headers: headers);
     // Obtain the proxy URL that the platform side should use to load the data.
     final proxyUri = Uri.parse(player.icyMetadata!.info!.url!);
     // Simulate the platform side requesting the data.
@@ -410,6 +414,10 @@ void runTests() {
     expect(responseText, equals('Hello'));
     expect(response.headers.value(HttpHeaders.contentTypeHeader),
         equals('audio/mock'));
+    // MockWebServer returns original request headers in response headers
+    // (with 'original_' prepended)
+    headers.forEach(
+        (key, value) => expect(response.headers.value('original_$key'), value));
     await server.stop();
     await player.dispose();
   });
@@ -1293,7 +1301,7 @@ void runTests() {
   });
 
   test('loadConfiguration', () async {
-    final audioLoadConfiguration = AudioLoadConfiguration(
+    const audioLoadConfiguration = AudioLoadConfiguration(
       darwinLoadControl: DarwinLoadControl(),
       androidLoadControl: AndroidLoadControl(),
       androidLivePlaybackSpeedControl: AndroidLivePlaybackSpeedControl(),
@@ -1764,6 +1772,8 @@ class MockWebServer {
         response.contentLength = body.length;
         response.statusCode = HttpStatus.ok;
         response.headers.set(HttpHeaders.contentTypeHeader, 'audio/mock');
+        request.headers.forEach(
+            (name, value) => response.headers.set('original_$name', value));
         response.add(body);
         await response.flush();
         await response.close();
