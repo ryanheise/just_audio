@@ -59,6 +59,8 @@ Make the following changes to your project's `AndroidManifest.xml` file:
   <!-- ADD THESE TWO PERMISSIONS -->
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <!-- ALSO ADD THIS PERMISSION IF TARGETING SDK 34 -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
   
   <application ...>
     
