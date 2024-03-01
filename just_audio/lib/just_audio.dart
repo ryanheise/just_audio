@@ -1147,6 +1147,7 @@ class AudioPlayer {
           _playbackEvent = prevPlaybackEvent.copyWith(
             updatePosition: position,
             updateTime: DateTime.now(),
+            currentIndex: index,
           );
           _playbackEventSubject.add(_playbackEvent);
           _positionDiscontinuitySubject.add(PositionDiscontinuity(
