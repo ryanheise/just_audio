@@ -1,3 +1,7 @@
+## 0.9.37
+
+* Added support for HLS title and artist metadata.
+
 ## 0.9.36
 
 * Add setAllowsExternalPlayback on iOS/macOS.

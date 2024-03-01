@@ -1420,6 +1420,7 @@ final icyMetadata = IcyMetadata(
   ),
   info: IcyInfo(
     title: 'title',
+    artist: 'artist',
     url: 'url',
   ),
 );
@@ -1435,6 +1436,7 @@ final icyMetadataMessage = IcyMetadataMessage(
   ),
   info: IcyInfoMessage(
     title: 'title',
+    artist: 'artist',
     url: 'url',
   ),
 );
@@ -1654,6 +1656,7 @@ class MockAudioPlayer extends AudioPlayerPlatform {
         ),
         info: IcyInfoMessage(
           title: 'title',
+          artist: 'artist',
           url: url,
         ),
       ),

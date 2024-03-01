@@ -5,7 +5,8 @@
 
 ## 4.2.1
 
-* Update minimum flutter version to 3.0.
+- Added support for HLS title and artist metadata.
+- Update minimum flutter version to 3.0.
 
 ## 4.2.0
 
