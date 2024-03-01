@@ -1,3 +1,7 @@
+## 0.4.10
+
+* Migrate to package:web.
+
 ## 0.4.9
 
 * Fix bug to ensure play exceptions pass through (@idy).

@@ -10,14 +10,14 @@ topics:
   - background
 
 environment:
-  sdk: ">=2.17.0 <4.0.0"
-  flutter: ">=3.0.0"
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
 
 dependencies:
   just_audio_platform_interface: ^4.2.2
   # just_audio_platform_interface:
   #   path: ../just_audio_platform_interface
-  just_audio_web: ^0.4.9
+  just_audio_web: ^0.4.10
   # just_audio_web:
   #   path: ../just_audio_web
   audio_session: ^0.1.14
