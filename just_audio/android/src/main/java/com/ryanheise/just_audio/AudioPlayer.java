@@ -235,6 +235,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         final Metadata.Entry entry = metadata.get(k);
                         if (entry instanceof IcyHeaders) {
                             icyHeaders = (IcyHeaders) entry;
+                            // null out info if interval is unset (bug 871)
+                            if (icyHeaders.metadataInterval == C.LENGTH_UNSET) {
+                                icyInfo = null;
+                            }
                             broadcastImmediatePlaybackEvent();
                         }
                     }
