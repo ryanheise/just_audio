@@ -8,16 +8,27 @@
     NSArray<NSNumber *> *_shuffleOrder;
 }
 
-- (instancetype)initWithId:(NSString *)sid audioSources:(NSMutableArray<AudioSource *> *)audioSources shuffleOrder:(NSArray<NSNumber *> *)shuffleOrder {
+- (instancetype)initWithId:(NSString *)sid audioSources:(NSMutableArray<AudioSource *> *)audioSources shuffleOrder:(NSArray<NSNumber *> *)shuffleOrder lazyLoading:(NSNumber *)lazyLoading {
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _audioSources = audioSources;
     _shuffleOrder = shuffleOrder;
+    self.lazyLoading = [lazyLoading boolValue];
     return self;
 }
 
 - (int)count {
     return (int)_audioSources.count;
+}
+
+- (BOOL)lazyLoading {
+    return [_audioSources count] > 0 ? _audioSources[0].lazyLoading : NO;
+}
+
+- (void)setLazyLoading:(BOOL)lazyLoading {
+    for (int i = 0; i < [_audioSources count]; i++) {
+        _audioSources[i].lazyLoading = lazyLoading;
+    }
 }
 
 - (void)insertSource:(AudioSource *)audioSource atIndex:(int)index {

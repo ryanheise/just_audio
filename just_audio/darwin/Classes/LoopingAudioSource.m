@@ -14,6 +14,16 @@
     return self;
 }
 
+- (BOOL)lazyLoading {
+    return [_audioSources count] > 0 ? _audioSources[0].lazyLoading : NO;
+}
+
+- (void)setLazyLoading:(BOOL)lazyLoading {
+    for (int i = 0; i < [_audioSources count]; i++) {
+        _audioSources[i].lazyLoading = lazyLoading;
+    }
+}
+
 - (int)buildSequence:(NSMutableArray *)sequence treeIndex:(int)treeIndex {
     for (int i = 0; i < [_audioSources count]; i++) {
         treeIndex = [_audioSources[i] buildSequence:sequence treeIndex:treeIndex];

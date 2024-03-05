@@ -16,6 +16,13 @@
     return _sourceId;
 }
 
+- (BOOL)lazyLoading {
+    return NO;
+}
+
+- (void)setLazyLoading:(BOOL)lazyLoading {
+}
+
 - (int)buildSequence:(NSMutableArray *)sequence treeIndex:(int)treeIndex {
     return 0;
 }

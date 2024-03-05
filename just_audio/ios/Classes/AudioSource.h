@@ -3,6 +3,7 @@
 @interface AudioSource : NSObject
 
 @property (readonly, nonatomic) NSString* sourceId;
+@property (readwrite, nonatomic) BOOL lazyLoading;
 
 - (instancetype)initWithId:(NSString *)sid;
 - (int)buildSequence:(NSMutableArray *)sequence treeIndex:(int)treeIndex;

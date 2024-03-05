@@ -11,7 +11,7 @@
 #import <stdlib.h>
 #include <TargetConditionals.h>
 
-#define MAX_QUEUE_LENGTH 2
+#define TREADMILL_SIZE 2
 
 // TODO: Check for and report invalid state transitions.
 // TODO: Apply Apple's guidance on seeking: https://developer.apple.com/library/archive/qa/qa1820/_index.html
@@ -47,6 +47,7 @@
     float _speed;
     float _volume;
     BOOL _justAdvanced;
+    BOOL _enqueuedAll;
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
 }
 
@@ -105,6 +106,7 @@
     _speed = 1.0f;
     _volume = 1.0f;
     _justAdvanced = NO;
+    _enqueuedAll = NO;
     _icyMetadata = @{};
     __weak __typeof__(self) weakSelf = self;
     [_methodChannel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
@@ -463,7 +465,8 @@
     } else if ([@"concatenating" isEqualToString:type]) {
         return [[ConcatenatingAudioSource alloc] initWithId:data[@"id"]
                                                audioSources:[self decodeAudioSources:data[@"children"]]
-                                               shuffleOrder:(NSArray<NSNumber *> *)data[@"shuffleOrder"]];
+                                               shuffleOrder:(NSArray<NSNumber *> *)data[@"shuffleOrder"]
+                                                lazyLoading:(NSNumber *)data[@"useLazyPreparation"]];
     } else if ([@"clipping" isEqualToString:type]) {
         return [[ClippingAudioSource alloc] initWithId:data[@"id"]
                                            audioSource:(UriAudioSource *)[self decodeAudioSource:data[@"child"]]
@@ -521,12 +524,19 @@
     /* [self dumpQueue]; */
 
     // Regenerate queue
+    _enqueuedAll = NO;
     if (!existingItem || _loopMode != loopOne) {
+        _enqueuedAll = YES;
         BOOL include = NO;
-        for (int i = 0; i < [_order count] && _player.items.count < MAX_QUEUE_LENGTH; i++) {
+        for (int i = 0; i < [_order count]; i++) {
             int si = [_order[i] intValue];
             if (si == _index) include = YES;
             if (include && _indexedAudioSources[si].playerItem != existingItem) {
+                if (_indexedAudioSources[si].lazyLoading && _player.items.count >= TREADMILL_SIZE) {
+                    // Enqueue up until the first lazy item that does not fit on the treadmill.
+                    _enqueuedAll = NO;
+                    break;
+                }
                 //NSLog(@"inserting item %d", si);
                 [_player insertItem:_indexedAudioSources[si].playerItem afterItem:nil];
                 if (_loopMode == loopOne) {
@@ -538,8 +548,8 @@
     }
 
     // Add next loop item if we're looping
-    if (_order.count > 0 && _player.items.count < MAX_QUEUE_LENGTH) {
-        if (_loopMode == loopAll) {
+    if (_order.count > 0) {
+        if (_loopMode == loopAll && _enqueuedAll) {
             int si = [_order[0] intValue];
             //NSLog(@"### add loop item:%d", si);
             if (!_indexedAudioSources[si].playerItem2) {
@@ -943,14 +953,19 @@
             IndexedAudioSource *audioSource = playerItem.audioSource;
             if (_loopMode == loopOne) {
                 [audioSource flip];
+                [self enqueueFrom:_index];
             } else if (_loopMode == loopAll) {
                 if (_index == [_order[0] intValue] && playerItem == audioSource.playerItem2) {
                     [audioSource flip];
+                    [self enqueueFrom:_index];
+                } else if (!_enqueuedAll) {
+                    [self enqueueFrom:_index];
                 } else {
                     [self updateEndAction];
                 }
+            } else if (!_enqueuedAll) {
+                [self enqueueFrom:_index];
             }
-            [self enqueueFrom:_index];
             _justAdvanced = NO;
         }
     } else if ([keyPath isEqualToString:@"loadedTimeRanges"]) {

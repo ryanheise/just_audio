@@ -12,15 +12,15 @@
 @end
 
 enum ProcessingState {
-	none,
-	loading,
-	buffering,
-	ready,
-	completed
+    none,
+    loading,
+    buffering,
+    ready,
+    completed
 };
 
 enum LoopMode {
-	loopOff,
-	loopOne,
-	loopAll
+    loopOff,
+    loopOne,
+    loopAll
 };

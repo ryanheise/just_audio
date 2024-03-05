@@ -4,6 +4,7 @@
 
 @implementation IndexedAudioSource {
     BOOL _isAttached;
+    BOOL _lazyLoading;
     CMTime _queuedSeekPos;
     void (^_queuedSeekCompletionHandler)(BOOL);
 }
@@ -12,6 +13,7 @@
     self = [super initWithId:sid];
     NSAssert(self, @"super init cannot be nil");
     _isAttached = NO;
+    _lazyLoading = NO;
     _queuedSeekPos = kCMTimeInvalid;
     _queuedSeekCompletionHandler = nil;
     return self;
@@ -39,6 +41,14 @@
 
 - (BOOL)isAttached {
     return _isAttached;
+}
+
+- (BOOL)lazyLoading {
+    return _lazyLoading;
+}
+
+- (void)setLazyLoading:(BOOL)lazyLoading {
+    _lazyLoading = lazyLoading;
 }
 
 - (int)buildSequence:(NSMutableArray *)sequence treeIndex:(int)treeIndex {

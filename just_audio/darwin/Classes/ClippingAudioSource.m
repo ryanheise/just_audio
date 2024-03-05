@@ -23,6 +23,14 @@
     return _audioSource;
 }
 
+- (BOOL)lazyLoading {
+    return _audioSource.lazyLoading;
+}
+
+- (void)setLazyLoading:(BOOL)lazyLoading {
+    _audioSource.lazyLoading = lazyLoading;
+}
+
 - (void)findById:(NSString *)sourceId matches:(NSMutableArray<AudioSource *> *)matches {
     [super findById:sourceId matches:matches];
     [_audioSource findById:sourceId matches:matches];
