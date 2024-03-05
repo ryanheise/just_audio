@@ -52,7 +52,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // to the cache file.
       // await _player.setAudioSource(await _audioSource.resolve());
       await _player.setAudioSource(_audioSource);
-    } catch (e) {
+    } on PlayerException catch (e) {
       print("Error loading audio source: $e");
     }
   }

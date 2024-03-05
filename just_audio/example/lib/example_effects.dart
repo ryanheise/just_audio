@@ -50,7 +50,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
     try {
       await _player.setAudioSource(AudioSource.uri(Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")));
-    } catch (e) {
+    } on PlayerException catch (e) {
       print("Error loading audio source: $e");
     }
   }

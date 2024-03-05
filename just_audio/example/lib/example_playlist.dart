@@ -96,7 +96,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // Preloading audio is not currently supported on Linux.
       await _player.setAudioSource(_playlist,
           preload: kIsWeb || defaultTargetPlatform != TargetPlatform.linux);
-    } catch (e) {
+    } on PlayerException catch (e) {
       // Catch load errors: 404, invalid url...
       print("Error loading audio source: $e");
     }

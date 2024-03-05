@@ -183,14 +183,17 @@ try {
 
 // Catching errors during playback (e.g. lost network connection)
 player.playbackEventStream.listen((event) {}, onError: (Object e, StackTrace st) {
-  if (e is PlayerException) {
+  if (e is PlatformException) {
     print('Error code: ${e.code}');
     print('Error message: ${e.message}');
+    print('AudioSource index: ${e.details?["index"]}');
   } else {
     print('An error occurred: $e');
   }
 });
 ```
+
+Note: In a future release, the exception type on `playbackEventStream` will change from `PlatformException` to `PlayerException`.
 
 ### Working with state streams
 
