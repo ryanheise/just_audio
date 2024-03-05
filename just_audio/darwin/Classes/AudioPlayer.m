@@ -982,7 +982,7 @@
 - (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
     FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%d", (int)playerItem.error.code]
                                                      message:playerItem.error.localizedDescription
-                                                     details:nil];
+                                                     details:@{@"index": @([self indexForItem:playerItem])}];
     [self sendError:flutterError playerItem:playerItem];
 }
 
