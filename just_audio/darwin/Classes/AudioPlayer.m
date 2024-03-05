@@ -1271,6 +1271,7 @@
                         _player.rate = _speed;
                     }
                 }
+                [self broadcastPlaybackEvent];
                 completionHandler(YES);
             }
         }
