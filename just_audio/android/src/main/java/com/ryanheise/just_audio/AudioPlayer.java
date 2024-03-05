@@ -383,10 +383,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 Log.e(TAG, "default ExoPlaybackException: " + exoError.getUnexpectedException().getMessage());
             }
             // TODO: send both errorCode and type
-            sendError(String.valueOf(exoError.type), exoError.getMessage());
+            sendError(String.valueOf(exoError.type), exoError.getMessage(), mapOf("index", currentIndex));
         } else {
             Log.e(TAG, "default PlaybackException: " + error.getMessage());
-            sendError(String.valueOf(error.errorCode), error.getMessage());
+            sendError(String.valueOf(error.errorCode), error.getMessage(), mapOf("index", currentIndex));
         }
         errorCount++;
         if (player.hasNextMediaItem() && currentIndex != null && errorCount <= 5) {
@@ -914,12 +914,16 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void sendError(String errorCode, String errorMsg) {
+        sendError(errorCode, errorMsg, null);
+    }
+
+    private void sendError(String errorCode, String errorMsg, Object details) {
         if (prepareResult != null) {
-            prepareResult.error(errorCode, errorMsg, null);
+            prepareResult.error(errorCode, errorMsg, details);
             prepareResult = null;
         }
 
-        eventChannel.error(errorCode, errorMsg, null);
+        eventChannel.error(errorCode, errorMsg, details);
     }
 
     private String getLowerCaseExtension(Uri uri) {
