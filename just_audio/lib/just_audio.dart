@@ -2375,7 +2375,7 @@ class ProgressiveAudioSource extends UriAudioSource {
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
         id: _id,
-        uri: _effectiveUri.toString(),
+        uri: Uri.decodeFull(_effectiveUri.toString()),
         headers: _mergedHeaders,
         tag: tag,
         options: options?._toMessage(),
@@ -2404,7 +2404,7 @@ class DashAudioSource extends UriAudioSource {
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
         id: _id,
-        uri: _effectiveUri.toString(),
+        uri: Uri.decodeFull(_effectiveUri.toString()),
         headers: _mergedHeaders,
         tag: tag,
       );
@@ -2431,7 +2431,7 @@ class HlsAudioSource extends UriAudioSource {
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
         id: _id,
-        uri: _effectiveUri.toString(),
+        uri: Uri.decodeFull(_effectiveUri.toString()),
         headers: _mergedHeaders,
         tag: tag,
       );
