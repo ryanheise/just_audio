@@ -11,6 +11,9 @@ Future<void> main() async {
     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
+    // customOnRewind: () async {
+    //   print("rewind");
+    // },
   );
   runApp(const MyApp());
 }
