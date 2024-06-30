@@ -33,6 +33,8 @@ const kMediaControlFastForward15seconds = MediaControl(
   action: MediaAction.fastForward,
 );
 
+const kAudioPlayerJumpSeconds = 15;
+
 /// Provides the [init] method to initialise just_audio for background playback.
 class JustAudioBackground {
   /// Initialise just_audio for background playback. This should be called from
@@ -65,13 +67,14 @@ class JustAudioBackground {
     bool androidStopForegroundOnPause = true,
     int? artDownscaleWidth,
     int? artDownscaleHeight,
-    Duration fastForwardInterval = const Duration(seconds: 15),
-    Duration rewindInterval = const Duration(seconds: 15),
     Future<void> Function()? customOnRewind,
     Future<void> Function()? customOnFastForward,
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
   }) async {
+    const Duration fastForwardInterval =
+        Duration(seconds: kAudioPlayerJumpSeconds);
+    const Duration rewindInterval = Duration(seconds: kAudioPlayerJumpSeconds);
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
         androidResumeOnClick: androidResumeOnClick,
@@ -754,7 +757,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> fastForward() async {
     if (customCallbacks?.onFastForward != null) {
       await customCallbacks!.onFastForward!.call();
-      _updatePosition();
+      _updatePositionIfPaused(const Duration(seconds: kAudioPlayerJumpSeconds));
       _broadcastState();
     } else {
       return _seekRelative(AudioService.config.fastForwardInterval);
@@ -765,10 +768,23 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> rewind() async {
     if (customCallbacks?.onRewind != null) {
       await customCallbacks!.onRewind!.call();
-      _updatePosition();
+      _updatePositionIfPaused(
+          const Duration(seconds: -kAudioPlayerJumpSeconds));
       _broadcastState();
     } else {
       return _seekRelative(-AudioService.config.rewindInterval);
+    }
+  }
+
+  void _updatePositionIfPaused(Duration offset) {
+    if (!_playing) {
+      _justAudioEvent = _justAudioEvent.copyWith(
+        updatePosition: Duration(
+          milliseconds: _justAudioEvent.updatePosition.inMilliseconds +
+              offset.inMilliseconds,
+        ),
+        updateTime: DateTime.now(),
+      );
     }
   }
 
