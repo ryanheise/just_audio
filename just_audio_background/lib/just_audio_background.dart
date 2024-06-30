@@ -33,7 +33,7 @@ const kMediaControlFastForward15seconds = MediaControl(
   action: MediaAction.fastForward,
 );
 
-const kAudioPlayerJumpSeconds = 15;
+const kJumpSeconds = 15;
 
 /// Provides the [init] method to initialise just_audio for background playback.
 class JustAudioBackground {
@@ -72,9 +72,8 @@ class JustAudioBackground {
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
   }) async {
-    const Duration fastForwardInterval =
-        Duration(seconds: kAudioPlayerJumpSeconds);
-    const Duration rewindInterval = Duration(seconds: kAudioPlayerJumpSeconds);
+    const Duration fastForwardInterval = Duration(seconds: kJumpSeconds);
+    const Duration rewindInterval = Duration(seconds: kJumpSeconds);
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
         androidResumeOnClick: androidResumeOnClick,
@@ -757,7 +756,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> fastForward() async {
     if (customCallbacks?.onFastForward != null) {
       await customCallbacks!.onFastForward!.call();
-      _updatePositionIfPaused(const Duration(seconds: kAudioPlayerJumpSeconds));
+      _updatePositionIfPaused(const Duration(seconds: kJumpSeconds));
       _broadcastState();
     } else {
       return _seekRelative(AudioService.config.fastForwardInterval);
@@ -768,8 +767,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> rewind() async {
     if (customCallbacks?.onRewind != null) {
       await customCallbacks!.onRewind!.call();
-      _updatePositionIfPaused(
-          const Duration(seconds: -kAudioPlayerJumpSeconds));
+      _updatePositionIfPaused(const Duration(seconds: -kJumpSeconds));
       _broadcastState();
     } else {
       return _seekRelative(-AudioService.config.rewindInterval);
