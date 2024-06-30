@@ -756,10 +756,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> fastForward() async {
     if (customCallbacks?.onFastForward != null) {
       await customCallbacks!.onFastForward!.call();
-      _updatePositionIfPaused(const Duration(seconds: kJumpSeconds));
-      _broadcastState();
+      _updatePositionIfPaused();
     } else {
-      return _seekRelative(AudioService.config.fastForwardInterval);
+      await _seekRelative(AudioService.config.fastForwardInterval);
+      _updatePositionIfPaused();
     }
   }
 
@@ -767,22 +767,28 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> rewind() async {
     if (customCallbacks?.onRewind != null) {
       await customCallbacks!.onRewind!.call();
-      _updatePositionIfPaused(const Duration(seconds: -kJumpSeconds));
-      _broadcastState();
+      _updatePositionIfPaused();
     } else {
-      return _seekRelative(-AudioService.config.rewindInterval);
+      await _seekRelative(-AudioService.config.rewindInterval);
+      _updatePositionIfPaused();
     }
   }
 
-  void _updatePositionIfPaused(Duration offset) {
+  Future<void> _updatePositionIfPaused() async {
     if (!_playing) {
-      _justAudioEvent = _justAudioEvent.copyWith(
-        updatePosition: Duration(
-          milliseconds: _justAudioEvent.updatePosition.inMilliseconds +
-              offset.inMilliseconds,
-        ),
-        updateTime: DateTime.now(),
-      );
+      playbackState.add(playbackState.value.copyWith(
+        systemActions: {
+          MediaAction.seek,
+        },
+      ));
+
+      playbackState.add(playbackState.value.copyWith(
+        systemActions: {
+          MediaAction.seek,
+          MediaAction.seekForward,
+          MediaAction.seekBackward,
+        },
+      ));
     }
   }
 
@@ -879,6 +885,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
       kMediaControlRewind15seconds,
       if (_playing) MediaControl.pause else MediaControl.play,
       kMediaControlFastForward15seconds,
+      // if (!_playing) MediaControl.stop,
     ];
     playbackState.add(playbackState.nvalue!.copyWith(
       controls: controls,
@@ -886,6 +893,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
+        // MediaAction.fastForward,
+        // MediaAction.rewind,
       },
       androidCompactActionIndices: List.generate(controls.length, (i) => i)
           .where((i) => controls[i].action != MediaAction.stop)
