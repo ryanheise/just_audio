@@ -754,6 +754,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> fastForward() async {
     if (customCallbacks?.onFastForward != null) {
       await customCallbacks!.onFastForward!.call();
+      _updatePosition();
       _broadcastState();
     } else {
       return _seekRelative(AudioService.config.fastForwardInterval);
@@ -764,6 +765,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<void> rewind() async {
     if (customCallbacks?.onRewind != null) {
       await customCallbacks!.onRewind!.call();
+      _updatePosition();
       _broadcastState();
     } else {
       return _seekRelative(-AudioService.config.rewindInterval);
