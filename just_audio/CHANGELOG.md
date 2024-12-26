@@ -1,3 +1,8 @@
+## 0.9.47
+
+* Add timeoutMillis parameter to Uri/LockCaching/Stream AudioSources (@ctedgar).
+    * Android platform implementation completed
+
 ## 0.9.46
 
 * Fix SwiftPM support on macOS.
