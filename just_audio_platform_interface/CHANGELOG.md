@@ -1,3 +1,7 @@
+## 4.4.1
+
+* Add timeoutMillis to UriAudioSourceMessage (@ctedgar).
+
 ## 4.4.0
 
 * Add setWebSinkId for web (@dganzella).
