@@ -883,6 +883,16 @@ class AudioPlayer {
       return duration;
     } on PlatformException catch (e) {
       try {
+        // cant connect to servers
+        if (e.code == "-1004" && source is LockCachingAudioSource) {
+          // proxy is offline
+          try {
+            await _proxy._server.close(force: true);
+          } catch (_) {
+            // ignore err
+          }
+          await _proxy.start();
+        }
         throw PlayerException(int.parse(e.code), e.message,
             (e.details as Map<dynamic, dynamic>?)?.cast<String, dynamic>());
       } on FormatException catch (_) {
@@ -2160,9 +2170,14 @@ class _ProxyHttpServer {
       }
     }, onDone: () {
       _running = false;
-    }, onError: (Object e, StackTrace st) {
+    }, onError: (Object e, StackTrace st) async {
       _running = false;
-    });
+      try {
+        await _server.close(force: true);
+      } catch (_) {
+        // ignore
+      }
+    }, cancelOnError: true);
   }
 
   /// Stops the server
