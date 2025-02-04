@@ -166,7 +166,15 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
   late final _PlayerAudioHandler _playerAudioHandler;
 
   _JustAudioPlayer({required this.initRequest}) : super(initRequest.id) {
-    _playerAudioHandler = _PlayerAudioHandler(initRequest);
+    _playerAudioHandler = _PlayerAudioHandler(
+      initRequest,
+      addPlaybackEventMessageError: (error, stackTrace) {
+        if (eventController.isClosed) {
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+        eventController.addError(error, stackTrace);
+      },
+    );
     _audioHandler.inner = _playerAudioHandler;
     _audioHandler.playbackState.listen((playbackState) {
       broadcastPlaybackEvent();
@@ -412,18 +420,29 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   List<MediaItem>? get currentQueue => queue.nvalue;
 
-  _PlayerAudioHandler(InitRequest initRequest) {
+  void Function(Object error, StackTrace stackTrace)
+      addPlaybackEventMessageError;
+
+  _PlayerAudioHandler(
+    InitRequest initRequest, {
+    required this.addPlaybackEventMessageError,
+  }) {
     _init(initRequest);
   }
 
   Future<void> _init(InitRequest initRequest) async {
     final player = await _platform.init(initRequest);
     _playerCompleter.complete(player);
+
     final playbackEventMessageStream = player.playbackEventMessageStream;
-    playbackEventMessageStream.listen((event) {
-      _justAudioEvent = event;
-      _broadcastState();
-    });
+
+    playbackEventMessageStream.listen(
+      (event) {
+        _justAudioEvent = event;
+        _broadcastState();
+      },
+      onError: addPlaybackEventMessageError,
+    );
     playbackEventMessageStream
         .map((event) => event.icyMetadata)
         .distinct()
@@ -432,7 +451,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
         'type': 'icyMetadata',
         'value': icyMetadata,
       });
-    });
+    }, onError: (_) {});
     playbackEventMessageStream
         .map((event) => event.androidAudioSessionId)
         .distinct()
@@ -441,7 +460,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
         'type': 'androidAudioSessionId',
         'value': audioSessionId,
       });
-    });
+    }, onError: (_) {});
     playbackEventMessageStream
         .map((event) => TrackInfo(event.currentIndex, event.duration))
         .distinct()
@@ -468,7 +487,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
             }
             mediaItem.add(currentMediaItem!);
           }
-        });
+        }, onError: (_) {});
   }
 
   @override
