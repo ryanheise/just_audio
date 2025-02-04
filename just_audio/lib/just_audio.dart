@@ -250,11 +250,15 @@ class AudioPlayer {
     _currentIndexSubject.addStream(playbackEventStream
         .map((event) => event.currentIndex)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _androidAudioSessionIdSubject.addStream(playbackEventStream
         .map((event) => event.androidAudioSessionId)
         .distinct()
-        .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+        .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _sequenceStateSubject.addStream(Rx.combineLatest5<List<IndexedAudioSource>?,
         List<int>?, int?, bool, LoopMode, SequenceState?>(
       sequenceStream,
@@ -275,14 +279,18 @@ class AudioPlayer {
           loopMode,
         );
       },
-    ).distinct().handleError((Object err, StackTrace stackTrace) {/* noop */}));
+    ).distinct().handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _playerStateSubject.addStream(
         Rx.combineLatest2<bool, PlaybackEvent, PlayerState>(
                 playingStream,
                 playbackEventStream,
                 (playing, event) => PlayerState(playing, event.processingState))
             .distinct()
-            .handleError((Object err, StackTrace stackTrace) {/* noop */}));
+            .handleError((Object err, StackTrace stackTrace) {
+      /* noop */
+    }));
     _shuffleModeEnabledSubject.add(false);
     _loopModeSubject.add(LoopMode.off);
     _setPlatformActive(false, force: true)
@@ -814,7 +822,7 @@ class AudioPlayer {
       final initialSeekValues = _initialSeekValues;
       _initialSeekValues = null;
       return await _load(await _platform, _audioSource!,
-          initialSeekValues: initialSeekValues);
+          initialSeekValues: initialSeekValues, onError: _audioSource!.onError);
     } else {
       // This will implicitly load the current audio source.
       return await _setPlatformActive(true);
@@ -848,7 +856,7 @@ class AudioPlayer {
   }
 
   Future<Duration?> _load(AudioPlayerPlatform platform, AudioSource source,
-      {_InitialSeekValues? initialSeekValues}) async {
+      {_InitialSeekValues? initialSeekValues, void Function(String error)? onError}) async {
     final activationNumber = _activationCount;
     void checkInterruption() {
       if (_activationCount != activationNumber) {
@@ -874,6 +882,7 @@ class AudioPlayer {
       _durationSubject.add(duration);
       if (platform != _platformValue) {
         // the platform has changed since we started loading, so abort.
+        if (onError!=null) onError("PlatformException(code: 'abort', message: 'Loading interrupted')");
         throw PlatformException(code: 'abort', message: 'Loading interrupted');
       }
       // Wait for loading state to pass.
@@ -883,9 +892,11 @@ class AudioPlayer {
       return duration;
     } on PlatformException catch (e) {
       try {
+        if (onError!=null) onError("PlayerException: ${int.parse(e.code)} ${e.message}");
         throw PlayerException(int.parse(e.code), e.message,
             (e.details as Map<dynamic, dynamic>?)?.cast<String, dynamic>());
-      } on FormatException catch (_) {
+      } on FormatException catch (f) {
+        if (onError!=null) onError("FormatException: $f");
         if (e.code == 'abort') {
           throw PlayerInterruptedException(e.message);
         } else {
@@ -913,7 +924,7 @@ class AudioPlayer {
                 start: start,
                 end: end,
                 tag: tag,
-              ));
+              ), onError: _audioSource?.onError);
     return duration;
   }
 
@@ -1530,7 +1541,7 @@ class AudioPlayer {
               _InitialSeekValues(position: position, index: currentIndex);
           _initialSeekValues = null;
           final duration = await _load(platform, _audioSource!,
-              initialSeekValues: initialSeekValues);
+              initialSeekValues: initialSeekValues, onError: _audioSource!.onError);
           if (checkInterruption()) return platform;
           durationCompleter.complete(duration);
         } catch (e, stackTrace) {
@@ -2108,6 +2119,9 @@ class _ProxyHttpServer {
   Uri addUriAudioSource(UriAudioSource source) {
     final uri = source.uri;
     final headers = <String, String>{};
+    final refreshCredentials = source.refreshCredentials;
+    final onError = source.onError;
+    final getAuthHeaders = source.getAuthHeaders;
     if (source.headers != null) {
       headers.addAll(source.headers!.cast<String, String>());
     }
@@ -2116,6 +2130,9 @@ class _ProxyHttpServer {
       uri,
       headers: headers,
       userAgent: source._player?._userAgent,
+      refreshCredentials: refreshCredentials,
+      onError: onError,
+      getAuthHeaders: getAuthHeaders,
     );
     return uri.replace(
       scheme: 'http',
@@ -2231,6 +2248,16 @@ abstract class AudioSource {
   final String _id;
   AudioPlayer? _player;
 
+  /// If a request needs authorization headers, logically it needs to refresh credentials.
+  /// In case of giving a playlist with lazy load, the player freezes if there is no
+  /// inbuilt refresh tokens mechanism
+  final Future<void> Function()? refreshCredentials;
+
+  final void Function(String message)? onError;
+
+  /// getter function for additional headers to auth
+  final Map<String, String> Function()? getAuthHeaders;
+
   /// Creates an [AudioSource] from a [Uri] with optional headers by
   /// attempting to guess the type of stream. On iOS, this uses Apple's SDK to
   /// automatically detect the stream type. On Android, the type of stream will
@@ -2253,8 +2280,14 @@ abstract class AudioSource {
   /// provided by that package. If you wish to have more control over the tag
   /// for background audio purposes, consider using the plugin audio_service
   /// instead of just_audio_background.
-  static UriAudioSource uri(Uri uri,
-      {Map<String, String>? headers, dynamic tag}) {
+  static UriAudioSource uri(
+    Uri uri, {
+    Map<String, String>? headers,
+    dynamic tag,
+    Future<void> Function()? refreshCredentials,
+    void Function(String message)? onError,
+    Map<String, String> Function()? getAuthHeaders,
+  }) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
@@ -2263,7 +2296,14 @@ abstract class AudioSource {
     } else if (hasExtension(uri, 'm3u8')) {
       return HlsAudioSource(uri, headers: headers, tag: tag);
     } else {
-      return ProgressiveAudioSource(uri, headers: headers, tag: tag);
+      return ProgressiveAudioSource(
+        uri,
+        headers: headers,
+        tag: tag,
+        refreshCredentials: refreshCredentials,
+        onError: onError,
+        getAuthHeaders: getAuthHeaders,
+      );
     }
   }
 
@@ -2295,7 +2335,8 @@ abstract class AudioSource {
     return AudioSource.uri(Uri.parse('asset:///$keyName'), tag: tag);
   }
 
-  AudioSource() : _id = _uuid.v4();
+  AudioSource({this.refreshCredentials, this.onError, this.getAuthHeaders})
+      : _id = _uuid.v4();
 
   @mustCallSuper
   Future<void> _setup(AudioPlayer player) async {
@@ -2334,7 +2375,12 @@ abstract class IndexedAudioSource extends AudioSource {
   final dynamic tag;
   Duration? duration;
 
-  IndexedAudioSource({this.tag, this.duration});
+  IndexedAudioSource(
+      {this.tag,
+      this.duration,
+      super.refreshCredentials,
+      super.onError,
+      super.getAuthHeaders});
 
   @override
   void _shuffle({int? initialIndex}) {}
@@ -2352,8 +2398,15 @@ abstract class UriAudioSource extends IndexedAudioSource {
   final Map<String, String>? headers;
   Uri? _overrideUri;
 
-  UriAudioSource(this.uri, {this.headers, dynamic tag, Duration? duration})
-      : super(tag: tag, duration: duration);
+  UriAudioSource(
+    this.uri, {
+    this.headers,
+    dynamic tag,
+    Duration? duration,
+    super.refreshCredentials,
+    super.onError,
+    super.getAuthHeaders,
+  }) : super(tag: tag, duration: duration);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
   /// of the copied asset on the filesystem, otherwise it gives us the original
@@ -2453,6 +2506,9 @@ class ProgressiveAudioSource extends UriAudioSource {
     super.tag,
     super.duration,
     this.options,
+    super.refreshCredentials,
+    super.onError,
+    super.getAuthHeaders,
   });
 
   @override
@@ -2562,6 +2618,8 @@ class ConcatenatingAudioSource extends AudioSource {
     required this.children,
     this.useLazyPreparation = true,
     ShuffleOrder? shuffleOrder,
+    super.refreshCredentials,
+    super.getAuthHeaders,
   }) : _shuffleOrder = shuffleOrder ?? DefaultShuffleOrder()
           ..insert(0, children.length);
 
@@ -3239,6 +3297,7 @@ class _InProgressCacheResponse {
   // ignore: close_sinks
   final controller = ReplaySubject<List<int>>();
   final int? end;
+
   _InProgressCacheResponse({
     required this.end,
   });
@@ -3348,11 +3407,12 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
 }
 
 /// A proxy handler for serving audio from a URI with optional headers.
-_ProxyHandler _proxyHandlerForUri(
-  Uri uri, {
-  Map<String, String>? headers,
-  String? userAgent,
-}) {
+_ProxyHandler _proxyHandlerForUri(Uri uri,
+    {Map<String, String>? headers,
+    String? userAgent,
+    Future<void> Function()? refreshCredentials,
+    void Function(String message)? onError,
+    Map<String, String> Function()? getAuthHeaders,}) {
   // Keep redirected [Uri] to speed-up requests
   Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
@@ -3365,14 +3425,32 @@ _ProxyHandler _proxyHandlerForUri(
           .forEach((name, value) => requestHeaders[name] = value.join(', '));
       // write supplied headers last (to ensure supplied headers aren't overwritten)
       headers?.forEach((name, value) => requestHeaders[name] = value);
-      final originRequest =
+      if (getAuthHeaders != null) {
+        final authHeaders = getAuthHeaders();
+        authHeaders.forEach((name, value) => requestHeaders[name] = value);
+      }
+      var originRequest =
           await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
       host = originRequest.headers.value(HttpHeaders.hostHeader);
-      final originResponse = await originRequest.close();
+      var originResponse = await originRequest.close();
       if (originResponse.redirects.isNotEmpty) {
         redirectedUri = originResponse.redirects.last.location;
       }
-
+      if (refreshCredentials != null &&
+          originResponse.statusCode == HttpStatus.unauthorized) {
+        await refreshCredentials();
+        if (getAuthHeaders != null) {
+          final authHeaders = getAuthHeaders();
+          authHeaders.forEach((name, value) => requestHeaders[name] = value);
+        }
+        originRequest = await _getUrl(client, redirectedUri ?? uri,
+            headers: requestHeaders);
+        host = originRequest.headers.value(HttpHeaders.hostHeader);
+        originResponse = await originRequest.close();
+        if (originResponse.redirects.isNotEmpty) {
+          redirectedUri = originResponse.redirects.last.location;
+        }
+      }
       request.response.headers.clear();
       originResponse.headers.forEach((name, value) {
         final filteredValue = value
@@ -3426,7 +3504,10 @@ _ProxyHandler _proxyHandlerForUri(
       }
       await request.response.flush();
       await request.response.close();
-    } on HttpException {
+    } on HttpException catch (e) {
+      if (onError != null) {
+        onError('on HttpException: ${e.toString()}');
+      }
       // We likely are dealing with a streaming protocol
       if (uri.scheme == 'http') {
         // Try parsing HTTP 0.9 response
@@ -3464,6 +3545,10 @@ _ProxyHandler _proxyHandlerForUri(
         socket.write("\n");
         await socket.flush();
         await done.future;
+      }
+    } catch (e) {
+      if (onError != null) {
+        onError(e.toString());
       }
     }
   }
@@ -4019,7 +4104,9 @@ class AndroidEqualizer extends AudioEffect with AndroidAudioEffect {
 }
 
 bool _isAndroid() => !kIsWeb && Platform.isAndroid;
+
 bool _isDarwin() => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+
 bool _isUnitTest() => !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 
 /// Backwards compatible extensions on rxdart's ValueStream
