@@ -949,26 +949,34 @@ class AudioPlayer {
     _playbackEventSubject.add(_playbackEvent);
     final playCompleter = Completer<dynamic>();
     final audioSession = await AudioSession.instance;
-    if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
-      if (!playing) return;
-      // TODO: rewrite this to more cleanly handle simultaneous load/play
-      // requests which each may result in platform play requests.
-      final requireActive = _audioSource != null;
-      if (requireActive) {
-        if (_active) {
-          // If the native platform is already active, send it a play request.
-          // NOTE: If a load() request happens simultaneously, this may result
-          // in two play requests being sent. The platform implementation should
-          // ignore the second play request since it is already playing.
-          _sendPlayRequest(await _platform, playCompleter);
-        } else {
-          // If the native platform wasn't already active, activating it will
-          // implicitly restore the playing state and send a play request.
-          _setPlatformActive(true, playCompleter: playCompleter)
-              ?.catchError((dynamic e) async => null);
+    try {
+      if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
+        if (!playing) return;
+
+        // TODO: rewrite this to more cleanly handle simultaneous load/play
+        // requests which each may result in platform play requests.
+        final requireActive = _audioSource != null;
+        if (requireActive) {
+          if (_active) {
+            // If the native platform is already active, send it a play request.
+            _sendPlayRequest(await _platform, playCompleter);
+          } else {
+            // If the native platform wasn't already active, activating it will
+            // implicitly restore the playing state and send a play request.
+            _setPlatformActive(true, playCompleter: playCompleter)
+                ?.catchError((dynamic e) async => null);
+          }
         }
+      } else {
+        // Revert if we fail to activate the audio session.
+        _playingSubject.add(false);
       }
-    } else {
+    } catch (e) {
+      // Handle the PlatformException
+      if (e is PlatformException) {
+        // Log the exception if needed
+        print('Failed to activate audio session in background thread');
+      }
       // Revert if we fail to activate the audio session.
       _playingSubject.add(false);
     }
