@@ -3506,7 +3506,7 @@ class DefaultShuffleOrder extends ShuffleOrder {
   @override
   final indices = <int>[];
 
-  DefaultShuffleOrder({Random? random}) : _random = random ?? Random();
+  DefaultShuffleOrder({Random? random}) : _random = random ?? Random.secure();
 
   @override
   void shuffle({int? initialIndex}) {
