@@ -190,6 +190,20 @@ void runTests() {
       exception = e;
     }
     expect(exception != null, equals(true));
+    try {
+      await player.setUrl('https://foo.foo/timeout.mp3');
+      exception = null;
+    } catch (e) {
+      exception = e;
+    }
+    expect(exception != null, equals(true));
+    try {
+      await player.setUrl('https://foo.foo/timeout.mp3', timeoutMillis: 11);
+      exception = null;
+    } catch (e) {
+      exception = e;
+    }
+    expect(exception == null, equals(true));
     await player.dispose();
   });
 
@@ -1563,6 +1577,10 @@ class MockAudioPlayer extends AudioPlayerPlatform {
             code: '404', message: 'Not found: ${audioSource.uri}');
       } else if (uri.path.contains('error')) {
         throw PlatformException(code: 'error', message: 'Unknown error');
+      } else if (audioSource.uri.contains('timeout')){
+        if ((audioSource.timeoutMillis ?? 0) < 10) {
+          throw PlatformException(code: 'timeout', message: 'Timed out (because timeoutMillis setting is less than 10)');
+        }
       }
       _duration = audioSourceDuration;
     } else if (audioSource is ClippingAudioSourceMessage) {

@@ -685,7 +685,7 @@ class AudioPlayer {
   /// This is equivalent to:
   ///
   /// ```
-  /// setAudioSource(AudioSource.uri(Uri.parse(url), headers: headers, tag: tag),
+  /// setAudioSource(AudioSource.uri(Uri.parse(url), headers: headers, timeoutMillis: timeoutMillis, tag: tag),
   ///     initialPosition: Duration.zero, preload: true);
   /// ```
   ///
@@ -693,12 +693,13 @@ class AudioPlayer {
   Future<Duration?> setUrl(
     String url, {
     Map<String, String>? headers,
+    int? timeoutMillis,
     Duration? initialPosition,
     bool preload = true,
     dynamic tag,
   }) =>
       setAudioSource(
-          AudioSource.uri(Uri.parse(url), headers: headers, tag: tag),
+          AudioSource.uri(Uri.parse(url), headers: headers, timeoutMillis: timeoutMillis, tag: tag),
           initialPosition: initialPosition,
           preload: preload);
 
@@ -2116,6 +2117,7 @@ class _ProxyHttpServer {
       uri,
       headers: headers,
       userAgent: source._player?._userAgent,
+      timeoutMillis: source.timeoutMillis
     );
     return uri.replace(
       scheme: 'http',
@@ -2253,17 +2255,20 @@ abstract class AudioSource {
   /// provided by that package. If you wish to have more control over the tag
   /// for background audio purposes, consider using the plugin audio_service
   /// instead of just_audio_background.
+  ///
+  /// [timeoutMillis] can be used to adjust http connection timeout settings
+  /// (currently only supported for Android)
   static UriAudioSource uri(Uri uri,
-      {Map<String, String>? headers, dynamic tag}) {
+      {Map<String, String>? headers, int? timeoutMillis, dynamic tag}) {
     bool hasExtension(Uri uri, String extension) =>
         uri.path.toLowerCase().endsWith('.$extension') ||
         uri.fragment.toLowerCase().endsWith('.$extension');
     if (hasExtension(uri, 'mpd')) {
-      return DashAudioSource(uri, headers: headers, tag: tag);
+      return DashAudioSource(uri, headers: headers, timeoutMillis: timeoutMillis, tag: tag);
     } else if (hasExtension(uri, 'm3u8')) {
-      return HlsAudioSource(uri, headers: headers, tag: tag);
+      return HlsAudioSource(uri, headers: headers, timeoutMillis: timeoutMillis, tag: tag);
     } else {
-      return ProgressiveAudioSource(uri, headers: headers, tag: tag);
+      return ProgressiveAudioSource(uri, headers: headers, timeoutMillis: timeoutMillis, tag: tag);
     }
   }
 
@@ -2350,9 +2355,10 @@ abstract class IndexedAudioSource extends AudioSource {
 abstract class UriAudioSource extends IndexedAudioSource {
   final Uri uri;
   final Map<String, String>? headers;
+  final int? timeoutMillis;
   Uri? _overrideUri;
 
-  UriAudioSource(this.uri, {this.headers, dynamic tag, Duration? duration})
+  UriAudioSource(this.uri, {this.headers, this.timeoutMillis, dynamic tag, Duration? duration})
       : super(tag: tag, duration: duration);
 
   /// If [uri] points to an asset, this gives us [_overrideUri] which is the URI
@@ -2444,12 +2450,16 @@ abstract class UriAudioSource extends IndexedAudioSource {
 ///
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
+///
+/// [timeoutMillis] can be used to adjust http connection timeout settings
+/// (currently only supported for Android)
 class ProgressiveAudioSource extends UriAudioSource {
   final ProgressiveAudioSourceOptions? options;
 
   ProgressiveAudioSource(
     super.uri, {
     super.headers,
+    super.timeoutMillis,
     super.tag,
     super.duration,
     this.options,
@@ -2460,6 +2470,7 @@ class ProgressiveAudioSource extends UriAudioSource {
         id: _id,
         uri: _effectiveUri.toString(),
         headers: _mergedHeaders,
+        timeoutMillis: timeoutMillis,
         tag: tag,
         options: options?._toMessage(),
       );
@@ -2479,16 +2490,20 @@ class ProgressiveAudioSource extends UriAudioSource {
 ///
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
+///
+/// [timeoutMillis] can be used to adjust http connection timeout settings
+/// (currently only supported for Android)
 class DashAudioSource extends UriAudioSource {
   DashAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+      {Map<String, String>? headers, int? timeoutMillis, dynamic tag, Duration? duration})
+      : super(uri, headers: headers, timeoutMillis: timeoutMillis, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => DashAudioSourceMessage(
         id: _id,
         uri: _effectiveUri.toString(),
         headers: _mergedHeaders,
+        timeoutMillis: timeoutMillis,
         tag: tag,
       );
 }
@@ -2506,16 +2521,20 @@ class DashAudioSource extends UriAudioSource {
 ///
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
+///
+/// [timeoutMillis] can be used to adjust http connection timeout settings
+/// (currently only supported for Android)
 class HlsAudioSource extends UriAudioSource {
   HlsAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
-      : super(uri, headers: headers, tag: tag, duration: duration);
+      {Map<String, String>? headers, int? timeoutMillis, dynamic tag, Duration? duration})
+      : super(uri, headers: headers, timeoutMillis: timeoutMillis, tag: tag, duration: duration);
 
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
         id: _id,
         uri: _effectiveUri.toString(),
         headers: _mergedHeaders,
+        timeoutMillis: timeoutMillis,
         tag: tag,
       );
 }
@@ -2836,7 +2855,8 @@ Uri _encodeDataUrl(String base64Data, String mimeType) =>
 @experimental
 abstract class StreamAudioSource extends IndexedAudioSource {
   Uri? _uri;
-  StreamAudioSource({dynamic tag}) : super(tag: tag);
+  int? timeoutMillis;
+  StreamAudioSource({this.timeoutMillis, dynamic tag}) : super(tag: tag);
 
   @override
   Future<void> _setup(AudioPlayer player) async {
@@ -2860,7 +2880,7 @@ abstract class StreamAudioSource extends IndexedAudioSource {
 
   @override
   AudioSourceMessage _toMessage() => ProgressiveAudioSourceMessage(
-      id: _id, uri: _uri.toString(), headers: null, tag: tag);
+      id: _id, uri: _uri.toString(), headers: null, timeoutMillis: timeoutMillis, tag: tag);
 }
 
 /// The response for a [StreamAudioSource]. This API is experimental.
@@ -2924,11 +2944,12 @@ class LockCachingAudioSource extends StreamAudioSource {
   LockCachingAudioSource(
     this.uri, {
     this.headers,
+    int? timeoutMillis,
     File? cacheFile,
     dynamic tag,
   })  : cacheFile =
             cacheFile != null ? Future.value(cacheFile) : _getCacheFile(uri),
-        super(tag: tag) {
+        super(tag: tag, timeoutMillis: timeoutMillis) {
     _init();
   }
 
@@ -3012,7 +3033,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
-    final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+    final httpClient = _createHttpClient(userAgent: _player?._userAgent, timeoutMillis: timeoutMillis);
     final httpRequest = await _getUrl(httpClient, uri, headers: headers);
     final response = await httpRequest.close();
     if (response.statusCode != 200) {
@@ -3127,7 +3148,7 @@ class LockCachingAudioSource extends StreamAudioSource {
         _requests.remove(request);
         final start = request.start!;
         final end = request.end ?? sourceLength;
-        final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+        final httpClient = _createHttpClient(userAgent: _player?._userAgent, timeoutMillis: timeoutMillis);
 
         final rangeRequest = _HttpRangeRequest(start, end);
         _getUrl(httpClient, uri, headers: {
@@ -3352,11 +3373,12 @@ _ProxyHandler _proxyHandlerForUri(
   Uri uri, {
   Map<String, String>? headers,
   String? userAgent,
+  int? timeoutMillis,
 }) {
   // Keep redirected [Uri] to speed-up requests
   Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
-    final client = _createHttpClient(userAgent: userAgent);
+    final client = _createHttpClient(userAgent: userAgent, timeoutMillis: timeoutMillis);
     // Try to make normal request
     String? host;
     try {
@@ -4072,10 +4094,15 @@ Future<HttpClientRequest> _getUrl(HttpClient client, Uri uri,
   return request;
 }
 
-HttpClient _createHttpClient({String? userAgent}) {
+HttpClient _createHttpClient({String? userAgent, int? timeoutMillis}) {
   final client = HttpClient();
   if (userAgent != null) {
     client.userAgent = userAgent;
+  }
+  if (timeoutMillis!=null){
+    var connectivityTimeouts = Duration(milliseconds: timeoutMillis);
+    client.idleTimeout = connectivityTimeouts;
+    client.connectionTimeout = connectivityTimeouts;
   }
   return client;
 }

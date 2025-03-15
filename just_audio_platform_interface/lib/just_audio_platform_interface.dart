@@ -1122,11 +1122,13 @@ abstract class IndexedAudioSourceMessage extends AudioSourceMessage {
 abstract class UriAudioSourceMessage extends IndexedAudioSourceMessage {
   final String uri;
   final Map<String, String>? headers;
+  final int? timeoutMillis;
 
   UriAudioSourceMessage({
     required super.id,
     required this.uri,
     this.headers,
+    this.timeoutMillis,
     super.tag,
   });
 }
@@ -1140,6 +1142,7 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
     required super.id,
     required super.uri,
     super.headers,
+    super.timeoutMillis,
     super.tag,
     this.options,
   });
@@ -1150,6 +1153,7 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'timeoutMillis': timeoutMillis,
         'options': options?.toMap(),
       };
 }
@@ -1161,6 +1165,7 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
     required super.id,
     required super.uri,
     super.headers,
+    super.timeoutMillis,
     super.tag,
   });
 
@@ -1170,6 +1175,7 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'timeoutMillis': timeoutMillis,
       };
 }
 
@@ -1180,6 +1186,7 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
     required super.id,
     required super.uri,
     super.headers,
+    super.timeoutMillis,
     super.tag,
   });
 
@@ -1189,6 +1196,7 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        'timeoutMillis': timeoutMillis,
       };
 }
 
