@@ -1457,18 +1457,21 @@ class AudioPlayer {
           _setPlatformActive(false)?.catchError((dynamic e) async => null);
         }
       }, onError: _playbackEventSubject.addError);
-      _visualizerWaveformSubscription =
-          platform.visualizerWaveformStream.listen((message) {
-        _visualizerWaveformSubject.add(VisualizerWaveformCapture(
-          samplingRate: message.samplingRate,
-          data: message.data,
-        ));
-      });
-      _visualizerFftSubscription = platform.visualizerFftStream
-          .listen((message) => _visualizerFftSubject.add(VisualizerFftCapture(
-                samplingRate: message.samplingRate,
-                data: Int8List.sublistView(message.data),
-              )));
+      if ([TargetPlatform.android, TargetPlatform.macOS, TargetPlatform.iOS]
+          .contains(defaultTargetPlatform)) {
+        _visualizerWaveformSubscription =
+            platform.visualizerWaveformStream.listen((message) {
+          _visualizerWaveformSubject.add(VisualizerWaveformCapture(
+            samplingRate: message.samplingRate,
+            data: message.data,
+          ));
+        });
+        _visualizerFftSubscription = platform.visualizerFftStream
+            .listen((message) => _visualizerFftSubject.add(VisualizerFftCapture(
+                  samplingRate: message.samplingRate,
+                  data: Int8List.sublistView(message.data),
+                )));
+      }
     }
 
     Future<AudioPlayerPlatform> setPlatform() async {
