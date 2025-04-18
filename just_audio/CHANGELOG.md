@@ -1,5 +1,9 @@
 ## 0.11.0
 
+## 0.10.1
+
+* Fix unhandled PlayerInterruptedException.
+
 ## 0.10.0
 
 * New playlist API.

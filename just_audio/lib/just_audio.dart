@@ -969,7 +969,7 @@ class AudioPlayer {
     void checkInterruption() {
       if (_activationCount != activationNumber) {
         // the platform has changed since we started loading, so abort.
-        throw PlatformException(code: 'abort', message: 'Loading interrupted');
+        throw PlayerInterruptedException('Loading interrupted');
       }
     }
 
@@ -992,7 +992,7 @@ class AudioPlayer {
       checkInterruption();
       if (platform != _platformValue) {
         // the platform has changed since we started loading, so abort.
-        throw PlatformException(code: 'abort', message: 'Loading interrupted');
+        throw PlayerInterruptedException('Loading interrupted');
       }
       // Wait for loading state to pass.
       await processingStateStream
@@ -1464,10 +1464,7 @@ class AudioPlayer {
       // An interruption that we can ignore
       if (!active) return true;
       // An interruption that should throw
-      final e =
-          PlatformException(code: 'abort', message: 'Loading interrupted');
-      durationCompleter.completeError(e);
-      throw e;
+      throw PlayerInterruptedException('Loading interrupted');
     }
 
     // This method updates _active and _platform before yielding to the next
@@ -1708,7 +1705,7 @@ class AudioPlayer {
     }
 
     _platform = setPlatform();
-    return durationCompleter.future;
+    return _platform.then((_) => durationCompleter.future);
   }
 
   /// Disposes of the given platform.
