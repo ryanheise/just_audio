@@ -1278,9 +1278,10 @@ void runTests() {
     await player.setUrl('https://bar.bar/bar.mp3');
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
-    expectDuration(player.position, const Duration(seconds: 0));
+    final startPosition = player.position;
+    expectDuration(startPosition, const Duration(seconds: 0), epsilon: 100);
     await Future<dynamic>.delayed(playDuration);
-    expectDuration(player.position, playDuration);
+    expectDuration(player.position, startPosition + playDuration);
     await player.dispose();
   });
 

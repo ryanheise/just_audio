@@ -12,6 +12,7 @@ import 'package:meta/meta.dart' show experimental;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:synchronized/synchronized.dart';
 import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
@@ -114,7 +115,7 @@ class AudioPlayer {
   final ConcatenatingAudioSource _playlist;
   final Map<String, AudioSource> _audioSources = {};
   bool _disposed = false;
-  _InitialSeekValues? _initialSeekValues;
+  _PluginLoadRequest? _pluginLoadRequest;
   final AudioPipeline _audioPipeline;
 
   Future<Duration?>? _loadFuture;
@@ -859,23 +860,24 @@ class AudioPlayer {
     Duration? initialPosition,
     ShuffleOrder? shuffleOrder,
   }) async {
+    _pluginLoadRequest?.interrupted = true;
     if (_disposed) return null;
-    await _playlist.clear();
-    _initialSeekValues =
-        _InitialSeekValues(position: initialPosition, index: initialIndex);
-    _playbackEventSubject.add(PlaybackEvent(
-        currentIndex: initialIndex ?? 0,
-        updatePosition: initialPosition ?? Duration.zero));
-    _playlist._shuffleOrder = shuffleOrder ?? DefaultShuffleOrder();
-    await _playlist.addAll(audioSources);
-    await _broadcastSequence();
+    final loadRequest = _pluginLoadRequest = _PluginLoadRequest(
+      audioSources: audioSources,
+      preload: preload,
+      initialIndex: initialIndex,
+      initialPosition: initialPosition,
+      shuffleOrder: shuffleOrder ?? DefaultShuffleOrder(),
+    );
+    await _playlist._init(audioSources, loadRequest.shuffleOrder);
+    loadRequest.checkInterruption();
     Duration? duration;
-    if (playing) preload = true;
-    if (preload && _playlist.children.isNotEmpty) {
+    if (preload || playing) {
       duration = await load();
     } else {
       await _setPlatformActive(false)?.catchError((dynamic e) async => null);
     }
+    loadRequest.checkInterruption();
     return duration;
   }
 
@@ -890,12 +892,17 @@ class AudioPlayer {
   /// interrupted this invocation.
   Future<Duration?> load() async {
     if (_disposed) return null;
+    final pluginLoadRequest = _pluginLoadRequest;
     if (_playlist.children.isEmpty) return null;
     if (_active) {
-      final initialSeekValues = _initialSeekValues;
-      _initialSeekValues = null;
-      return await _load(await _platform, _playlist,
-          initialSeekValues: initialSeekValues);
+      return await _load(
+        await _platform,
+        _playlist,
+        initialSeekValues: (
+          index: pluginLoadRequest?.initialIndex ?? currentIndex,
+          position: pluginLoadRequest?.initialPosition ?? position,
+        ),
+      );
     } else {
       // This will implicitly load the current audio source.
       return await _setPlatformActive(true);
@@ -965,12 +972,15 @@ class AudioPlayer {
     ConcatenatingAudioSource source, {
     _InitialSeekValues? initialSeekValues,
   }) async {
+    final pluginLoadRequest = _pluginLoadRequest;
     final activationNumber = _activationCount;
     void checkInterruption() {
-      if (_activationCount != activationNumber) {
+      if (_activationCount != activationNumber ||
+          pluginLoadRequest != _pluginLoadRequest) {
         // the platform has changed since we started loading, so abort.
         throw PlayerInterruptedException('Loading interrupted');
       }
+      pluginLoadRequest?.checkInterruption();
     }
 
     try {
@@ -998,6 +1008,7 @@ class AudioPlayer {
       await processingStateStream
           .firstWhere((state) => state != ProcessingState.loading);
       checkInterruption();
+      _pluginLoadRequest = null;
       return duration;
     } on PlatformException catch (e) {
       throw _convertException(e);
@@ -1095,7 +1106,6 @@ class AudioPlayer {
   Future<void> pause() async {
     if (_disposed) return;
     if (!playing) return;
-    //_setPlatformActive(true);
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
     _playbackEventSubject.add(playbackEvent.copyWith(
@@ -1267,7 +1277,7 @@ class AudioPlayer {
   /// A `null` [position] seeks to the head of a live stream.
   Future<void> seek(final Duration? position, {int? index}) async {
     if (_disposed) return;
-    _initialSeekValues = null;
+    _pluginLoadRequest?.resetInitialSeekValues();
     switch (processingState) {
       case ProcessingState.loading:
         return;
@@ -1444,10 +1454,13 @@ class AudioPlayer {
     // Store the current activation sequence number. activationNumber should
     // equal _activationCount for the duration of this call, unless it is
     // interrupted by another simultaneous call.
+    final pluginLoadRequest = _pluginLoadRequest;
     final activationNumber = ++_activationCount;
 
     /// Tells whether we've been interrupted.
-    bool wasInterrupted() => _activationCount != activationNumber;
+    bool wasInterrupted() =>
+        _activationCount != activationNumber ||
+        pluginLoadRequest != _pluginLoadRequest;
 
     final durationCompleter = Completer<Duration?>();
 
@@ -1461,6 +1474,7 @@ class AudioPlayer {
     bool checkInterruption() {
       // No interruption.
       if (!wasInterrupted()) return false;
+      pluginLoadRequest?.checkInterruption();
       // An interruption that we can ignore
       if (!active) return true;
       // An interruption that should throw
@@ -1541,7 +1555,8 @@ class AudioPlayer {
         final oldPlaybackEvent = playbackEvent;
         _playbackEventSubject.add(newPlaybackEvent);
         if (playbackEvent.processingState != oldPlaybackEvent.processingState &&
-            playbackEvent.processingState == ProcessingState.idle) {
+            playbackEvent.processingState == ProcessingState.idle &&
+            _active) {
           _setPlatformActive(false)?.catchError((dynamic e) async => null);
         }
       }, onError: (Object e, [StackTrace? st]) {});
@@ -1685,20 +1700,17 @@ class AudioPlayer {
 
       subscribeToEvents(platform);
 
-      if (playlist.children.isNotEmpty) {
-        try {
-          final initialSeekValues = _initialSeekValues ??
-              _InitialSeekValues(position: position, index: currentIndex);
-          _initialSeekValues = null;
-          final duration = await _load(platform, _playlist,
-              initialSeekValues: initialSeekValues);
-          if (checkInterruption()) return platform;
-          durationCompleter.complete(duration);
-        } catch (e, stackTrace) {
-          durationCompleter.completeError(e, stackTrace);
-        }
-      } else {
-        durationCompleter.complete(null);
+      try {
+        final initialSeekValues = pluginLoadRequest?.initialSeekValues ??
+            (index: currentIndex, position: position);
+        final duration = await _load(
+          platform,
+          _playlist,
+          initialSeekValues: initialSeekValues,
+        );
+        durationCompleter.complete(duration);
+      } catch (e, stackTrace) {
+        durationCompleter.completeError(e, stackTrace);
       }
 
       return platform;
@@ -2781,6 +2793,7 @@ class SilenceAudioSource extends IndexedAudioSource {
 /// audio is playing.
 @Deprecated('Use AudioPlayer.setAudioSources instead')
 class ConcatenatingAudioSource extends AudioSource {
+  final _lock = Lock();
   final List<AudioSource> children;
   final bool useLazyPreparation;
   ShuffleOrder _shuffleOrder;
@@ -2846,155 +2859,199 @@ class ConcatenatingAudioSource extends AudioSource {
   }
 
   /// Appends an [AudioSource].
-  Future<void> add(AudioSource audioSource) async {
-    if (_player != null) audioSource._onAttach(_player!);
-    final index = children.length;
-    children.add(audioSource);
-    _shuffleOrder.insert(index, 1);
-    if (_player != null) {
-      audioSource._onAttach(_player!);
-      await _player!._broadcastSequence();
-      if (_player!._active) {
-        await audioSource._onLoad();
+  Future<void> add(AudioSource audioSource) {
+    return _lock.synchronized(() async {
+      final index = children.length;
+      children.add(audioSource);
+      _shuffleOrder.insert(index, 1);
+      final player = _player;
+      if (player != null) {
+        audioSource._onAttach(player);
+        await player._broadcastSequence();
+        if (player._active) {
+          await audioSource._onLoad();
+        }
+        await (await player._platform).concatenatingInsertAll(
+            ConcatenatingInsertAllRequest(
+                id: _id,
+                index: index,
+                children: [audioSource._toMessage()],
+                shuffleOrder: List.of(_shuffleOrder.indices)));
       }
-      await (await _player!._platform).concatenatingInsertAll(
-          ConcatenatingInsertAllRequest(
-              id: _id,
-              index: index,
-              children: [audioSource._toMessage()],
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+    });
   }
 
   /// Inserts an [AudioSource] at [index].
-  Future<void> insert(int index, AudioSource audioSource) async {
-    if (_player != null) audioSource._onAttach(_player!);
-    children.insert(index, audioSource);
-    _shuffleOrder.insert(index, 1);
-    if (_player != null) {
-      audioSource._onAttach(_player!);
-      await _player!._broadcastSequence();
-      if (_player!._active) {
-        await audioSource._onLoad();
+  Future<void> insert(int index, AudioSource audioSource) {
+    return _lock.synchronized(() async {
+      children.insert(index, audioSource);
+      _shuffleOrder.insert(index, 1);
+      final player = _player;
+      if (player != null) {
+        audioSource._onAttach(player);
+        await player._broadcastSequence();
+        if (player._active) {
+          await audioSource._onLoad();
+        }
+        await (await player._platform).concatenatingInsertAll(
+            ConcatenatingInsertAllRequest(
+                id: _id,
+                index: index,
+                children: [audioSource._toMessage()],
+                shuffleOrder: List.of(_shuffleOrder.indices)));
       }
-      await (await _player!._platform).concatenatingInsertAll(
-          ConcatenatingInsertAllRequest(
-              id: _id,
-              index: index,
-              children: [audioSource._toMessage()],
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+    });
   }
 
   /// Appends multiple [AudioSource]s.
-  Future<void> addAll(List<AudioSource> children) async {
-    final index = this.children.length;
-    this.children.addAll(children);
-    _shuffleOrder.insert(index, children.length);
-    if (_player != null) {
-      for (var child in children) {
-        child._onAttach(_player!);
-      }
-      await _player!._broadcastSequence();
-      if (_player!._active) {
+  Future<void> addAll(List<AudioSource> children) {
+    return _lock.synchronized(() async {
+      final index = this.children.length;
+      this.children.addAll(children);
+      _shuffleOrder.insert(index, children.length);
+      final player = _player;
+      if (player != null) {
         for (var child in children) {
-          await child._onLoad();
+          child._onAttach(player);
         }
+        await player._broadcastSequence();
+        if (player._active) {
+          for (var child in children) {
+            await child._onLoad();
+          }
+        }
+        await (await player._platform).concatenatingInsertAll(
+            ConcatenatingInsertAllRequest(
+                id: _id,
+                index: index,
+                children: children.map((child) => child._toMessage()).toList(),
+                shuffleOrder: List.of(_shuffleOrder.indices)));
       }
-      await (await _player!._platform).concatenatingInsertAll(
-          ConcatenatingInsertAllRequest(
-              id: _id,
-              index: index,
-              children: children.map((child) => child._toMessage()).toList(),
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+    });
   }
 
   /// Inserts multiple [AudioSource]s at [index].
-  Future<void> insertAll(int index, List<AudioSource> children) async {
-    this.children.insertAll(index, children);
-    _shuffleOrder.insert(index, children.length);
-    if (_player != null) {
-      for (var child in children) {
-        child._onAttach(_player!);
-      }
-      await _player!._broadcastSequence();
-      if (_player!._active) {
+  Future<void> insertAll(int index, List<AudioSource> children) {
+    return _lock.synchronized(() async {
+      this.children.insertAll(index, children);
+      _shuffleOrder.insert(index, children.length);
+      final player = _player;
+      if (player != null) {
         for (var child in children) {
-          await child._onLoad();
+          child._onAttach(player);
         }
+        await player._broadcastSequence();
+        if (player._active) {
+          for (var child in children) {
+            await child._onLoad();
+          }
+        }
+        await (await player._platform).concatenatingInsertAll(
+            ConcatenatingInsertAllRequest(
+                id: _id,
+                index: index,
+                children: children.map((child) => child._toMessage()).toList(),
+                shuffleOrder: List.of(_shuffleOrder.indices)));
       }
-      await (await _player!._platform).concatenatingInsertAll(
-          ConcatenatingInsertAllRequest(
-              id: _id,
-              index: index,
-              children: children.map((child) => child._toMessage()).toList(),
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+    });
   }
 
   /// Dynamically removes an [AudioSource] at [index] after this
   /// [ConcatenatingAudioSource] has already been loaded.
-  Future<void> removeAt(int index) async {
-    children.removeAt(index);
-    _shuffleOrder.removeRange(index, index + 1);
-    if (_player != null) {
-      await _player!._broadcastSequence();
-      await (await _player!._platform).concatenatingRemoveRange(
-          ConcatenatingRemoveRangeRequest(
-              id: _id,
-              startIndex: index,
-              endIndex: index + 1,
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+  Future<void> removeAt(int index) {
+    return _lock.synchronized(() async {
+      children.removeAt(index);
+      _shuffleOrder.removeRange(index, index + 1);
+      final player = _player;
+      if (player != null) {
+        await player._broadcastSequence();
+        await (await player._platform).concatenatingRemoveRange(
+            ConcatenatingRemoveRangeRequest(
+                id: _id,
+                startIndex: index,
+                endIndex: index + 1,
+                shuffleOrder: List.of(_shuffleOrder.indices)));
+      }
+    });
   }
 
   /// Removes a range of [AudioSource]s from index [start] inclusive to [end]
   /// exclusive.
-  Future<void> removeRange(int start, int end) async {
-    children.removeRange(start, end);
-    _shuffleOrder.removeRange(start, end);
-    if (_player != null) {
-      await _player!._broadcastSequence();
-      await (await _player!._platform).concatenatingRemoveRange(
-          ConcatenatingRemoveRangeRequest(
-              id: _id,
-              startIndex: start,
-              endIndex: end,
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+  Future<void> removeRange(int start, int end) {
+    return _lock.synchronized(() async {
+      children.removeRange(start, end);
+      _shuffleOrder.removeRange(start, end);
+      final player = _player;
+      if (player != null) {
+        await player._broadcastSequence();
+        await (await player._platform).concatenatingRemoveRange(
+            ConcatenatingRemoveRangeRequest(
+                id: _id,
+                startIndex: start,
+                endIndex: end,
+                shuffleOrder: List.of(_shuffleOrder.indices)));
+      }
+    });
   }
 
   /// Moves an [AudioSource] from [currentIndex] to [newIndex].
-  Future<void> move(int currentIndex, int newIndex) async {
-    children.insert(newIndex, children.removeAt(currentIndex));
-    _shuffleOrder.removeRange(currentIndex, currentIndex + 1);
-    _shuffleOrder.insert(newIndex, 1);
-    if (_player != null) {
-      await _player!._broadcastSequence();
-      await (await _player!._platform).concatenatingMove(
-          ConcatenatingMoveRequest(
-              id: _id,
-              currentIndex: currentIndex,
-              newIndex: newIndex,
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+  Future<void> move(int currentIndex, int newIndex) {
+    return _lock.synchronized(() async {
+      children.insert(newIndex, children.removeAt(currentIndex));
+      _shuffleOrder.removeRange(currentIndex, currentIndex + 1);
+      _shuffleOrder.insert(newIndex, 1);
+      final player = _player;
+      if (player != null) {
+        await player._broadcastSequence();
+        await (await player._platform).concatenatingMove(
+            ConcatenatingMoveRequest(
+                id: _id,
+                currentIndex: currentIndex,
+                newIndex: newIndex,
+                shuffleOrder: List.of(_shuffleOrder.indices)));
+      }
+    });
   }
 
   /// Removes all [AudioSource]s.
-  Future<void> clear() async {
-    final end = children.length;
-    children.clear();
-    _shuffleOrder.clear();
-    if (_player != null) {
-      await _player!._broadcastSequence();
-      await (await _player!._platform).concatenatingRemoveRange(
-          ConcatenatingRemoveRangeRequest(
-              id: _id,
-              startIndex: 0,
-              endIndex: end,
-              shuffleOrder: List.of(_shuffleOrder.indices)));
-    }
+  Future<void> clear() {
+    return _lock.synchronized(() async {
+      final end = children.length;
+      children.clear();
+      _shuffleOrder.clear();
+      final player = _player;
+      if (player != null) {
+        await player._broadcastSequence();
+        await (await player._platform).concatenatingRemoveRange(
+            ConcatenatingRemoveRangeRequest(
+                id: _id,
+                startIndex: 0,
+                endIndex: end,
+                shuffleOrder: List.of(_shuffleOrder.indices)));
+      }
+    });
+  }
+
+  /// Initialise without communicating with platform.
+  Future<void> _init(List<AudioSource> children, ShuffleOrder shuffleOrder) {
+    return _lock.synchronized(() async {
+      this.children.replaceRange(0, this.children.length, children);
+      _shuffleOrder = shuffleOrder;
+      _shuffleOrder.clear();
+      _shuffleOrder.insert(0, children.length);
+      final player = _player;
+      if (player != null) {
+        for (var child in children) {
+          child._onAttach(player);
+        }
+        await player._broadcastSequence();
+        if (player._active) {
+          for (var child in children) {
+            await child._onLoad();
+          }
+        }
+      }
+    });
   }
 
   /// The number of [AudioSource]s.
@@ -4093,15 +4150,43 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
   }
 }
 
-/// Holds the initial requested position and index for a newly loaded audio
-/// source.
-class _InitialSeekValues {
-  final Duration? position;
-  final int? index;
+/// Encapsulates the arguments passed to the current invocation of
+/// `AudioSource.setAudioSources`.
+class _PluginLoadRequest {
+  List<AudioSource> audioSources;
+  bool preload;
+  int? initialIndex;
+  Duration? initialPosition;
+  ShuffleOrder shuffleOrder;
+  bool interrupted = false;
 
-  _InitialSeekValues({required this.position, required this.index});
+  _PluginLoadRequest({
+    required this.audioSources,
+    this.preload = true,
+    this.initialIndex,
+    this.initialPosition,
+    required this.shuffleOrder,
+  });
+
+  _InitialSeekValues get initialSeekValues =>
+      (index: initialIndex, position: initialPosition);
+
+  void resetInitialSeekValues() {
+    initialIndex = null;
+    initialPosition = null;
+  }
+
+  void checkInterruption() {
+    if (!interrupted) return;
+    throw PlayerInterruptedException('Loading interrupted');
+  }
 }
 
+/// Holds the initial requested position and index for a newly loaded audio
+/// source.
+typedef _InitialSeekValues = ({int? index, Duration? position});
+
+/// THe pipeline of audio effects to be appliet to an [AudioPlayer].
 class AudioPipeline {
   final List<AndroidAudioEffect> androidAudioEffects;
   final List<DarwinAudioEffect> darwinAudioEffects;

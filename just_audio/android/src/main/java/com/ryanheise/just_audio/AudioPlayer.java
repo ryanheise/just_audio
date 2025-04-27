@@ -11,6 +11,7 @@ import android.os.Looper;
 import androidx.media3.common.C;
 import androidx.media3.exoplayer.DefaultLivePlaybackSpeedControl;
 import androidx.media3.exoplayer.DefaultLoadControl;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlaybackException;
 import androidx.media3.exoplayer.LivePlaybackSpeedControl;
 import androidx.media3.exoplayer.LoadControl;
@@ -25,6 +26,9 @@ import androidx.media3.common.Tracks;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences;
 import androidx.media3.common.AudioAttributes;
+import androidx.media3.exoplayer.NoSampleRenderer;
+import androidx.media3.exoplayer.Renderer;
+import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.common.Metadata;
 import androidx.media3.exoplayer.metadata.MetadataOutput;
@@ -250,7 +254,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private boolean updatePositionIfChanged() {
-        if (getCurrentPosition() == updatePosition) return false;
+        if (!player.getPlayWhenReady() || processingState != ProcessingState.ready) {
+            if (getCurrentPosition() == updatePosition) return false;
+        }
         updatePosition = getCurrentPosition();
         updateTime = System.currentTimeMillis();
         return true;
@@ -749,7 +755,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private void ensurePlayerInitialized() {
         if (player == null) {
-            ExoPlayer.Builder builder = new ExoPlayer.Builder(context);
+            RenderersFactory renderersFactory = (eventHandler, videoListener, audioListener, textOutput, metadataOutput) -> {
+                Renderer[] defaultRenderers = new DefaultRenderersFactory(context)
+                    .createRenderers(eventHandler, videoListener, audioListener, textOutput, metadataOutput);
+                Renderer[] allRenderers = Arrays.copyOf(defaultRenderers, defaultRenderers.length + 1);
+                allRenderers[defaultRenderers.length] = new ObserverRenderer();
+                return allRenderers;
+            };
+            ExoPlayer.Builder builder = new ExoPlayer.Builder(context, renderersFactory);
             builder.setUseLazyPreparation(useLazyPreparation);
             if (loadControl != null) {
                 builder.setLoadControl(loadControl);
@@ -1102,5 +1115,32 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         buffering,
         ready,
         completed
+    }
+
+    public class ObserverRenderer extends NoSampleRenderer {
+        private long lastPosUs = 0L;
+        private int consecutivePosCount = 0;
+
+        @Override
+        public void render(long positionUs, long elapsedRealtimeUs) {
+            if (positionUs == lastPosUs) {
+                consecutivePosCount++;
+            } else {
+                if (consecutivePosCount >= 3) {
+                    handler.post(() -> {
+                        if (updatePositionIfChanged()) {
+                            broadcastImmediatePlaybackEvent();
+                        }
+                    });
+                }
+                consecutivePosCount = 0;
+            }
+            lastPosUs = positionUs;
+        }
+
+        @Override
+        public String getName() {
+            return "ObserverRenderer";
+        }
     }
 }

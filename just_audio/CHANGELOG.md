@@ -3,6 +3,9 @@
 ## 0.10.1
 
 * Fix unhandled PlayerInterruptedException.
+* Fix duplicate load in active state.
+* Synchronize playlist API calls.
+* Improve position accuracy over Bluetooth on Android.
 
 ## 0.10.0
 
