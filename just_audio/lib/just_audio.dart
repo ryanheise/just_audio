@@ -57,6 +57,7 @@ JustAudioPlatform get _pluginPlatform {
 /// player, including any temporary files created to cache assets.
 class AudioPlayer {
   static String _generateId() => _uuid.v4();
+  final _lock = Lock();
 
   /// The user agent to set on all HTTP requests.
   final String? _userAgent;
@@ -279,7 +280,7 @@ class AudioPlayer {
         .pairwise()
         .listen((rec) {
       if (_seeking) return;
-      final [(prevEvent, prevSource), (currEvent, currSource)] = rec;
+      final [(prevEvent, prevSource), (currEvent, currSource)] = rec.toList();
       if (prevSource == null || currSource == null) return;
       if (currSource._id != prevSource._id) {
         // If we've changed item without seeking, it must be an autoAdvance.
@@ -447,7 +448,7 @@ class AudioPlayer {
   AudioSource? get audioSource => _playlist.children.firstOrNull;
 
   /// The latest [PlaybackEvent].
-  PlaybackEvent get playbackEvent => _playbackEventSubject.value;
+  PlaybackEvent get playbackEvent => _playbackEventSubject.nvalue!;
 
   /// A stream of [PlaybackEvent]s.
   Stream<PlaybackEvent> get playbackEventStream => _playbackEventSubject.stream;
@@ -520,14 +521,14 @@ class AudioPlayer {
   Stream<PlayerState> get playerStateStream => _playerStateSubject.stream;
 
   /// The current sequence of indexed audio sources.
-  List<IndexedAudioSource> get sequence => _sequenceSubject.value;
+  List<IndexedAudioSource> get sequence => _sequenceSubject.nvalue!;
 
   /// A stream broadcasting the current sequence of indexed audio sources.
   Stream<List<IndexedAudioSource>> get sequenceStream =>
       _sequenceSubject.stream;
 
   /// The current shuffled sequence of indexed audio sources.
-  List<int> get shuffleIndices => _shuffleIndicesSubject.value;
+  List<int> get shuffleIndices => _shuffleIndicesSubject.nvalue!;
 
   /// A stream broadcasting the current shuffled sequence of indexed audio
   /// sources.
@@ -541,7 +542,7 @@ class AudioPlayer {
   Stream<int?> get currentIndexStream => _currentIndexSubject.stream;
 
   /// The current [SequenceState].
-  SequenceState get sequenceState => _sequenceStateSubject.value;
+  SequenceState get sequenceState => _sequenceStateSubject.nvalue!;
 
   /// A stream broadcasting the current [SequenceState].
   Stream<SequenceState> get sequenceStateStream => _sequenceStateSubject.stream;
@@ -1068,11 +1069,11 @@ class AudioPlayer {
     // Broadcast to clients immediately, but revert to false if we fail to
     // activate the audio session. This allows setAudioSource to be aware of a
     // prior play request.
+    _playingSubject.add(true);
     _playbackEventSubject.add(playbackEvent.copyWith(
       updatePosition: position,
       updateTime: DateTime.now(),
     ));
-    _playingSubject.add(true);
     final playCompleter = Completer<dynamic>();
     final audioSession = await AudioSession.instance;
     if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
@@ -1108,11 +1109,11 @@ class AudioPlayer {
     if (!playing) return;
     _playInterrupted = false;
     // Update local state immediately so that queries aren't surprised.
+    _playingSubject.add(false);
     _playbackEventSubject.add(playbackEvent.copyWith(
       updatePosition: position,
       updateTime: DateTime.now(),
     ));
-    _playingSubject.add(false);
     // TODO: perhaps modify platform side to ensure new state is broadcast
     // before this method returns.
     await (await _platform).pause(PauseRequest());
@@ -1373,61 +1374,64 @@ class AudioPlayer {
 
   /// Releases all resources associated with this player. You must invoke this
   /// after you are done with the player.
-  Future<void> dispose() async {
-    if (_disposed) return;
-    _disposed = true;
-    if (_nativePlatform != null) {
-      await _disposePlatform(await _nativePlatform!);
-      _nativePlatform = null;
-    }
-    if (_idlePlatform != null) {
-      await _disposePlatform(_idlePlatform!);
-      _idlePlatform = null;
-    }
-    _playlist.children.clear();
-    for (var s in _audioSources.values) {
-      s._dispose();
-    }
-    _audioSources.clear();
-    _proxy.stop();
-    await _playerDataSubscription?.cancel();
-    await _playbackEventSubscription?.cancel();
-    await _androidAudioAttributesSubscription?.cancel();
-    await _becomingNoisyEventSubscription?.cancel();
-    await _interruptionEventSubscription?.cancel();
-    await _positionDiscontinuitySubscription?.cancel();
-    await _currentIndexSubscription?.cancel();
-    await _errorsSubscription?.cancel();
-    await _errorsResetSubscription?.cancel();
+  Future<void> dispose() {
+    return _lock.synchronized(() async {
+      if (_disposed) return;
+      await stop();
+      _disposed = true;
+      if (_nativePlatform != null) {
+        await _disposePlatform(await _nativePlatform!);
+        _nativePlatform = null;
+      }
+      if (_idlePlatform != null) {
+        await _disposePlatform(_idlePlatform!);
+        _idlePlatform = null;
+      }
+      _playlist.children.clear();
+      for (var s in _audioSources.values) {
+        s._dispose();
+      }
+      _audioSources.clear();
+      _proxy.stop();
+      await _playerDataSubscription?.cancel();
+      await _playbackEventSubscription?.cancel();
+      await _androidAudioAttributesSubscription?.cancel();
+      await _becomingNoisyEventSubscription?.cancel();
+      await _interruptionEventSubscription?.cancel();
+      await _positionDiscontinuitySubscription?.cancel();
+      await _currentIndexSubscription?.cancel();
+      await _errorsSubscription?.cancel();
+      await _errorsResetSubscription?.cancel();
 
-    await _playbackEventSubject.close();
-    await _sequenceStateSubject.close();
-    await _playingSubject.close();
-    await _volumeSubject.close();
-    await _speedSubject.close();
-    await _pitchSubject.close();
+      await _playbackEventSubject.close();
+      await _sequenceStateSubject.close();
+      await _playingSubject.close();
+      await _volumeSubject.close();
+      await _speedSubject.close();
+      await _pitchSubject.close();
 
-    await Future<void>.delayed(Duration.zero);
-    await _durationSubject.close();
-    await _processingStateSubject.close();
-    await _bufferedPositionSubject.close();
-    await _icyMetadataSubject.close();
-    await _androidAudioSessionIdSubject.close();
-    await _errorSubject.close();
-    await _playerStateSubject.close();
-    await _skipSilenceEnabledSubject.close();
-    await _positionDiscontinuitySubject.close();
-    await _sequenceSubject.close();
-    await _shuffleIndicesSubject.close();
-    await _currentIndexSubject.close();
-    await _loopModeSubject.close();
-    await _shuffleModeEnabledSubject.close();
-    await _shuffleModeEnabledSubject.close();
+      await Future<void>.delayed(Duration.zero);
+      await _durationSubject.close();
+      await _processingStateSubject.close();
+      await _bufferedPositionSubject.close();
+      await _icyMetadataSubject.close();
+      await _androidAudioSessionIdSubject.close();
+      await _errorSubject.close();
+      await _playerStateSubject.close();
+      await _skipSilenceEnabledSubject.close();
+      await _positionDiscontinuitySubject.close();
+      await _sequenceSubject.close();
+      await _shuffleIndicesSubject.close();
+      await _currentIndexSubject.close();
+      await _loopModeSubject.close();
+      await _shuffleModeEnabledSubject.close();
+      await _shuffleModeEnabledSubject.close();
 
-    if (playbackEvent.processingState != ProcessingState.idle) {
-      _playbackEventSubject
-          .add(playbackEvent.copyWith(processingState: ProcessingState.idle));
-    }
+      if (playbackEvent.processingState != ProcessingState.idle) {
+        _playbackEventSubject
+            .add(playbackEvent.copyWith(processingState: ProcessingState.idle));
+      }
+    });
   }
 
   /// Switches to using the native platform when [active] is `true` and using the
