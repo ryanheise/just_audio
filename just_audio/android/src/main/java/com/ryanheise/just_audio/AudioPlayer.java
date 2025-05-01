@@ -983,6 +983,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if (!player.getPlayWhenReady()) return;
         player.setPlayWhenReady(false);
         updatePosition();
+        enqueuePlaybackEvent();
         if (playResult != null) {
             playResult.success(new HashMap<String, Object>());
             playResult = null;

@@ -899,7 +899,7 @@ void runTests() {
       await player.clearAudioSources();
       playlist.clear();
       expect(player.sequenceState.sequence, equals(playlist));
-      // expecting 0 here may change in a future version.
+      // expecting null here may change in a future version.
       expect(player.sequenceState.currentIndex, equals(null));
       expect(player.sequenceState.currentSource, equals(null));
       expectEffectiveSequence();
@@ -1828,10 +1828,10 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<PauseResponse> pause(PauseRequest request) async {
     if (!_playing) return PauseResponse();
+    _setPosition(_position);
     _playing = false;
     _playTimer?.cancel();
     _playCompleter?.complete();
-    _setPosition(_position);
     _broadcastPlaybackEvent();
     return PauseResponse();
   }

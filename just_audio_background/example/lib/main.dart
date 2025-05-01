@@ -352,12 +352,14 @@ class ControlButtons extends StatelessWidget {
           ),
         ),
         StreamBuilder<(bool, ProcessingState, int)>(
-          stream: Rx.combineLatest3(
-              player.playingStream,
-              player.playbackEventStream,
+          stream: Rx.combineLatest2(
+              player.playerEventStream,
               player.sequenceStream,
-              (playing, event, sequence) =>
-                  (playing, event.processingState, sequence.length)),
+              (event, sequence) => (
+                    event.playing,
+                    event.playbackEvent.processingState,
+                    sequence.length
+                  )),
           builder: (context, snapshot) {
             final (playing, processingState, sequenceLength) =
                 snapshot.data ?? (false, null, 0);
