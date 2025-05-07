@@ -49,6 +49,7 @@ class JustAudioBackground {
     Duration rewindInterval = const Duration(seconds: 10),
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
+    AudioHandler? handler,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
@@ -70,6 +71,7 @@ class JustAudioBackground {
       rewindInterval: rewindInterval,
       preloadArtwork: preloadArtwork,
       androidBrowsableRootExtras: androidBrowsableRootExtras,
+      handler: handler,
     );
   }
 }
@@ -92,11 +94,12 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     Duration rewindInterval = const Duration(seconds: 10),
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
+    AudioHandler? handler,
   }) async {
     _platform = JustAudioPlatform.instance;
     JustAudioPlatform.instance = _JustAudioBackgroundPlugin();
     _audioHandler = await AudioService.init(
-      builder: () => SwitchAudioHandler(BaseAudioHandler()),
+      builder: () => SwitchAudioHandler(handler ?? BaseAudioHandler()),
       config: AudioServiceConfig(
         androidResumeOnClick: androidResumeOnClick,
         androidNotificationChannelId: androidNotificationChannelId,
