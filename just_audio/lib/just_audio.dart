@@ -162,6 +162,10 @@ class AudioPlayer {
   final _sequenceSubject = BehaviorSubject.seeded(<IndexedAudioSource>[]);
   final _shuffleIndicesSubject = BehaviorSubject.seeded(<int>[]);
   final _currentIndexSubject = BehaviorSubject<int?>.seeded(null);
+
+  // New: hasNext/hasPrevious stream subjects
+  final _hasNextSubject = BehaviorSubject<bool>.seeded(false);
+  final _hasPreviousSubject = BehaviorSubject<bool>.seeded(false);
   final _loopModeSubject = BehaviorSubject.seeded(LoopMode.off);
   final _shuffleModeEnabledSubject = BehaviorSubject.seeded(false);
 
@@ -318,6 +322,14 @@ class AudioPlayer {
     );
     _currentIndexSubject.addStream(
         sequenceStateStream.map((sequenceState) => sequenceState.currentIndex));
+
+    // Update hasNext/hasPrevious streams whenever sequenceState changes
+    sequenceStateStream.listen((sequenceState) {
+      final next = nextIndex != null;
+      final prev = previousIndex != null;
+      if (_hasNextSubject.value != next) _hasNextSubject.add(next);
+      if (_hasPreviousSubject.value != prev) _hasPreviousSubject.add(prev);
+    });
     _sequenceSubject.addStream(
         sequenceStateStream.map((sequenceState) => sequenceState.sequence));
     _shuffleIndicesSubject.addStream(sequenceStateStream
@@ -551,6 +563,12 @@ class AudioPlayer {
 
   /// A stream broadcasting the current index.
   Stream<int?> get currentIndexStream => _currentIndexSubject.stream;
+
+  /// Emits true if there is a next item in the playlist.
+  Stream<bool> get hasNextStream => _hasNextSubject.stream;
+
+  /// Emits true if there is a previous item in the playlist.
+  Stream<bool> get hasPreviousStream => _hasPreviousSubject.stream;
 
   /// The current [SequenceState].
   SequenceState get sequenceState => _sequenceStateSubject.nvalue!;
@@ -1443,6 +1461,8 @@ class AudioPlayer {
       await _processingStateSubject.close();
       await _bufferedPositionSubject.close();
       await _icyMetadataSubject.close();
+      await _hasNextSubject.close();
+      await _hasPreviousSubject.close();
       await _androidAudioSessionIdSubject.close();
       await _errorSubject.close();
       await _playerStateSubject.close();
