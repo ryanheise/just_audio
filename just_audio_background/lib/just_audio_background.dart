@@ -34,6 +34,8 @@ class JustAudioBackground {
   /// information.
   static Future<void> init({
     bool androidResumeOnClick = true,
+    void Function(Stream<MediaItem?>? mediaItem, Stream<Duration?>? position)?
+    handlePlayerChanged,
     String? androidNotificationChannelId,
     String androidNotificationChannelName = 'Notifications',
     String? androidNotificationChannelDescription,
@@ -52,6 +54,7 @@ class JustAudioBackground {
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
+      handlePlayerChanged: handlePlayerChanged,
       androidResumeOnClick: androidResumeOnClick,
       androidNotificationChannelId: androidNotificationChannelId,
       androidNotificationChannelName: androidNotificationChannelName,
@@ -75,9 +78,11 @@ class JustAudioBackground {
 }
 
 class _JustAudioBackgroundPlugin extends JustAudioPlatform {
+  static void Function(Stream<MediaItem?>? mediaItem, Stream<Duration?>? position)? handlePlayerChangedPlugin;
   static Future<void> setup({
     bool androidResumeOnClick = true,
     String? androidNotificationChannelId,
+    void Function(Stream<MediaItem?>? mediaItem, Stream<Duration?>? position)? handlePlayerChanged,
     String androidNotificationChannelName = 'Notifications',
     String? androidNotificationChannelDescription,
     Color? notificationColor,
@@ -94,6 +99,7 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     Map<String, dynamic>? androidBrowsableRootExtras,
   }) async {
     _platform = JustAudioPlatform.instance;
+    handlePlayerChangedPlugin = handlePlayerChanged;
     JustAudioPlatform.instance = _JustAudioBackgroundPlugin();
     _audioHandler = await AudioService.init(
       builder: () => SwitchAudioHandler(BaseAudioHandler()),
@@ -135,6 +141,7 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     }
     _playerId = request.id;
     _player ??= _JustAudioPlayer(initRequest: request);
+    handlePlayerChangedPlugin?.call(_audioHandler.mediaItem, AudioService.position);
     return _player!;
   }
 
