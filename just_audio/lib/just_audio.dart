@@ -1464,8 +1464,6 @@ class AudioPlayer {
       await _processingStateSubject.close();
       await _bufferedPositionSubject.close();
       await _icyMetadataSubject.close();
-      await _hasNextSubject.close();
-      await _hasPreviousSubject.close();
       await _androidAudioSessionIdSubject.close();
       await _errorSubject.close();
       await _playerStateSubject.close();
@@ -1477,6 +1475,8 @@ class AudioPlayer {
       await _loopModeSubject.close();
       await _shuffleModeEnabledSubject.close();
       await _shuffleModeEnabledSubject.close();
+      await _hasNextSubject.close();
+      await _hasPreviousSubject.close();
 
       if (playbackEvent.processingState != ProcessingState.idle) {
         _playbackEventSubject

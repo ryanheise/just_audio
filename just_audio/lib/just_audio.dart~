@@ -324,34 +324,15 @@ class AudioPlayer {
         sequenceStateStream.map((sequenceState) => sequenceState.currentIndex));
 
     _hasNextSubject.addStream(
-      Rx.combineLatest2(currentIndexStream, loopModeStream,
-              (currentIndex, loopMode) => currentIndex != null && currentIndex < sequence.length - 1 || loopMode != LoopMode.off)
-      // currentIndexStream.map(
-      //   (index) => index != null && index < sequence.length - 1,)
+      Rx.combineLatest3(currentIndexStream, loopModeStream, sequenceStream,
+              (currentIndex, loopMode, sequence) => currentIndex != null && currentIndex < sequence.length - 1 || loopMode != LoopMode.off)
     );
 
     _hasPreviousSubject.addStream(
-      // currentIndexStream.map(
-      //   (index) => index != null && index > 0,)
       Rx.combineLatest2(currentIndexStream, loopModeStream,
               (currentIndex, loopMode) => currentIndex != null && currentIndex > 0 || loopMode != LoopMode.off)
     );
 
-    // Update hasNext/hasPrevious streams whenever sequenceState changes
-    // sequenceStateStream.listen((sequenceState) {
-    //   if(sequenceState.loopMode != LoopMode.off) {
-    //     _hasNextSubject.add(true);
-    //     _hasPreviousSubject.add(true);
-    //   }
-    //   else {
-    //     print('loopmode is off');
-    //     final next = nextIndex != null;
-    //     final prev = previousIndex != null;
-    //
-    //     if (_hasNextSubject.value != next) _hasNextSubject.add(next);
-    //     if (_hasPreviousSubject.value != prev) _hasPreviousSubject.add(prev);
-    //   }
-    // });
     _sequenceSubject.addStream(
         sequenceStateStream.map((sequenceState) => sequenceState.sequence));
     _shuffleIndicesSubject.addStream(sequenceStateStream
