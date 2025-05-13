@@ -1,3 +1,7 @@
+## 0.4.16
+
+* Fix play interrupted by load.
+
 ## 0.4.15
 
 * Support errorCode, errorMessage.

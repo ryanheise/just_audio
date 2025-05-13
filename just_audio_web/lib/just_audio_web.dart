@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
+import 'package:synchronized/synchronized.dart' as synch;
 import 'package:web/web.dart';
 
 /// The web implementation of [JustAudioPlatform].
@@ -113,7 +114,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   // Uncomment after: https://github.com/dart-lang/web/issues/124
   //final _audioElement = HTMLAudioElement();
   final _audioElement = document.createElement('audio') as HTMLAudioElement;
-  late final _playPauseQueue = _PlayPauseQueue(_audioElement);
+  late final _audioElementQueue = _AudioElementQueue(_audioElement);
   Completer<dynamic>? _durationCompleter;
   AudioSourcePlayer? _audioSourcePlayer;
   LoopModeMessage _loopMode = LoopModeMessage.off;
@@ -282,7 +283,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
       _audioElement.src = src;
       _audioElement.playbackRate = _speed;
       _audioElement.preload = 'auto';
-      _audioElement.load();
+      await _audioElementQueue.load();
       if (initialPosition != null) {
         _audioElement.currentTime = initialPosition.inMilliseconds / 1000.0;
       }
@@ -381,7 +382,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   /// Sets a specific device output id, null for default
   @override
   Future<SetWebSinkIdResponse> setWebSinkId(SetWebSinkIdRequest request) async {
-    await _audioElement.setSinkId(request.sinkId).toDart;
+    await _audioElementQueue.setSinkId(request.sinkId);
     return SetWebSinkIdResponse();
   }
 
@@ -522,8 +523,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<void> release() async {
     _currentAudioSourcePlayer?.pause();
-    _audioElement.removeAttribute('src');
-    _audioElement.load();
+    await _audioElementQueue.removeAttribute('src');
+    await _audioElementQueue.load();
     transition(ProcessingStateMessage.idle);
     return await super.release();
   }
@@ -630,7 +631,8 @@ abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
   /// The audio element that renders the audio.
   HTMLAudioElement get _audioElement => html5AudioPlayer._audioElement;
 
-  _PlayPauseQueue get _playPauseQueue => html5AudioPlayer._playPauseQueue;
+  _AudioElementQueue get _audioElementQueue =>
+      html5AudioPlayer._audioElementQueue;
 
   @override
   String toString() => "$runtimeType";
@@ -674,7 +676,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<void> play() async {
     _audioElement.currentTime = _resumePos!;
-    await _playPauseQueue.play();
+    await _audioElementQueue.play();
     _completer = Completer<dynamic>();
     await _completer!.future;
     _completer = null;
@@ -683,7 +685,7 @@ abstract class UriAudioSourcePlayer extends IndexedAudioSourcePlayer {
   @override
   Future<void> pause() async {
     _resumePos = _audioElement.currentTime as double?;
-    _playPauseQueue.pause();
+    _audioElementQueue.pause();
     _interruptPlay();
   }
 
@@ -873,7 +875,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
     if (_completer != null) return;
     _completer = Completer<ClipInterruptReason>();
     _audioElement.currentTime = _resumePos!;
-    await _playPauseQueue.play();
+    await _audioElementQueue.play();
     ClipInterruptReason reason;
     while ((reason = await _completer!.future) == ClipInterruptReason.seek) {
       _completer = Completer<ClipInterruptReason>();
@@ -888,7 +890,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
   Future<void> pause() async {
     _interruptPlay(ClipInterruptReason.pause);
     _resumePos = _audioElement.currentTime as double?;
-    _playPauseQueue.pause();
+    _audioElementQueue.pause();
   }
 
   @override
@@ -989,45 +991,30 @@ class LoopingAudioSourcePlayer extends AudioSourcePlayer {
   }
 }
 
-class _PlayPauseRequest {
-  final bool playing;
-  final completer = Completer<void>();
-
-  _PlayPauseRequest(this.playing);
-}
-
-class _PlayPauseQueue {
+class _AudioElementQueue {
+  final _lock = synch.Lock();
   final HTMLAudioElement audioElement;
-  final _queue = StreamController<_PlayPauseRequest>();
 
-  _PlayPauseQueue(this.audioElement) {
-    _run();
+  _AudioElementQueue(this.audioElement);
+
+  Future<void> pause() {
+    return _lock.synchronized(() => audioElement.pause());
   }
 
-  Future<void> play() async {
-    final request = _PlayPauseRequest(true);
-    _queue.add(request);
-    await request.completer.future;
+  Future<JSAny?> play() {
+    return _lock.synchronized(() => audioElement.play().toDart);
   }
 
-  Future<void> pause() async {
-    final request = _PlayPauseRequest(false);
-    _queue.add(request);
-    await request.completer.future;
+  Future<void> load() {
+    return _lock.synchronized(() => audioElement.load());
   }
 
-  Future<void> _run() async {
-    await for (var request in _queue.stream) {
-      try {
-        if (request.playing) {
-          await audioElement.play().toDart;
-        } else {
-          audioElement.pause();
-        }
-        request.completer.complete();
-      } catch (e, st) {
-        request.completer.completeError(e, st);
-      }
-    }
+  Future<void> removeAttribute(String qualifiedName) {
+    return _lock
+        .synchronized(() => audioElement.removeAttribute(qualifiedName));
+  }
+
+  Future<JSAny?> setSinkId(String sinkId) {
+    return _lock.synchronized(() => audioElement.setSinkId(sinkId).toDart);
   }
 }
