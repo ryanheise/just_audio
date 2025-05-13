@@ -1,3 +1,7 @@
+## 0.0.1-beta.17
+
+* Fix notification dismissal on player.stop (@rserro).
+
 ## 0.0.1-beta.16
 
 * Support errorCode, errorMessage.

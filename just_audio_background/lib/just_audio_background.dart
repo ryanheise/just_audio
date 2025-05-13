@@ -711,12 +711,12 @@ class _PlayerAudioHandler extends BaseAudioHandler
         if (player == null) return;
         _updatePosition();
         customEvent.add(_PlayingEvent(_playing = false));
-        _broadcastState();
-        _playerCompleter = _ValueCompleter<AudioPlayerPlatform>();
-        await _platform.disposePlayer(DisposePlayerRequest(id: player.id));
         _justAudioEvent = _justAudioEvent.copyWith(
           processingState: ProcessingStateMessage.idle,
         );
+        _broadcastState();
+        _playerCompleter = _ValueCompleter<AudioPlayerPlatform>();
+        await _platform.disposePlayer(DisposePlayerRequest(id: player.id));
       });
 
   Duration get currentPosition {
