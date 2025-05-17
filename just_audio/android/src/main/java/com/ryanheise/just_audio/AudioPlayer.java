@@ -254,6 +254,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private boolean updatePositionIfChanged() {
+        if (player == null) return false;
         if (!player.getPlayWhenReady() || processingState != ProcessingState.ready) {
             if (getCurrentPosition() == updatePosition) return false;
         }

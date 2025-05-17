@@ -277,6 +277,8 @@ dependencies {
 }
 ```
 
+Note: the Android Gradle Plugin (AGP) versions 8.6 and 8.7 contain a bug that affects ExoPlayer in release mode. To avoid this, either downgrade or upgrade your AGP version.
+
 ### iOS
 
 If you wish to connect to non-HTTPS URLs, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
