@@ -9,6 +9,6 @@
 
 - (instancetype)initWithName:(NSString*)name messenger:(NSObject<FlutterBinaryMessenger> *)messenger;
 - (void)sendEvent:(id)event;
-- (void)dispose;
+- (void)dispose:(BOOL)terminating;
 
 @end

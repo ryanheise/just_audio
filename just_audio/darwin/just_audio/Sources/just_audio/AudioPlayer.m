@@ -1338,8 +1338,10 @@
         }];
     }
 }
-
 - (void)dispose:(BOOL)calledFromDealloc {
+    [self dispose:calledFromDealloc terminating:NO];
+}
+- (void)dispose:(BOOL)calledFromDealloc terminating:(BOOL)terminating{
     if (!_player) return;
     if (_processingState != psIdle) {
         [_player pause];
@@ -1381,8 +1383,8 @@
         _player = nil;
     }
     // Untested:
-    [_eventChannel dispose];
-    [_dataEventChannel dispose];
+    [_eventChannel dispose:terminating];
+    [_dataEventChannel dispose:terminating];
     [_methodChannel setMethodCallHandler:nil];
 }
 

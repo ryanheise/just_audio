@@ -1,3 +1,7 @@
+## 0.10.4
+
+* Fix dealloc crash on iOS when app is forcibly terminated.
+
 ## 0.10.3
 
 * Fix pending timers bug in unit tests.

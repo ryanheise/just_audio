@@ -58,7 +58,7 @@
 
 - (void)dealloc {
     for (NSString *playerId in _players) {
-        [_players[playerId] dispose:YES];
+        [_players[playerId] dispose:YES terminating:YES];
     }
     [_players removeAllObjects];
 }

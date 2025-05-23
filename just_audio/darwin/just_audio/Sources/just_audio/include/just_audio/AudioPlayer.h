@@ -12,6 +12,7 @@
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration useLazyPreparation:(BOOL)useLazyPreparation;
 - (void)dispose:(BOOL)calledFromDealloc;
+- (void)dispose:(BOOL)calledFromDealloc terminating:(BOOL)terminating;
 
 @end
 

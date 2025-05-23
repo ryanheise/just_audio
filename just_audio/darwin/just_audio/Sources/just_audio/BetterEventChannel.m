@@ -30,8 +30,10 @@
     _eventSink(event);
 }
 
-- (void)dispose {
-    if (_eventSink) {
+- (void)dispose:(BOOL)terminating {
+    // If the app is terminating, the FlutterEngine may be deallocated before this and cause:
+    // NSInternalInconsistencyException: 'Sending a message before the FlutterEngine has been run.'
+    if (_eventSink && !terminating) {
         _eventSink(FlutterEndOfEventStream);
     }
     [_eventChannel setStreamHandler:nil];
