@@ -1,3 +1,7 @@
+## 0.10.4
+
+* Improve duration comparison logic when playbackEvent.duration is Duration.zero (@xiaoxin-sky)
+
 ## 0.10.3
 
 * Fix pending timers bug in unit tests.
