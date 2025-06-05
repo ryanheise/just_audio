@@ -608,7 +608,7 @@
         [_player pause];
     }
     if (_processingState == psLoading) {
-        [self abortExistingConnection];
+        [self abortExistingConnection:NO];
     }
     _loadResult = result;
     _processingState = psLoading;
@@ -992,11 +992,11 @@
 }
 
 - (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
-    [self sendError:@((int)playerItem.error.code) errorMessage:playerItem.error.localizedDescription playerItem:playerItem];
+    [self sendError:@((int)playerItem.error.code) errorMessage:playerItem.error.localizedDescription playerItem:playerItem switchToIdle:YES];
     [_player removeAllItems];
 }
 
-- (void)sendError:(NSNumber *)errorCode errorMessage:(NSString *)errorMessage playerItem:(IndexedPlayerItem *)playerItem {
+- (void)sendError:(NSNumber *)errorCode errorMessage:(NSString *)errorMessage playerItem:(IndexedPlayerItem *)playerItem switchToIdle:(BOOL)switchToIdle {
     //NSLog(@"sendError (%@) %@", errorCode, errorMessage);
     FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%@", errorCode]
                                                      message:errorMessage
@@ -1004,7 +1004,9 @@
     [_eventChannel sendEvent:flutterError];
     _errorCode = errorCode;
     _errorMessage = errorMessage;
-    _processingState = psIdle;
+    if (switchToIdle) {
+        _processingState = psIdle;
+    }
     [self broadcastPlaybackEvent];
     if (_loadResult && playerItem == _player.currentItem) {
         _loadResult(flutterError);
@@ -1012,8 +1014,8 @@
     }
 }
 
-- (void)abortExistingConnection {
-    [self sendError:@(ERROR_ABORT) errorMessage:@"Connection aborted" playerItem:nil];
+- (void)abortExistingConnection:(BOOL)switchToIdle {
+    [self sendError:@(ERROR_ABORT) errorMessage:@"Connection aborted" playerItem:nil switchToIdle:switchToIdle];
 }
 
 - (int)indexForItem:(IndexedPlayerItem *)playerItem {

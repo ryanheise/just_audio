@@ -176,6 +176,28 @@ void runTests() {
     await player.dispose();
   });
 
+  test('initial-seek-values', () async {
+    final player = AudioPlayer();
+    const targetPos = Duration(seconds: 2);
+    await player.setAudioSources([
+      AudioSource.uri(Uri.parse('https://a.a/a.mp3')),
+      AudioSource.uri(Uri.parse('https://b.b/b.mp3')),
+    ], initialPosition: targetPos, initialIndex: 1);
+    expect(player.position, targetPos);
+    expect(player.currentIndex, 1);
+    await player.stop();
+    await player.load();
+    expect(player.position, targetPos);
+    expect(player.currentIndex, 1);
+    await player.setAudioSources([
+      AudioSource.uri(Uri.parse('https://a.a/a.mp3')),
+      AudioSource.uri(Uri.parse('https://b.b/b.mp3')),
+    ]);
+    expect(player.position, equals(Duration.zero));
+    expect(player.currentIndex, 0);
+    await player.dispose();
+  });
+
   test('load error', () async {
     final player = AudioPlayer();
     Object? exception;
@@ -1204,6 +1226,41 @@ void runTests() {
     await player.dispose();
   });
 
+  test('load-stop-load-simultaneous', () async {
+    final player = AudioPlayer();
+    await player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    final stop1Future = player.stop();
+    final load1Future = player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    expectLater(load1Future, completion(audioSourceDuration));
+    await stop1Future.catchError((e) => null);
+    await load1Future.catchError((e) => null);
+    await player.dispose();
+  });
+
+  test('load-simultaneous', () async {
+    final player = AudioPlayer();
+    // Activate the platform
+    await player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    // Do two simultaneous loads
+    mock.mostRecentPlayer?.blockLoad();
+    final load1Future = player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    // Wait for first load to enter platform before starting second load.
+    await player.processingStateStream
+        .firstWhere((s) => s == ProcessingState.loading);
+    final load2Future = player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    mock.mostRecentPlayer?.unblockLoad();
+    expectLater(() => load1Future, throwsException);
+    expectLater(load2Future, completion(audioSourceDuration));
+    await load1Future.catchError((e) => null);
+    await load2Future.catchError((e) => null);
+    await player.dispose();
+  });
+
   test('load-load', () async {
     final player = AudioPlayer();
     await player.setAudioSource(
@@ -1739,6 +1796,7 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   Duration _updatePosition = Duration.zero;
   DateTime _updateTime = DateTime.now();
+  MockLoadRequest? _loadRequest;
   // ignore: prefer_final_fields
   Duration? _duration;
   int? _index;
@@ -1747,6 +1805,9 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   Completer<dynamic>? _playCompleter;
   Timer? _playTimer;
   LoopModeMessage _loopMode = LoopModeMessage.off;
+  int? _errorCode;
+  String? _errorMessage;
+  Completer<void>? _loadBlock;
 
   MockAudioPlayer(InitRequest request)
       : audioLoadConfiguration = request.audioLoadConfiguration,
@@ -1764,23 +1825,54 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     dataMessageController.add(message);
   }
 
+  void blockLoad() {
+    _loadBlock ??= Completer();
+  }
+
+  void unblockLoad() {
+    _loadBlock?.complete();
+    _loadBlock = null;
+  }
+
+  Future<void> _loadReady() async {
+    if (_loadBlock != null) {
+      await _loadBlock!.future;
+    }
+  }
+
+  PlatformException _sendError(int errorCode, String errorMessage,
+      {bool switchToIdle = true}) {
+    final e = PlatformException(code: '$errorCode', message: errorMessage);
+    eventController.addError(e);
+    if (switchToIdle) {
+      _processingState = ProcessingStateMessage.idle;
+    }
+    _errorCode = errorCode;
+    _errorMessage = errorMessage;
+    _broadcastPlaybackEvent();
+    return e;
+  }
+
   @override
   Future<LoadResponse> load(LoadRequest request) async {
+    _loadRequest?.interrupted = true;
+    final loadRequest = _loadRequest = MockLoadRequest();
     final playlist =
         request.audioSourceMessage as ConcatenatingAudioSourceMessage;
     if (playlist.children.isEmpty) return LoadResponse(duration: null);
     final audioSource = playlist.children.first;
     _processingState = ProcessingStateMessage.loading;
+    _errorCode = null;
+    _errorMessage = null;
     _broadcastPlaybackEvent();
     if (audioSource is UriAudioSourceMessage) {
       final uri = Uri.parse(audioSource.uri);
       if (uri.path.contains('abort')) {
-        throw PlatformException(code: 'abort', message: 'Failed to load URL');
+        throw _sendError(415, 'Failed to load URL');
       } else if (uri.path.contains('404')) {
-        throw PlatformException(
-            code: '404', message: 'Not found: ${audioSource.uri}');
+        throw _sendError(404, 'Not found: ${audioSource.uri}');
       } else if (uri.path.contains('error')) {
-        throw PlatformException(code: 'error', message: 'Unknown error');
+        throw _sendError(500, 'Unknown error');
       }
       _duration = audioSourceDuration;
     } else if (audioSource is ClippingAudioSourceMessage) {
@@ -1794,13 +1886,17 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     _audioSource = audioSource;
     _index = request.initialIndex ?? 0;
     // Simulate loading time.
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await _loadReady();
+    if (loadRequest.interrupted) {
+      throw _sendError(10000000, 'Connection aborted', switchToIdle: false);
+    }
     _setPosition(request.initialPosition ?? Duration.zero);
     _processingState = ProcessingStateMessage.ready;
     _broadcastPlaybackEvent();
     if (_playing) {
       _startTimer();
     }
+    _loadRequest = null;
     return LoadResponse(duration: _duration);
   }
 
@@ -1820,6 +1916,8 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     _playTimer = Timer(_remaining, () {
       _setPosition(_position);
       _processingState = ProcessingStateMessage.completed;
+      _errorCode = null;
+      _errorMessage = null;
       _broadcastPlaybackEvent();
       _playCompleter?.complete();
     });
@@ -1908,8 +2006,12 @@ class MockAudioPlayer extends AudioPlayerPlatform {
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
+    await Future<dynamic>.delayed(const Duration(milliseconds: 10));
     _processingState = ProcessingStateMessage.idle;
+    _errorCode = null;
+    _errorMessage = null;
     _broadcastPlaybackEvent();
+    eventController.close();
     return DisposeResponse();
   }
 
@@ -1942,6 +2044,8 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     }
     eventController.add(PlaybackEventMessage(
       processingState: _processingState,
+      errorCode: _errorCode,
+      errorMessage: _errorMessage,
       updatePosition: _updatePosition,
       updateTime: _updateTime,
       bufferedPosition: _position,
@@ -2041,6 +2145,10 @@ class MockAudioPlayer extends AudioPlayerPlatform {
       AndroidEqualizerBandSetGainRequest request) async {
     return AndroidEqualizerBandSetGainResponse();
   }
+}
+
+class MockLoadRequest {
+  bool interrupted = false;
 }
 
 final byteRangeData = List.generate(200, (i) => i);

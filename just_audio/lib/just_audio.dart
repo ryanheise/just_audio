@@ -57,7 +57,7 @@ JustAudioPlatform get _pluginPlatform {
 /// player, including any temporary files created to cache assets.
 class AudioPlayer {
   static String _generateId() => _uuid.v4();
-  final _lock = Lock();
+  final _lock = Lock(reentrant: true);
   Future<void>? _playbackEventPipe;
 
   /// The user agent to set on all HTTP requests.
@@ -911,10 +911,7 @@ class AudioPlayer {
       return await _load(
         await _platform,
         _playlist,
-        initialSeekValues: (
-          index: pluginLoadRequest?.initialIndex ?? currentIndex,
-          position: pluginLoadRequest?.initialPosition ?? position,
-        ),
+        initialSeekValues: pluginLoadRequest?.initialSeekValues,
       );
     } else {
       // This will implicitly load the current audio source.
@@ -1023,8 +1020,8 @@ class AudioPlayer {
       checkInterruption();
       _pluginLoadRequest = null;
       return duration;
-    } on PlatformException catch (e) {
-      throw _convertException(e);
+    } on PlatformException catch (e, st) {
+      Error.throwWithStackTrace(_convertException(e), st);
     }
   }
 
@@ -1455,11 +1452,6 @@ class AudioPlayer {
       await _loopModeSubject.close();
       await _shuffleModeEnabledSubject.close();
       await _shuffleModeEnabledSubject.close();
-
-      if (playbackEvent.processingState != ProcessingState.idle) {
-        _playbackEventSubject
-            .add(playbackEvent.copyWith(processingState: ProcessingState.idle));
-      }
     });
   }
 
@@ -1493,7 +1485,8 @@ class AudioPlayer {
     /// Tells whether we've been interrupted.
     bool wasInterrupted() =>
         _activationCount != activationNumber ||
-        pluginLoadRequest != _pluginLoadRequest;
+        pluginLoadRequest != _pluginLoadRequest ||
+        _disposed;
 
     final durationCompleter = Completer<Duration?>();
 
@@ -1606,52 +1599,60 @@ class AudioPlayer {
       // getting crossed, although it would be better to find a way to flush the
       // event channel and keep the same ID.
 
-      // Strangely, this throws "Cannot complete a future with itself" when
-      // _playbackEventSubscription==null under flutter test.
-      // await _playbackEventSubscription?.cancel();
-      // await _playerDataSubscription?.cancel();
-      if (_playbackEventSubscription != null) {
-        await _playbackEventSubscription!.cancel();
-      }
-      if (_playerDataSubscription != null) {
-        await _playerDataSubscription!.cancel();
+      AudioPlayerPlatform inactiveResult(AudioPlayerPlatform platform) {
+        durationCompleter.complete(null);
+        return platform;
       }
 
-      if (!force) {
-        final oldPlatform = _platformValue!;
-        if (oldPlatform is! _IdleAudioPlayer) {
-          await _disposePlatform(oldPlatform);
+      final platform = await _lock.synchronized(() async {
+        final oldPlatform = _platformValue;
+        // Strangely, this throws "Cannot complete a future with itself" when
+        // _playbackEventSubscription==null under flutter test.
+        // await _playbackEventSubscription?.cancel();
+        // await _playerDataSubscription?.cancel();
+        if (_playbackEventSubscription != null) {
+          await _playbackEventSubscription!.cancel();
         }
-      }
-      if (_disposed) return _platform;
-      // During initialisation, we must only use this platform reference in case
-      // _platform is updated again during initialisation.
-      final platform = active
-          ? await (_nativePlatform = _pluginPlatform.init(InitRequest(
-              id: _id = _generateId(),
-              audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
-              androidAudioEffects: (_isAndroid() || _isUnitTest())
-                  ? _audioPipeline.androidAudioEffects
-                      .map((audioEffect) => audioEffect._toMessage())
-                      .toList()
-                  : [],
-              darwinAudioEffects: (_isDarwin() || _isUnitTest())
-                  ? _audioPipeline.darwinAudioEffects
-                      .map((audioEffect) => audioEffect._toMessage())
-                      .toList()
-                  : [],
-              androidOffloadSchedulingEnabled: _androidOffloadSchedulingEnabled,
-              useLazyPreparation: _playlist.useLazyPreparation,
-            )))
-          : (_idlePlatform = _IdleAudioPlayer(
-              id: _id = _generateId(),
-              sequenceStream: sequenceStream,
-              errorCode: playbackEvent.errorCode,
-              errorMessage: playbackEvent.errorMessage,
-            ));
-      if (checkInterruption()) return platform;
+        if (_playerDataSubscription != null) {
+          await _playerDataSubscription!.cancel();
+        }
 
-      _platformValue = platform;
+        if (!force) {
+          if (oldPlatform != null && oldPlatform is! _IdleAudioPlayer) {
+            await _disposePlatform(oldPlatform);
+          }
+        }
+        // During initialisation, we must only use this platform reference in case
+        // _platform is updated again during initialisation.
+        final platform = active && !_disposed
+            ? await (_nativePlatform = _pluginPlatform.init(InitRequest(
+                id: _id = _generateId(),
+                audioLoadConfiguration: _audioLoadConfiguration?._toMessage(),
+                androidAudioEffects: (_isAndroid() || _isUnitTest())
+                    ? _audioPipeline.androidAudioEffects
+                        .map((audioEffect) => audioEffect._toMessage())
+                        .toList()
+                    : [],
+                darwinAudioEffects: (_isDarwin() || _isUnitTest())
+                    ? _audioPipeline.darwinAudioEffects
+                        .map((audioEffect) => audioEffect._toMessage())
+                        .toList()
+                    : [],
+                androidOffloadSchedulingEnabled:
+                    _androidOffloadSchedulingEnabled,
+                useLazyPreparation: _playlist.useLazyPreparation,
+              )))
+            : (_idlePlatform = _IdleAudioPlayer(
+                id: _id = _generateId(),
+                sequenceStream: sequenceStream,
+                errorCode: playbackEvent.errorCode,
+                errorMessage: playbackEvent.errorMessage,
+              ));
+
+        _platformValue = platform;
+        return platform;
+      });
+      if (checkInterruption() || _disposed) return inactiveResult(platform);
 
       if (active) {
         if (playlist.children.isNotEmpty) {
@@ -1671,14 +1672,14 @@ class AudioPlayer {
         if (_isAndroid() || _isUnitTest()) {
           if (_androidApplyAudioAttributes) {
             final audioSession = await AudioSession.instance;
-            if (checkInterruption()) return platform;
+            if (checkInterruption()) return inactiveResult(platform);
             _androidAudioAttributes ??=
                 audioSession.configuration?.androidAudioAttributes;
           }
           if (_androidAudioAttributes != null) {
             await _internalSetAndroidAudioAttributes(
                 platform, _androidAudioAttributes!);
-            if (checkInterruption()) return platform;
+            if (checkInterruption()) return inactiveResult(platform);
           }
         }
         if (!automaticallyWaitsToMinimizeStalling) {
@@ -1686,50 +1687,50 @@ class AudioPlayer {
           await platform.setAutomaticallyWaitsToMinimizeStalling(
               SetAutomaticallyWaitsToMinimizeStallingRequest(
                   enabled: automaticallyWaitsToMinimizeStalling));
-          if (checkInterruption()) return platform;
+          if (checkInterruption()) return inactiveResult(platform);
         }
         await platform.setVolume(SetVolumeRequest(volume: volume));
-        if (checkInterruption()) return platform;
+        if (checkInterruption()) return inactiveResult(platform);
         await platform.setSpeed(SetSpeedRequest(speed: speed));
-        if (checkInterruption()) return platform;
+        if (checkInterruption()) return inactiveResult(platform);
         try {
           await platform.setPitch(SetPitchRequest(pitch: pitch));
         } catch (e) {
           // setPitch not supported on this platform.
         }
-        if (checkInterruption()) return platform;
+        if (checkInterruption()) return inactiveResult(platform);
         try {
           await platform.setSkipSilence(
               SetSkipSilenceRequest(enabled: skipSilenceEnabled));
         } catch (e) {
           // setSkipSilence not supported on this platform.
         }
-        if (checkInterruption()) return platform;
+        if (checkInterruption()) return inactiveResult(platform);
         await platform.setLoopMode(SetLoopModeRequest(
             loopMode: LoopModeMessage.values[loopMode.index]));
-        if (checkInterruption()) return platform;
+        if (checkInterruption()) return inactiveResult(platform);
         await platform.setShuffleMode(SetShuffleModeRequest(
             shuffleMode: shuffleModeEnabled
                 ? ShuffleModeMessage.all
                 : ShuffleModeMessage.none));
-        if (checkInterruption()) return platform;
+        if (checkInterruption()) return inactiveResult(platform);
         if (kIsWeb) {
           if (_webCrossOrigin != null) {
             await platform.setWebCrossOrigin(SetWebCrossOriginRequest(
               crossOrigin: WebCrossOriginMessage.values[_webCrossOrigin!.index],
             ));
-            if (checkInterruption()) return platform;
+            if (checkInterruption()) return inactiveResult(platform);
           }
           if (_webSinkId != '') {
             await platform.setWebSinkId(SetWebSinkIdRequest(
               sinkId: _webSinkId,
             ));
-            if (checkInterruption()) return platform;
+            if (checkInterruption()) return inactiveResult(platform);
           }
         }
         for (var audioEffect in _audioPipeline._audioEffects) {
           await audioEffect._activate(platform);
-          if (checkInterruption()) return platform;
+          if (checkInterruption()) return inactiveResult(platform);
         }
         if (playing) {
           _sendPlayRequest(platform, playCompleter);
