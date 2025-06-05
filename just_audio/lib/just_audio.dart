@@ -3327,6 +3327,11 @@ class LockCachingAudioSource extends StreamAudioSource {
   final _requests = <_StreamingByteRangeRequest>[];
   final _downloadProgressSubject = BehaviorSubject<double>();
   bool _downloading = false;
+  Completer<void>? _downloadCompleter;
+  StreamSubscription<List<int>>? _downloadSubscription;
+  HttpClient? _activeHttpClient;
+  IOSink? _activeSink;
+  bool _disposed = false;
 
   /// Creates a [LockCachingAudioSource] to that provides [uri] to the player
   /// while simultaneously caching it to [cacheFile]. If no cache file is
@@ -3361,23 +3366,89 @@ class LockCachingAudioSource extends StreamAudioSource {
   /// downloaded) to 1.0 (download complete).
   Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
 
+  @override
+  void _dispose() {
+    _disposed = true;
+
+    // Cancel any active download subscription
+    _downloadSubscription?.cancel();
+    _downloadSubscription = null;
+
+    // Close active HTTP client
+    _activeHttpClient?.close();
+    _activeHttpClient = null;
+
+    // Close active file sink
+    try {
+      _activeSink?.close();
+    } catch (e) {
+      // Ignore errors when closing sink
+    }
+    _activeSink = null;
+
+    // Fail all pending requests to prevent memory leaks
+    for (final req in _requests) {
+      if (!req._completer.isCompleted) {
+        req.fail(Exception('AudioSource disposed'));
+      }
+    }
+    _requests.clear();
+
+    // Complete any pending download completer
+    if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+      _downloadCompleter!.complete();
+    }
+    _downloadCompleter = null;
+
+    // Close the download progress subject
+    if (!_downloadProgressSubject.isClosed) {
+      _downloadProgressSubject.close();
+    }
+
+    // Reset state
+    _response = null;
+    _downloading = false;
+    _progress = 0;
+
+    // Call parent dispose
+    super._dispose();
+  }
+
   /// Removes the underlying cache files. It is an error to clear the cache
   /// while a download is in progress.
   Future<void> clearCache() async {
+    if (_disposed) {
+      return; // Silently return if disposed
+    }
+
     if (_downloading) {
       throw Exception("Cannot clear cache while download is in progress");
     }
+
+    // Wait for any pending download completion to finish
+    if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+      await _downloadCompleter!.future;
+    }
+
     _response = null;
     final cacheFile = await this.cacheFile;
     if (await cacheFile.exists()) {
       await cacheFile.delete();
+    }
+    final partialCacheFile = await _partialCacheFile;
+    if (await partialCacheFile.exists()) {
+      await partialCacheFile.delete();
     }
     final mimeFile = await _mimeFile;
     if (await mimeFile.exists()) {
       await mimeFile.delete();
     }
     _progress = 0;
-    _downloadProgressSubject.add(0.0);
+
+    // Only update progress if not disposed
+    if (!_disposed && !_downloadProgressSubject.isClosed) {
+      _downloadProgressSubject.add(0.0);
+    }
   }
 
   /// Gets the cache file for [uri] with the proper extension.
@@ -3418,7 +3489,12 @@ class LockCachingAudioSource extends StreamAudioSource {
   /// separate HTTP request is made to fulfill it while the download of the
   /// entire file continues in parallel.
   Future<HttpClientResponse> _fetch() async {
+    if (_disposed) {
+      throw Exception('AudioSource has been disposed');
+    }
+
     _downloading = true;
+    _downloadCompleter = Completer<void>();
     final cacheFile = await this.cacheFile;
     final partialCacheFile = await _partialCacheFile;
 
@@ -3426,16 +3502,21 @@ class LockCachingAudioSource extends StreamAudioSource {
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
     final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+    _activeHttpClient = httpClient; // Track for disposal
+
     final httpRequest = await _getUrl(httpClient, uri, headers: headers);
     final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
+      _activeHttpClient = null;
       throw Exception('HTTP Status Error: ${response.statusCode}');
     }
     (await _partialCacheFile).createSync(recursive: true);
     // TODO: Should close sink after done, but it throws an error.
     // ignore: close_sinks
     final sink = (await _partialCacheFile).openWrite();
+    _activeSink = sink; // Track for disposal
+
     final sourceLength =
         response.contentLength == -1 ? null : response.contentLength;
     final mimeType = response.headers.contentType.toString();
@@ -3456,6 +3537,11 @@ class LockCachingAudioSource extends StreamAudioSource {
 
     _progress = 0;
     subscription = response.listen((data) async {
+      // Check if disposed during processing
+      if (_disposed) {
+        subscription.cancel();
+        return;
+      }
       _progress += data.length;
       final newPercentProgress = (sourceLength == null)
           ? 0
@@ -3567,38 +3653,98 @@ class LockCachingAudioSource extends StreamAudioSource {
         });
       }
     }, onDone: () async {
-      if (sourceLength == null) {
-        updateProgress(100);
-      }
-      for (var cacheResponse in inProgressResponses) {
-        if (!cacheResponse.controller.isClosed) {
-          cacheResponse.controller.close();
+      try {
+        if (sourceLength == null) {
+          updateProgress(100);
+        }
+        for (var cacheResponse in inProgressResponses) {
+          if (!cacheResponse.controller.isClosed) {
+            cacheResponse.controller.close();
+          }
+        }
+
+        // Safely rename the partial cache file to the final cache file
+        final partialFile = await _partialCacheFile;
+        if (partialFile.existsSync()) {
+          try {
+            partialFile.renameSync(cacheFile.path);
+          } catch (e) {
+            // If rename fails (e.g., due to race condition with clearCache),
+            // just delete the partial file to clean up
+            if (partialFile.existsSync()) {
+              partialFile.deleteSync();
+            }
+          }
+        }
+
+        await subscription.cancel();
+        _downloadSubscription = null;
+
+        httpClient.close();
+        _activeHttpClient = null;
+
+        try {
+          sink.close();
+        } catch (e) {
+          // Ignore errors when closing sink
+        }
+        _activeSink = null;
+
+        _downloading = false;
+      } finally {
+        // Always complete the download completer to unblock any waiting clearCache calls
+        if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+          _downloadCompleter!.complete();
         }
       }
-      (await _partialCacheFile).renameSync(cacheFile.path);
-      await subscription.cancel();
-      httpClient.close();
-      _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
-      (await _partialCacheFile).deleteSync();
-      httpClient.close();
-      // Fail all pending requests
-      for (final req in _requests) {
-        req.fail(e, stackTrace);
+      try {
+        final partialFile = await _partialCacheFile;
+        if (partialFile.existsSync()) {
+          partialFile.deleteSync();
+        }
+
+        httpClient.close();
+        _activeHttpClient = null;
+
+        try {
+          sink.close();
+        } catch (sinkError) {
+          // Ignore errors when closing sink
+        }
+        _activeSink = null;
+
+        // Fail all pending requests
+        for (final req in _requests) {
+          req.fail(e, stackTrace);
+        }
+        _requests.clear();
+        // Close all in progress requests
+        for (final res in inProgressResponses) {
+          res.controller.addError(e, stackTrace);
+          res.controller.close();
+        }
+        _downloading = false;
+        _downloadSubscription = null;
+      } finally {
+        // Always complete the download completer to unblock any waiting clearCache calls
+        if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+          _downloadCompleter!.complete();
+        }
       }
-      _requests.clear();
-      // Close all in progress requests
-      for (final res in inProgressResponses) {
-        res.controller.addError(e, stackTrace);
-        res.controller.close();
-      }
-      _downloading = false;
     }, cancelOnError: true);
+
+    // Track the subscription for disposal
+    _downloadSubscription = subscription;
     return response;
   }
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
+    if (_disposed) {
+      throw Exception('AudioSource has been disposed');
+    }
+
     final cacheFile = await this.cacheFile;
     if (cacheFile.existsSync()) {
       final sourceLength = cacheFile.lengthSync();
@@ -3611,6 +3757,11 @@ class LockCachingAudioSource extends StreamAudioSource {
         stream: cacheFile.openRead(start, end).asBroadcastStream(),
       );
     }
+
+    if (_disposed) {
+      throw Exception('AudioSource has been disposed');
+    }
+
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
     _response ??=
@@ -3652,9 +3803,17 @@ class _InProgressCacheResponse {
   // ignore: close_sinks
   final controller = ReplaySubject<List<int>>();
   final int? end;
+
   _InProgressCacheResponse({
     required this.end,
   });
+
+  /// Disposes of this response and closes the controller
+  void dispose() {
+    if (!controller.isClosed) {
+      controller.close();
+    }
+  }
 }
 
 /// Request parameters for a [StreamAudioSource].
