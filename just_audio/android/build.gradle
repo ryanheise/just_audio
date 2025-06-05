@@ -1,15 +1,18 @@
-group 'com.ryanheise.just_audio'
-version '1.0'
+group "com.ryanheise.just_audio"
+version "1.0"
 def args = ["-Xlint:deprecation","-Xlint:unchecked"]
 
 buildscript {
+    ext {
+        agp_version = '8.5.2'
+    }
     repositories {
         google()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.3.0'
+        classpath "com.android.tools.build:gradle:$agp_version"
     }
 }
 
@@ -24,35 +27,30 @@ project.getTasks().withType(JavaCompile) {
     options.compilerArgs.addAll(args)
 }
 
-apply plugin: 'com.android.library'
+apply plugin: "com.android.library"
 
 android {
-    // Conditional for compatibility with AGP <4.2.
-    if (project.android.hasProperty("namespace")) {
-        namespace 'com.ryanheise.just_audio'
+    namespace "com.ryanheise.just_audio"
+
+    compileSdk = 35
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
-    compileSdk 34
 
     defaultConfig {
-        minSdk 16
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        minSdk = 16
     }
 
     lintOptions {
-        disable 'InvalidPackage'
-    }
-
-    compileOptions {
-        sourceCompatibility 1.8
-        targetCompatibility 1.8
-    }
-
-    dependencies {
-        def exoplayer_version = "2.18.7"
-        implementation "com.google.android.exoplayer:exoplayer-core:$exoplayer_version"
-        implementation "com.google.android.exoplayer:exoplayer-dash:$exoplayer_version"
-        implementation "com.google.android.exoplayer:exoplayer-hls:$exoplayer_version"
-        implementation "com.google.android.exoplayer:exoplayer-smoothstreaming:$exoplayer_version"
+        disable 'AndroidGradlePluginVersion', 'InvalidPackage', 'GradleDependency', 'NewerVersionAvailable'
     }
 }
-
+dependencies {
+    def exoplayer_version = "1.4.1"
+    implementation "androidx.media3:media3-exoplayer:$exoplayer_version"
+    implementation "androidx.media3:media3-exoplayer-dash:$exoplayer_version"
+    implementation "androidx.media3:media3-exoplayer-hls:$exoplayer_version"
+    implementation "androidx.media3:media3-exoplayer-smoothstreaming:$exoplayer_version"
+}

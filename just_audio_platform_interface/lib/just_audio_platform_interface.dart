@@ -236,6 +236,11 @@ abstract class AudioPlayerPlatform {
       SetWebCrossOriginRequest request) {
     throw UnimplementedError("setWebCrossOrigin() has not been implemented.");
   }
+
+  /// Sets a specific device output id on the web audio element.
+  Future<SetWebSinkIdResponse> setWebSinkId(SetWebSinkIdRequest request) {
+    throw UnimplementedError("setWebSinkId() has not been implemented.");
+  }
 }
 
 /// A data update communicated from the platform implementation to the Flutter
@@ -288,6 +293,8 @@ class PlaybackEventMessage {
   final IcyMetadataMessage? icyMetadata;
   final int? currentIndex;
   final int? androidAudioSessionId;
+  final int? errorCode;
+  final String? errorMessage;
 
   PlaybackEventMessage({
     required this.processingState,
@@ -298,6 +305,8 @@ class PlaybackEventMessage {
     required this.icyMetadata,
     required this.currentIndex,
     required this.androidAudioSessionId,
+    this.errorCode,
+    this.errorMessage,
   });
 
   static PlaybackEventMessage fromMap(Map<dynamic, dynamic> map) =>
@@ -318,6 +327,8 @@ class PlaybackEventMessage {
                 map['icyMetadata'] as Map<dynamic, dynamic>),
         currentIndex: map['currentIndex'] as int?,
         androidAudioSessionId: map['androidAudioSessionId'] as int?,
+        errorCode: map['errorCode'] as int?,
+        errorMessage: map['errorMessage'] as String?,
       );
 }
 
@@ -403,6 +414,7 @@ class InitRequest {
   final List<AudioEffectMessage> androidAudioEffects;
   final List<AudioEffectMessage> darwinAudioEffects;
   final bool? androidOffloadSchedulingEnabled;
+  final bool useLazyPreparation;
 
   InitRequest({
     required this.id,
@@ -410,6 +422,7 @@ class InitRequest {
     this.androidAudioEffects = const [],
     this.darwinAudioEffects = const [],
     this.androidOffloadSchedulingEnabled,
+    this.useLazyPreparation = true,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -422,6 +435,7 @@ class InitRequest {
             .map((audioEffect) => audioEffect.toMap())
             .toList(),
         'androidOffloadSchedulingEnabled': androidOffloadSchedulingEnabled,
+        'useLazyPreparation': useLazyPreparation,
       };
 }
 
@@ -1501,3 +1515,11 @@ class SetWebCrossOriginRequest {
 class SetWebCrossOriginResponse {}
 
 enum WebCrossOriginMessage { anonymous, useCredentials }
+
+class SetWebSinkIdRequest {
+  final String sinkId;
+
+  SetWebSinkIdRequest({required this.sinkId});
+}
+
+class SetWebSinkIdResponse {}

@@ -16,3 +16,5 @@ build/
 coverage
 pubspec.lock
 Podfile.lock
+
+**/.cxx/

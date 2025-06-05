@@ -1,4 +1,5 @@
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
@@ -25,20 +26,24 @@ class MyApp extends StatefulWidget {
 class MyAppState extends State<MyApp> {
   static int _nextMediaId = 0;
   late AudioPlayer _player;
-  final _playlist = ConcatenatingAudioSource(children: [
-    ClippingAudioSource(
-      start: const Duration(seconds: 60),
-      end: const Duration(seconds: 90),
-      child: AudioSource.uri(Uri.parse(
-          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
-      tag: MediaItem(
-        id: '${_nextMediaId++}',
-        album: "Science Friday",
-        title: "A Salute To Head-Scratching Science (30 seconds)",
-        artUri: Uri.parse(
-            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
+  static final _playlist = [
+    // Remove this audio source from the Windows and Linux version because it's not supported yet
+    if (kIsWeb ||
+        ![TargetPlatform.windows, TargetPlatform.linux]
+            .contains(defaultTargetPlatform))
+      ClippingAudioSource(
+        start: const Duration(seconds: 60),
+        end: const Duration(seconds: 90),
+        child: AudioSource.uri(Uri.parse(
+            "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
+        tag: MediaItem(
+          id: '${_nextMediaId++}',
+          album: "Science Friday",
+          title: "A Salute To Head-Scratching Science (30 seconds)",
+          artUri: Uri.parse(
+              "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
+        ),
       ),
-    ),
     AudioSource.uri(
       Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
@@ -70,13 +75,14 @@ class MyAppState extends State<MyApp> {
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
       ),
     ),
-  ]);
+  ];
   int _addedCount = 0;
+  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    _player = AudioPlayer();
+    _player = AudioPlayer(maxSkipsOnError: 3);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
@@ -87,17 +93,40 @@ class MyAppState extends State<MyApp> {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.speech());
     // Listen to errors during playback.
-    _player.playbackEventStream.listen((event) {},
-        onError: (Object e, StackTrace stackTrace) {
+    _player.errorStream.listen((e) {
       print('A stream error occurred: $e');
     });
     try {
-      await _player.setAudioSource(_playlist);
-    } catch (e, stackTrace) {
-      // Catch load errors: 404, invalid url ...
+      // Preloading audio is not currently supported on Linux.
+      await _player.setAudioSources(_playlist,
+          preload: kIsWeb || defaultTargetPlatform != TargetPlatform.linux);
+    } on PlayerException catch (e) {
+      // Catch load errors: 404, invalid url...
       print("Error loading playlist: $e");
-      print(stackTrace);
     }
+    // Show a snackbar whenever reaching the end of an item in the playlist.
+    _player.positionDiscontinuityStream.listen((discontinuity) {
+      if (discontinuity.reason == PositionDiscontinuityReason.autoAdvance) {
+        _showItemFinished(discontinuity.previousEvent.currentIndex);
+      }
+    });
+    _player.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed) {
+        _showItemFinished(_player.currentIndex);
+      }
+    });
+  }
+
+  void _showItemFinished(int? index) {
+    if (index == null) return;
+    final sequence = _player.sequence;
+    if (index >= sequence.length) return;
+    final source = sequence[index];
+    final metadata = source.tag as MediaItem;
+    _scaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
+      content: Text('Finished playing ${metadata.title}'),
+      duration: const Duration(seconds: 1),
+    ));
   }
 
   @override
@@ -118,6 +147,7 @@ class MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       home: Scaffold(
         body: SafeArea(
           child: Column(
@@ -233,7 +263,7 @@ class MyAppState extends State<MyApp> {
                     return ReorderableListView(
                       onReorder: (int oldIndex, int newIndex) {
                         if (oldIndex < newIndex) newIndex--;
-                        _playlist.move(oldIndex, newIndex);
+                        _player.moveAudioSource(oldIndex, newIndex);
                       },
                       children: [
                         for (var i = 0; i < sequence.length; i++)
@@ -247,18 +277,17 @@ class MyAppState extends State<MyApp> {
                                 child: Icon(Icons.delete, color: Colors.white),
                               ),
                             ),
-                            onDismissed: (dismissDirection) {
-                              _playlist.removeAt(i);
-                            },
+                            onDismissed: (dismissDirection) =>
+                                _player.removeAudioSourceAt(i),
                             child: Material(
                               color: i == state!.currentIndex
                                   ? Colors.grey.shade300
                                   : null,
                               child: ListTile(
                                 title: Text(sequence[i].tag.title as String),
-                                onTap: () {
-                                  _player.seek(Duration.zero, index: i);
-                                },
+                                onTap: () => _player
+                                    .seek(Duration.zero, index: i)
+                                    .catchError((e, st) {}),
                               ),
                             ),
                           ),
@@ -273,7 +302,7 @@ class MyAppState extends State<MyApp> {
         floatingActionButton: FloatingActionButton(
           child: const Icon(Icons.add),
           onPressed: () {
-            _playlist.add(AudioSource.uri(
+            _player.addAudioSource(AudioSource.uri(
               Uri.parse("asset:///audio/nature.mp3"),
               tag: MediaItem(
                 id: '${_nextMediaId++}',
@@ -309,6 +338,7 @@ class ControlButtons extends StatelessWidget {
               divisions: 10,
               min: 0.0,
               max: 1.0,
+              value: player.volume,
               stream: player.volumeStream,
               onChanged: player.setVolume,
             );
@@ -321,12 +351,18 @@ class ControlButtons extends StatelessWidget {
             onPressed: player.hasPrevious ? player.seekToPrevious : null,
           ),
         ),
-        StreamBuilder<PlayerState>(
-          stream: player.playerStateStream,
+        StreamBuilder<(bool, ProcessingState, int)>(
+          stream: Rx.combineLatest2(
+              player.playerEventStream,
+              player.sequenceStream,
+              (event, sequence) => (
+                    event.playing,
+                    event.playbackEvent.processingState,
+                    sequence.length
+                  )),
           builder: (context, snapshot) {
-            final playerState = snapshot.data;
-            final processingState = playerState?.processingState;
-            final playing = playerState?.playing;
+            final (playing, processingState, sequenceLength) =
+                snapshot.data ?? (false, null, 0);
             if (processingState == ProcessingState.loading ||
                 processingState == ProcessingState.buffering) {
               return Container(
@@ -335,11 +371,11 @@ class ControlButtons extends StatelessWidget {
                 height: 64.0,
                 child: const CircularProgressIndicator(),
               );
-            } else if (playing != true) {
+            } else if (!playing) {
               return IconButton(
                 icon: const Icon(Icons.play_arrow),
                 iconSize: 64.0,
-                onPressed: player.play,
+                onPressed: sequenceLength > 0 ? player.play : null,
               );
             } else if (processingState != ProcessingState.completed) {
               return IconButton(
@@ -351,8 +387,10 @@ class ControlButtons extends StatelessWidget {
               return IconButton(
                 icon: const Icon(Icons.replay),
                 iconSize: 64.0,
-                onPressed: () => player.seek(Duration.zero,
-                    index: player.effectiveIndices!.first),
+                onPressed: sequenceLength > 0
+                    ? () => player.seek(Duration.zero,
+                        index: player.effectiveIndices.first)
+                    : null,
               );
             }
           },
@@ -376,6 +414,7 @@ class ControlButtons extends StatelessWidget {
                 divisions: 10,
                 min: 0.5,
                 max: 1.5,
+                value: player.speed,
                 stream: player.speedStream,
                 onChanged: player.setSpeed,
               );

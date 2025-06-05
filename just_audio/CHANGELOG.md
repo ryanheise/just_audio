@@ -1,3 +1,66 @@
+## 0.10.4
+
+* Fix bug on simultaneous loads.
+* Fix dispose crash on iOS.
+* Fix initial seek values on subsequent loads (@Abestanis).
+
+## 0.10.3
+
+* Fix pending timers bug in unit tests.
+* Fix NPE in Android position broadcast.
+
+## 0.10.2
+
+* Add Player.playerEvent.
+* Fix playing/playbackEvent emission order.
+* Fix rxdart errors on lower bound rxdart 0.26.0.
+* Fix MissingPluginException in dispose on iOS.
+
+## 0.10.1
+
+* Fix unhandled PlayerInterruptedException.
+* Fix duplicate load in active state.
+* Synchronize playlist API calls.
+* Improve position accuracy over Bluetooth on Android.
+
+## 0.10.0
+
+* New playlist API.
+* Deprecate ConcatenatingAudioSource - use playlist API instead.
+* Deprecate LoopingAudioSource - Use List.filled(N, source) instead.
+* Replace playbackEventStream.onError by errorStream.
+* Add errorCode/errorMessage to PlaybackEvent.
+* Add maxSkipsOnError constructor parameter.
+* Fix conversion between milliBel and deciBel (@Chaphasilor).
+* Bump min flutter version to 3.27.0, AGP to 8.5.2.
+
+## 0.9.46
+
+* Fix SwiftPM support on macOS.
+
+## 0.9.45
+
+* Add setWebSinkId for web (@dganzella).
+
+## 0.9.44
+
+* Add support for SwiftPM.
+
+## 0.9.43
+
+* Fix NPE in load on iOS/macOS.
+* Migrate to media3 ExoPlayer 1.4.1 on Android (@hansvdwd and @ryanheise).
+
+## 0.9.42
+
+* Fix dealloc crash on iOS/macOS (@cristian1980).
+* Fix Dart memory leak on dispose (@MinSeungHyun).
+* Bump gradle to 8.5.0.
+
+## 0.9.41
+
+* Fix stop() to cause play() to return on iOS.
+
 ## 0.9.40
 
 * Fix JDK 21 compile error.
