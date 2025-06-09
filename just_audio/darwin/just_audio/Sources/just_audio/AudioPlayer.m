@@ -12,6 +12,7 @@
 #include <TargetConditionals.h>
 
 #define TREADMILL_SIZE 2
+#define ERROR_ABORT 10000000
 
 // TODO: Check for and report invalid state transitions.
 // TODO: Apply Apple's guidance on seeking: https://developer.apple.com/library/archive/qa/qa1820/_index.html
@@ -593,7 +594,7 @@
         [_player pause];
     }
     if (_processingState == loading) {
-        [self abortExistingConnection];
+        [self abortExistingConnection:NO];
     }
     _loadResult = result;
     _processingState = loading;
@@ -889,15 +890,7 @@
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)change[NSKeyValueChangeNewKey];
         //IndexedPlayerItem *oldPlayerItem = (IndexedPlayerItem *)change[NSKeyValueChangeOldKey];
         if (playerItem.status == AVPlayerItemStatusFailed) {
-            if ([_orderInv[_index] intValue] + 1 < [_order count]) {
-                // account for automatic move to next item
-                _index = [_order[[_orderInv[_index] intValue] + 1] intValue];
-                //NSLog(@"advance to next on error: index = %d", _index);
-                [self updateEndAction];
-                [self broadcastPlaybackEvent];
-            } else {
-                //NSLog(@"error on last item");
-            }
+            [self sendErrorForItem:playerItem];
             return;
         } else {
             int expectedIndex = [self indexForItem:playerItem];
@@ -980,27 +973,30 @@
 }
 
 - (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
-    FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%d", (int)playerItem.error.code]
-                                                     message:playerItem.error.localizedDescription
-                                                     details:@{@"index": @([self indexForItem:playerItem])}];
-    [self sendError:flutterError playerItem:playerItem];
+    [self sendError:@((int)playerItem.error.code) errorMessage:playerItem.error.localizedDescription playerItem:playerItem switchToIdle:YES];
+    [_player removeAllItems];
 }
 
-- (void)sendError:(FlutterError *)flutterError playerItem:(IndexedPlayerItem *)playerItem {
-    //NSLog(@"sendError");
+- (void)sendError:(NSNumber *)errorCode errorMessage:(NSString *)errorMessage playerItem:(IndexedPlayerItem *)playerItem switchToIdle:(BOOL)switchToIdle {
+    //NSLog(@"sendError (%@) %@", errorCode, errorMessage);
+    FlutterError *flutterError = [FlutterError errorWithCode:[NSString stringWithFormat:@"%@", errorCode]
+                                                     message:errorMessage
+                                                     details:playerItem != nil ? @{@"index": @([self indexForItem:playerItem])} : nil];
+    [_eventChannel sendEvent:flutterError];
+//    _errorCode = errorCode;
+//    _errorMessage = errorMessage;
+    if (switchToIdle) {
+        _processingState = none;
+    }
+    [self broadcastPlaybackEvent];
     if (_loadResult && playerItem == _player.currentItem) {
         _loadResult(flutterError);
         _loadResult = nil;
     }
-    // Broadcast all errors even if they aren't on the current item.
-    [_eventChannel sendEvent:flutterError];
 }
 
-- (void)abortExistingConnection {
-    FlutterError *flutterError = [FlutterError errorWithCode:@"abort"
-                                                     message:@"Connection aborted"
-                                                     details:nil];
-    [self sendError:flutterError playerItem:nil];
+- (void)abortExistingConnection:(BOOL)switchToIdle {
+    [self sendError:@(ERROR_ABORT) errorMessage:@"Connection aborted" playerItem:nil switchToIdle:switchToIdle];
 }
 
 - (int)indexForItem:(IndexedPlayerItem *)playerItem {
