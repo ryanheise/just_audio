@@ -53,6 +53,7 @@
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
     NSNumber *_errorCode;
     NSString *_errorMessage;
+    BOOL _autoPlayNextPlayListItem; // Add this new instance variable
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration useLazyPreparation:(BOOL)useLazyPreparation {
@@ -92,7 +93,13 @@
     _automaticallyWaitsToMinimizeStalling = YES;
     _allowsExternalPlayback = NO;
     _loadControl = nil;
+    _autoPlayNextPlayListItem = YES; // Default to true for backward compatibility
     if (loadConfiguration != (id)[NSNull null]) {
+        // Extract autoPlayNextPlayListItem parameter
+        if (loadConfiguration[@"autoPlayNextPlayListItem"] != (id)[NSNull null]) {
+            _autoPlayNextPlayListItem = [loadConfiguration[@"autoPlayNextPlayListItem"] boolValue];
+        }
+        
         NSDictionary *map = loadConfiguration[@"darwinLoadControl"];
         if (map != (id)[NSNull null]) {
             _loadControl = [[LoadControl alloc] init];
@@ -769,10 +776,17 @@
         _justAdvanced = YES;
     } else if ([_orderInv[_index] intValue] + 1 < [_order count]) {
         [endedSource seek:kCMTimeZero];
-        _index = [_order[([_orderInv[_index] intValue] + 1)] intValue];
-        [self updateEndAction];
-        [self broadcastPlaybackEvent];
-        _justAdvanced = YES;
+        if (_autoPlayNextPlayListItem) {
+            // Auto-advance to next item (original behavior)
+            _index = [_order[([_orderInv[_index] intValue] + 1)] intValue];
+            [self updateEndAction];
+            [self broadcastPlaybackEvent];
+            _justAdvanced = YES;
+        } else {
+            // Pause at end of current item instead of auto-advancing
+            [self pause];
+            [self broadcastPlaybackEvent];
+        }
     } else {
         // reached end of playlist
         [self complete];
@@ -1134,10 +1148,10 @@
     // - when the shuffle order changes. (TODO)
     // - when the shuffle mode changes.
     if (!_player) return;
-    if (_audioSource && (_loopMode != lmLoopOff || ([_order count] > 0 && [_orderInv[_index] intValue] + 1 < [_order count]))) {
+    if (_audioSource && (_loopMode != lmLoopOff || (_autoPlayNextPlayListItem && [_order count] > 0 && [_orderInv[_index] intValue] + 1 < [_order count]))) {
         _player.actionAtItemEnd = AVPlayerActionAtItemEndAdvance;
     } else {
-        _player.actionAtItemEnd = AVPlayerActionAtItemEndPause; // AVPlayerActionAtItemEndNone
+        _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     }
 }
 
