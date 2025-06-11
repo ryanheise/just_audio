@@ -39,6 +39,10 @@ dev_dependencies:
   plugin_platform_interface: ^2.0.0
   flutter_lints: ^2.0.1
 
+dependency_overrides: 
+  just_audio_platform_interface:
+    path: ../just_audio_platform_interface
+
 flutter:
   plugin:
     platforms:
