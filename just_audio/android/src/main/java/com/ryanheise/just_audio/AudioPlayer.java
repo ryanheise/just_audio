@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.Random;
 
 public class AudioPlayer implements MethodCallHandler, Player.Listener, MetadataOutput {
+    public static final int ERROR_ABORT = 10000000;
 
     static final String TAG = "AudioPlayer";
 
@@ -386,22 +387,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 Log.e(TAG, "default ExoPlaybackException: " + exoError.getUnexpectedException().getMessage());
             }
             // TODO: send both errorCode and type
-            sendError(String.valueOf(exoError.type), exoError.getMessage(), mapOf("index", currentIndex));
+            sendError(exoError.type, exoError.getMessage(), mapOf("index", currentIndex));
         } else {
             Log.e(TAG, "default PlaybackException: " + error.getMessage());
-            sendError(String.valueOf(error.errorCode), error.getMessage(), mapOf("index", currentIndex));
-        }
-        errorCount++;
-        if (player.hasNextMediaItem() && currentIndex != null && errorCount <= 5) {
-            int nextIndex = currentIndex + 1;
-            Timeline timeline = player.getCurrentTimeline();
-            // This condition is due to: https://github.com/ryanheise/just_audio/pull/310
-            if (nextIndex < timeline.getWindowCount()) {
-                // TODO: pass in initial position here.
-                player.setMediaSource(mediaSource);
-                player.prepare();
-                player.seekTo(nextIndex, 0);
-            }
+            sendError(error.errorCode, error.getMessage(), mapOf("index", currentIndex));
         }
     }
 
@@ -745,7 +734,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         case none:
             break;
         case loading:
-            abortExistingConnection();
+            abortExistingConnection(false);
             player.stop();
             break;
         default:
@@ -939,17 +928,22 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
     }
 
-    private void sendError(String errorCode, String errorMsg) {
-        sendError(errorCode, errorMsg, null);
+    private void sendError(int errorCode, String errorMsg, Object details) {
+        sendError(errorCode, errorMsg, details, true);
     }
 
-    private void sendError(String errorCode, String errorMsg, Object details) {
+    private void sendError(int errorCode, String errorMsg, Object details, boolean switchToIdle) {
+        eventChannel.error(String.valueOf(errorCode), errorMsg, details);
+//        this.errorCode = errorCode;
+//        this.errorMessage = errorMsg;
+        if (switchToIdle) {
+            processingState = ProcessingState.none;
+        }
+        broadcastImmediatePlaybackEvent();
         if (prepareResult != null) {
-            prepareResult.error(errorCode, errorMsg, details);
+            prepareResult.error(String.valueOf(errorCode), errorMsg, details);
             prepareResult = null;
         }
-
-        eventChannel.error(errorCode, errorMsg, details);
     }
 
     private String getLowerCaseExtension(Uri uri) {
@@ -1041,7 +1035,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     public void dispose() {
         if (processingState == ProcessingState.loading) {
-            abortExistingConnection();
+            abortExistingConnection(true);
         }
         if (playResult != null) {
             playResult.success(new HashMap<String, Object>());
@@ -1072,10 +1066,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
     }
 
-    private void abortExistingConnection() {
-        sendError("abort", "Connection aborted");
+    private void abortExistingConnection(boolean switchToIdle) {
+        sendError(ERROR_ABORT, "Connection aborted", null, switchToIdle);
     }
-
     // Dart can't distinguish between int sizes so
     // Flutter may send us a Long or an Integer
     // depending on the number of bits required to
