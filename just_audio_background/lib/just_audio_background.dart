@@ -65,6 +65,7 @@ class JustAudioBackground {
     Map<String, dynamic>? androidBrowsableRootExtras,
     LeftMediaControl leftMediaControl = LeftMediaControl.skipToPrevious,
     RightMediaControl rightMediaControl = RightMediaControl.skipToNext,
+    bool showStopControl = true,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
@@ -88,6 +89,7 @@ class JustAudioBackground {
       androidBrowsableRootExtras: androidBrowsableRootExtras,
       leftMediaControl: leftMediaControl,
       rightMediaControl: rightMediaControl,
+      showStopControl: showStopControl,
     );
   }
 }
@@ -112,6 +114,7 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     Map<String, dynamic>? androidBrowsableRootExtras,
     LeftMediaControl leftMediaControl = LeftMediaControl.skipToPrevious,
     RightMediaControl rightMediaControl = RightMediaControl.skipToNext,
+    bool showStopControl = true,
   }) async {
     _platform = JustAudioPlatform.instance;
     JustAudioPlatform.instance = _JustAudioBackgroundPlugin();
@@ -140,7 +143,7 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     );
     // Set the media control preferences
     _playerAudioHandler._setMediaControlPreferences(
-        leftMediaControl, rightMediaControl);
+        leftMediaControl, rightMediaControl, showStopControl);
   }
 
   _JustAudioPlayer? _player;
@@ -395,11 +398,13 @@ class _PlayerAudioHandler extends BaseAudioHandler
   // Media control preferences
   LeftMediaControl _leftMediaControl = LeftMediaControl.skipToPrevious;
   RightMediaControl _rightMediaControl = RightMediaControl.skipToNext;
+  bool _showStopControl = true;
 
-  void _setMediaControlPreferences(
-      LeftMediaControl leftControl, RightMediaControl rightControl) {
+  void _setMediaControlPreferences(LeftMediaControl leftControl,
+      RightMediaControl rightControl, bool showStopControl) {
     _leftMediaControl = leftControl;
     _rightMediaControl = rightControl;
+    _showStopControl = showStopControl;
   }
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
@@ -810,8 +815,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
     // Add play/pause control
     controls.add(_playing ? MediaControl.pause : MediaControl.play);
 
-    // Add stop control
-    controls.add(MediaControl.stop);
+    // Add stop control based on preference
+    if (_showStopControl) {
+      controls.add(MediaControl.stop);
+    }
 
     // Add right control based on preference
     if (_rightMediaControl == RightMediaControl.skipToNext && hasNext) {
