@@ -619,6 +619,7 @@ class _PlayerAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToQueueItem(int index) async {
     (await _player).seek(SeekRequest(position: Duration.zero, index: index));
+    (await _player).play(PlayRequest());
   }
 
   @override
