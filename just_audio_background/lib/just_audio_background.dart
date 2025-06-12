@@ -10,6 +10,18 @@ import 'package:synchronized/synchronized.dart';
 
 export 'package:audio_service/audio_service.dart' show MediaItem;
 
+/// Enum to define left media control options
+enum LeftMediaControl {
+  skipToPrevious,
+  rewind,
+}
+
+/// Enum to define right media control options
+enum RightMediaControl {
+  skipToNext,
+  fastForward,
+}
+
 late SwitchAudioHandler _audioHandler;
 late JustAudioPlatform _platform;
 
@@ -24,6 +36,8 @@ class JustAudioBackground {
   ///     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
   ///     androidNotificationChannelName: 'Audio playback',
   ///     androidNotificationOngoing: true,
+  ///     leftMediaControl: LeftMediaControl.skipToPrevious,
+  ///     rightMediaControl: RightMediaControl.skipToNext,
   ///   );
   ///   runApp(MyApp());
   /// }
@@ -49,6 +63,8 @@ class JustAudioBackground {
     Duration rewindInterval = const Duration(seconds: 10),
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
+    LeftMediaControl leftMediaControl = LeftMediaControl.skipToPrevious,
+    RightMediaControl rightMediaControl = RightMediaControl.skipToNext,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     await _JustAudioBackgroundPlugin.setup(
@@ -70,6 +86,8 @@ class JustAudioBackground {
       rewindInterval: rewindInterval,
       preloadArtwork: preloadArtwork,
       androidBrowsableRootExtras: androidBrowsableRootExtras,
+      leftMediaControl: leftMediaControl,
+      rightMediaControl: rightMediaControl,
     );
   }
 }
@@ -92,6 +110,8 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
     Duration rewindInterval = const Duration(seconds: 10),
     bool preloadArtwork = false,
     Map<String, dynamic>? androidBrowsableRootExtras,
+    LeftMediaControl leftMediaControl = LeftMediaControl.skipToPrevious,
+    RightMediaControl rightMediaControl = RightMediaControl.skipToNext,
   }) async {
     _platform = JustAudioPlatform.instance;
     JustAudioPlatform.instance = _JustAudioBackgroundPlugin();
@@ -118,6 +138,9 @@ class _JustAudioBackgroundPlugin extends JustAudioPlatform {
         androidBrowsableRootExtras: androidBrowsableRootExtras,
       ),
     );
+    // Set the media control preferences
+    _playerAudioHandler._setMediaControlPreferences(
+        leftMediaControl, rightMediaControl);
   }
 
   _JustAudioPlayer? _player;
@@ -368,6 +391,16 @@ class _PlayerAudioHandler extends BaseAudioHandler
   List<int> _shuffleIndicesInv = [];
   List<int> _effectiveIndices = [];
   List<int> _effectiveIndicesInv = [];
+
+  // Media control preferences
+  LeftMediaControl _leftMediaControl = LeftMediaControl.skipToPrevious;
+  RightMediaControl _rightMediaControl = RightMediaControl.skipToNext;
+
+  void _setMediaControlPreferences(
+      LeftMediaControl leftControl, RightMediaControl rightControl) {
+    _leftMediaControl = leftControl;
+    _rightMediaControl = rightControl;
+  }
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
   int? index;
@@ -765,12 +798,28 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   /// Broadcasts the current state to all clients.
   void _broadcastState() {
-    final controls = [
-      if (hasPrevious) MediaControl.skipToPrevious,
-      if (_playing) MediaControl.pause else MediaControl.play,
-      MediaControl.stop,
-      if (hasNext) MediaControl.skipToNext,
-    ];
+    final controls = <MediaControl>[];
+
+    // Add left control based on preference
+    if (_leftMediaControl == LeftMediaControl.skipToPrevious && hasPrevious) {
+      controls.add(MediaControl.skipToPrevious);
+    } else if (_leftMediaControl == LeftMediaControl.rewind) {
+      controls.add(MediaControl.rewind);
+    }
+
+    // Add play/pause control
+    controls.add(_playing ? MediaControl.pause : MediaControl.play);
+
+    // Add stop control
+    controls.add(MediaControl.stop);
+
+    // Add right control based on preference
+    if (_rightMediaControl == RightMediaControl.skipToNext && hasNext) {
+      controls.add(MediaControl.skipToNext);
+    } else if (_rightMediaControl == RightMediaControl.fastForward) {
+      controls.add(MediaControl.fastForward);
+    }
+
     playbackState.add(playbackState.nvalue!.copyWith(
       controls: controls,
       systemActions: {
