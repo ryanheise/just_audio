@@ -1001,13 +1001,14 @@ class AudioPlayer {
       source._shuffle(initialIndex: initialSeekValues?.index ?? 0);
       await _broadcastSequence();
       checkInterruption();
-      _loadFuture = platform
-          .load(LoadRequest(
-            audioSourceMessage: source._toMessage(),
-            initialPosition: initialSeekValues?.position,
-            initialIndex: initialSeekValues?.index,
-          ))
-          .then((response) => response.duration);
+      final loadRequest = LoadRequest(
+        audioSourceMessage: source._toMessage(),
+        initialPosition: initialSeekValues?.position,
+        initialIndex: initialSeekValues?.index,
+      );
+
+      _loadFuture =
+          platform.load(loadRequest).then((response) => response.duration);
       final duration = await _loadFuture;
       checkInterruption();
       if (platform != _platformValue) {
@@ -2834,7 +2835,7 @@ class HlsAudioSource extends UriAudioSource {
   @override
   AudioSourceMessage _toMessage() => HlsAudioSourceMessage(
         id: _id,
-        uri: _effectiveUri.toString(),
+        uri: uri.toString(),
         headers: _mergedHeaders,
         tag: tag,
       );
@@ -4563,3 +4564,202 @@ HttpClient _createHttpClient({String? userAgent}) {
   }
   return client;
 }
+
+/// An [AudioSource] representing an HLS stream with precaching support.
+/// This allows you to download HLS audio streams for offline playback.
+///
+/// On iOS, this uses AVAssetDownloadTask to download the HLS stream to
+/// .movpkg files. On Android, this uses ExoPlayer's DownloadManager.
+///
+/// Example usage:
+/// ```dart
+/// final hlsCachingSource = HlsPrecachingAudioSource(
+///   Uri.parse('https://example.com/audio.m3u8'),
+///   headers: {'Authorization': 'Bearer token'},
+/// );
+///
+/// // Start download
+/// await hlsCachingSource.download();
+///
+/// // Check download progress
+/// hlsCachingSource.downloadProgressStream.listen((progress) {
+///   print('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+/// });
+///
+/// // Play (will use cached version if available)
+/// await player.setAudioSource(hlsCachingSource);
+/// ```
+@experimental
+class HlsPrecachingAudioSource extends HlsAudioSource {
+  static const MethodChannel _channel = MethodChannel('just_audio_hls_cache');
+
+  final _downloadProgressSubject = BehaviorSubject<double>.seeded(0.0);
+  bool _isDownloading = false;
+  bool _isDownloaded = false;
+
+  /// Creates an [HlsPrecachingAudioSource] that can download and cache HLS audio streams.
+  HlsPrecachingAudioSource(
+    Uri uri, {
+    Map<String, String>? headers,
+    dynamic tag,
+    Duration? duration,
+  }) : super(uri, headers: headers, tag: tag, duration: duration);
+
+  /// Emits the current download progress as a double value from 0.0 (nothing
+  /// downloaded) to 1.0 (download complete).
+  Stream<double> get downloadProgressStream => _downloadProgressSubject.stream;
+
+  /// Whether the HLS stream is currently being downloaded.
+  bool get isDownloading => _isDownloading;
+
+  /// Whether the HLS stream has been fully downloaded.
+  bool get isDownloaded => _isDownloaded;
+
+  /// Starts downloading the HLS stream for offline playback.
+  /// Returns true if download started successfully or is already complete.
+  Future<bool> download() async {
+    if (_isDownloaded) {
+      _downloadProgressSubject.add(1.0);
+      return true;
+    }
+
+    if (_isDownloading) {
+      return true; // Already downloading
+    }
+
+    try {
+      _isDownloading = true;
+      _monitorDownloadProgress();
+
+      final result = await _channel.invokeMethod('downloadHLS', {
+        'url': uri.toString(),
+        'headers': headers ?? <String, String>{},
+      });
+
+      // If download starts successfully (native side returns right away, even if download isn't finished)
+      if (result['success'] == true) {
+        return true;
+      } else {
+        _isDownloading = false;
+        throw Exception('Failed to start download: ${result['error']}');
+      }
+    } catch (e) {
+      _isDownloading = false;
+      rethrow;
+    }
+  }
+
+  /// Monitors download progress and updates the progress stream.
+  Future<void> _monitorDownloadProgress() async {
+    while (_isDownloading && !_isDownloaded) {
+      try {
+        final result = await _channel.invokeMethod('getHLSDownloadProgress', {
+          'url': uri.toString(),
+        });
+
+        final progress = (result['progress'] as num?)?.toDouble() ?? 0.0;
+        _downloadProgressSubject.add(progress);
+
+        if (progress >= 1.0) {
+          _isDownloaded = true;
+          _isDownloading = false;
+          break;
+        }
+
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e) {
+        _isDownloading = false;
+        break;
+      }
+    }
+  }
+
+  /// Checks if the HLS stream is already downloaded.
+  Future<bool> isStreamDownloaded() async {
+    try {
+      final result = await _channel.invokeMethod('isHLSDownloaded', {
+        'url': uri.toString(),
+      });
+      _isDownloaded = result['isDownloaded'] == true;
+      if (_isDownloaded) {
+        _downloadProgressSubject.add(1.0);
+      } else {
+        _monitorDownloadProgress();
+      }
+      return _isDownloaded;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Cancels an ongoing download.
+  Future<bool> cancelDownload() async {
+    try {
+      final result = await _channel.invokeMethod('cancelHLSDownload', {
+        'url': uri.toString(),
+      });
+
+      if (result['cancelled'] == true) {
+        _isDownloading = false;
+        _downloadProgressSubject.add(0.0);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Deletes the downloaded HLS stream.
+  Future<bool> clearCache() async {
+    try {
+      final result = await _channel.invokeMethod('deleteHLSDownload', {
+        'url': uri.toString(),
+      });
+
+      if (result['deleted'] == true) {
+        _isDownloaded = false;
+        _isDownloading = false;
+        _downloadProgressSubject.add(0.0);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Returns an [AudioSource] that uses the cached version if available,
+  /// otherwise returns the original HLS source.
+  Future<AudioSource> resolve() async {
+    await isStreamDownloaded();
+    return this; // The native layer will automatically use cached version if available
+  }
+
+  /// Disposes resources used by this audio source.
+  void dispose() {
+    _downloadProgressSubject.close();
+  }
+
+  /// Static method to clear all HLS downloads.
+  static Future<bool> clearAllDownloads() async {
+    try {
+      final result = await _channel.invokeMethod('clearAllDownloads');
+      return result['cleared'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Static method to list all downloaded HLS streams.
+  static Future<Map<String, dynamic>> listAllDownloads() async {
+    try {
+      final result = await _channel.invokeMethod('listDownloads');
+      final downloads = result['downloads'] as Map?;
+      return Map<String, dynamic>.from(downloads ?? {});
+    } catch (e) {
+      return {};
+    }
+  }
+}
+

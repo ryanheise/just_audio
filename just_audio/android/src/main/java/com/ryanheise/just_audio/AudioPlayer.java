@@ -628,9 +628,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             .setTag(id)
                             .build());
         case "hls":
-            return new HlsMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")))
+            String originalUri = (String) map.get("uri");
+            String cachedUri = JustAudioHLSDownloadManager.getInstance(context).getCachedUri(originalUri);
+            DataSource.Factory dataSourceFactory;
+
+            if (cachedUri != null) {
+                dataSourceFactory = JustAudioHLSDownloadManager.getInstance(context)
+                        .getCacheDataSourceFactory(mapGet(map, "headers"));
+            } else {
+                dataSourceFactory = buildDataSourceFactory(mapGet(map, "headers"));
+            }
+            return new HlsMediaSource.Factory(dataSourceFactory)
                     .createMediaSource(new MediaItem.Builder()
-                            .setUri(Uri.parse((String)map.get("uri")))
+                            .setUri(Uri.parse(originalUri))
                             .setMimeType(MimeTypes.APPLICATION_M3U8)
                             .build());
         case "silence":
