@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -24,7 +26,7 @@ void runTests() {
   JustAudioPlatform.instance = mock;
   const audioSessionChannel = MethodChannel('com.ryanheise.audio_session');
 
-  void expectDuration(Duration a, Duration b, {int epsilon = 200}) {
+  void expectDuration(Duration a, Duration b, {int epsilon = 30}) {
     expect((a - b).inMilliseconds.abs(), lessThanOrEqualTo(epsilon));
   }
 
@@ -78,7 +80,7 @@ void runTests() {
     expect(player.playing, equals(false));
     expect(player.volume, equals(1.0));
     expect(player.speed, equals(1.0));
-    expect(player.sequence, equals(null));
+    expect(player.sequence, equals([]));
     expect(player.hasNext, equals(false));
     expect(player.hasPrevious, equals(false));
     //expect(player.loopMode, equals(LoopMode.off));
@@ -129,7 +131,7 @@ void runTests() {
         player: player, playing: false, position: const Duration(seconds: 1));
     final playlist = ConcatenatingAudioSource(children: []);
     await player.setAudioSource(playlist, preload: false);
-    await playlist.addAll([
+    final audioSources = [
       AudioSource.uri(
         Uri.parse("https://foo.foo/foo.mp3"),
         tag: 'a',
@@ -142,10 +144,18 @@ void runTests() {
         Uri.parse("https://baz.baz/baz.mp3"),
         tag: 'c',
       ),
-    ]);
+    ];
+    await playlist.addAll(audioSources);
     await playlist.move(2, 1);
     await playlist.removeAt(2);
-    await player.load();
+    expect(player.processingState, equals(ProcessingState.idle));
+    expect(playlist.sequence.map((s) => s.tag as String?).toList(),
+        equals(['a', 'c']));
+    await player.clearAudioSources();
+    await player.addAudioSources(audioSources);
+    await player.moveAudioSource(2, 1);
+    await player.removeAudioSourceAt(2);
+    expect(player.processingState, equals(ProcessingState.idle));
     expect(playlist.sequence.map((s) => s.tag as String?).toList(),
         equals(['a', 'c']));
     await player.dispose();
@@ -161,8 +171,30 @@ void runTests() {
     expect(player.currentIndex, equals(0));
     expect(player.hasNext, equals(false));
     expect(player.hasPrevious, equals(false));
-    expect(player.sequence!.length, equals(1));
+    expect(player.sequence.length, equals(1));
     expect(player.playing, equals(false));
+    await player.dispose();
+  });
+
+  test('initial-seek-values', () async {
+    final player = AudioPlayer();
+    const targetPos = Duration(seconds: 2);
+    await player.setAudioSources([
+      AudioSource.uri(Uri.parse('https://a.a/a.mp3')),
+      AudioSource.uri(Uri.parse('https://b.b/b.mp3')),
+    ], initialPosition: targetPos, initialIndex: 1);
+    expect(player.position, targetPos);
+    expect(player.currentIndex, 1);
+    await player.stop();
+    await player.load();
+    expect(player.position, targetPos);
+    expect(player.currentIndex, 1);
+    await player.setAudioSources([
+      AudioSource.uri(Uri.parse('https://a.a/a.mp3')),
+      AudioSource.uri(Uri.parse('https://b.b/b.mp3')),
+    ]);
+    expect(player.position, equals(Duration.zero));
+    expect(player.currentIndex, 0);
     await player.dispose();
   });
 
@@ -197,7 +229,6 @@ void runTests() {
     final player = AudioPlayer();
     final duration = (await (player.setUrl('https://foo.foo/foo.mp3')))!;
     final point1 = duration * 0.3;
-    final stopwatch = Stopwatch();
     expectState(
       player: player,
       position: Duration.zero,
@@ -217,40 +248,42 @@ void runTests() {
       position: point1,
       processingState: ProcessingState.ready,
     );
-    await Future<dynamic>.delayed(const Duration(milliseconds: 100));
+    await Future<dynamic>.delayed(const Duration(milliseconds: 50));
     expectState(player: player, playing: true);
-    await Future<dynamic>.delayed(const Duration(seconds: 1));
+    await Future<dynamic>.delayed(const Duration(milliseconds: 100));
     expectState(
       player: player,
-      position: point1 + const Duration(seconds: 1),
+      position: point1 + const Duration(milliseconds: 150),
       processingState: ProcessingState.ready,
       playing: true,
     );
-    await player.seek(duration - const Duration(seconds: 3));
+    const playDuration = Duration(milliseconds: 100);
+    final point2 = duration - playDuration;
+    await player.seek(point2);
     expectState(
       player: player,
-      position: duration - const Duration(seconds: 3),
+      position: point2,
       processingState: ProcessingState.ready,
       playing: true,
     );
     await player.pause();
     expectState(
       player: player,
-      position: duration - const Duration(seconds: 3),
+      position: point2,
       processingState: ProcessingState.ready,
       playing: false,
     );
-    stopwatch.reset();
+    final stopwatch = Stopwatch();
     stopwatch.start();
     final playFuture = player.play();
     expectState(
       player: player,
-      position: duration - const Duration(seconds: 3),
+      position: point2,
       processingState: ProcessingState.ready,
     );
     expectState(player: player, playing: true);
     await playFuture;
-    expectDuration(stopwatch.elapsed, const Duration(seconds: 3));
+    expectDuration(stopwatch.elapsed, playDuration);
     expectState(
       player: player,
       position: duration,
@@ -263,8 +296,8 @@ void runTests() {
   test('speed', () async {
     final player = AudioPlayer();
     /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
-    const period1 = Duration(seconds: 2);
-    const period2 = Duration(seconds: 2);
+    const period1 = Duration(milliseconds: 100);
+    const period2 = Duration(milliseconds: 100);
     const speed1 = 0.75;
     const speed2 = 1.5;
     final position1 = period1 * speed1;
@@ -329,6 +362,32 @@ void runTests() {
     await player.dispose();
   });
 
+  test('setAllowsExternalPlayback', () async {
+    final player = AudioPlayer();
+    expect(player.allowsExternalPlayback, equals(false));
+    await player.setAllowsExternalPlayback(true);
+    expect(player.allowsExternalPlayback, equals(true));
+    await player.dispose();
+  });
+
+  test('setWebCrossOrigin', () async {
+    final player = AudioPlayer();
+    expect(player.webCrossOrigin, isNull);
+    await player.setWebCrossOrigin(WebCrossOrigin.anonymous);
+    expect(player.webCrossOrigin, equals(WebCrossOrigin.anonymous));
+    await player.dispose();
+  });
+
+  test('setWebSinkId', () async {
+    final player = AudioPlayer();
+    expect(player.webSinkId, equals(''));
+    await player.setWebSinkId('foo');
+    expect(player.webSinkId, equals('foo'));
+    await player.setWebSinkId('');
+    expect(player.webSinkId, equals(''));
+    await player.dispose();
+  });
+
   test('setAndroidAudioAttributes', () async {
     final player = AudioPlayer();
     await player.setAndroidAudioAttributes(const AndroidAudioAttributes());
@@ -338,7 +397,7 @@ void runTests() {
   test('positionStream', () async {
     final player = AudioPlayer();
     /*final duration =*/ await player.setUrl('https://foo.foo/foo.mp3');
-    const period = Duration(seconds: 3);
+    const period = Duration(milliseconds: 250);
     const position1 = period;
     final position2 = position1 + period;
     const speed1 = 0.75;
@@ -365,7 +424,7 @@ void runTests() {
     player.setSpeed(speed2);
     stopwatch.reset();
 
-    target = position1 + target;
+    target = position1 + stepDuration;
     completer = Completer<dynamic>();
     subscription = player.positionStream.listen((position) {
       if (position >= position2) {
@@ -604,7 +663,11 @@ void runTests() {
 
   test('sequence-state', () async {
     final player = AudioPlayer();
-    expect(player.sequenceState, equals(null));
+    expect(player.sequenceState.sequence, equals([]));
+    expect(player.sequenceState.currentIndex, equals(null));
+    expect(player.sequenceState.shuffleIndices, equals([]));
+    expect(player.sequenceState.shuffleModeEnabled, equals(false));
+    expect(player.sequenceState.loopMode, equals(LoopMode.off));
     for (var shuffle in [false, true]) {
       if (shuffle) {
         await player.setShuffleModeEnabled(shuffle);
@@ -635,10 +698,10 @@ void runTests() {
       );
       void expectEffectiveSequence() {
         expect(
-            player.sequenceState?.effectiveSequence,
+            player.sequenceState.effectiveSequence,
             shuffle
-                ? player.effectiveIndices!
-                    .map((i) => player.sequence![i])
+                ? player.effectiveIndices
+                    .map((i) => player.sequence[i])
                     .toList()
                 : player.sequence);
       }
@@ -647,28 +710,220 @@ void runTests() {
       //  return player.effectiveSequence.map((IndexedAudioSource item) => player1.sequence.indexOf(item)).toList();
       //}
       await player.setAudioSource(playlist);
-      expect(player.sequenceState?.sequence, equals(playlist.children));
-      expect(player.sequenceState?.currentIndex, equals(0));
-      expect(player.sequenceState?.currentSource, equals(playlist.children[0]));
+      expect(player.sequenceState.sequence, equals(playlist.children));
+      expect(player.sequenceState.currentIndex, equals(0));
+      expect(player.sequenceState.currentSource, equals(playlist.children[0]));
       expectEffectiveSequence();
       await player.seek(Duration.zero, index: 4);
-      expect(player.sequenceState?.sequence, equals(playlist.children));
-      expect(player.sequenceState?.currentIndex, equals(4));
-      expect(player.sequenceState?.currentSource, equals(playlist.children[4]));
+      expect(player.sequenceState.sequence, equals(playlist.children));
+      expect(player.sequenceState.currentIndex, equals(4));
+      expect(player.sequenceState.currentSource, equals(playlist.children[4]));
       await playlist.removeAt(4);
       expectEffectiveSequence();
-      expect(player.sequenceState?.sequence, equals(playlist.children));
-      expect(player.sequenceState?.currentIndex, equals(3));
-      expect(player.sequenceState?.currentSource, equals(playlist.children[3]));
+      expect(player.sequenceState.sequence, equals(playlist.children));
+      expect(player.sequenceState.currentIndex, equals(3));
+      expect(player.sequenceState.currentSource, equals(playlist.children[3]));
       await playlist.removeAt(1);
-      expect(player.sequenceState?.sequence, equals(playlist.children));
-      expect(player.sequenceState?.currentIndex, equals(2));
-      expect(player.sequenceState?.currentSource, equals(playlist.children[2]));
+      expect(player.sequenceState.sequence, equals(playlist.children));
+      expect(player.sequenceState.currentIndex, equals(2));
+      expect(player.sequenceState.currentSource, equals(playlist.children[2]));
       await playlist.clear();
-      expect(player.sequenceState?.sequence, equals(playlist.children));
+      expect(player.sequenceState.sequence, equals(playlist.children));
       // expecting 0 here may change in a future version.
-      expect(player.sequenceState?.currentIndex, equals(0));
-      expect(player.sequenceState?.currentSource, equals(null));
+      expect(player.sequenceState.currentIndex, equals(null));
+      expect(player.sequenceState.currentSource, equals(null));
+      expectEffectiveSequence();
+    }
+    await player.dispose();
+  });
+
+  test('playlist', () async {
+    final player = AudioPlayer();
+    expect(player.sequence.length, equals(0));
+    await player.addAudioSource(
+        AudioSource.uri(Uri.parse('https://b.b/b.mp3'), tag: 'b'));
+    await player.load();
+    await player.insertAudioSource(
+      0,
+      // AudioSource.uri(Uri.parse('https://a.a/a.mp3'), tag: 'a'),
+      LoopingAudioSource(
+        count: 2,
+        child: ClippingAudioSource(
+          start: const Duration(seconds: 60),
+          end: const Duration(seconds: 65),
+          child: AudioSource.uri(Uri.parse("https://foo.foo/foo.mp3")),
+          tag: 'a',
+        ),
+      ),
+    );
+    await player.insertAudioSource(
+        2, AudioSource.uri(Uri.parse('https://c.c/c.mp3'), tag: 'c'));
+    await player.addAudioSources([
+      AudioSource.uri(Uri.parse('https://d.d/d.mp3'), tag: 'd'),
+      AudioSource.uri(Uri.parse('https://e.e/e.mp3'), tag: 'e'),
+    ]);
+    await player.insertAudioSources(3, [
+      AudioSource.uri(Uri.parse('https://e.e/e.mp3'), tag: 'e'),
+      AudioSource.uri(Uri.parse('https://f.f/f.mp3'), tag: 'f'),
+    ]);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['a', 'a', 'b', 'c', 'e', 'f', 'd', 'e']));
+    await player.removeAudioSourceAt(0);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'e', 'f', 'd', 'e']));
+    await player.moveAudioSource(3, 2);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'f', 'e', 'd', 'e']));
+    await player.moveAudioSource(2, 3);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'e', 'f', 'd', 'e']));
+    await player.removeAudioSourceRange(0, 2);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['e', 'f', 'd', 'e']));
+    await player.removeAudioSourceAt(3);
+    expect(
+        player.sequence.map((s) => s.tag as String?), equals(['e', 'f', 'd']));
+    await player.removeAudioSourceRange(1, 3);
+    expect(player.sequence.map((s) => s.tag as String?), equals(['e']));
+    await player.setAudioSources([
+      AudioSource.uri(Uri.parse('https://a.a/a.mp3'), tag: 'a'),
+      AudioSource.uri(Uri.parse('https://b.b/b.mp3'), tag: 'b'),
+    ]);
+    expect(player.sequence.map((s) => s.tag as String?), equals(['a', 'b']));
+    await player.clearAudioSources();
+    expect(player.sequence.map((s) => s.tag as String?), equals(<String>[]));
+    await player.dispose();
+  });
+
+  test('idle-playlist', () async {
+    final player = AudioPlayer();
+    expect(player.sequence.length, equals(0));
+    await player.addAudioSource(
+        AudioSource.uri(Uri.parse('https://b.b/b.mp3'), tag: 'b'));
+    await player.insertAudioSource(
+      0,
+      // AudioSource.uri(Uri.parse('https://a.a/a.mp3'), tag: 'a'),
+      LoopingAudioSource(
+        count: 2,
+        child: ClippingAudioSource(
+          start: const Duration(seconds: 60),
+          end: const Duration(seconds: 65),
+          child: AudioSource.uri(Uri.parse("https://foo.foo/foo.mp3")),
+          tag: 'a',
+        ),
+      ),
+    );
+    await player.insertAudioSource(
+        2, AudioSource.uri(Uri.parse('https://c.c/c.mp3'), tag: 'c'));
+    await player.addAudioSources([
+      AudioSource.uri(Uri.parse('https://d.d/d.mp3'), tag: 'd'),
+      AudioSource.uri(Uri.parse('https://e.e/e.mp3'), tag: 'e'),
+    ]);
+    await player.insertAudioSources(3, [
+      AudioSource.uri(Uri.parse('https://e.e/e.mp3'), tag: 'e'),
+      AudioSource.uri(Uri.parse('https://f.f/f.mp3'), tag: 'f'),
+    ]);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['a', 'a', 'b', 'c', 'e', 'f', 'd', 'e']));
+    await player.removeAudioSourceAt(0);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'e', 'f', 'd', 'e']));
+    await player.moveAudioSource(3, 2);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'f', 'e', 'd', 'e']));
+    await player.moveAudioSource(2, 3);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['b', 'c', 'e', 'f', 'd', 'e']));
+    await player.removeAudioSourceRange(0, 2);
+    expect(player.sequence.map((s) => s.tag as String?),
+        equals(['e', 'f', 'd', 'e']));
+    await player.removeAudioSourceAt(3);
+    expect(
+        player.sequence.map((s) => s.tag as String?), equals(['e', 'f', 'd']));
+    await player.removeAudioSourceRange(1, 3);
+    expect(player.sequence.map((s) => s.tag as String?), equals(['e']));
+    await player.setAudioSources([
+      AudioSource.uri(Uri.parse('https://a.a/a.mp3'), tag: 'a'),
+      AudioSource.uri(Uri.parse('https://b.b/b.mp3'), tag: 'b'),
+    ], preload: false);
+    expect(player.sequence.map((s) => s.tag as String?), equals(['a', 'b']));
+    await player.clearAudioSources();
+    expect(player.sequence.map((s) => s.tag as String?), equals(<String>[]));
+    await player.dispose();
+  });
+
+  test('playlist-state', () async {
+    final player = AudioPlayer();
+    expect(player.sequenceState.sequence, equals([]));
+    expect(player.sequenceState.currentIndex, equals(null));
+    expect(player.sequenceState.shuffleIndices, equals([]));
+    expect(player.sequenceState.shuffleModeEnabled, equals(false));
+    expect(player.sequenceState.loopMode, equals(LoopMode.off));
+    for (var shuffle in [false, true]) {
+      if (shuffle) {
+        await player.setShuffleModeEnabled(shuffle);
+      }
+      final playlist = [
+        AudioSource.uri(
+          Uri.parse("https://bar.bar/a.mp3"),
+          tag: 'a',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/b.mp3"),
+          tag: 'b',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/c.mp3"),
+          tag: 'c',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/d.mp3"),
+          tag: 'd',
+        ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/e.mp3"),
+          tag: 'e',
+        ),
+      ];
+      void expectEffectiveSequence() {
+        expect(
+            player.sequenceState.effectiveSequence,
+            shuffle
+                ? player.effectiveIndices
+                    .map((i) => player.sequence[i])
+                    .toList()
+                : player.sequence);
+      }
+
+      //List<int> effectiveSequenceToIndices() {
+      //  return player.effectiveSequence.map((IndexedAudioSource item) => player1.sequence.indexOf(item)).toList();
+      //}
+      await player.setAudioSources(playlist);
+      expect(player.sequenceState.sequence, equals(playlist));
+      expect(player.sequenceState.currentIndex, equals(0));
+      expect(player.sequenceState.currentSource, equals(playlist[0]));
+      expectEffectiveSequence();
+      await player.seek(Duration.zero, index: 4);
+      expect(player.sequenceState.sequence, equals(playlist));
+      expect(player.sequenceState.currentIndex, equals(4));
+      expect(player.sequenceState.currentSource, equals(playlist[4]));
+      await player.removeAudioSourceAt(4);
+      playlist.removeAt(4);
+      expectEffectiveSequence();
+      expect(player.sequenceState.sequence, equals(playlist));
+      expect(player.sequenceState.currentIndex, equals(3));
+      expect(player.sequenceState.currentSource, equals(playlist[3]));
+      await player.removeAudioSourceAt(1);
+      playlist.removeAt(1);
+      expect(player.sequenceState.sequence, equals(playlist));
+      expect(player.sequenceState.currentIndex, equals(2));
+      expect(player.sequenceState.currentSource, equals(playlist[2]));
+      await player.clearAudioSources();
+      playlist.clear();
+      expect(player.sequenceState.sequence, equals(playlist));
+      // expecting null here may change in a future version.
+      expect(player.sequenceState.currentIndex, equals(null));
+      expect(player.sequenceState.currentSource, equals(null));
       expectEffectiveSequence();
     }
     await player.dispose();
@@ -779,25 +1034,25 @@ void runTests() {
         equals(1));
     final player1 = AudioPlayer();
     await player1.setAudioSource(source1);
-    checkIndices(player1.shuffleIndices!, 5);
-    expect(player1.shuffleIndices!.first, equals(0));
-    expect(player1.effectiveIndices!,
-        List.generate(player1.sequence!.length, (i) => i));
+    checkIndices(player1.shuffleIndices, 5);
+    expect(player1.shuffleIndices.first, equals(0));
+    expect(player1.effectiveIndices,
+        List.generate(player1.sequence.length, (i) => i));
     await player1.seek(Duration.zero, index: 3);
     await player1.shuffle();
-    checkIndices(player1.shuffleIndices!, 5);
-    expect(player1.shuffleIndices!.first, equals(3));
-    expect(player1.effectiveIndices!,
-        List.generate(player1.sequence!.length, (i) => i));
+    checkIndices(player1.shuffleIndices, 5);
+    expect(player1.shuffleIndices.first, equals(3));
+    expect(player1.effectiveIndices,
+        List.generate(player1.sequence.length, (i) => i));
     await player1.setShuffleModeEnabled(true);
-    expect(player1.effectiveIndices!, player1.shuffleIndices!);
+    expect(player1.effectiveIndices, player1.shuffleIndices);
     await player1.dispose();
 
     final source2 = createSource();
     final player2 = AudioPlayer();
     await player2.setAudioSource(source2, initialIndex: 3);
-    checkIndices(player2.shuffleIndices!, 5);
-    expect(player2.shuffleIndices!.first, equals(3));
+    checkIndices(player2.shuffleIndices, 5);
+    expect(player2.shuffleIndices.first, equals(3));
     await player2.dispose();
   });
 
@@ -813,6 +1068,10 @@ void runTests() {
           Uri.parse("https://baz.baz/bar.mp3"),
           tag: 'bar',
         ),
+        AudioSource.uri(
+          Uri.parse("https://baz.baz/baz.mp3"),
+          tag: 'baz',
+        ),
       ],
     );
     final player = AudioPlayer();
@@ -825,11 +1084,15 @@ void runTests() {
     await player.seekToNext();
     expect(player.currentIndex, 1);
     expect(player.hasPrevious, true);
+    expect(player.hasNext, true);
+    await player.seekToNext();
+    expect(player.currentIndex, 2);
+    expect(player.hasPrevious, true);
     expect(player.hasNext, false);
     await player.seekToNext();
-    expect(player.currentIndex, 1);
+    expect(player.currentIndex, 2);
     await player.seekToPrevious();
-    expect(player.currentIndex, 0);
+    expect(player.currentIndex, 1);
     await player.dispose();
   });
 
@@ -876,7 +1139,7 @@ void runTests() {
   });
 
   test('play-load', () async {
-    for (var delayMs in [0, 100]) {
+    for (var delayMs in [0, 50]) {
       final player = AudioPlayer();
       player.play();
       if (delayMs != 0) {
@@ -888,14 +1151,15 @@ void runTests() {
       expect(player.processingState, equals(ProcessingState.ready));
       expect(player.playing, equals(true));
       expectDuration(player.position, Duration.zero);
-      await Future<dynamic>.delayed(const Duration(seconds: 1));
-      expectDuration(player.position, const Duration(seconds: 1));
+      const playDuration = Duration(milliseconds: 50);
+      await Future<dynamic>.delayed(playDuration);
+      expectDuration(player.position, playDuration);
       await player.dispose();
     }
   });
 
   test('play-set', () async {
-    for (var delayMs in [0, 100]) {
+    for (var delayMs in [0, 50]) {
       final player = AudioPlayer();
       player.play();
       if (delayMs != 0) {
@@ -907,8 +1171,9 @@ void runTests() {
       expect(player.processingState, equals(ProcessingState.ready));
       expect(player.playing, equals(true));
       expectDuration(player.position, Duration.zero);
-      await Future<dynamic>.delayed(const Duration(seconds: 1));
-      expectDuration(player.position, const Duration(seconds: 1));
+      const playDuration = Duration(milliseconds: 50);
+      await Future<dynamic>.delayed(playDuration);
+      expectDuration(player.position, playDuration);
       await player.dispose();
     }
   });
@@ -925,8 +1190,9 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, Duration.zero);
-    await Future<dynamic>.delayed(const Duration(seconds: 1));
-    expectDuration(player.position, const Duration(seconds: 1));
+    const playDuration = Duration(milliseconds: 50);
+    await Future<dynamic>.delayed(playDuration);
+    expectDuration(player.position, playDuration);
     await player.dispose();
   });
 
@@ -942,7 +1208,7 @@ void runTests() {
       preload: false,
     );
     expect(player.processingState, equals(ProcessingState.idle));
-    expect(player.sequence!.length, equals(2));
+    expect(player.sequence.length, equals(2));
     expect(player.playing, equals(false));
     await player.setAudioSource(
       ConcatenatingAudioSource(
@@ -955,8 +1221,43 @@ void runTests() {
       preload: false,
     );
     expect(player.processingState, equals(ProcessingState.idle));
-    expect(player.sequence!.length, equals(3));
+    expect(player.sequence.length, equals(3));
     expect(player.playing, equals(false));
+    await player.dispose();
+  });
+
+  test('load-stop-load-simultaneous', () async {
+    final player = AudioPlayer();
+    await player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    final stop1Future = player.stop();
+    final load1Future = player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    expectLater(load1Future, completion(audioSourceDuration));
+    await stop1Future.catchError((e) => null);
+    await load1Future.catchError((e) => null);
+    await player.dispose();
+  });
+
+  test('load-simultaneous', () async {
+    final player = AudioPlayer();
+    // Activate the platform
+    await player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    // Do two simultaneous loads
+    mock.mostRecentPlayer?.blockLoad();
+    final load1Future = player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    // Wait for first load to enter platform before starting second load.
+    await player.processingStateStream
+        .firstWhere((s) => s == ProcessingState.loading);
+    final load2Future = player
+        .setAudioSource(AudioSource.uri(Uri.parse('https://bar.bar/foo.mp3')));
+    mock.mostRecentPlayer?.unblockLoad();
+    expectLater(() => load1Future, throwsException);
+    expectLater(load2Future, completion(audioSourceDuration));
+    await load1Future.catchError((e) => null);
+    await load2Future.catchError((e) => null);
     await player.dispose();
   });
 
@@ -971,7 +1272,7 @@ void runTests() {
       ),
     );
     expect(player.processingState, equals(ProcessingState.ready));
-    expect(player.sequence!.length, equals(2));
+    expect(player.sequence.length, equals(2));
     expect(player.playing, equals(false));
     await player.setAudioSource(
       ConcatenatingAudioSource(
@@ -983,7 +1284,7 @@ void runTests() {
       ),
     );
     expect(player.processingState, equals(ProcessingState.ready));
-    expect(player.sequence!.length, equals(3));
+    expect(player.sequence.length, equals(3));
     expect(player.playing, equals(false));
     await player.dispose();
   });
@@ -999,7 +1300,7 @@ void runTests() {
       ),
     );
     expect(player.processingState, equals(ProcessingState.ready));
-    expect(player.sequence!.length, equals(2));
+    expect(player.sequence.length, equals(2));
     expect(player.playing, equals(false));
     await player.setAudioSource(
       ConcatenatingAudioSource(
@@ -1012,11 +1313,11 @@ void runTests() {
       preload: false,
     );
     expect(player.processingState, equals(ProcessingState.idle));
-    expect(player.sequence!.length, equals(3));
+    expect(player.sequence.length, equals(3));
     expect(player.playing, equals(false));
     await player.load();
     expect(player.processingState, equals(ProcessingState.ready));
-    expect(player.sequence!.length, equals(3));
+    expect(player.sequence.length, equals(3));
     expect(player.playing, equals(false));
     await player.dispose();
   });
@@ -1028,14 +1329,16 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, const Duration(seconds: 0));
-    await Future<dynamic>.delayed(const Duration(seconds: 1));
-    expectDuration(player.position, const Duration(seconds: 1));
+    const playDuration = Duration(milliseconds: 50);
+    await Future<dynamic>.delayed(playDuration);
+    expectDuration(player.position, playDuration);
     await player.setUrl('https://bar.bar/bar.mp3');
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
-    expectDuration(player.position, const Duration(seconds: 0));
-    await Future<dynamic>.delayed(const Duration(seconds: 1));
-    expectDuration(player.position, const Duration(seconds: 1));
+    final startPosition = player.position;
+    expectDuration(startPosition, const Duration(seconds: 0), epsilon: 100);
+    await Future<dynamic>.delayed(playDuration);
+    expectDuration(player.position, startPosition + playDuration);
     await player.dispose();
   });
 
@@ -1046,8 +1349,9 @@ void runTests() {
     expect(player.processingState, equals(ProcessingState.ready));
     expect(player.playing, equals(true));
     expectDuration(player.position, const Duration(seconds: 0));
-    await Future<dynamic>.delayed(const Duration(seconds: 1));
-    expectDuration(player.position, const Duration(seconds: 1));
+    const playDuration = Duration(milliseconds: 50);
+    await Future<dynamic>.delayed(playDuration);
+    expectDuration(player.position, playDuration);
     player.pause();
     expect(player.playing, equals(false));
     await player.setUrl('https://bar.bar/bar.mp3', preload: false);
@@ -1061,8 +1365,8 @@ void runTests() {
     player.play();
     expect(player.playing, equals(true));
     expectDuration(player.position, const Duration(seconds: 0));
-    await Future<dynamic>.delayed(const Duration(seconds: 1));
-    expectDuration(player.position, const Duration(seconds: 1));
+    await Future<dynamic>.delayed(playDuration);
+    expectDuration(player.position, playDuration);
     await player.dispose();
   });
 
@@ -1113,8 +1417,8 @@ void runTests() {
     await completer.future;
 
     const duration1 = Duration(seconds: 1);
-    const duration2 = Duration(milliseconds: 600);
-    const duration3 = Duration(milliseconds: 750);
+    const duration2 = Duration(milliseconds: 100);
+    const duration3 = Duration(milliseconds: 80);
 
     await player.seek(duration1);
     expectState(
@@ -1365,7 +1669,52 @@ void runTests() {
       expect(band.upperFrequency, equals((i + 1) * 1000));
       expect(band.centerFrequency, equals((i + 0.5) * 1000));
       expect(band.gain, equals(i * 0.1));
+      final newGain = i * 0.2;
+      await band.setGain(newGain);
+      expect(band.gain, equals(newGain));
     }
+    await player.stop();
+    await player.load();
+    expect(equalizer.enabled, equals(true));
+    expect(parameters.minDecibels, equals(0.0));
+    expect(parameters.maxDecibels, equals(10.0));
+    expect(bands.length, equals(5));
+    for (var i = 0; i < 5; i++) {
+      final band = bands[i];
+      expect(band.index, equals(i));
+      expect(band.lowerFrequency, equals(i * 1000));
+      expect(band.upperFrequency, equals((i + 1) * 1000));
+      expect(band.centerFrequency, equals((i + 0.5) * 1000));
+      expect(band.gain, equals(i * 0.2));
+    }
+  });
+
+  test('asyncMessages', () async {
+    final player = AudioPlayer();
+    await player.setUrl('https://foo.foo/foo.mp3');
+    final platform = mock.mostRecentPlayer!;
+    expect(player.playing, equals(false));
+    expect(player.volume, equals(1.0));
+    expect(player.speed, equals(1.0));
+    expect(player.pitch, equals(1.0));
+    expect(player.loopMode, LoopMode.off);
+    expect(player.shuffleModeEnabled, equals(false));
+    platform._broadcastDataMessage(PlayerDataMessage(
+      playing: true,
+      volume: 0.7,
+      speed: 0.8,
+      pitch: 0.9,
+      loopMode: LoopModeMessage.all,
+      shuffleMode: ShuffleModeMessage.all,
+    ));
+    await Future<void>.delayed(Duration.zero);
+    expect(player.playing, equals(true));
+    expect(player.volume, equals(0.7));
+    expect(player.speed, equals(0.8));
+    expect(player.pitch, equals(0.9));
+    expect(player.loopMode, equals(LoopMode.all));
+    expect(player.shuffleModeEnabled, equals(true));
+    await player.dispose();
   });
 }
 
@@ -1407,7 +1756,7 @@ class MockJustAudio extends Mock
   }
 }
 
-const audioSourceDuration = Duration(minutes: 2);
+const audioSourceDuration = Duration(seconds: 30);
 
 final icyMetadata = IcyMetadata(
   headers: IcyHeaders(
@@ -1441,11 +1790,13 @@ final icyMetadataMessage = IcyMetadataMessage(
 
 class MockAudioPlayer extends AudioPlayerPlatform {
   final eventController = StreamController<PlaybackEventMessage>();
+  final dataMessageController = StreamController<PlayerDataMessage>();
   final AudioLoadConfigurationMessage? audioLoadConfiguration;
   AudioSourceMessage? _audioSource;
   ProcessingStateMessage _processingState = ProcessingStateMessage.idle;
   Duration _updatePosition = Duration.zero;
   DateTime _updateTime = DateTime.now();
+  MockLoadRequest? _loadRequest;
   // ignore: prefer_final_fields
   Duration? _duration;
   int? _index;
@@ -1454,6 +1805,9 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   Completer<dynamic>? _playCompleter;
   Timer? _playTimer;
   LoopModeMessage _loopMode = LoopModeMessage.off;
+  int? _errorCode;
+  String? _errorMessage;
+  Completer<void>? _loadBlock;
 
   MockAudioPlayer(InitRequest request)
       : audioLoadConfiguration = request.audioLoadConfiguration,
@@ -1461,24 +1815,64 @@ class MockAudioPlayer extends AudioPlayerPlatform {
 
   @override
   Stream<PlayerDataMessage> get playerDataMessageStream =>
-      StreamController<PlayerDataMessage>().stream;
+      dataMessageController.stream;
 
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream =>
       eventController.stream;
 
+  void _broadcastDataMessage(PlayerDataMessage message) {
+    dataMessageController.add(message);
+  }
+
+  void blockLoad() {
+    _loadBlock ??= Completer();
+  }
+
+  void unblockLoad() {
+    _loadBlock?.complete();
+    _loadBlock = null;
+  }
+
+  Future<void> _loadReady() async {
+    if (_loadBlock != null) {
+      await _loadBlock!.future;
+    }
+  }
+
+  PlatformException _sendError(int errorCode, String errorMessage,
+      {bool switchToIdle = true}) {
+    final e = PlatformException(code: '$errorCode', message: errorMessage);
+    eventController.addError(e);
+    if (switchToIdle) {
+      _processingState = ProcessingStateMessage.idle;
+    }
+    _errorCode = errorCode;
+    _errorMessage = errorMessage;
+    _broadcastPlaybackEvent();
+    return e;
+  }
+
   @override
   Future<LoadResponse> load(LoadRequest request) async {
-    final audioSource = request.audioSourceMessage;
+    _loadRequest?.interrupted = true;
+    final loadRequest = _loadRequest = MockLoadRequest();
+    final playlist =
+        request.audioSourceMessage as ConcatenatingAudioSourceMessage;
+    if (playlist.children.isEmpty) return LoadResponse(duration: null);
+    final audioSource = playlist.children.first;
     _processingState = ProcessingStateMessage.loading;
+    _errorCode = null;
+    _errorMessage = null;
     _broadcastPlaybackEvent();
     if (audioSource is UriAudioSourceMessage) {
-      if (audioSource.uri.contains('abort')) {
-        throw PlatformException(code: 'abort', message: 'Failed to load URL');
-      } else if (audioSource.uri.contains('404')) {
-        throw PlatformException(code: '404', message: 'Not found');
-      } else if (audioSource.uri.contains('error')) {
-        throw PlatformException(code: 'error', message: 'Unknown error');
+      final uri = Uri.parse(audioSource.uri);
+      if (uri.path.contains('abort')) {
+        throw _sendError(415, 'Failed to load URL');
+      } else if (uri.path.contains('404')) {
+        throw _sendError(404, 'Not found: ${audioSource.uri}');
+      } else if (uri.path.contains('error')) {
+        throw _sendError(500, 'Unknown error');
       }
       _duration = audioSourceDuration;
     } else if (audioSource is ClippingAudioSourceMessage) {
@@ -1492,13 +1886,17 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     _audioSource = audioSource;
     _index = request.initialIndex ?? 0;
     // Simulate loading time.
-    await Future<dynamic>.delayed(const Duration(milliseconds: 100));
+    await _loadReady();
+    if (loadRequest.interrupted) {
+      throw _sendError(10000000, 'Connection aborted', switchToIdle: false);
+    }
     _setPosition(request.initialPosition ?? Duration.zero);
     _processingState = ProcessingStateMessage.ready;
     _broadcastPlaybackEvent();
     if (_playing) {
       _startTimer();
     }
+    _loadRequest = null;
     return LoadResponse(duration: _duration);
   }
 
@@ -1518,6 +1916,8 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     _playTimer = Timer(_remaining, () {
       _setPosition(_position);
       _processingState = ProcessingStateMessage.completed;
+      _errorCode = null;
+      _errorMessage = null;
       _broadcastPlaybackEvent();
       _playCompleter?.complete();
     });
@@ -1526,10 +1926,10 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<PauseResponse> pause(PauseRequest request) async {
     if (!_playing) return PauseResponse();
+    _setPosition(_position);
     _playing = false;
     _playTimer?.cancel();
     _playCompleter?.complete();
-    _setPosition(_position);
     _broadcastPlaybackEvent();
     return PauseResponse();
   }
@@ -1606,8 +2006,12 @@ class MockAudioPlayer extends AudioPlayerPlatform {
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
+    await Future<dynamic>.delayed(const Duration(milliseconds: 10));
     _processingState = ProcessingStateMessage.idle;
+    _errorCode = null;
+    _errorMessage = null;
     _broadcastPlaybackEvent();
+    eventController.close();
     return DisposeResponse();
   }
 
@@ -1640,6 +2044,8 @@ class MockAudioPlayer extends AudioPlayerPlatform {
     }
     eventController.add(PlaybackEventMessage(
       processingState: _processingState,
+      errorCode: _errorCode,
+      errorMessage: _errorMessage,
       updatePosition: _updatePosition,
       updateTime: _updateTime,
       bufferedPosition: _position,
@@ -1695,6 +2101,12 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
+  Future<SetAllowsExternalPlaybackResponse> setAllowsExternalPlayback(
+      SetAllowsExternalPlaybackRequest request) async {
+    return SetAllowsExternalPlaybackResponse();
+  }
+
+  @override
   Future<AudioEffectSetEnabledResponse> audioEffectSetEnabled(
       AudioEffectSetEnabledRequest request) async {
     return AudioEffectSetEnabledResponse();
@@ -1733,6 +2145,10 @@ class MockAudioPlayer extends AudioPlayerPlatform {
       AndroidEqualizerBandSetGainRequest request) async {
     return AndroidEqualizerBandSetGainResponse();
   }
+}
+
+class MockLoadRequest {
+  bool interrupted = false;
 }
 
 final byteRangeData = List.generate(200, (i) => i);

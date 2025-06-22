@@ -17,11 +17,19 @@ final duration = await player.setUrl(           // Load a URL
 player.play();                                  // Play without waiting for completion
 await player.play();                            // Play while waiting for completion
 await player.pause();                           // Pause but remain ready to play
-await player.seek(Duration(second: 10));        // Jump to the 10 second position
+await player.seek(Duration(seconds: 10));       // Jump to the 10 second position
 await player.setSpeed(2.0);                     // Twice as fast
 await player.setVolume(0.5);                    // Half as loud
 await player.stop();                            // Stop and free resources
 ```
+
+### Migrating to 0.10.x
+
+* iOS: You may remove the compile flag `AUDIO_SESSION_MICROPHONE=0` since this is now the default.
+* Instead of `player.setAudioSource(ConcatenatingAudioSource(children: sources))` use `player.setAudioSources(sources)`.
+* Instead of `LoopingAudioSource(child: source, count: N)` use `...List.filled(N, source)`.
+* Instead of listening to `player.playbackEventStream.onError`, listen to `player.errorStream`.
+* If you would like to emulate the previous skip-on-error setting, use constructor parameter `maxSkipsOnError: 6`.
 
 ### Working with multiple players
 
@@ -65,21 +73,16 @@ await player.setClip(); // Clear clip region
 
 ```dart
 // Define the playlist
-final playlist = ConcatenatingAudioSource(
-  // Start loading next item just before reaching it
-  useLazyPreparation: true,
-  // Customise the shuffle algorithm
-  shuffleOrder: DefaultShuffleOrder(),
-  // Specify the playlist items
-  children: [
-    AudioSource.uri(Uri.parse('https://example.com/track1.mp3')),
-    AudioSource.uri(Uri.parse('https://example.com/track2.mp3')),
-    AudioSource.uri(Uri.parse('https://example.com/track3.mp3')),
-  ],
+final playlist = <AudioSource>[
+  AudioSource.uri(Uri.parse('https://example.com/track1.mp3')),
+  AudioSource.uri(Uri.parse('https://example.com/track2.mp3')),
+  AudioSource.uri(Uri.parse('https://example.com/track3.mp3')),
+];
+// Load the playlist
+await player.setAudioSources(playlist, initialIndex: 0, initialPosition: Duration.zero,
+  useLazyPreparation: true,                    // Load each item just in time
+  shuffleOrder: DefaultShuffleOrder(),         // Customise the shuffle algorithm
 );
-
-// Load and play the playlist
-await player.setAudioSource(playlist, initialIndex: 0, initialPosition: Duration.zero);
 await player.seekToNext();                     // Skip to the next item
 await player.seekToPrevious();                 // Skip to the previous item
 await player.seek(Duration.zero, index: 2);    // Skip to the start of track3.mp3
@@ -87,9 +90,10 @@ await player.setLoopMode(LoopMode.all);        // Set playlist to loop (off|all|
 await player.setShuffleModeEnabled(true);      // Shuffle playlist order (true|false)
 
 // Update the playlist
-await playlist.add(newChild1);
-await playlist.insert(3, newChild2);
-await playlist.removeAt(3);
+await player.addAudioSource(newChild1);
+await player.insertAudioSource(3, newChild2);
+await player.removeAudioSourceAt(3);
+await player.moveAudioSource(2, 1);
 ```
 
 ### Working with headers
@@ -181,19 +185,13 @@ try {
   print('An error occured: $e');
 }
 
-// Catching errors during playback (e.g. lost network connection)
-player.playbackEventStream.listen((event) {}, onError: (Object e, StackTrace st) {
-  if (e is PlatformException) {
-    print('Error code: ${e.code}');
-    print('Error message: ${e.message}');
-    print('AudioSource index: ${e.details?["index"]}');
-  } else {
-    print('An error occurred: $e');
-  }
+// Listening to errors during playback (e.g. lost network connection)
+player.errorStream.listen((PlayerException e) {
+  print('Error code: ${e.code}');
+  print('Error message: ${e.message}');
+  print('AudioSource index: ${e.index}');
 });
 ```
-
-Note: In a future release, the exception type on `playbackEventStream` will change from `PlatformException` to `PlayerException`.
 
 ### Working with state streams
 
@@ -279,33 +277,9 @@ dependencies {
 }
 ```
 
+Note: the Android Gradle Plugin (AGP) versions 8.6 and 8.7 contain a bug that affects ExoPlayer in release mode. To avoid this, either downgrade or upgrade your AGP version.
+
 ### iOS
-
-Using the default configuration, the App Store will detect that your app uses the AVAudioSession API which includes a microphone API, and for privacy reasons it will ask you to describe your app's usage of the microphone. If your app does indeed use the microphone, you can describe your usage by editing the `Info.plist` file as follows:
-
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>... explain why the app uses the microphone here ...</string>
-```
-
-But if your app does not use the microphone, you can pass a build option to "compile out" any microphone code so that the App Store won't ask for the above usage description. To do so, edit your `ios/Podfile` as follows:
-
-```ruby
-post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    flutter_additional_ios_build_settings(target)
-    
-    # ADD THE NEXT SECTION
-    target.build_configurations.each do |config|
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
-        '$(inherited)',
-        'AUDIO_SESSION_MICROPHONE=0'
-      ]
-    end
-    
-  end
-end
-```
 
 If you wish to connect to non-HTTPS URLs, or if you use a feature that depends on the proxy such as headers, caching or stream audio sources, add the following to your `Info.plist` file:
 
@@ -316,8 +290,6 @@ If you wish to connect to non-HTTPS URLs, or if you use a feature that depends o
     <true/>
 </dict>
 ```
-
-The iOS player relies on server headers (e.g. `Content-Type`, `Content-Length` and [byte range requests](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/CreatingVideoforSafarioniPhone/CreatingVideoforSafarioniPhone.html#//apple_ref/doc/uid/TP40006514-SW6)) to know how to decode the file and where applicable to report its duration. In the case of files, iOS relies on the file extension.
 
 ### macOS
 
@@ -344,6 +316,7 @@ The macOS player relies on server headers (e.g. `Content-Type`, `Content-Length`
 
 Windows support is enabled by adding an additional dependency to your `pubspec.yaml` alongside `just_audio`. There are a number of alternative options:
 
+* [just_audio_media_kit](https://pub.dev/packages/just_audio_media_kit)
 * [just_audio_windows](https://pub.dev/packages/just_audio_windows)
 * [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia)
 
@@ -352,7 +325,8 @@ Example:
 ```yaml
 dependencies:
   just_audio: any # substitute version number
-  just_audio_windows: any # substitute version number
+  just_audio_media_kit: any # substitute version number
+  media_kit_libs_windows_audio: any # substitute version number
 ```
 
 For issues with the Windows implementation, please open an issue on the respective implementation's GitHub issues page.
@@ -361,13 +335,14 @@ For issues with the Windows implementation, please open an issue on the respecti
 
 Linux support is enabled by adding an additional dependency to your `pubspec.yaml` alongside `just_audio`. There are a number of alternative options:
 
-* [just_audio_mpv](https://pub.dev/packages/just_audio_mpv)
+* [just_audio_media_kit](https://pub.dev/packages/just_audio_media_kit)
 * [just_audio_libwinmedia](https://pub.dev/packages/just_audio_libwinmedia) (untested)
 
 ```yaml
 dependencies:
   just_audio: any # substitute version number
-  just_audio_mpv: any # substitute version number
+  just_audio_media_kit: any # substitute version number
+  media_kit_libs_linux: any # substitute version number
 ```
 
 For issues with the Linux implementation, please open an issue on the respective implementation's GitHub issues page.
@@ -443,18 +418,17 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 | buffer status/position         | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | play/pause/seek                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | set volume/speed               | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| clip audio                     | ✅      | ✅  | ✅    | ✅  |         | ✅    |
+| clip audio                     | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | playlists                      | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | looping/shuffling              | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
-| compose audio                  | ✅      | ✅  | ✅    | ✅  |         | ✅    |
 | gapless playback               | ✅      | ✅  | ✅    |     | ✅      | ✅    |
 | report player errors           | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | handle phonecall interruptions | ✅      | ✅  |       |     |         |       |
-| buffering/loading options      | ✅      | ✅  | ✅    |     |         |       |
+| buffering/loading options      | ✅      | ✅  | ✅    |     | ✅      | ✅    |
 | set pitch                      | ✅      |     |       |     |         |       |
 | skip silence                   | ✅      |     |       |     |         |       |
-| equalizer                      | ✅      |     |       |     |         | ✅    |
-| volume boost                   | ✅      |     |       |     |         | ✅    |
+| equalizer                      | ✅      |     |       |     |         |       |
+| volume boost                   | ✅      |     |       |     |         |       |
 
 (*): While request headers cannot be set directly on Web, cookies can be used to send information in the [Cookie header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cookie). See also `AudioPlayer.setWebCrossOrigin` to allow sending cookies when loading audio files from the same origin or a different origin.
 
@@ -474,7 +448,7 @@ Please consider reporting any bugs you encounter [here](https://github.com/ryanh
 
 The state of the player consists of two orthogonal states: `playing` and `processingState`. The `playing` state typically maps to the app's play/pause button and only ever changes in response to direct method calls by the app. By contrast, `processingState` reflects the state of the underlying audio decoder and can change both in response to method calls by the app and also in response to events occurring asynchronously within the audio processing pipeline. The following diagram depicts the valid state transitions:
 
-![just_audio_states](https://user-images.githubusercontent.com/19899190/103147563-e6601100-47aa-11eb-8baf-dee00d8e2cd4.png)
+![just_audio_states](https://github.com/user-attachments/assets/177a80fd-29e2-493f-a29d-2a3c34e42835)
 
 This state model provides a flexible way to capture different combinations of states such as playing+buffering vs paused+buffering, and this allows state to be more accurately represented in an app's UI. It is important to understand that even when `playing == true`, no sound will actually be audible unless `processingState == ready` which indicates that the buffers are filled and ready to play. This makes intuitive sense when imagining the `playing` state as mapping onto an app's play/pause button:
 
@@ -483,6 +457,14 @@ This state model provides a flexible way to capture different combinations of st
 * When playback reaches the end of the audio stream, the player remains in the `playing` state with the seek bar positioned at the end of the track. No sound will be audible until the app seeks to an earlier point in the stream. Some apps may choose to display a "replay" button in place of the play/pause button at this point, which calls `seek(Duration.zero)`. When clicked, playback will automatically continue from the seek point (because it was never paused in the first place). Other apps may instead wish to listen for the `processingState == completed` event and programmatically pause and rewind the audio at that point.
 
 Apps that wish to react to both orthogonal states through a single combined stream may listen to `playerStateStream`. This stream will emit events that contain the latest value of both `playing` and `processingState`.
+
+### Exceptions to the rule
+
+The `playing` state normally changes only according to direct method calls by the app. However, there are some exceptions:
+
+* When the `hundleInterruptions` constructor parameter is `true`, just_audio will automatically pause the player whenever there is an interruption to the audio session (such as a phone call), and will in some cases resume playback when the interruption ends.
+* When just_audio_background is used and the user interacts with the media notification's play/pause buttons, these will automatically call the `play` and `pause` methods on the player.
+* When the `maxSkipsOnError` parameter is set to a positive number `N`, just_audio will automatically pause the player after encountering `N` consecutive errors in the playlist.
 
 ## Configuring the audio session
 
