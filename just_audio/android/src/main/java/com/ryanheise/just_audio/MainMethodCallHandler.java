@@ -42,7 +42,8 @@ public class MainMethodCallHandler implements MethodCallHandler {
                     id,
                     call.argument("audioLoadConfiguration"),
                     rawAudioEffects,
-                    call.argument("androidOffloadSchedulingEnabled")
+                    call.argument("androidOffloadSchedulingEnabled"),
+		    call.argument("useLazyPreparation")
                 )
             );
             result.success(null);

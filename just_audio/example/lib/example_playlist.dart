@@ -5,15 +5,22 @@
 //
 // flutter run -t lib/example_playlist.dart
 
+import 'dart:async';
+
+import 'media_kit_stub.dart' if (dart.library.io) 'media_kit_impl.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_example/common.dart';
 import 'package:rxdart/rxdart.dart';
 
-void main() => runApp(const MyApp());
+void main() {
+  initMediaKit(); // Initialise just_audio_media_kit for Linux/Windows.
+  // Enable gapless playback on Linux/Windows (experimental):
+  // JustAudioMediaKit.prefetchPlaylist = true;
+  runApp(const MyApp());
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -24,23 +31,19 @@ class MyApp extends StatefulWidget {
 
 class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late AudioPlayer _player;
-  final _playlist = ConcatenatingAudioSource(children: [
-    // Remove this audio source from the Windows and Linux version because it's not supported yet
-    if (kIsWeb ||
-        ![TargetPlatform.windows, TargetPlatform.linux]
-            .contains(defaultTargetPlatform))
-      ClippingAudioSource(
-        start: const Duration(seconds: 60),
-        end: const Duration(seconds: 90),
-        child: AudioSource.uri(Uri.parse(
-            "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
-        tag: AudioMetadata(
-          album: "Science Friday",
-          title: "A Salute To Head-Scratching Science (30 seconds)",
-          artwork:
-              "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
-        ),
+  static final _playlist = [
+    ClippingAudioSource(
+      start: const Duration(seconds: 60),
+      end: const Duration(seconds: 90),
+      child: AudioSource.uri(Uri.parse(
+          "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3")),
+      tag: AudioMetadata(
+        album: "Science Friday",
+        title: "A Salute To Head-Scratching Science (30 seconds)",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
+    ),
     AudioSource.uri(
       Uri.parse(
           "https://s3.amazonaws.com/scifri-episodes/scifri20181123-episode.mp3"),
@@ -69,7 +72,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
-  ]);
+  ];
   int _addedCount = 0;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -77,7 +80,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     ambiguate(WidgetsBinding.instance)!.addObserver(this);
-    _player = AudioPlayer();
+    _player = AudioPlayer(maxSkipsOnError: 3);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.black,
     ));
@@ -88,17 +91,14 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.speech());
     // Listen to errors during playback.
-    _player.playbackEventStream.listen((event) {},
-        onError: (Object e, StackTrace stackTrace) {
+    _player.errorStream.listen((e) {
       print('A stream error occurred: $e');
     });
     try {
-      // Preloading audio is not currently supported on Linux.
-      await _player.setAudioSource(_playlist,
-          preload: kIsWeb || defaultTargetPlatform != TargetPlatform.linux);
+      await _player.setAudioSources(_playlist);
     } on PlayerException catch (e) {
       // Catch load errors: 404, invalid url...
-      print("Error loading audio source: $e");
+      print("Error loading playlist: $e");
     }
     // Show a snackbar whenever reaching the end of an item in the playlist.
     _player.positionDiscontinuityStream.listen((discontinuity) {
@@ -116,7 +116,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void _showItemFinished(int? index) {
     if (index == null) return;
     final sequence = _player.sequence;
-    if (sequence == null) return;
+    if (index >= sequence.length) return;
     final source = sequence[index];
     final metadata = source.tag as AudioMetadata;
     _scaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
@@ -269,7 +269,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     return ReorderableListView(
                       onReorder: (int oldIndex, int newIndex) {
                         if (oldIndex < newIndex) newIndex--;
-                        _playlist.move(oldIndex, newIndex);
+                        _player.moveAudioSource(oldIndex, newIndex);
                       },
                       children: [
                         for (var i = 0; i < sequence.length; i++)
@@ -283,18 +283,17 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                                 child: Icon(Icons.delete, color: Colors.white),
                               ),
                             ),
-                            onDismissed: (dismissDirection) {
-                              _playlist.removeAt(i);
-                            },
+                            onDismissed: (dismissDirection) =>
+                                _player.removeAudioSourceAt(i),
                             child: Material(
                               color: i == state!.currentIndex
                                   ? Colors.grey.shade300
                                   : null,
                               child: ListTile(
                                 title: Text(sequence[i].tag.title as String),
-                                onTap: () {
-                                  _player.seek(Duration.zero, index: i);
-                                },
+                                onTap: () => _player
+                                    .seek(Duration.zero, index: i)
+                                    .catchError((e, st) {}),
                               ),
                             ),
                           ),
@@ -309,7 +308,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
         floatingActionButton: FloatingActionButton(
           child: const Icon(Icons.add),
           onPressed: () {
-            _playlist.add(AudioSource.uri(
+            _player.addAudioSource(AudioSource.uri(
               Uri.parse("asset:///audio/nature.mp3"),
               tag: AudioMetadata(
                 album: "Public Domain",
@@ -357,12 +356,18 @@ class ControlButtons extends StatelessWidget {
             onPressed: player.hasPrevious ? player.seekToPrevious : null,
           ),
         ),
-        StreamBuilder<PlayerState>(
-          stream: player.playerStateStream,
+        StreamBuilder<(bool, ProcessingState, int)>(
+          stream: Rx.combineLatest2(
+              player.playerEventStream,
+              player.sequenceStream,
+              (event, sequence) => (
+                    event.playing,
+                    event.playbackEvent.processingState,
+                    sequence.length,
+                  )),
           builder: (context, snapshot) {
-            final playerState = snapshot.data;
-            final processingState = playerState?.processingState;
-            final playing = playerState?.playing;
+            final (playing, processingState, sequenceLength) =
+                snapshot.data ?? (false, null, 0);
             if (processingState == ProcessingState.loading ||
                 processingState == ProcessingState.buffering) {
               return Container(
@@ -371,11 +376,11 @@ class ControlButtons extends StatelessWidget {
                 height: 64.0,
                 child: const CircularProgressIndicator(),
               );
-            } else if (playing != true) {
+            } else if (!playing) {
               return IconButton(
                 icon: const Icon(Icons.play_arrow),
                 iconSize: 64.0,
-                onPressed: player.play,
+                onPressed: sequenceLength > 0 ? player.play : null,
               );
             } else if (processingState != ProcessingState.completed) {
               return IconButton(
@@ -387,8 +392,10 @@ class ControlButtons extends StatelessWidget {
               return IconButton(
                 icon: const Icon(Icons.replay),
                 iconSize: 64.0,
-                onPressed: () => player.seek(Duration.zero,
-                    index: player.effectiveIndices!.first),
+                onPressed: sequenceLength > 0
+                    ? () => player.seek(Duration.zero,
+                        index: player.effectiveIndices.first)
+                    : null,
               );
             }
           },
