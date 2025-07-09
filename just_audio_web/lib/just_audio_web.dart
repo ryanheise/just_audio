@@ -538,10 +538,10 @@ class Html5AudioPlayer extends JustAudioPlayer {
   AudioSourcePlayer getAudioSource(AudioSourceMessage audioSourceMessage) {
     final id = audioSourceMessage.id;
     var audioSourcePlayer = _audioSourcePlayers[id];
-    if (audioSourcePlayer == null) {
+    // if (audioSourcePlayer == null) {
       audioSourcePlayer = decodeAudioSource(audioSourceMessage);
       _audioSourcePlayers[id] = audioSourcePlayer;
-    }
+    // }
     return audioSourcePlayer;
   }
 
