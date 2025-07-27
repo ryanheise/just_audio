@@ -237,13 +237,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
         _hls!.on(
           'hlsError',
           ((JSObject _, JSObject data) {
-            final HlsError _data = HlsError(data);
-            if (_data.fatal) {
+            final HlsError hlsData = HlsError(data);
+            if (hlsData.fatal) {
               _eventController.addError(
                 PlatformException(
                   code: kErrorValueToErrorName[2]!,
-                  message: _data.type,
-                  details: _data.details,
+                  message: hlsData.type,
+                  details: hlsData.details,
                 ),
               );
             }
@@ -270,7 +270,9 @@ class Html5AudioPlayer extends JustAudioPlayer {
         'application/vnd.apple.mpegurl',
       );
       canPlayHls = canPlayType != '';
-    } catch (e) {}
+    } catch (e) {
+      canPlayHls = false;
+    }
     return canPlayHls;
   }
 
