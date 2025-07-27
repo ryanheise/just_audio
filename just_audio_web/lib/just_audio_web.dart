@@ -215,9 +215,10 @@ class Html5AudioPlayer extends JustAudioPlayer {
       try {
         _hls = Hls(
           HlsConfig(
-            debug: true.toJS, // Enable debug logging in HLS.js
+            debug: false.toJS, // Enable to output debug logging in HLS.js
             xhrSetup: ((JSObject xhr, String _) {
               return;
+              // Note: Not tested yet, but could be used to set headers for HLS requests.
               // if (headers.isEmpty) {
               //   return;
               // }
@@ -389,7 +390,6 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
       _durationCompleter = Completer<dynamic>();
       _audioElement.id = 'audioPlayer-$id';
-      _audioElement.src = src;
       _audioElement.playbackRate = _speed;
       _audioElement.preload = 'auto';
       ui_web.platformViewRegistry.registerViewFactory(
@@ -401,6 +401,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
         // handled in function
       } else {
         // normal audio
+        _audioElement.src = src;
         await _audioElementQueue.load();
       }
 
