@@ -3,7 +3,6 @@ import 'dart:js_interop';
 import 'dart:math';
 import 'dart:ui_web' as ui_web;
 
-import 'package:logging/logging.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -217,22 +216,21 @@ class Html5AudioPlayer extends JustAudioPlayer {
         _hls = Hls(
           HlsConfig(
             debug: true.toJS, // Enable debug logging in HLS.js
-            xhrSetup:
-                ((JSObject xhr, String _) {
-                  return;
-                  // if (headers.isEmpty) {
-                  //   return;
-                  // }
+            xhrSetup: ((JSObject xhr, String _) {
+              return;
+              // if (headers.isEmpty) {
+              //   return;
+              // }
 
-                  // if (headers.containsKey('useCookies')) {
-                  //   xhr.withCredentials = true;
-                  // }
-                  // headers.forEach((String key, String value) {
-                  //   if (key != 'useCookies') {
-                  //     xhr.setRequestHeader(key, value);
-                  //   }
-                  // });
-                }).toJS,
+              // if (headers.containsKey('useCookies')) {
+              //   xhr.withCredentials = true;
+              // }
+              // headers.forEach((String key, String value) {
+              //   if (key != 'useCookies') {
+              //     xhr.setRequestHeader(key, value);
+              //   }
+              // });
+            }).toJS,
           ),
         );
 
@@ -497,11 +495,10 @@ class Html5AudioPlayer extends JustAudioPlayer {
   Future<SetWebCrossOriginResponse> setWebCrossOrigin(
     SetWebCrossOriginRequest request,
   ) async {
-    _audioElement.crossOrigin =
-        const {
-          WebCrossOriginMessage.anonymous: 'anonymous',
-          WebCrossOriginMessage.useCredentials: 'use-credentials',
-        }[request.crossOrigin];
+    _audioElement.crossOrigin = const {
+      WebCrossOriginMessage.anonymous: 'anonymous',
+      WebCrossOriginMessage.useCredentials: 'use-credentials',
+    }[request.crossOrigin];
     return SetWebCrossOriginResponse();
   }
 
@@ -543,7 +540,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _concatenating(request.id)!.setShuffleOrder(request.shuffleOrder);
     _concatenating(
       request.id,
-    )!.insertAll(request.index, getAudioSources(request.children));
+    )!
+        .insertAll(request.index, getAudioSources(request.children));
     if (_index != null && wasNotEmpty && request.index <= _index!) {
       _index = _index! + request.children.length;
     }
@@ -566,7 +564,8 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _concatenating(request.id)!.setShuffleOrder(request.shuffleOrder);
     _concatenating(
       request.id,
-    )!.removeRange(request.startIndex, request.endIndex);
+    )!
+        .removeRange(request.startIndex, request.endIndex);
     if (_index != null) {
       if (_index! >= request.startIndex && _index! < request.endIndex) {
         // Skip backward if there's nothing after this
@@ -622,7 +621,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<SetAutomaticallyWaitsToMinimizeStallingResponse>
-  setAutomaticallyWaitsToMinimizeStalling(
+      setAutomaticallyWaitsToMinimizeStalling(
     SetAutomaticallyWaitsToMinimizeStallingRequest request,
   ) async {
     return SetAutomaticallyWaitsToMinimizeStallingResponse();
@@ -630,7 +629,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   @override
   Future<SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse>
-  setCanUseNetworkResourcesForLiveStreamingWhilePaused(
+      setCanUseNetworkResourcesForLiveStreamingWhilePaused(
     SetCanUseNetworkResourcesForLiveStreamingWhilePausedRequest request,
   ) async {
     return SetCanUseNetworkResourcesForLiveStreamingWhilePausedResponse();
@@ -673,7 +672,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   AudioSourcePlayer getAudioSource(AudioSourceMessage audioSourceMessage) {
     final id = audioSourceMessage.id;
     var audioSourcePlayer = _audioSourcePlayers[id];
-    if (audioSourcePlayer == null) {
+    if (audioSourcePlayer == null || id.isEmpty) {
       audioSourcePlayer = decodeAudioSource(audioSourceMessage);
       _audioSourcePlayers[id] = audioSourcePlayer;
     }
@@ -752,7 +751,7 @@ abstract class AudioSourcePlayer {
 /// A player for an [IndexedAudioSourceMessage].
 abstract class IndexedAudioSourcePlayer extends AudioSourcePlayer {
   IndexedAudioSourcePlayer(Html5AudioPlayer html5AudioPlayer, String id)
-    : super(html5AudioPlayer, id);
+      : super(html5AudioPlayer, id);
 
   /// Loads the audio for the underlying audio source.
   Future<Duration?> load([int? initialPosition]);
@@ -937,8 +936,8 @@ class ConcatenatingAudioSourcePlayer extends AudioSourcePlayer {
     this.audioSourcePlayers,
     this.useLazyPreparation,
     List<int> shuffleOrder,
-  ) : _shuffleOrder = shuffleOrder,
-      super(html5AudioPlayer, id);
+  )   : _shuffleOrder = shuffleOrder,
+        super(html5AudioPlayer, id);
 
   @override
   List<IndexedAudioSourcePlayer> get sequence =>
@@ -1034,8 +1033,7 @@ class ClippingAudioSourcePlayer extends IndexedAudioSourcePlayer {
     _initialPos = null;
     if (fullDuration != null) {
       _duration = Duration(
-        milliseconds:
-            min(
+        milliseconds: min(
               (end ?? fullDuration).inMilliseconds,
               fullDuration.inMilliseconds,
             ) -
@@ -1159,8 +1157,7 @@ class LoopingAudioSourcePlayer extends AudioSourcePlayer {
   ) : super(html5AudioPlayer, id);
 
   @override
-  List<IndexedAudioSourcePlayer> get sequence =>
-      List.generate(
+  List<IndexedAudioSourcePlayer> get sequence => List.generate(
         count,
         (i) => audioSourcePlayer,
       ).expand((p) => p.sequence).toList();

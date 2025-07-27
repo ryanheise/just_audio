@@ -1,3 +1,7 @@
+## 0.4.17
+
+* Add support for HLS streams in just_audio_web (@dindils)
+
 ## 0.4.16
 
 * Fix play interrupted by load.
