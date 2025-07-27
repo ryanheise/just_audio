@@ -2720,6 +2720,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
         '.aifc': 'audio/x-aiff',
         '.aiff': 'audio/x-aiff',
         '.m3u': 'audio/x-mpegurl',
+        '.m3u8': 'application/x-mpegurl',
       };
       // Default to 'audio/mpeg'
       final mimeType =
