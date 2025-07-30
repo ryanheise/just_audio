@@ -347,6 +347,14 @@ dependencies:
 
 For issues with the Linux implementation, please open an issue on the respective implementation's GitHub issues page.
 
+### Web
+
+To enable HLS (HTTP Live Streaming) playback in the web player, add the following script tag to your HTML file:
+
+```html
+<script async src="//cdn.jsdelivr.net/npm/hls.js@1"></script>
+```
+
 ## Troubleshooting
 
 Most problems you encounter when playing an audio file will likely relate to the audio file format, the server headers, or the file name.
@@ -413,7 +421,7 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 | read from byte stream          | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | request headers                | ✅      | ✅  | ✅    | *   | ✅      | ✅    |
 | DASH                           | ✅      |     |       |     | ✅      | ✅    |
-| HLS                            | ✅      | ✅  | ✅    |     | ✅      | ✅    |
+| HLS                            | ✅      | ✅  | ✅    | ✅   | ✅      | ✅    |
 | ICY metadata                   | ✅      | ✅  | ✅    |     |         |       |
 | buffer status/position         | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | play/pause/seek                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
