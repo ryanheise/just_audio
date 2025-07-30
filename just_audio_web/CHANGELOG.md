@@ -1,6 +1,6 @@
 ## 0.4.17
 
-* Add support for HLS streams in just_audio_web (@dindils)
+* Add support for HLS streams in just_audio_web (@dindils, @liorshk, @aletorrado)
 
 ## 0.4.16
 

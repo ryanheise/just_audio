@@ -352,7 +352,7 @@ For issues with the Linux implementation, please open an issue on the respective
 To enable HLS (HTTP Live Streaming) playback in the web player, add the following script tag to your HTML file:
 
 ```html
-<script src="//cdn.jsdelivr.net/npm/hls.js@1"></script>
+<script async src="//cdn.jsdelivr.net/npm/hls.js@1"></script>
 ```
 
 ## Troubleshooting
