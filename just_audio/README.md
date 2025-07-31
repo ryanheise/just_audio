@@ -421,7 +421,7 @@ Please also consider pressing the thumbs up button at the top of [this page](htt
 | read from byte stream          | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | request headers                | ✅      | ✅  | ✅    | *   | ✅      | ✅    |
 | DASH                           | ✅      |     |       |     | ✅      | ✅    |
-| HLS                            | ✅      | ✅  | ✅    | ✅   | ✅      | ✅    |
+| HLS                            | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | ICY metadata                   | ✅      | ✅  | ✅    |     |         |       |
 | buffer status/position         | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
 | play/pause/seek                | ✅      | ✅  | ✅    | ✅  | ✅      | ✅    |
