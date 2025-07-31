@@ -1,3 +1,7 @@
+## 0.10.5
+
+* Add support for HLS streams in just_audio_web (@dindils, @liorshk, @aletorrado)
+
 ## 0.10.4
 
 * Fix bug on simultaneous loads.

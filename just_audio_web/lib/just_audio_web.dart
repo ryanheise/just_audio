@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:math';
+import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -8,6 +9,9 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:synchronized/synchronized.dart' as synch;
 import 'package:web/web.dart';
+
+import 'hls.dart';
+import 'extra.dart';
 
 /// The web implementation of [JustAudioPlatform].
 class JustAudioPlugin extends JustAudioPlatform {
@@ -120,6 +124,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   LoopModeMessage _loopMode = LoopModeMessage.off;
   bool _shuffleModeEnabled = false;
   final Map<String, AudioSourcePlayer> _audioSourcePlayers = {};
+  Hls? _hls;
 
   /// Creates an [Html5AudioPlayer] with the given [id].
   Html5AudioPlayer({required String id}) : super(id: id) {
@@ -180,6 +185,81 @@ class Html5AudioPlayer extends JustAudioPlayer {
         (Event event) {
           broadcastPlaybackEvent();
         }.toJS);
+  }
+
+  /// Initializes HLS handling for the given [uri].
+  /// @param uri The URI of the audio source.
+  /// @return A [Future] that completes with a boolean indicating whether HLS handling was initialized.
+  /// True if HLS handling was initialized, false otherwise.
+  Future<bool> initializeHlsHandling(String uri) async {
+    if (await shouldUseHlsLibrary(uri)) {
+      try {
+        _hls = Hls(
+          HlsConfig(
+            debug: false.toJS, // Enable to output debug logging in HLS.js
+            xhrSetup: ((JSObject xhr, String _) {
+              return;
+              // Note: Not tested yet, but could be used to set headers for HLS requests.
+              // if (headers.isEmpty) {
+              //   return;
+              // }
+
+              // if (headers.containsKey('useCookies')) {
+              //   xhr.withCredentials = true;
+              // }
+              // headers.forEach((String key, String value) {
+              //   if (key != 'useCookies') {
+              //     xhr.setRequestHeader(key, value);
+              //   }
+              // });
+            }).toJS,
+          ),
+        );
+
+        _hls!.on(
+          'hlsError',
+          ((JSObject _, JSObject data) {
+            final HlsError hlsData = HlsError(data);
+            if (hlsData.fatal) {
+              _eventController.addError(
+                PlatformException(
+                  code: kErrorValueToErrorName[2]!,
+                  message: hlsData.type,
+                  details: hlsData.details,
+                ),
+              );
+            }
+          }).toJS,
+        );
+        _audioElement.onCanPlay.listen((dynamic _) {
+          _durationCompleter?.complete();
+        });
+        _hls!.loadSource(uri);
+        _hls!.attachMedia(_audioElement);
+      } catch (e) {
+        throw NoScriptTagException();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // HLS support check methods (similar to VideoPlayer class)
+  bool canPlayHlsNatively() {
+    bool canPlayHls = false;
+    try {
+      final String canPlayType = _audioElement.canPlayType(
+        'application/vnd.apple.mpegurl',
+      );
+      canPlayHls = canPlayType != '';
+    } catch (e) {
+      canPlayHls = false;
+    }
+    return canPlayHls;
+  }
+
+  Future<bool> shouldUseHlsLibrary(String uri) async {
+    return isSupported() && (uri.contains('m3u8')) && !canPlayHlsNatively();
   }
 
   /// The current playback order, depending on whether shuffle mode is enabled.
@@ -279,11 +359,29 @@ class Html5AudioPlayer extends JustAudioPlayer {
     transition(ProcessingStateMessage.loading);
     final src = uri.toString();
     if (src != _audioElement.src) {
+      // Reset the HLS handling if the previous source was HLS.
+      if (_hls != null) {
+        _hls?.stopLoad();
+        _hls = null;
+      }
+
       _durationCompleter = Completer<dynamic>();
-      _audioElement.src = src;
+      _audioElement.id = 'audioPlayer-$id';
       _audioElement.playbackRate = _speed;
       _audioElement.preload = 'auto';
-      await _audioElementQueue.load();
+      ui_web.platformViewRegistry.registerViewFactory(
+        'audioPlayer-$id',
+        (int viewId) => _audioElement,
+      );
+
+      if (await initializeHlsHandling(src)) {
+        // handled in function
+      } else {
+        // normal audio
+        _audioElement.src = src;
+        await _audioElementQueue.load();
+      }
+
       if (initialPosition != null) {
         _audioElement.currentTime = initialPosition.inMilliseconds / 1000.0;
       }
@@ -525,6 +623,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _currentAudioSourcePlayer?.pause();
     await _audioElementQueue.removeAttribute('src');
     await _audioElementQueue.load();
+    _hls?.stopLoad();
     transition(ProcessingStateMessage.idle);
     return await super.release();
   }
@@ -538,7 +637,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   AudioSourcePlayer getAudioSource(AudioSourceMessage audioSourceMessage) {
     final id = audioSourceMessage.id;
     var audioSourcePlayer = _audioSourcePlayers[id];
-    if (audioSourcePlayer == null) {
+    if (audioSourcePlayer == null || id.isEmpty) {
       audioSourcePlayer = decodeAudioSource(audioSourceMessage);
       _audioSourcePlayers[id] = audioSourcePlayer;
     }
