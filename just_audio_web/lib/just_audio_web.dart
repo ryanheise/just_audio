@@ -10,6 +10,8 @@ import 'package:just_audio_web/hlsjs_loader.dart';
 import 'package:synchronized/synchronized.dart' as synch;
 import 'package:web/web.dart';
 
+export './hlsjs_loader.dart' show setHlsjsCdnUrl;
+
 /// The web implementation of [JustAudioPlatform].
 class JustAudioPlugin extends JustAudioPlatform {
   final Map<String, JustAudioPlayer> players = {};

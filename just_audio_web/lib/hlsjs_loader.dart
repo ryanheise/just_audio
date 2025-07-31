@@ -4,14 +4,18 @@ import 'package:web/web.dart';
 
 import 'hlsjs.dart';
 
-const hlsjsCdnUrl = "https://cdn.jsdelivr.net/npm/hls.js@1";
+var hlsjsBundleUrl = "https://cdn.jsdelivr.net/npm/hls.js@1";
+
+void setHlsjsCdnUrl(String url){
+  hlsjsBundleUrl = url;
+}
 
 Future<void>? _loadHlsFuture;
 
 Future<void> _loadHls() async {
   var completer = Completer<void>();
   var script = document.createElement('script');
-  script.setAttribute('src', hlsjsCdnUrl);
+  script.setAttribute('src', hlsjsBundleUrl);
   script.setAttribute('async', '');
   script.addEventListener('load', (void _){completer.complete();}.toJS);
   script.addEventListener('error', (void _){completer.completeError("Error loading Hls.js");}.toJS);
