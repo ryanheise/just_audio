@@ -14,6 +14,8 @@ dependencies:
     path: ../../just_audio
   just_audio_background:
     path: ..
+  # for visualizer example
+  permission_handler: ^12.0.1
 
 # Uncomment when testing platform interface changes.
 # dependency_overrides:
