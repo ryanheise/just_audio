@@ -168,6 +168,10 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
       StreamController<PlaybackEventMessage>.broadcast(sync: true);
   final playerDataController =
       StreamController<PlayerDataMessage>.broadcast(sync: true);
+  final visualizerFftController =
+      StreamController<VisualizerFftCaptureMessage>.broadcast(sync: true);
+  final visualizerWaveformController =
+      StreamController<VisualizerWaveformCaptureMessage>.broadcast(sync: true);
 
   _JustAudioPlayer({required this.initRequest}) : super(initRequest.id) {
     eventController.onCancel = _playerAudioHandler.cancelStreamSubscriptions;
@@ -183,6 +187,10 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
         .listen((playing) {
       playerDataController.add(PlayerDataMessage(playing: playing));
     });
+    _playerAudioHandler.visualizerFftController.stream
+        .pipe(visualizerFftController);
+    _playerAudioHandler.visualizerWaveformController.stream
+        .pipe(visualizerWaveformController);
   }
 
   PlaybackState get playbackState => _audioHandler.playbackState.nvalue!;
@@ -342,6 +350,28 @@ class _JustAudioPlayer extends AudioPlayerPlatform {
   Future<SetPreferredPeakBitRateResponse> setPreferredPeakBitRate(
           SetPreferredPeakBitRateRequest request) =>
       _playerAudioHandler.customSetPreferredPeakBitRate(request);
+
+  @override
+  Future<StartVisualizerResponse> startVisualizer(
+      StartVisualizerRequest request) async {
+    await _playerAudioHandler.customStartVisualizer(request);
+    return StartVisualizerResponse();
+  }
+
+  @override
+  Future<StopVisualizerResponse> stopVisualizer(
+      StopVisualizerRequest request) async {
+    await _playerAudioHandler.customStopVisualizer(request);
+    return StopVisualizerResponse();
+  }
+
+  @override
+  Stream<VisualizerFftCaptureMessage> get visualizerFftStream =>
+      visualizerFftController.stream;
+
+  @override
+  Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream =>
+      visualizerWaveformController.stream;
 }
 
 class _PlayerAudioHandler extends BaseAudioHandler
@@ -368,6 +398,10 @@ class _PlayerAudioHandler extends BaseAudioHandler
   List<int> _shuffleIndicesInv = [];
   List<int> _effectiveIndices = [];
   List<int> _effectiveIndicesInv = [];
+  final visualizerFftController =
+      StreamController<VisualizerFftCaptureMessage>.broadcast(sync: true);
+  final visualizerWaveformController =
+      StreamController<VisualizerWaveformCaptureMessage>.broadcast(sync: true);
 
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
   int? index;
@@ -383,6 +417,8 @@ class _PlayerAudioHandler extends BaseAudioHandler
       _lock.synchronized(() async {
         final player = await _platform.init(initRequest);
         _playerCompleter.complete(player);
+        player.visualizerFftStream.pipe(visualizerFftController);
+        player.visualizerWaveformStream.pipe(visualizerWaveformController);
         final playbackEventMessageStream = player.playbackEventMessageStream;
         _trackInfoSubscription = playbackEventMessageStream
             .map((event) {
@@ -567,6 +603,14 @@ class _PlayerAudioHandler extends BaseAudioHandler
   Future<SetPreferredPeakBitRateResponse> customSetPreferredPeakBitRate(
           SetPreferredPeakBitRateRequest request) async =>
       await (await _player).setPreferredPeakBitRate(request);
+
+  Future<StartVisualizerResponse> customStartVisualizer(
+          StartVisualizerRequest request) async =>
+      await (await _player).startVisualizer(request);
+
+  Future<StopVisualizerResponse> customStopVisualizer(
+          StopVisualizerRequest request) async =>
+      await (await _player).stopVisualizer(request);
 
   void _updateQueue() {
     assert(sequence.every((source) => source.tag is MediaItem),
