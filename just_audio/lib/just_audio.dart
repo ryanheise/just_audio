@@ -2435,7 +2435,7 @@ class _ProxyHttpServer {
       userAgent: source._player?._userAgent,
     );
     return uri.replace(
-      scheme: 'http',
+      scheme: 'https',  // renan, replaced http by https
       host: InternetAddress.loopbackIPv4.address,
       port: port,
     );
@@ -2450,7 +2450,8 @@ class _ProxyHttpServer {
     return uri;
   }
 
-  Uri _sourceUri(StreamAudioSource source) => Uri.http(
+  // renan replaced Uri.http bu Uri.https
+  Uri _sourceUri(StreamAudioSource source) => Uri.https(
       '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}');
 
   /// A unique key for each request that can be processed by this proxy,
@@ -2468,7 +2469,7 @@ class _ProxyHttpServer {
   /// Starts the server.
   Future<dynamic> start() async {
     _running = true;
-    
+
     // renan /////////////////////
     // https://api.flutter.dev/flutter/dart-io/HttpServer-class.html
     var chain = Platform.script.resolve('assets/cert.pem').toFilePath();
