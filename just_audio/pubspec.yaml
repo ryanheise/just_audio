@@ -53,3 +53,5 @@ flutter:
         sharedDarwinSource: true
       web:
         default_package: just_audio_web
+  assets:
+    - assets/

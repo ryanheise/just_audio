@@ -2468,7 +2468,19 @@ class _ProxyHttpServer {
   /// Starts the server.
   Future<dynamic> start() async {
     _running = true;
-    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    
+    // renan /////////////////////
+    // https://api.flutter.dev/flutter/dart-io/HttpServer-class.html
+    var chain = Platform.script.resolve('assets/cert.pem').toFilePath();
+    var key = Platform.script.resolve('assets/key.pem').toFilePath();
+    var context = SecurityContext()
+      ..useCertificateChain(chain)
+      ..usePrivateKey(key, password: 'renan');
+    _server =
+        await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
+    // end renan ////////////////
+
+    //_server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server.listen((request) async {
       if (request.method == 'GET') {
         final uriPath = _requestKey(request.uri);
