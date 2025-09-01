@@ -2435,7 +2435,7 @@ class _ProxyHttpServer {
       userAgent: source._player?._userAgent,
     );
     return uri.replace(
-      scheme: 'https',  // renan, replaced http by https
+      scheme: Platform.isAndroid ? 'https' : 'http',
       host: InternetAddress.loopbackIPv4.address,
       port: port,
     );
@@ -2450,9 +2450,11 @@ class _ProxyHttpServer {
     return uri;
   }
 
-  // renan replaced Uri.http bu Uri.https
-  Uri _sourceUri(StreamAudioSource source) => Uri.https(
-      '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}');
+  Uri _sourceUri(StreamAudioSource source) => Platform.isAndroid
+      ? Uri.https(
+          '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}')
+      : Uri.http(
+          '${InternetAddress.loopbackIPv4.address}:$port', '/id/${source._id}');
 
   /// A unique key for each request that can be processed by this proxy,
   /// made up of the URL path and query string. It is not possible to
@@ -2470,18 +2472,17 @@ class _ProxyHttpServer {
   Future<dynamic> start() async {
     _running = true;
 
-    // renan /////////////////////
-    // https://api.flutter.dev/flutter/dart-io/HttpServer-class.html
-    var chain = Platform.script.resolve('assets/cert.pem').toFilePath();
-    var key = Platform.script.resolve('assets/key.pem').toFilePath();
-    var context = SecurityContext()
-      ..useCertificateChain(chain)
-      ..usePrivateKey(key, password: 'renan');
-    _server =
-        await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
-    // end renan ////////////////
-
-    //_server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    if (Platform.isAndroid) {
+      var chain = Platform.script.resolve('assets/cert.pem').toFilePath();
+      var key = Platform.script.resolve('assets/key.pem').toFilePath();
+      var context = SecurityContext()
+        ..useCertificateChain(chain)
+        ..usePrivateKey(key, password: 'renan');
+      _server =
+          await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
+    } else {
+      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    }
     _server.listen((request) async {
       if (request.method == 'GET') {
         final uriPath = _requestKey(request.uri);
