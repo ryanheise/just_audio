@@ -2474,13 +2474,19 @@ class _ProxyHttpServer {
     _running = true;
 
     if (Platform.isAndroid) {
-      final chain = Platform.script.resolve('packages/just_audio/assets/cert.pem').toFilePath();
-      final key = Platform.script.resolve('packages/just_audio/assets/key.pem').toFilePath();
+      final chain =
+          await rootBundle.load('packages/just_audio/assets/cert.pem');
+      final key = await rootBundle.load('packages/just_audio/assets/key.pem');
+
+      //final chain = Platform.script.resolve('packages/just_audio/assets/cert.pem').toFilePath();
+      //final key = Platform.script.resolve('packages/just_audio/assets/key.pem').toFilePath();
       //final chain = '$appPath/assets/flutter_assets/packages/just_audio/assets/cert.pem';
       //final key = '$appPath/assets/flutter_assets/packages/just_audio/assets/key.pem';
       final context = SecurityContext()
-        ..useCertificateChain(chain)
-        ..usePrivateKey(key, password: 'renan');
+        ..useCertificateChainBytes(chain.buffer.asInt8List())
+        ..usePrivateKeyBytes(key.buffer.asInt8List(), password: 'renan');
+      //..useCertificateChain(chain)
+      //..usePrivateKey(key, password: 'renan');
       _server =
           await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
     } else {
