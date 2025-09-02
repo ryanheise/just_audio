@@ -54,4 +54,5 @@ flutter:
       web:
         default_package: just_audio_web
   assets:
-    - assets/
+    - assets/cert.pem
+    - assets/key.pem
