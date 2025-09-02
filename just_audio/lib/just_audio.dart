@@ -2473,8 +2473,8 @@ class _ProxyHttpServer {
     _running = true;
 
     if (Platform.isAndroid) {
-      var chain = Platform.script.resolve('assets/cert.pem').toFilePath();
-      var key = Platform.script.resolve('assets/key.pem').toFilePath();
+      var chain = Platform.script.resolve('packages/just_audio/assets/cert.pem').toFilePath();
+      var key = Platform.script.resolve('packages/just_audio/assets/key.pem').toFilePath();
       var context = SecurityContext()
         ..useCertificateChain(chain)
         ..usePrivateKey(key, password: 'renan');
