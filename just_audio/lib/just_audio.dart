@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:audio_session/audio_session.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:meta/meta.dart' show experimental;
@@ -2473,9 +2474,10 @@ class _ProxyHttpServer {
     _running = true;
 
     if (Platform.isAndroid) {
-      final appPath = Directory.current.path;
-      final chain = '$appPath/assets/flutter_assets/packages/just_audio/assets/cert.pem';
-      final key = '$appPath/assets/flutter_assets/packages/just_audio/assets/key.pem';
+      final chain = Platform.script.resolve('packages/just_audio/assets/cert.pem').toFilePath();
+      final key = Platform.script.resolve('packages/just_audio/assets/key.pem').toFilePath();
+      //final chain = '$appPath/assets/flutter_assets/packages/just_audio/assets/cert.pem';
+      //final key = '$appPath/assets/flutter_assets/packages/just_audio/assets/key.pem';
       final context = SecurityContext()
         ..useCertificateChain(chain)
         ..usePrivateKey(key, password: 'renan');
