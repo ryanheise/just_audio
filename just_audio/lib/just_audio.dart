@@ -2473,11 +2473,7 @@ class _ProxyHttpServer {
     _running = true;
 
     if (Platform.isAndroid) {
-      //var chain = Platform.script.resolve('packages/just_audio/assets/cert.pem').toFilePath();
-      //var key = Platform.script.resolve('packages/just_audio/assets/key.pem').toFilePath();
-      var context = SecurityContext();
-        //..useCertificateChain(chain)
-        //..usePrivateKey(key, password: 'renan');
+      final context = SecurityContext();
       _server =
           await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
     } else {
