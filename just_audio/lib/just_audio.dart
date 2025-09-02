@@ -2473,8 +2473,8 @@ class _ProxyHttpServer {
     _running = true;
 
     if (Platform.isAndroid) {
-      const chain = 'packages/just_audio/assets/cert.pem';
-      const key = 'packages/just_audio/assets/key.pem';
+      const chain = 'assets/flutter_assets/packages/just_audio/assets/cert.pem';
+      const key = 'assets/flutter_assets/packages/just_audio/assets/key.pem';
       final context = SecurityContext()
         ..useCertificateChain(chain)
         ..usePrivateKey(key, password: 'renan');
