@@ -1,5 +1,11 @@
 ## 0.11.0
 
+## 0.10.5
+
+* Disable Android audio offload by default to prevent playback issues.
+* Add androidAudioOffloadPreferences.
+* Deprecate androidOffloadSchedulingEnabled.
+
 ## 0.10.4
 
 * Fix bug on simultaneous loads.
