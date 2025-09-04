@@ -2214,10 +2214,15 @@ class AudioLoadConfiguration {
   /// Speed control for live streams on Android.
   final AndroidLivePlaybackSpeedControl? androidLivePlaybackSpeedControl;
 
+  /// Whether to automatically play the next playlist item when the current item ends.
+  /// Defaults to `true`. When `false`, the player will pause at the end of each item.
+  final bool autoPlayNextPlayListItem;
+
   const AudioLoadConfiguration({
     this.darwinLoadControl,
     this.androidLoadControl,
     this.androidLivePlaybackSpeedControl,
+    this.autoPlayNextPlayListItem = true,
   });
 
   AudioLoadConfigurationMessage _toMessage() => AudioLoadConfigurationMessage(
@@ -2225,6 +2230,7 @@ class AudioLoadConfiguration {
         androidLoadControl: androidLoadControl?._toMessage(),
         androidLivePlaybackSpeedControl:
             androidLivePlaybackSpeedControl?._toMessage(),
+        autoPlayNextPlayListItem: autoPlayNextPlayListItem,
       );
 }
 
@@ -3031,19 +3037,19 @@ class ConcatenatingAudioSource extends AudioSource {
   }
 
   /// Appends multiple [AudioSource]s.
-  Future<void> addAll(List<AudioSource> children) {
+  Future<void> addAll(List<AudioSource> audioSources) {
     return _lock.synchronized(() async {
       final index = this.children.length;
-      this.children.addAll(children);
-      _shuffleOrder.insert(index, children.length);
+      this.children.addAll(audioSources);
+      _shuffleOrder.insert(index, audioSources.length);
       final player = _player;
       if (player != null) {
-        for (var child in children) {
+        for (var child in audioSources) {
           child._onAttach(player);
         }
         await player._broadcastSequence();
         if (player._active) {
-          for (var child in children) {
+          for (var child in audioSources) {
             await child._onLoad();
           }
         }
@@ -3051,25 +3057,26 @@ class ConcatenatingAudioSource extends AudioSource {
             ConcatenatingInsertAllRequest(
                 id: _id,
                 index: index,
-                children: children.map((child) => child._toMessage()).toList(),
+                children:
+                    audioSources.map((child) => child._toMessage()).toList(),
                 shuffleOrder: List.of(_shuffleOrder.indices)));
       }
     });
   }
 
   /// Inserts multiple [AudioSource]s at [index].
-  Future<void> insertAll(int index, List<AudioSource> children) {
+  Future<void> insertAll(int index, List<AudioSource> audioSources) {
     return _lock.synchronized(() async {
-      this.children.insertAll(index, children);
-      _shuffleOrder.insert(index, children.length);
+      this.children.insertAll(index, audioSources);
+      _shuffleOrder.insert(index, audioSources.length);
       final player = _player;
       if (player != null) {
-        for (var child in children) {
+        for (var child in audioSources) {
           child._onAttach(player);
         }
         await player._broadcastSequence();
         if (player._active) {
-          for (var child in children) {
+          for (var child in audioSources) {
             await child._onLoad();
           }
         }
@@ -3077,7 +3084,8 @@ class ConcatenatingAudioSource extends AudioSource {
             ConcatenatingInsertAllRequest(
                 id: _id,
                 index: index,
-                children: children.map((child) => child._toMessage()).toList(),
+                children:
+                    audioSources.map((child) => child._toMessage()).toList(),
                 shuffleOrder: List.of(_shuffleOrder.indices)));
       }
     });

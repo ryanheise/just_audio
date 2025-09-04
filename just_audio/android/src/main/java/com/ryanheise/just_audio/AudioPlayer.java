@@ -140,6 +140,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
     };
 
+    private boolean autoPlayNextPlayListItem = true; // Default to true for backward compatibility
+
     public AudioPlayer(
         final Context applicationContext,
         final BinaryMessenger messenger,
@@ -178,6 +180,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         dataEventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.data." + id);
         processingState = ProcessingState.idle;
         if (audioLoadConfiguration != null) {
+            // Extract autoPlayNextPlayListItem parameter
+            if (audioLoadConfiguration.containsKey("autoPlayNextPlayListItem")) {
+                this.autoPlayNextPlayListItem = (Boolean) audioLoadConfiguration.get("autoPlayNextPlayListItem");
+            }
+            
             Map<?, ?> loadControlMap = (Map<?, ?>)audioLoadConfiguration.get("androidLoadControl");
             if (loadControlMap != null) {
                 DefaultLoadControl.Builder builder = new DefaultLoadControl.Builder()
@@ -785,6 +792,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             };
             ExoPlayer.Builder builder = new ExoPlayer.Builder(context, renderersFactory);
             builder.setUseLazyPreparation(useLazyPreparation);
+            
+            // Set pause at end of media items based on autoPlayNextPlayListItem parameter
+            builder.setPauseAtEndOfMediaItems(!autoPlayNextPlayListItem);
+            
             if (loadControl != null) {
                 builder.setLoadControl(loadControl);
             }

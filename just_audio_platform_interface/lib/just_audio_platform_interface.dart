@@ -906,11 +906,13 @@ class AudioLoadConfigurationMessage {
   final DarwinLoadControlMessage? darwinLoadControl;
   final AndroidLoadControlMessage? androidLoadControl;
   final AndroidLivePlaybackSpeedControlMessage? androidLivePlaybackSpeedControl;
+  final bool autoPlayNextPlayListItem;
 
   const AudioLoadConfigurationMessage({
     required this.darwinLoadControl,
     required this.androidLoadControl,
     required this.androidLivePlaybackSpeedControl,
+    required this.autoPlayNextPlayListItem,
   });
 
   Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
@@ -918,6 +920,7 @@ class AudioLoadConfigurationMessage {
         'androidLoadControl': androidLoadControl?.toMap(),
         'androidLivePlaybackSpeedControl':
             androidLivePlaybackSpeedControl?.toMap(),
+        'autoPlayNextPlayListItem': autoPlayNextPlayListItem,
       };
 }
 
