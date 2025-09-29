@@ -1,3 +1,7 @@
+## 0.10.6
+
+* Fix bug where ExoPlayer's auto-advance ignores new shuffle order
+
 ## 0.10.5
 
 * Disable Android audio offload by default to prevent playback issues.

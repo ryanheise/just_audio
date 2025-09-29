@@ -583,11 +583,13 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         Map<?, ?> map = (Map<?, ?>)json;
         String id = mapGet(map, "id");
         MediaSource mediaSource = mediaSources.get(id);
+        ShuffleOrder shuffleOrder = decodeShuffleOrder(mapGet(map, "shuffleOrder"));
+        player.setShuffleOrder(shuffleOrder);
         if (mediaSource == null) return;
         switch ((String)mapGet(map, "type")) {
         case "concatenating":
             androidx.media3.exoplayer.source.ConcatenatingMediaSource concatenatingMediaSource = (androidx.media3.exoplayer.source.ConcatenatingMediaSource)mediaSource;
-            concatenatingMediaSource.setShuffleOrder(decodeShuffleOrder(mapGet(map, "shuffleOrder")));
+            concatenatingMediaSource.setShuffleOrder(shuffleOrder);
             List<Object> children = mapGet(map, "children");
             for (Object child : children) {
                 setShuffleOrder(child);
