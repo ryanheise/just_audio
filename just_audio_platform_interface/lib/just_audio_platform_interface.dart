@@ -413,6 +413,8 @@ class InitRequest {
   final AudioLoadConfigurationMessage? audioLoadConfiguration;
   final List<AudioEffectMessage> androidAudioEffects;
   final List<AudioEffectMessage> darwinAudioEffects;
+
+  final AndroidAudioOffloadPreferencesMessage? androidAudioOffloadPreferences;
   final bool? androidOffloadSchedulingEnabled;
   final bool useLazyPreparation;
 
@@ -421,6 +423,7 @@ class InitRequest {
     this.audioLoadConfiguration,
     this.androidAudioEffects = const [],
     this.darwinAudioEffects = const [],
+    this.androidAudioOffloadPreferences,
     this.androidOffloadSchedulingEnabled,
     this.useLazyPreparation = true,
   });
@@ -434,6 +437,8 @@ class InitRequest {
         'darwinAudioEffects': darwinAudioEffects
             .map((audioEffect) => audioEffect.toMap())
             .toList(),
+        'androidAudioOffloadPreferences':
+            androidAudioOffloadPreferences?.toMap(),
         'androidOffloadSchedulingEnabled': androidOffloadSchedulingEnabled,
         'useLazyPreparation': useLazyPreparation,
       };
@@ -1052,6 +1057,29 @@ class AndroidLivePlaybackSpeedControlMessage {
             targetLiveOffsetIncrementOnRebuffer.inMicroseconds,
         'minPossibleLiveOffsetSmoothingFactor':
             minPossibleLiveOffsetSmoothingFactor,
+      };
+}
+
+/// The loop mode communicated to the platform implementation.
+enum AndroidAudioOffloadModeMessage { disabled, enabled }
+
+/// Information communicated to the platform implementation when setting the
+/// audio offload preferences.
+class AndroidAudioOffloadPreferencesMessage {
+  final AndroidAudioOffloadModeMessage audioOffloadMode;
+  final bool isGaplessSupportRequired;
+  final bool isSpeedChangeSupportRequired;
+
+  AndroidAudioOffloadPreferencesMessage({
+    required this.audioOffloadMode,
+    required this.isGaplessSupportRequired,
+    required this.isSpeedChangeSupportRequired,
+  });
+
+  Map<dynamic, dynamic> toMap() => <dynamic, dynamic>{
+        'audioOffloadMode': audioOffloadMode.index,
+        'isGaplessSupportRequired': isGaplessSupportRequired,
+        'isSpeedChangeSupportRequired': isSpeedChangeSupportRequired,
       };
 }
 

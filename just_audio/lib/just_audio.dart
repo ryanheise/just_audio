@@ -70,6 +70,8 @@ class AudioPlayer {
 
   final bool _androidOffloadSchedulingEnabled;
 
+  final AndroidAudioOffloadPreferences? _androidAudioOffloadPreferences;
+
   /// This is `true` when the audio player needs to engage the native platform
   /// side of the plugin to decode or play audio, and is `false` when the native
   /// resources are not needed (i.e. after initial instantiation and after [stop]).
@@ -231,6 +233,9 @@ class AudioPlayer {
   /// next audio source on load errors, and will give up after [maxSkipsOnError]
   /// attempts. This is supported on Android, iOS and web. For other platforms,
   /// check the documentation of the respective platform implementation.
+  ///
+  /// [androidAudioOffloadPreferences] specifies whether audio offload is enabled
+  /// on Android.
   AudioPlayer({
     String? userAgent,
     bool handleInterruptions = true,
@@ -238,6 +243,8 @@ class AudioPlayer {
     bool handleAudioSessionActivation = true,
     AudioLoadConfiguration? audioLoadConfiguration,
     AudioPipeline? audioPipeline,
+    AndroidAudioOffloadPreferences? androidAudioOffloadPreferences,
+    @Deprecated('Use androidAudioOffloadPreferences instead')
     bool androidOffloadSchedulingEnabled = false,
     bool useProxyForRequestHeaders = true,
     bool useLazyPreparation = true,
@@ -251,6 +258,7 @@ class AudioPlayer {
         _audioLoadConfiguration = audioLoadConfiguration,
         _audioPipeline = audioPipeline ?? AudioPipeline(),
         _androidOffloadSchedulingEnabled = androidOffloadSchedulingEnabled,
+        _androidAudioOffloadPreferences = androidAudioOffloadPreferences,
         _useProxyForRequestHeaders = useProxyForRequestHeaders,
         // ignore: deprecated_member_use_from_same_package
         _playlist = ConcatenatingAudioSource._playlist(
@@ -1640,6 +1648,8 @@ class AudioPlayer {
                     : [],
                 androidOffloadSchedulingEnabled:
                     _androidOffloadSchedulingEnabled,
+                androidAudioOffloadPreferences:
+                    _androidAudioOffloadPreferences?._toMessage(),
                 useLazyPreparation: _playlist.useLazyPreparation,
               )))
             : (_idlePlatform = _IdleAudioPlayer(
@@ -2357,6 +2367,47 @@ class AndroidLivePlaybackSpeedControl {
             targetLiveOffsetIncrementOnRebuffer,
         minPossibleLiveOffsetSmoothingFactor:
             minPossibleLiveOffsetSmoothingFactor,
+      );
+}
+
+/// Audio offload modes for Android.
+enum AndroidAudioOffloadMode { disabled, enabled }
+
+/// Audio offload preferences for Android.
+///
+/// IMPORTANT: activation of audio offload depends on a negotiation between
+/// ExoPlayer and the device to determine whether offload can be supported for a
+/// given format and with given constraints (gapless, speed change). However,
+/// several instances have been reported where the device incorrectly confirms
+/// support for audio offload when it doesn't, and this can result in buggy
+/// audio playback. Therefore, it is advised that you programmatically enable
+/// audio offload only on device/OS combinations that you have tested and
+/// verified to work.
+class AndroidAudioOffloadPreferences {
+  /// The preferred audio offload mode.
+  final AndroidAudioOffloadMode audioOffloadMode;
+
+  /// Constrains enablement of audio offload to happen only if the device
+  /// can fulfill any gapless transitions that might exist in the playlist
+  /// during offload.
+  final bool isGaplessSupportRequired;
+
+  /// Constrains enablement of audio offload to happen only if the device
+  /// can fulfill any speed change request during offload.
+  final bool isSpeedChangeSupportRequired;
+
+  const AndroidAudioOffloadPreferences({
+    this.audioOffloadMode = AndroidAudioOffloadMode.disabled,
+    this.isGaplessSupportRequired = false,
+    this.isSpeedChangeSupportRequired = false,
+  });
+
+  AndroidAudioOffloadPreferencesMessage _toMessage() =>
+      AndroidAudioOffloadPreferencesMessage(
+        audioOffloadMode:
+            AndroidAudioOffloadModeMessage.values[audioOffloadMode.index],
+        isGaplessSupportRequired: isGaplessSupportRequired,
+        isSpeedChangeSupportRequired: isSpeedChangeSupportRequired,
       );
 }
 

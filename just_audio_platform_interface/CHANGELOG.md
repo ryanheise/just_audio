@@ -1,3 +1,7 @@
+## 4.6.0
+
+* Add androidAudioOffloadPreferences.
+
 ## 4.5.0
 
 * Add errorCode/errorMessage to PlaybackEventMessage.
