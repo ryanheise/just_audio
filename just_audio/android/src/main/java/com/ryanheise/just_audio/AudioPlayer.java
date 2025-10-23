@@ -29,6 +29,11 @@ import androidx.media3.common.AudioAttributes;
 import androidx.media3.exoplayer.NoSampleRenderer;
 import androidx.media3.exoplayer.Renderer;
 import androidx.media3.exoplayer.RenderersFactory;
+import androidx.media3.exoplayer.audio.AudioRendererEventListener;
+import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.audio.DefaultAudioSink;
+import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer;
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
 import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.common.Metadata;
 import androidx.media3.exoplayer.metadata.MetadataOutput;
@@ -104,6 +109,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Map<String, AudioEffect> audioEffectsMap = new HashMap<String, AudioEffect>();
     private int lastPlaylistLength = 0;
     private Map<String, Object> pendingPlaybackEvent;
+    private float balance = 0.0f; // -1.0 (left) to +1.0 (right), 0.0 = center
+    private float currentVolume = 1.0f; // Store current volume for balance calculations
+    private StereoVolumeProcessor stereoVolumeProcessor; // AudioProcessor for per-channel volume control
 
     private ExoPlayer player;
     private Integer audioSessionId;
@@ -457,6 +465,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 setVolume((float) ((double) ((Double) call.argument("volume"))));
                 result.success(new HashMap<String, Object>());
                 break;
+            case "setBalance":
+                setBalance((float) ((double) ((Double) call.argument("balance"))));
+                result.success(new HashMap<String, Object>());
+                break;
             case "setSpeed":
                 setSpeed((float) ((double) ((Double) call.argument("speed"))));
                 result.success(new HashMap<String, Object>());
@@ -776,11 +788,43 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private void ensurePlayerInitialized() {
         if (player == null) {
+            // initialize StereoVolumeProcessor for balance control
+            stereoVolumeProcessor = new StereoVolumeProcessor();
+            
+            // we create custom RenderersFactory that includes our audio processor
             RenderersFactory renderersFactory = (eventHandler, videoListener, audioListener, textOutput, metadataOutput) -> {
-                Renderer[] defaultRenderers = new DefaultRenderersFactory(context)
+                // we create audio sink with our processor
+                androidx.media3.common.audio.AudioProcessor[] audioProcessors = 
+                    new androidx.media3.common.audio.AudioProcessor[]{stereoVolumeProcessor};
+                AudioSink audioSink = new DefaultAudioSink.Builder(context)
+                    .setAudioProcessors(audioProcessors)
+                    .build();
+                
+                // we create audio renderer with our audio sink
+                MediaCodecAudioRenderer audioRenderer = new MediaCodecAudioRenderer(
+                    context,
+                    MediaCodecSelector.DEFAULT,
+                    eventHandler,
+                    (AudioRendererEventListener) audioListener,
+                    audioSink
+                );
+                
+                // we create default renderers for video, text, etc.
+                DefaultRenderersFactory defaultFactory = new DefaultRenderersFactory(context);
+                Renderer[] defaultRenderers = defaultFactory
                     .createRenderers(eventHandler, videoListener, audioListener, textOutput, metadataOutput);
-                Renderer[] allRenderers = Arrays.copyOf(defaultRenderers, defaultRenderers.length + 1);
-                allRenderers[defaultRenderers.length] = new ObserverRenderer();
+                
+                // we replace the audio renderer and add ObserverRenderer
+                Renderer[] allRenderers = new Renderer[defaultRenderers.length + 1];
+                allRenderers[0] = audioRenderer; // Audio renderer first
+                // Copy other renderers (skip the default audio renderer)
+                int targetIndex = 1;
+                for (int i = 0; i < defaultRenderers.length; i++) {
+                    if (!(defaultRenderers[i] instanceof MediaCodecAudioRenderer)) {
+                        allRenderers[targetIndex++] = defaultRenderers[i];
+                    }
+                }
+                allRenderers[targetIndex] = new ObserverRenderer();
                 return allRenderers;
             };
             ExoPlayer.Builder builder = new ExoPlayer.Builder(context, renderersFactory);
@@ -997,7 +1041,39 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     public void setVolume(final float volume) {
-        player.setVolume(volume);
+        this.currentVolume = volume;
+        applyVolumeAndBalance();
+    }
+
+    public void setBalance(final float balance) {
+        // Clamp balance to valid range [-1.0, 1.0]
+        this.balance = Math.max(-1.0f, Math.min(1.0f, balance));
+        applyVolumeAndBalance();
+    }
+
+    private void applyVolumeAndBalance() {
+        if (player == null) return;
+        
+        // balance = -1.0: left only (left=1.0, right=0.0)
+        // balance = 0.0: center (left=1.0, right=1.0)
+        // balance = +1.0: right only (left=0.0, right=1.0)
+        float leftVolume = currentVolume;
+        float rightVolume = currentVolume;
+        
+        if (balance < 0) {
+            // here we reduce right channel
+            rightVolume = currentVolume * (1.0f + balance);
+        } else if (balance > 0) {
+            // here we reduce left channel
+            leftVolume = currentVolume * (1.0f - balance);
+        }
+        
+        player.setVolume(currentVolume);
+        
+        // here we apply per-channel volume using AudioProcessor
+        if (stereoVolumeProcessor != null) {
+            stereoVolumeProcessor.setChannelVolumes(leftVolume, rightVolume);
+        }
     }
 
     public void setSpeed(final float speed) {
@@ -1061,6 +1137,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             player = null;
             processingState = ProcessingState.idle;
             broadcastImmediatePlaybackEvent();
+        }
+        if (stereoVolumeProcessor != null) {
+            stereoVolumeProcessor.reset();
+            stereoVolumeProcessor = null;
         }
         eventChannel.endOfStream();
         dataEventChannel.endOfStream();
