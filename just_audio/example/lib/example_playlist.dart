@@ -7,7 +7,7 @@
 
 import 'dart:async';
 
-import 'media_kit_stub.dart' if (dart.library.io) 'media_kit_impl.dart';
+// import 'media_kit_stub.dart' if (dart.library.io) 'media_kit_impl.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +16,7 @@ import 'package:just_audio_example/common.dart';
 import 'package:rxdart/rxdart.dart';
 
 void main() {
-  initMediaKit(); // Initialise just_audio_media_kit for Linux/Windows.
+  // initMediaKit(); // Initialise just_audio_media_kit for Linux/Windows.
   // Enable gapless playback on Linux/Windows (experimental):
   // JustAudioMediaKit.prefetchPlaylist = true;
   runApp(const MyApp());
@@ -95,7 +95,16 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
       print('A stream error occurred: $e');
     });
     try {
-      await _player.setAudioSources(_playlist);
+      // await _player.setAudioSources(_playlist);
+
+      print(
+          'XXX XXX: _init(): BEFORE _player.setAudioSource(_playlist, preload: false, initialIndex: 2). currentIndex: ${_player.currentIndex}');
+      await _player.setAudioSources(_playlist, preload: false, initialIndex: 2);
+      print(
+          'XXX XXX: _init(): AFTER _player.setAudioSource but BEFORE _player.seek(Duration.zero, index: 2). currentIndex: ${_player.currentIndex}');
+      _player.seek(Duration.zero, index: 2);
+      print(
+          'XXX XXX: _init(): AFTER _player.seek(Duration.zero, index: 2). currentIndex: ${_player.currentIndex}');
     } on PlayerException catch (e) {
       // Catch load errors: 404, invalid url...
       print("Error loading playlist: $e");
@@ -291,10 +300,22 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                                   : null,
                               child: ListTile(
                                 title: Text(sequence[i].tag.title as String),
-                                onTap: () => _player
-                                    .seek(Duration.zero, index: i)
-                                    .catchError((e, st) {}),
-                              ),
+                                // onTap: () => _player
+                                //     .seek(Duration.zero, index: i)
+                                //     .catchError((e, st) {}),       
+
+                                onTap: () {
+                                  print(
+                                      'XXX XXX BEFORE seek: _audioHandler.skipToQueueItem($i).  currentIndex: ${_player.currentIndex}');
+                                  _player
+                                      .seek(Duration.zero, index: i)
+                                      .catchError((e, st) {});
+                                  print(
+                                      'XXX XXX AFTER seek but before play(): currentIndex: ${_player.currentIndex}');
+                                  _player.play();
+                                },
+
+                       ),
                             ),
                           ),
                       ],
