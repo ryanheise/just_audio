@@ -306,15 +306,18 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
                                 onTap: () {
                                   print(
-                                      'XXX XXX BEFORE seek: _audioHandler.skipToQueueItem($i).  currentIndex: ${_player.currentIndex}');
+                                      'XXX XXX BEFORE seek: _player.seek(Duration.zero, index: $i).  currentIndex: ${_player.currentIndex}');
                                   _player
                                       .seek(Duration.zero, index: i)
-                                      .catchError((e, st) {});
+                                      .catchError((e, st) {
+
+                                        print('XXX XXX: Line 314: _player.seek() ERROR: e: "$e", st: "$st"');
+                                      });
                                   print(
-                                      'XXX XXX AFTER seek but before play(): currentIndex: ${_player.currentIndex}');
+                                      'XXX XXX AFTER _player.seek but before _player.play(): currentIndex: ${_player.currentIndex}');
                                   _player.play();
                                   print(
-                                      'XXX XXX AFTER play(): currentIndex: ${_player.currentIndex}');
+                                      'XXX XXX AFTER _player.play(): currentIndex: ${_player.currentIndex}');
                                 },
 
                        ),
