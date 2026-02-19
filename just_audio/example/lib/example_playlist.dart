@@ -313,6 +313,8 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                                   print(
                                       'XXX XXX AFTER seek but before play(): currentIndex: ${_player.currentIndex}');
                                   _player.play();
+                                  print(
+                                      'XXX XXX AFTER play(): currentIndex: ${_player.currentIndex}');
                                 },
 
                        ),
