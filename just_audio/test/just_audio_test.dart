@@ -481,6 +481,18 @@ void runTests() {
     await player.dispose();
   });
 
+  test('content URI skips proxy', () async {
+    final player = AudioPlayer(userAgent: 'TestAgent');
+    final contentUri = 'content://com.example.provider/audio/test.mp3';
+    await player.setUrl(contentUri);
+    // The platform-side URL should be the original content:// URI,
+    // not rewritten to a localhost proxy URL.
+    final platformUri = player.icyMetadata!.info!.url!;
+    expect(platformUri, equals(contentUri));
+    expect(platformUri, isNot(startsWith('http://127.0.0.1')));
+    await player.dispose();
+  });
+
   test('proxy0.9', () async {
     final server = MockWebServer();
     await server.start();

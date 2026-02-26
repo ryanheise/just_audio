@@ -2745,8 +2745,7 @@ abstract class UriAudioSource extends IndexedAudioSource {
     await super._onLoad();
     if (uri.scheme == 'asset') {
       _overrideUri = await _loadAsset(uri.pathSegments.join('/'));
-    } else if (uri.scheme != 'file' &&
-        uri.scheme != 'content' &&
+    } else if ((uri.scheme == 'http' || uri.scheme == 'https') &&
         !kIsWeb &&
         _player!._useProxyForRequestHeaders &&
         (headers != null || _player!._userAgent != null)) {
