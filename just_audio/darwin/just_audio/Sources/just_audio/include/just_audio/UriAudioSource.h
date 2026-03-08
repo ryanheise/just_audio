@@ -1,5 +1,6 @@
 #import "IndexedAudioSource.h"
 #import "LoadControl.h"
+#import "ResourceLoaderDelegate.h"
 #import <AVFoundation/AVFoundation.h>
 #if TARGET_OS_OSX
 #import <FlutterMacOS/FlutterMacOS.h>

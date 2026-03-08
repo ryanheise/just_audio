@@ -992,7 +992,27 @@
 }
 
 - (void)sendErrorForItem:(IndexedPlayerItem *)playerItem {
-    [self sendError:@((int)playerItem.error.code) errorMessage:playerItem.error.localizedDescription playerItem:playerItem switchToIdle:YES];
+    NSString *errorMessage = playerItem.error.localizedDescription;
+    // Log full error chain for diagnostics.
+    NSLog(@"just_audio: AVPlayerItem error: domain=%@ code=%ld desc=%@",
+          playerItem.error.domain, (long)playerItem.error.code, playerItem.error.localizedDescription);
+    NSLog(@"just_audio: AVPlayerItem error userInfo: %@", playerItem.error.userInfo);
+    // Include underlying error details (e.g. iOS 17 AVFoundation / network errors).
+    NSError *underlyingError = playerItem.error.userInfo[NSUnderlyingErrorKey];
+    while (underlyingError) {
+        NSLog(@"just_audio:   Underlying error: domain=%@ code=%ld desc=%@",
+              underlyingError.domain, (long)underlyingError.code, underlyingError.localizedDescription);
+        errorMessage = [NSString stringWithFormat:@"%@ (underlying: %@ %ld - %@)",
+                        errorMessage, underlyingError.domain, (long)underlyingError.code,
+                        underlyingError.localizedDescription];
+        underlyingError = underlyingError.userInfo[NSUnderlyingErrorKey];
+    }
+    // Include the failing URL if available.
+    NSURL *failingURL = playerItem.error.userInfo[NSURLErrorFailingURLErrorKey];
+    if (failingURL) {
+        NSLog(@"just_audio:   Failing URL: %@", [failingURL absoluteString]);
+    }
+    [self sendError:@((int)playerItem.error.code) errorMessage:errorMessage playerItem:playerItem switchToIdle:YES];
     [_player removeAllItems];
 }
 
