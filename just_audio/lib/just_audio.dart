@@ -321,10 +321,12 @@ class AudioPlayer {
             PositionDiscontinuityReason.autoAdvance, prevEvent, currEvent));
       }
     });
-    _currentIndexSubscription = playbackEventStream.listen(
-      (event) => _sequenceStateSubject
-          .add(sequenceState.copyWith(currentIndex: event.currentIndex)),
-    );
+    _currentIndexSubscription = playbackEventStream.listen((event) {
+      final pending = _pluginLoadRequest?.initialIndex;
+      if (pending != null && event.currentIndex != pending) return;
+      _sequenceStateSubject
+          .add(sequenceState.copyWith(currentIndex: event.currentIndex));
+    });
     _currentIndexSubject.addStream(
         sequenceStateStream.map((sequenceState) => sequenceState.currentIndex));
     _sequenceSubject.addStream(
@@ -890,7 +892,8 @@ class AudioPlayer {
       initialPosition: initialPosition,
       shuffleOrder: shuffleOrder ?? DefaultShuffleOrder(),
     );
-    await _playlist._init(audioSources, loadRequest.shuffleOrder);
+    await _playlist._init(audioSources, loadRequest.shuffleOrder,
+        initialIndex: initialIndex);
     loadRequest.checkInterruption();
     Duration? duration;
     if (preload || playing) {
@@ -960,10 +963,12 @@ class AudioPlayer {
   /// The playlist.
   List<AudioSource> get audioSources => _playlist.children;
 
-  Future<void> _broadcastSequence({bool sequenceChanged = true}) async {
+  Future<void> _broadcastSequence(
+      {bool sequenceChanged = true, int? initialIndex}) async {
     _sequenceStateSubject.add(sequenceState.copyWith(
       sequence: sequenceChanged ? _playlist.sequence : sequenceState.sequence,
       shuffleIndices: _playlist.shuffleIndices,
+      currentIndex: initialIndex ?? sequenceState.currentIndex,
     ));
     final shuffleIndicesLength = shuffleIndices.length;
     if (_shuffleIndicesInv.length > shuffleIndicesLength) {
@@ -3160,7 +3165,8 @@ class ConcatenatingAudioSource extends AudioSource {
   }
 
   /// Initialise without communicating with platform.
-  Future<void> _init(List<AudioSource> children, ShuffleOrder shuffleOrder) {
+  Future<void> _init(List<AudioSource> children, ShuffleOrder shuffleOrder,
+      {int? initialIndex}) {
     return _lock.synchronized(() async {
       this.children.replaceRange(0, this.children.length, children);
       _shuffleOrder = shuffleOrder;
@@ -3171,7 +3177,7 @@ class ConcatenatingAudioSource extends AudioSource {
         for (var child in children) {
           child._onAttach(player);
         }
-        await player._broadcastSequence();
+        await player._broadcastSequence(initialIndex: initialIndex);
         if (player._active) {
           for (var child in children) {
             await child._onLoad();

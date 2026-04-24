@@ -1,3 +1,6 @@
+### 0.10.6
+* Fix currentIndexStream to emit correct values (@maciex97).
+
 ## 0.10.5
 
 * Disable Android audio offload by default to prevent playback issues.
