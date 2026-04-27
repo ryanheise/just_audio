@@ -820,7 +820,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void audioEffectSetEnabled(String type, boolean enabled) {
-        audioEffectsMap.get(type).setEnabled(enabled);
+        AudioEffect effect = audioEffectsMap.get(type);
+        if (effect == null) return;
+        effect.setEnabled(enabled);
     }
 
     private void loudnessEnhancerSetTargetGain(double targetGain) {
@@ -830,6 +832,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private Map<String, Object> equalizerAudioEffectGetParameters() {
         Equalizer equalizer = (Equalizer)audioEffectsMap.get("AndroidEqualizer");
+        if (equalizer == null) return null;
         ArrayList<Object> rawBands = new ArrayList<>();
         for (short i = 0; i < equalizer.getNumberOfBands(); i++) {
             rawBands.add(mapOf(
@@ -850,7 +853,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void equalizerBandSetGain(int bandIndex, double gain) {
-        ((Equalizer)audioEffectsMap.get("AndroidEqualizer")).setBandLevel((short)bandIndex, (short)(Math.round(gain * 100.0))); // target gain needs to be provided in milliBel, the user provides the value in deciBel
+        Equalizer equalizer = (Equalizer)audioEffectsMap.get("AndroidEqualizer");
+        if (equalizer == null) return;
+        equalizer.setBandLevel((short)bandIndex, (short)(Math.round(gain * 100.0))); // target gain needs to be provided in milliBel, the user provides the value in deciBel
     }
 
     /// Creates an event based on the current state.
