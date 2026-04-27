@@ -1750,8 +1750,10 @@ class AudioPlayer {
       subscribeToEvents(platform);
 
       try {
-        final initialSeekValues = pluginLoadRequest?.initialSeekValues ??
-            (index: currentIndex, position: position);
+        final initialSeekValues = (
+          index: pluginLoadRequest?.initialSeekValues.index ?? currentIndex,
+          position: pluginLoadRequest?.initialSeekValues.position ?? position,
+        );
         final duration = await _load(
           platform,
           _playlist,
