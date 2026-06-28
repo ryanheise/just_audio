@@ -4,7 +4,7 @@ version = "1.0"
 val compilerArgs = listOf("-Xlint:deprecation", "-Xlint:unchecked")
 
 buildscript {
-    val agpVersion = "8.5.2"
+    val agpVersion = "9.0.1"
     repositories {
         google()
         mavenCentral()
