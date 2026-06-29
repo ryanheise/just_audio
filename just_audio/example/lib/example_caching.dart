@@ -27,6 +27,7 @@ class MyApp extends StatefulWidget {
 
 class MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _player = AudioPlayer();
+  // ignore: experimental_member_use
   final _audioSource = LockCachingAudioSource(Uri.parse(
     // Supports range requests:
     "https://dovetail.prxu.org/70/66673fd4-6851-4b90-a762-7c0538c76626/CoryCombs_2021T_VO_Intro.mp3",
@@ -222,3 +223,5 @@ class ControlButtons extends StatelessWidget {
     );
   }
 }
+
+
