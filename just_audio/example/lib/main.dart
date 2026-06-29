@@ -2,7 +2,8 @@
 // More advanced examples demonstrating other features can be found in the same
 // directory as this example in the GitHub repository.
 
-import 'media_kit_stub.dart' if (dart.library.io) 'media_kit_impl.dart';
+// import 'media_kit_stub.dart' if (dart.library.io) 'media_kit_impl.dart';
+import 'media_kit_impl.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
