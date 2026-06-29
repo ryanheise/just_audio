@@ -19,6 +19,12 @@ let package = Package(
             dependencies: [],
             cSettings: [
                 .headerSearchPath("include/just_audio")
+            ],
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("UniformTypeIdentifiers", .when(platforms: [.iOS, .macOS])),
+                .linkedFramework("MobileCoreServices", .when(platforms: [.iOS])),
+                .linkedFramework("CoreServices", .when(platforms: [.macOS]))
             ]
         )
     ]

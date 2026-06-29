@@ -2,6 +2,7 @@
 #import "./include/just_audio/IndexedAudioSource.h"
 #import "./include/just_audio/IndexedPlayerItem.h"
 #import "./include/just_audio/LoadControl.h"
+#import "./include/just_audio/ResourceLoaderDelegate.h"
 #import <AVFoundation/AVFoundation.h>
 
 @implementation UriAudioSource {
@@ -12,6 +13,10 @@
     LoadControl *_loadControl;
     NSMutableDictionary *_headers;
     NSDictionary *_options;
+    // Must keep a strong reference to the delegate, as AVAssetResourceLoader
+    // only holds a weak reference.
+    ResourceLoaderDelegate *_resourceLoaderDelegate;
+    ResourceLoaderDelegate *_resourceLoaderDelegate2;
 }
 
 - (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl headers:(NSDictionary *)headers options:(NSDictionary *)options {
@@ -21,7 +26,9 @@
     _loadControl = loadControl;
     _headers = headers != (id)[NSNull null] ? [headers mutableCopy] : nil;
     _options = options;
-    _playerItem = [self createPlayerItem:uri];
+    _resourceLoaderDelegate = nil;
+    _resourceLoaderDelegate2 = nil;
+    _playerItem = [self createPlayerItem:uri storeDelegate:YES isPrimary:YES];
     _playerItem2 = nil;
     return self;
 }
@@ -30,7 +37,7 @@
     return _uri;
 }
 
-- (IndexedPlayerItem *)createPlayerItem:(NSString *)uri {
+- (IndexedPlayerItem *)createPlayerItem:(NSString *)uri storeDelegate:(BOOL)storeDelegate isPrimary:(BOOL)isPrimary {
     IndexedPlayerItem *item;
     NSMutableDictionary *assetOptions = [[NSMutableDictionary alloc] init];
     
@@ -69,8 +76,70 @@
             }
         }
         
-        AVURLAsset *asset = [AVURLAsset URLAssetWithURL:[NSURL URLWithString:uri] options:assetOptions];
-        item = [[IndexedPlayerItem alloc] initWithAsset:asset];
+        // For HTTP(S) URLs, use a custom URL scheme with AVAssetResourceLoaderDelegate
+        // to intercept and handle network requests ourselves via NSURLSession.
+        // This is necessary because iOS 17+ changed the URL parser (RFC 3986) which
+        // normalizes percent-encoded characters (e.g. %2B → +, %3D → =) breaking
+        // signed/verified URLs. By handling requests ourselves, we preserve the
+        // exact URL encoding.
+        BOOL useResourceLoader = [uri hasPrefix:@"http://"] || [uri hasPrefix:@"https://"];
+
+        if (useResourceLoader) {
+            NSString *interceptedURI = [ResourceLoaderDelegate interceptedURLString:uri];
+            NSURL *interceptedURL = [NSURL URLWithString:interceptedURI];
+            if (!interceptedURL) {
+                NSLog(@"just_audio: ResourceLoader: Failed to create intercepted URL from: %@", interceptedURI);
+                // Fallback to direct loading
+                useResourceLoader = NO;
+            } else {
+                ResourceLoaderDelegate *delegate = [[ResourceLoaderDelegate alloc]
+                    initWithOriginalURLString:uri
+                    headers:(_headers && [_headers count] > 0) ? _headers : nil];
+
+                AVURLAsset *asset = [AVURLAsset URLAssetWithURL:interceptedURL options:assetOptions];
+                [asset.resourceLoader setDelegate:delegate queue:dispatch_get_main_queue()];
+
+                // Store a strong reference to the delegate (AVAssetResourceLoader only
+                // holds a weak reference).
+                if (storeDelegate) {
+                    if (isPrimary) {
+                        _resourceLoaderDelegate = delegate;
+                    } else {
+                        _resourceLoaderDelegate2 = delegate;
+                    }
+                }
+
+                item = [[IndexedPlayerItem alloc] initWithAsset:asset];
+            }
+        }
+
+        if (!useResourceLoader) {
+            // Fallback: direct URL loading (for non-HTTP or if interception failed).
+            // Still try to preserve percent-encoding via NSURLComponents.
+            NSURL *url = nil;
+            NSURLComponents *components = [NSURLComponents componentsWithString:uri];
+            if (components) {
+                NSRange queryRange = [uri rangeOfString:@"?"];
+                if (queryRange.location != NSNotFound) {
+                    NSString *rawQuery = [uri substringFromIndex:queryRange.location + 1];
+                    NSRange fragmentRange = [rawQuery rangeOfString:@"#"];
+                    if (fragmentRange.location != NSNotFound) {
+                        rawQuery = [rawQuery substringToIndex:fragmentRange.location];
+                    }
+                    components.percentEncodedQuery = rawQuery;
+                }
+                url = components.URL;
+            }
+            if (!url) {
+                url = [NSURL URLWithString:uri];
+            }
+            if (!url) {
+                NSLog(@"just_audio: ERROR: Failed to create NSURL from URI: %@", uri);
+                url = [NSURL URLWithString:@"about:blank"];
+            }
+            AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:assetOptions];
+            item = [[IndexedPlayerItem alloc] initWithAsset:asset];
+        }
     }
     if (@available(macOS 10.13, iOS 11.0, *)) {
         // This does the best at reducing distortion on voice with speeds below 1.0
@@ -165,11 +234,15 @@
     IndexedPlayerItem *temp = _playerItem;
     _playerItem = _playerItem2;
     _playerItem2 = temp;
+    // Also swap the resource loader delegates
+    ResourceLoaderDelegate *tempDelegate = _resourceLoaderDelegate;
+    _resourceLoaderDelegate = _resourceLoaderDelegate2;
+    _resourceLoaderDelegate2 = tempDelegate;
 }
 
 - (void)preparePlayerItem2 {
     if (!_playerItem2) {
-        _playerItem2 = [self createPlayerItem:_uri];
+        _playerItem2 = [self createPlayerItem:_uri storeDelegate:YES isPrimary:NO];
         _playerItem2.audioSource = _playerItem.audioSource;
     }
 }
