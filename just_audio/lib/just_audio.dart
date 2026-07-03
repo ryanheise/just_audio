@@ -3821,10 +3821,15 @@ _ProxyHandler _proxyHandlerForUri(
     String? host;
     try {
       final requestHeaders = <String, String>{};
-      request.headers
-          .forEach((name, value) => requestHeaders[name] = value.join(', '));
+      request.headers.forEach((name, value) {
+        if (name == HttpHeaders.acceptEncodingHeader) return;
+        requestHeaders[name] = value.join(', ');
+      });
       // write supplied headers last (to ensure supplied headers aren't overwritten)
-      headers?.forEach((name, value) => requestHeaders[name] = value);
+      headers?.forEach((name, value) {
+        if (name == HttpHeaders.acceptEncodingHeader) return;
+        requestHeaders[name] = value;
+      });
       final originRequest =
           await _getUrl(client, redirectedUri ?? uri, headers: requestHeaders);
       host = originRequest.headers.value(HttpHeaders.hostHeader);
