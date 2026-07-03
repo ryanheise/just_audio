@@ -147,6 +147,7 @@ class AudioPlayer {
   final _speedSubject = BehaviorSubject.seeded(1.0);
   final _pitchSubject = BehaviorSubject.seeded(1.0);
   final _skipSilenceEnabledSubject = BehaviorSubject.seeded(false);
+  final _balanceSubject = BehaviorSubject.seeded(0.0);
 
   final _positionDiscontinuitySubject =
       PublishSubject<PositionDiscontinuity>(sync: true);
@@ -516,6 +517,13 @@ class AudioPlayer {
   /// A stream of current skipSilenceEnabled factor values.
   Stream<bool> get skipSilenceEnabledStream =>
       _skipSilenceEnabledSubject.stream;
+
+  /// The current audio balance of the player.
+  /// -1.0 is full left, 0.0 is center, +1.0 is full right. (Android only)
+  double get balance => _balanceSubject.nvalue!;
+
+  /// A stream of audio balance changes. (Android only)
+  Stream<double> get balanceStream => _balanceSubject.stream;
 
   /// The position up to which buffered audio is available.
   Duration get bufferedPosition =>
@@ -1181,6 +1189,36 @@ class AudioPlayer {
     await (await _platform).setVolume(SetVolumeRequest(volume: volume));
   }
 
+  /// Sets the audio balance (left/right channel volume).
+  ///
+  /// The [balance] parameter should be between -1.0 and +1.0:
+  /// * -1.0: Full left channel (right channel muted)
+  /// * 0.0: Center (both channels equal, default)
+  /// * +1.0: Full right channel (left channel muted)
+  ///
+  /// This feature is currently Android only. On other platforms,
+  /// this method will have no effect.
+  Future<void> setBalance(final double balance) async {
+    if (_disposed) return;
+    final clampedBalance = balance.clamp(-1.0, 1.0);
+    _balanceSubject.add(clampedBalance);
+
+    if (_isAndroid()) {
+      try {
+        final platform = await _platform;
+        if (platform is _IdleAudioPlayer) {
+          return;
+        }
+        final methodChannel =
+            MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+        await methodChannel
+            .invokeMethod('setBalance', {'balance': clampedBalance});
+      } catch (e) {
+        // silently ignore if platform doesn't support this method
+      }
+    }
+  }
+
   /// Sets whether silence should be skipped in audio playback. (Currently
   /// Android only).
   Future<void> setSkipSilenceEnabled(bool enabled) async {
@@ -1444,6 +1482,7 @@ class AudioPlayer {
       await _volumeSubject.close();
       await _speedSubject.close();
       await _pitchSubject.close();
+      await _balanceSubject.close();
 
       await _durationSubject.close();
       await _processingStateSubject.close();
@@ -1700,6 +1739,18 @@ class AudioPlayer {
           if (checkInterruption()) return inactiveResult(platform);
         }
         await platform.setVolume(SetVolumeRequest(volume: volume));
+        if (checkInterruption()) return inactiveResult(platform);
+        // Restore balance (Android only)
+        if (_isAndroid() && balance != 0.0) {
+          try {
+            final methodChannel = MethodChannel(
+                'com.ryanheise.just_audio.methods.${platform.id}');
+            await methodChannel
+                .invokeMethod('setBalance', {'balance': balance});
+          } catch (e) {
+            // Silently ignore if not supported
+          }
+        }
         if (checkInterruption()) return inactiveResult(platform);
         await platform.setSpeed(SetSpeedRequest(speed: speed));
         if (checkInterruption()) return inactiveResult(platform);
