@@ -1029,6 +1029,17 @@ class AudioPlayer {
       _pluginLoadRequest = null;
       return duration;
     } on PlatformException catch (e, st) {
+      // cant connect to servers
+      if (e.code == "-1004" && source is LockCachingAudioSource) {
+        // proxy is offline
+        try {
+          await _proxy._server.close(force: true);
+        } catch (_) {
+          // ignore err
+        }
+        await _proxy.start();
+      }
+
       Error.throwWithStackTrace(_convertException(e), st);
     }
   }
@@ -2519,18 +2530,33 @@ class _ProxyHttpServer {
   /// Starts the server.
   Future<dynamic> start() async {
     _running = true;
-    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    _server.listen((request) async {
-      if (request.method == 'GET') {
-        final uriPath = _requestKey(request.uri);
-        final handler = _handlerMap[uriPath]!;
-        handler(this, request);
-      }
-    }, onDone: () {
+    try {
+      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      _server.listen(
+        (request) async {
+          if (request.method == 'GET') {
+            final uriPath = _requestKey(request.uri);
+            final handler = _handlerMap[uriPath]!;
+            handler(this, request);
+          }
+        },
+        onDone: () {
+          _running = false;
+        },
+        onError: (Object e, StackTrace st) async {
+          _running = false;
+          try {
+            await _server.close(force: true);
+          } catch (_) {
+            // ignore
+          }
+        },
+        cancelOnError: true,
+      );
+    } catch (_) {
+      // ignore
       _running = false;
-    }, onError: (Object e, StackTrace st) {
-      _running = false;
-    });
+    }
   }
 
   /// Stops the server
