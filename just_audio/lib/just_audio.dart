@@ -2925,7 +2925,7 @@ class ConcatenatingAudioSource extends AudioSource {
   final bool useLazyPreparation;
   ShuffleOrder _shuffleOrder;
 
-  /// Creates a [ConcatenatingAudioSorce] with the specified [children]. If
+  /// Creates a [ConcatenatingAudioSource] with the specified [children]. If
   /// [useLazyPreparation] is `true`, children will be loaded/buffered as late
   /// as possible before needed for playback (currently supported on Android,
   /// iOS, MacOS). When [AudioPlayer.shuffleModeEnabled] is `true`,
