@@ -3379,6 +3379,7 @@ class LockCachingAudioSource extends StreamAudioSource {
   final _requests = <_StreamingByteRangeRequest>[];
   final _downloadProgressSubject = BehaviorSubject<double>();
   bool _downloading = false;
+  Completer<void>? _downloadCompleter;
 
   /// Creates a [LockCachingAudioSource] to that provides [uri] to the player
   /// while simultaneously caching it to [cacheFile]. If no cache file is
@@ -3419,10 +3420,20 @@ class LockCachingAudioSource extends StreamAudioSource {
     if (_downloading) {
       throw Exception("Cannot clear cache while download is in progress");
     }
+
+    // Wait for any pending download completion to finish
+    if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+      await _downloadCompleter!.future;
+    }
+
     _response = null;
     final cacheFile = await this.cacheFile;
     if (await cacheFile.exists()) {
       await cacheFile.delete();
+    }
+    final partialCacheFile = await _partialCacheFile;
+    if (await partialCacheFile.exists()) {
+      await partialCacheFile.delete();
     }
     final mimeFile = await _mimeFile;
     if (await mimeFile.exists()) {
@@ -3471,6 +3482,7 @@ class LockCachingAudioSource extends StreamAudioSource {
   /// entire file continues in parallel.
   Future<HttpClientResponse> _fetch() async {
     _downloading = true;
+    _downloadCompleter = Completer<void>();
     final cacheFile = await this.cacheFile;
     final partialCacheFile = await _partialCacheFile;
 
@@ -3619,32 +3631,63 @@ class LockCachingAudioSource extends StreamAudioSource {
         });
       }
     }, onDone: () async {
-      if (sourceLength == null) {
-        updateProgress(100);
-      }
-      for (var cacheResponse in inProgressResponses) {
-        if (!cacheResponse.controller.isClosed) {
-          cacheResponse.controller.close();
+      try {
+        if (sourceLength == null) {
+          updateProgress(100);
+        }
+        for (var cacheResponse in inProgressResponses) {
+          if (!cacheResponse.controller.isClosed) {
+            cacheResponse.controller.close();
+          }
+        }
+
+        // Safely rename the partial cache file to the final cache file
+        final partialFile = await _partialCacheFile;
+        if (partialFile.existsSync()) {
+          try {
+            partialFile.renameSync(cacheFile.path);
+          } catch (e) {
+            // If rename fails (e.g., due to race condition with clearCache),
+            // just delete the partial file to clean up
+            if (partialFile.existsSync()) {
+              partialFile.deleteSync();
+            }
+          }
+        }
+
+        await subscription.cancel();
+        httpClient.close();
+        _downloading = false;
+      } finally {
+        // Always complete the download completer to unblock any waiting clearCache calls
+        if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+          _downloadCompleter!.complete();
         }
       }
-      (await _partialCacheFile).renameSync(cacheFile.path);
-      await subscription.cancel();
-      httpClient.close();
-      _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
-      (await _partialCacheFile).deleteSync();
-      httpClient.close();
-      // Fail all pending requests
-      for (final req in _requests) {
-        req.fail(e, stackTrace);
+      try {
+        final partialFile = await _partialCacheFile;
+        if (partialFile.existsSync()) {
+          partialFile.deleteSync();
+        }
+        httpClient.close();
+        // Fail all pending requests
+        for (final req in _requests) {
+          req.fail(e, stackTrace);
+        }
+        _requests.clear();
+        // Close all in progress requests
+        for (final res in inProgressResponses) {
+          res.controller.addError(e, stackTrace);
+          res.controller.close();
+        }
+        _downloading = false;
+      } finally {
+        // Always complete the download completer to unblock any waiting clearCache calls
+        if (_downloadCompleter != null && !_downloadCompleter!.isCompleted) {
+          _downloadCompleter!.complete();
+        }
       }
-      _requests.clear();
-      // Close all in progress requests
-      for (final res in inProgressResponses) {
-        res.controller.addError(e, stackTrace);
-        res.controller.close();
-      }
-      _downloading = false;
     }, cancelOnError: true);
     return response;
   }
