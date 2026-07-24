@@ -23,6 +23,8 @@ dependencies:
   synchronized: ^3.3.0+3
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^2.0.1
 
 environment:

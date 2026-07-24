@@ -901,7 +901,9 @@ extension AudioSourceExtension on AudioSourceMessage {
       }
       final indices = <int>[];
       for (final index in self.shuffleOrder) {
-        indices.addAll(childIndicesList[index]);
+        if (index < childIndicesList.length) {
+          indices.addAll(childIndicesList[index]);
+        }
       }
       return indices;
     } else if (self is LoopingAudioSourceMessage) {

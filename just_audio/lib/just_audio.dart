@@ -3211,7 +3211,7 @@ class ConcatenatingAudioSource extends AudioSource {
       id: _id,
       children: children.map((child) => child._toMessage()).toList(),
       useLazyPreparation: useLazyPreparation,
-      shuffleOrder: _shuffleOrder.indices);
+      shuffleOrder: List.of(_shuffleOrder.indices));
 }
 
 /// An [AudioSource] that clips the audio of a [UriAudioSource] between a
