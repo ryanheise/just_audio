@@ -3482,7 +3482,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     final response = await httpRequest.close();
     if (response.statusCode != 200) {
       httpClient.close();
-      throw Exception('HTTP Status Error: ${response.statusCode}');
+      throw Exception('HTTP Status Error: ${response.statusCode}, URL: ${uri}');
     }
     (await _partialCacheFile).createSync(recursive: true);
     // TODO: Should close sink after done, but it throws an error.
@@ -3602,7 +3602,7 @@ class LockCachingAudioSource extends StreamAudioSource {
           final response = await httpRequest.close();
           if (response.statusCode != 206) {
             httpClient.close();
-            throw Exception('HTTP Status Error: ${response.statusCode}');
+            throw Exception('HTTP Status Error: ${response.statusCode}, URL: ${uri}');
           }
           request.complete(StreamAudioResponse(
             rangeRequestsSupported: originSupportsRangeRequests,
