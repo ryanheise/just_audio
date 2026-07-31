@@ -218,7 +218,7 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
     return value;
 }
 
-- (void)setGains:(NSArray<NSNumber *> *)gains {
+- (void)setGains:(nullable NSArray<NSNumber *> *)gains {
     double g[kEqSections];
     memset(g, 0, sizeof(g));
     BOOL flat = YES;
