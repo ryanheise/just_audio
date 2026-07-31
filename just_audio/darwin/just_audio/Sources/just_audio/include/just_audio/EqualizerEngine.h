@@ -23,9 +23,11 @@
 /// player), shared across that player's items.
 @interface EqualizerEngine : NSObject
 
-/// Set the 10-band gain vector in dB (clamped to ±12). `nil`, an empty array,
-/// or an all-flat vector disarms the engine.
-- (void)setGains:(nullable NSArray<NSNumber *> *)gains;
+/// Set the 10-band gain vector in dB (clamped to ±12). `nil`, `NSNull` (Dart
+/// `null` over the method channel), an empty array, or an all-flat vector all
+/// disarm the engine. Typed `id` so the runtime `isKindOfClass:` guard is not
+/// elided by the optimiser under a static `NSArray *` assumption.
+- (void)setGains:(nullable id)gains;
 
 /// Whether a non-flat curve is currently armed (taps should install/process).
 @property (readonly, nonatomic) BOOL armed;

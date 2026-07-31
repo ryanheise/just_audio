@@ -218,16 +218,17 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
     return value;
 }
 
-- (void)setGains:(nullable NSArray<NSNumber *> *)gains {
+- (void)setGains:(nullable id)gains {
     double g[kEqSections];
     memset(g, 0, sizeof(g));
     BOOL flat = YES;
     // Dart `null` crosses the method channel as NSNull, not nil; treat any
     // non-array (nil, NSNull, wrong type) as flat → disarm, per the header.
     if ([gains isKindOfClass:[NSArray class]]) {
-        NSUInteger n = gains.count < kEqSections ? gains.count : kEqSections;
+        NSArray *array = (NSArray *)gains;  // verified at runtime; the param is `id` so this check is not elided
+        NSUInteger n = array.count < kEqSections ? array.count : kEqSections;
         for (NSUInteger i = 0; i < n; i++) {
-            id elt = gains[i];
+            id elt = array[i];
             if (![elt isKindOfClass:[NSNumber class]]) continue;
             double v = [elt doubleValue];
             if (v > 12.0) v = 12.0;
