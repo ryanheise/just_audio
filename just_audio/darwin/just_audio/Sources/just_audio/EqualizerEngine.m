@@ -173,9 +173,16 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
     static int _procLog = 0;
     if (_procLog < 5) {
         _procLog++;
-        NSLog(@"[EqualizerEngine] process#%d produced=%lld nbuf=%u channels=%u armed=%d",
+        if (_procLog == 1) {
+            NSLog(@"[EqualizerEngine] process#1 gains=[%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f] sr=%.0f ch=%u",
+                  gains[0], gains[1], gains[2], gains[3], gains[4],
+                  gains[5], gains[6], gains[7], gains[8], gains[9],
+                  st->sampleRate, (unsigned)st->channels);
+        }
+        NSLog(@"[EqualizerEngine] process#%d produced=%lld nbuf=%u channels=%u armed=%d bytes=%u",
               _procLog, (long long)produced, (unsigned)bufferListInOut->mNumberBuffers,
-              (unsigned)st->channels, (int)armed);
+              (unsigned)st->channels, (int)armed,
+              (unsigned)(bufferListInOut->mNumberBuffers ? bufferListInOut->mBuffers[0].mDataByteSize : 0));
     }
     if (!armed) return;  // disarmed (flat): leave the fetched buffer untouched (bypass)
 
@@ -194,9 +201,12 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
     for (UInt32 b = 0; b < bufferListInOut->mNumberBuffers; b++) {
         AudioBuffer *buf = &bufferListInOut->mBuffers[b];
         if (!buf->mData || buf->mDataByteSize == 0) continue;
-        UInt32 n = (UInt32)(buf->mDataByteSize / sizeof(float));
-        EqApplyChain(st->coeffs, kEqSections, st->state + b * kEqSections * 2u,
-                     (float *)buf->mData, n);
+        // *** DIAGNOSTIC *** zero-fill instead of applying the EQ, to prove the
+        // tap owns the playback path. If audio goes silent when armed → the tap
+        // IS in the render path (so the real EQ should be audible; a no-op would
+        // mean gains/plumbing). If audio continues → the audioMix tap is NOT in
+        // the output path and a different attach mechanism is needed.
+        memset(buf->mData, 0, buf->mDataByteSize);
     }
 }
 
