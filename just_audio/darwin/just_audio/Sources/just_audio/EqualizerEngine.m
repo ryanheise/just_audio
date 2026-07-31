@@ -170,6 +170,13 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
     BOOL armed = NO;
     double gains[kEqSections];
     [engine snapshotGains:gains armed:&armed];
+    static int _procLog = 0;
+    if (_procLog < 5) {
+        _procLog++;
+        NSLog(@"[EqualizerEngine] process#%d produced=%lld nbuf=%u channels=%u armed=%d",
+              _procLog, (long long)produced, (unsigned)bufferListInOut->mNumberBuffers,
+              (unsigned)st->channels, (int)armed);
+    }
     if (!armed) return;  // disarmed (flat): leave the fetched buffer untouched (bypass)
 
     // Recompute coefficients only when the gain vector changed since last call.

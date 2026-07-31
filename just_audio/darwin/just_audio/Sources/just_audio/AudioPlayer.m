@@ -198,14 +198,16 @@
 }
 
 - (void)setEqualizerGains:(NSArray *)gains {
+    BOOL wasArmed = _eq.armed;
     [_eq setGains:gains];
-    // Arming mid-playback: the current item already passed readyToPlay while
-    // the engine was disarmed, so install the tap on it now rather than
-    // silently waiting for the next station change.
-    if (_eq.armed) {
+    // Install the tap only on the disarmed→armed transition. Once installed,
+    // the process callback reads gain updates live via snapshotGains, so slider
+    // drags must NOT re-install (re-attaching thrashes the audio graph, rebuilds
+    // the tap, and can flip the channel layout — audible as no-op or glitch).
+    if (!wasArmed && _eq.armed) {
         AVPlayerItem *item = _player.currentItem;
         if (item && item.status == AVPlayerItemStatusReadyToPlay) {
-            NSLog(@"[EqualizerEngine] armed: attaching tap to current ready item");
+            NSLog(@"[EqualizerEngine] arming: attaching tap to current ready item");
             [_eq attachToPlayerItem:item];
         } else {
             NSLog(@"[EqualizerEngine] armed but currentItem not ready (status=%ld); "
