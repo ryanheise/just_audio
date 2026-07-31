@@ -222,13 +222,19 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
     double g[kEqSections];
     memset(g, 0, sizeof(g));
     BOOL flat = YES;
-    NSUInteger n = gains.count < kEqSections ? gains.count : kEqSections;
-    for (NSUInteger i = 0; i < n; i++) {
-        double v = [gains[i] doubleValue];
-        if (v > 12.0) v = 12.0;
-        if (v < -12.0) v = -12.0;
-        g[i] = v;
-        if (fabs(v) > 0.001) flat = NO;
+    // Dart `null` crosses the method channel as NSNull, not nil; treat any
+    // non-array (nil, NSNull, wrong type) as flat → disarm, per the header.
+    if ([gains isKindOfClass:[NSArray class]]) {
+        NSUInteger n = gains.count < kEqSections ? gains.count : kEqSections;
+        for (NSUInteger i = 0; i < n; i++) {
+            id elt = gains[i];
+            if (![elt isKindOfClass:[NSNumber class]]) continue;
+            double v = [elt doubleValue];
+            if (v > 12.0) v = 12.0;
+            if (v < -12.0) v = -12.0;
+            g[i] = v;
+            if (fabs(v) > 0.001) flat = NO;
+        }
     }
     os_unfair_lock_lock(&_lock);
     memcpy(_gains, g, sizeof(g));
