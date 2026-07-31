@@ -7,6 +7,7 @@
 #import "./include/just_audio/ConcatenatingAudioSource.h"
 #import "./include/just_audio/LoopingAudioSource.h"
 #import "./include/just_audio/ClippingAudioSource.h"
+#import "./include/just_audio/EqualizerEngine.h"
 #import <AVFoundation/AVFoundation.h>
 #import <stdlib.h>
 #include <TargetConditionals.h>
@@ -53,6 +54,7 @@
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
     NSNumber *_errorCode;
     NSString *_errorMessage;
+    EqualizerEngine *_eq;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration useLazyPreparation:(BOOL)useLazyPreparation {
@@ -61,6 +63,7 @@
     _registrar = registrar;
     _playerId = idParam;
     _useLazyPreparation = useLazyPreparation;
+    _eq = [[EqualizerEngine alloc] init];
     _methodChannel =
         [FlutterMethodChannel methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
                                     binaryMessenger:[registrar messenger]];
@@ -192,6 +195,10 @@
 
 - (AVQueuePlayer *)player {
     return _player;
+}
+
+- (void)setEqualizerGains:(NSArray *)gains {
+    [_eq setGains:gains];
 }
 
 - (float)speed {
@@ -795,6 +802,7 @@
         switch (status) {
             case AVPlayerItemStatusReadyToPlay: {
                 if (playerItem != _player.currentItem) return;
+                [_eq attachToPlayerItem:playerItem];
                 // Detect buffering in different ways depending on whether we're playing
                 if (_playing) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {

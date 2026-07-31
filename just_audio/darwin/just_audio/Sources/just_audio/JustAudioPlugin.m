@@ -51,6 +51,15 @@
         }
         [_players removeAllObjects];
         result(@{});
+    } else if ([@"setEqualizerGains" isEqualToString:call.method]) {
+        // Phase B (darwin EQ): push the 10-band gain vector to every live
+        // player's equaliser engine. Mirrors the desktop
+        // `setMediaKitEqualizer` static-all-players contract.
+        NSArray *gains = [(NSDictionary *)call.arguments objectForKey:@"gains"];
+        for (NSString *playerId in _players) {
+            [_players[playerId] setEqualizerGains:gains];
+        }
+        result(@{});
     } else {
         result(FlutterMethodNotImplemented);
     }

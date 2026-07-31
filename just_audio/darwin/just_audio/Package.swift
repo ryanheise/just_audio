@@ -19,6 +19,10 @@ let package = Package(
             dependencies: [],
             cSettings: [
                 .headerSearchPath("include/just_audio")
+            ],
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("MediaToolbox")
             ]
         )
     ]
