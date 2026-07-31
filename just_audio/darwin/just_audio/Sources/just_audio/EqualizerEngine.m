@@ -24,13 +24,15 @@ typedef struct {
     float b0, b1, b2, a1, a2;
 } EqCoeff;
 
-/// Per-tap real-time state. Allocated in `prepare` (format known then), freed
-/// in `unprepare`/`finalize`. `state` layout: channel-major, then section, then
-/// [s1, s2] (Transposed Direct Form II registers).
+/// Per-tap real-time state. Allocated in the `init` callback (the only place the
+/// bridged engine ref is reachable) and freed in `finalize`; recovered elsewhere
+/// via MTAudioProcessingTapGetStorage(tap). `state` layout: channel-major, then
+/// section, then [s1, s2] (Transposed Direct Form II registers).
 typedef struct {
     double sampleRate;
     UInt32 channels;
     float *state;                  // channels * kEqSections * 2
+    void *clientInfo;              // bridged EqualizerEngine (retained in createTap)
     double gainsSnapshot[kEqSections];  // last-applied gains (force recompute when dirty)
     EqCoeff coeffs[kEqSections];
     BOOL dirty;
@@ -96,66 +98,79 @@ static void EqComputeCoeffs(const double gains[10],
 
 // MARK: - MTAudioProcessingTap callbacks
 
-static void EqTapInitCallback(void *clientInfo, void **tapStorageOut) {
-    *tapStorageOut = NULL;
+static void EqTapInitCallback(MTAudioProcessingTapRef tap,
+                              void *clientInfo,
+                              void **tapStorageOut) {
+    // The only place the bridged engine ref is reachable; allocate per-tap state
+    // here and recover it elsewhere via MTAudioProcessingTapGetStorage(tap).
+    EqTapState *st = (EqTapState *)calloc(1, sizeof(EqTapState));
+    st->clientInfo = clientInfo;  // bridged EqualizerEngine (retained in createTap)
+    st->dirty = YES;
+    *tapStorageOut = st;
 }
 
-static void EqTapPrepareCallback(void *tapStorage,
+static void EqTapPrepareCallback(MTAudioProcessingTapRef tap,
                                  CMItemCount maxFrames,
-                                 const AudioStreamBasicDescription *processingFormat,
-                                 void *clientInfo) {
-    EqTapState *st = (EqTapState *)tapStorage;
-    if (!st) {
-        st = (EqTapState *)calloc(1, sizeof(EqTapState));
-    }
+                                 const AudioStreamBasicDescription *processingFormat) {
+    EqTapState *st = (EqTapState *)MTAudioProcessingTapGetStorage(tap);
+    if (!st) return;
     if (processingFormat) {
         st->sampleRate = processingFormat->mSampleRate;
         st->channels = processingFormat->mChannelsPerFrame;
     }
     NSUInteger floats = (NSUInteger)st->channels * kEqSections * 2u;
-    if (floats > 0 && st->state == NULL) {
+    if (floats > 0) {
+        free(st->state);  // prepare can fire again if the audio machinery rebuilds
         st->state = (float *)calloc(floats, sizeof(float));
     }
-    st->dirty = YES;  // force a coefficient recompute on first process
+    st->dirty = YES;  // force a coefficient recompute after (re)prepare
     NSLog(@"[EqualizerEngine] prepare: %.0f Hz, %u ch, %lld maxFrames",
           st->sampleRate, (unsigned int)st->channels, (long long)maxFrames);
 }
 
-static void EqTapUnprepareCallback(void *tapStorage, void *clientInfo) {
-    EqTapState *st = (EqTapState *)tapStorage;
+static void EqTapUnprepareCallback(MTAudioProcessingTapRef tap) {
+    EqTapState *st = (EqTapState *)MTAudioProcessingTapGetStorage(tap);
     if (st && st->state) {
         free(st->state);
         st->state = NULL;
     }
 }
 
-static void EqTapFinalizeCallback(void *tapStorage, void *clientInfo) {
-    EqTapState *st = (EqTapState *)tapStorage;
-    if (st) {
-        if (st->state) free(st->state);
-        free(st);
+static void EqTapFinalizeCallback(MTAudioProcessingTapRef tap) {
+    EqTapState *st = (EqTapState *)MTAudioProcessingTapGetStorage(tap);
+    if (!st) return;
+    if (st->state) free(st->state);
+    // Balance the CFBridgingRetain(self) stored on callbacks.clientInfo in
+    // createTap. Each tap holds one retain on the engine for its lifetime.
+    if (st->clientInfo) {
+        CFBridgingRelease(st->clientInfo);
     }
-    // Balance the CFBridgingRetain(self) done at tap creation. Each tap holds
-    // one retain on the engine; releasing here keeps it alive exactly as long
-    // as any tap references it.
-    if (clientInfo) {
-        CFBridgingRelease(clientInfo);
-    }
+    free(st);
 }
 
-static void EqTapProcessCallback(void *tapStorage,
+static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
                                  CMItemCount numberFrames,
                                  MTAudioProcessingTapFlags flags,
                                  AudioBufferList *bufferListInOut,
-                                 void *clientInfo) {
-    EqTapState *st = (EqTapState *)tapStorage;
-    EqualizerEngine *engine = (__bridge EqualizerEngine *)clientInfo;
-    if (!st || !engine || numberFrames == 0) return;
+                                 CMItemCount *numberFramesOut,
+                                 MTAudioProcessingTapFlags *flagsOut) {
+    (void)flags;  // construction-time flags; unused for PostEffects processing
+    // The buffer list arrives with NULL data pointers; pull source audio in.
+    OSStatus err = MTAudioProcessingTapGetSourceAudio(
+        tap, numberFrames, bufferListInOut, flagsOut, NULL, numberFramesOut);
+    if (err != noErr) return;
+    CMItemCount produced = (numberFramesOut && *numberFramesOut > 0) ? *numberFramesOut : 0;
+    if (produced == 0) return;
+
+    EqTapState *st = (EqTapState *)MTAudioProcessingTapGetStorage(tap);
+    if (!st) return;
+    EqualizerEngine *engine = (__bridge EqualizerEngine *)st->clientInfo;
+    if (!engine) return;
 
     BOOL armed = NO;
     double gains[kEqSections];
     [engine snapshotGains:gains armed:&armed];
-    if (!armed) return;  // disarmed (flat): leave the buffer untouched (bypass)
+    if (!armed) return;  // disarmed (flat): leave the fetched buffer untouched (bypass)
 
     // Recompute coefficients only when the gain vector changed since last call.
     if (st->dirty || memcmp(gains, st->gainsSnapshot, sizeof(gains)) != 0) {
@@ -232,22 +247,25 @@ static void EqTapProcessCallback(void *tapStorage,
 }
 
 - (MTAudioProcessingTapRef _Nullable)createTap {
+    void *clientInfo = (void *)CFBridgingRetain(self);  // +1, balanced in finalize
     MTAudioProcessingTapCallbacks callbacks = {
         .version = kMTAudioProcessingTapCallbacksVersion_0,
+        .clientInfo = clientInfo,
         .init = EqTapInitCallback,
+        .finalize = EqTapFinalizeCallback,
         .prepare = EqTapPrepareCallback,
         .unprepare = EqTapUnprepareCallback,
         .process = EqTapProcessCallback,
-        .finalize = EqTapFinalizeCallback,
     };
-    void *clientInfo = (void *)CFBridgingRetain(self);  // +1, balanced in finalize
     MTAudioProcessingTapRef tap = NULL;
     OSStatus status = MTAudioProcessingTapCreate(
         kCFAllocatorDefault, &callbacks,
         kMTAudioProcessingTapCreationFlag_PostEffects, &tap);
     if (status != noErr || !tap) {
         NSLog(@"[EqualizerEngine] MTAudioProcessingTapCreate failed: %d", (int)status);
-        CFBridgingRelease(clientInfo);  // finalize won't run; balance now
+        // init runs before Create returns; on success finalize owns the retain.
+        // On failure finalize won't fire, so balance the retain here.
+        CFBridgingRelease(clientInfo);
         return NULL;
     }
     return tap;
