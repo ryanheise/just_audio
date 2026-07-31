@@ -343,7 +343,10 @@ static void EqTapProcessCallback(MTAudioProcessingTapRef tap,
 
 - (void)attachToPlayerItem:(AVPlayerItem *)item {
     if (!item) return;
-    if (!self.armed) return;
+    BOOL armed = self.armed;
+    NSLog(@"[EqualizerEngine] attachToPlayerItem: armed=%d item.tracks=%lu",
+          armed, (unsigned long)item.tracks.count);
+    if (!armed) return;
 
     NSMutableArray<AVAssetTrack *> *audioTracks = [NSMutableArray array];
     for (AVPlayerItemTrack *playerTrack in item.tracks) {

@@ -199,6 +199,20 @@
 
 - (void)setEqualizerGains:(NSArray *)gains {
     [_eq setGains:gains];
+    // Arming mid-playback: the current item already passed readyToPlay while
+    // the engine was disarmed, so install the tap on it now rather than
+    // silently waiting for the next station change.
+    if (_eq.armed) {
+        AVPlayerItem *item = _player.currentItem;
+        if (item && item.status == AVPlayerItemStatusReadyToPlay) {
+            NSLog(@"[EqualizerEngine] armed: attaching tap to current ready item");
+            [_eq attachToPlayerItem:item];
+        } else {
+            NSLog(@"[EqualizerEngine] armed but currentItem not ready (status=%ld); "
+                  @"tap will install on next readyToPlay",
+                  (long)(item ? item.status : -1));
+        }
+    }
 }
 
 - (float)speed {
