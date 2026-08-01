@@ -17,7 +17,7 @@
 - (void)stop;
 /// 10 dB values (clamped ±12). nil/empty/flat → all bands 0 dB (pass-through).
 - (void)setGains:(nullable NSArray<NSNumber *> *)gains;
-/// Mute test: when YES, the scheduled PCM is zeroed (proves the tap owns output).
+/// Mute test: when YES, the scheduled PCM is zeroed (proves this engine owns playback output).
 - (void)setMute:(BOOL)mute;
 
 @property (nonatomic, readonly, getter=isPlaying) BOOL playing;

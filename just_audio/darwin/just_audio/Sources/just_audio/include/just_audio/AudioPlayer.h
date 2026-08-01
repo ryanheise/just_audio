@@ -12,9 +12,11 @@
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration useLazyPreparation:(BOOL)useLazyPreparation;
 - (void)dispose:(BOOL)calledFromDealloc;
-/// Push the 10-band gain vector (dB) to the equaliser engine. `nil`/empty/flat
-/// disarms it. Driven by the top-level `setEqualizerGains` plugin method
-/// (Phase B: darwin MTAudioProcessingTap EQ).
+/// Push the 10-band gain vector (dB) to the AVAudioEngine equaliser
+/// (EqualizedStreamPlayer), the sole renderer for live http(s) streams.
+/// Always-on: nil/empty/0 dB is flat pass-through; non-flat values update
+/// the AVAudioUnitEQ bands live (no arm/disarm, no engine swap). Driven by
+/// the top-level `setEqualizerGains` plugin method.
 - (void)setEqualizerGains:(NSArray *)gains;
 
 @end
