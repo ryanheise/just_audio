@@ -98,6 +98,14 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
 #pragma mark - start / stop
 
 - (void)playURL:(NSURL *)url {
+#if TARGET_OS_IPHONE
+    // Ensure a background-capable playback session for AVAudioEngine output.
+    // (AVAudioSession is iOS-only; macOS has no equivalent.) Idempotent.
+    NSError *sessErr = nil;
+    AVAudioSession *sess = [AVAudioSession sharedInstance];
+    [sess setCategory:AVAudioSessionCategoryPlayback withOptions:0 error:&sessErr];
+    [sess setActive:YES error:&sessErr];
+#endif
     OSStatus s = AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
                                      kAudioFileAAC_ADTSType, &_streamID);
     if (s != noErr) { NSLog(@"[eq] AudioFileStreamOpen err=%d", (int)s); return; }
