@@ -221,7 +221,17 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
         if (audio.length) {
             OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
             if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
-                NSLog(@"[eq] ParseBytes err=%d (call#%ld audioBytes=%ld)", (int)s, _calls, _audioBytes);
+                NSLog(@"[eq] ParseBytes err=%d (call#%ld audio=%ld) — resyncing parser",
+                      (int)s, _calls, _audioBytes);
+                // The proxy can serve an out-of-sync chunk under rapid station
+                // switching; reopen the parser so subsequent chunks resync on
+                // the next valid frame. The converter/graph persist (_formatKnown
+                // stays), so packetsProc resumes feeding the existing decoder.
+                AudioFileStreamClose(_streamID);
+                if (AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
+                                        kAudioFileAAC_ADTSType, &_streamID) == noErr) {
+                    AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
+                }
             } else if (_calls % 20 == 0) {
                 NSLog(@"[eq] recv call#%ld audio=%ld q=%lu eng=%d ply=%d buf=%ld",
                       _calls, _audioBytes, (unsigned long)_queue.count,
