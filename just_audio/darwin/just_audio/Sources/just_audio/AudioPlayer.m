@@ -204,18 +204,21 @@
     [_streamEq setGains:gains];
 }
 
-/// Returns the stream URL to route through the AVAudioEngine EQ renderer, or
-/// nil to use the normal AVQueuePlayer path. Uses the ORIGINAL upstream URL
-/// supplied via setEqualizerStreamUrl so EqualizedStreamPlayer fetches
-/// independently of radiophonia's proxy — no proxy fallback, since two
-/// consumers of the proxy URL starve each other.
+/// Returns the current item's http(s) source URL — radiophonia's localhost
+/// proxy — to route through the AVAudioEngine EQ renderer, or nil to use the
+/// normal AVQueuePlayer path. The proxy de-muxes ICY and serves clean audio,
+/// so EqualizedStreamPlayer needs no ICY demux here (and localhost is
+/// ATS-exempt, unlike the original upstream host). The proxy must not evict
+/// this consumer — see StreamProxyService._evictSupersededPlaybackSockets.
 - (NSURL *)currentStreamEqURL {
-    if (_eqStreamUrl.length) {
-        NSURL *u = [NSURL URLWithString:_eqStreamUrl];
-        NSString *scheme = u.scheme.lowercaseString;
-        if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
-            return u;
-        }
+    AVPlayerItem *item = _player.currentItem;
+    if (!item) return nil;
+    AVAsset *asset = item.asset;
+    if (![asset isKindOfClass:[AVURLAsset class]]) return nil;
+    NSURL *url = [(AVURLAsset *)asset URL];
+    NSString *scheme = url.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+        return url;
     }
     return nil;
 }
