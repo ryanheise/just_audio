@@ -55,6 +55,7 @@
     NSNumber *_errorCode;
     NSString *_errorMessage;
     EqualizedStreamPlayer *_streamEq;
+    NSString *_eqStreamUrl;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration useLazyPreparation:(BOOL)useLazyPreparation {
@@ -203,20 +204,24 @@
     [_streamEq setGains:gains];
 }
 
-/// Returns the current item's http(s) stream URL when playback should be
-/// routed through the AVAudioEngine EQ renderer (EqualizedStreamPlayer),
-/// or nil to use the normal AVQueuePlayer path (local files, etc.).
+/// Returns the stream URL to route through the AVAudioEngine EQ renderer, or
+/// nil to use the normal AVQueuePlayer path. Uses the ORIGINAL upstream URL
+/// supplied via setEqualizerStreamUrl so EqualizedStreamPlayer fetches
+/// independently of radiophonia's proxy — no proxy fallback, since two
+/// consumers of the proxy URL starve each other.
 - (NSURL *)currentStreamEqURL {
-    AVPlayerItem *item = _player.currentItem;
-    if (!item) return nil;
-    AVAsset *asset = item.asset;
-    if (![asset isKindOfClass:[AVURLAsset class]]) return nil;
-    NSURL *url = [(AVURLAsset *)asset URL];
-    NSString *scheme = url.scheme.lowercaseString;
-    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
-        return url;
+    if (_eqStreamUrl.length) {
+        NSURL *u = [NSURL URLWithString:_eqStreamUrl];
+        NSString *scheme = u.scheme.lowercaseString;
+        if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+            return u;
+        }
     }
     return nil;
+}
+
+- (void)setEqualizerStreamUrl:(NSString *)url {
+    _eqStreamUrl = [url isKindOfClass:[NSString class]] ? [url copy] : nil;
 }
 
 - (float)speed {
@@ -629,6 +634,7 @@
 }
 
 - (void)load:(NSDictionary *)source initialPosition:(CMTime)initialPosition initialIndex:(NSNumber *)initialIndex result:(FlutterResult)result {
+    _eqStreamUrl = nil;  // clear per load; the app re-supplies it before play
     if (_playing) {
         [_player pause];
     }

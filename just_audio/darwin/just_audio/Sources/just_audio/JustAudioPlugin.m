@@ -60,6 +60,14 @@
             [_players[playerId] setEqualizerGains:gains];
         }
         result(@{});
+    } else if ([@"setEqualizerStreamUrl" isEqualToString:call.method]) {
+        // Phase B (darwin EQ): the ORIGINAL upstream stream URL, fetched
+        // independently by EqualizedStreamPlayer (not the proxy URL).
+        NSString *url = [(NSDictionary *)call.arguments objectForKey:@"url"];
+        for (NSString *playerId in _players) {
+            [_players[playerId] setEqualizerStreamUrl:url];
+        }
+        result(@{});
     } else {
         result(FlutterMethodNotImplemented);
     }

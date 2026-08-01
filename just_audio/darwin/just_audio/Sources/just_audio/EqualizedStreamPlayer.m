@@ -46,6 +46,12 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
     NSURLSession *_session;
     NSURLSessionDataTask *_task;
     ExtAudioFileRef _capture;
+    BOOL _icyActive;            // ICY metadata interleaving active (icy-metaint > 0)
+    NSInteger _metaInt;         // audio bytes between metadata blocks
+    NSInteger _audioRemaining;  // audio bytes until the next metadata marker
+    NSInteger _metaRemaining;   // metadata bytes left to consume
+    int _icyState;              // 0=audio, 1=await length byte, 2=metadata
+    NSArray<NSNumber *> *_lastGains;  // user gains, re-applied on graph rebuild
 }
 
 - (instancetype)init {
@@ -70,6 +76,7 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
 }
 
 - (void)setGains:(NSArray<NSNumber *> *)gains {
+    _lastGains = [gains isKindOfClass:[NSArray class]] ? [gains copy] : nil;
     if (!_eq) return;
     double g[kNumBands];
     memset(g, 0, sizeof(g));
@@ -106,14 +113,37 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
     [sess setCategory:AVAudioSessionCategoryPlayback withOptions:0 error:&sessErr];
     [sess setActive:YES error:&sessErr];
 #endif
+    @synchronized(self) {
+        // Each stream rebuilds the graph: formats vary per station (e.g. 44100/1
+        // MP3 vs 22050/2 AAC), and the previous stream's converter/engine must
+        // not be reused. Reset all per-stream state, tear down the old graph.
+        _stopped = NO;
+        _formatKnown = NO;
+        _haveFormat = NO;
+        _haveCookie = NO;
+        if (_converter) { AudioConverterDispose(_converter); _converter = NULL; }
+        if (_streamID) { AudioFileStreamClose(_streamID); _streamID = NULL; }
+        free(_pendingCookie); _pendingCookie = NULL; _pendingCookieSize = 0;
+        [_queue removeAllObjects];
+        _held = nil;
+        _buffered = 0;
+        _icyActive = NO; _metaInt = 0; _audioRemaining = 0;
+        _metaRemaining = 0; _icyState = 0;
+        if (_engine) { [_player stop]; [_engine stop]; _player = nil; _eq = nil; _engine = nil; }
+    }
+
     OSStatus s = AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
                                      kAudioFileAAC_ADTSType, &_streamID);
     if (s != noErr) { NSLog(@"[eq] AudioFileStreamOpen err=%d", (int)s); return; }
 
+    // Fetch the ORIGINAL upstream URL directly (not radiophonia's proxy), with
+    // Icy-MetaData:1 so the server interleaves metadata we can strip ourselves.
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    [req setValue:@"1" forHTTPHeaderField:@"Icy-MetaData"];
     NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
     cfg.HTTPMaximumConnectionsPerHost = 1;
     _session = [NSURLSession sessionWithConfiguration:cfg delegate:self delegateQueue:nil];
-    _task = [_session dataTaskWithURL:url];
+    _task = [_session dataTaskWithRequest:req];
     [_task resume];
     NSLog(@"[eq] streaming %@", url);
 }
@@ -138,18 +168,65 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
 #pragma mark - NSURLSessionDataDelegate
 
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dt
+      didReceiveResponse:(NSURLResponse *)response
+      completionHandler:(void (^)(NSURLSessionResponseDisposition))handler {
+    NSInteger metaint = 0;
+    if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+        NSString *m = [((NSHTTPURLResponse *)response).allHeaderFields objectForKey:@"icy-metaint"];
+        if (m.length) metaint = [m integerValue];
+    }
+    @synchronized(self) {
+        _metaInt = metaint;
+        _icyActive = (metaint > 0);
+        _audioRemaining = metaint;  // first metaint bytes are audio
+        _metaRemaining = 0;
+        _icyState = 0;              // start in audio mode
+    }
+    NSLog(@"[eq] response icy-metaint=%ld active=%d", (long)metaint, (int)_icyActive);
+    if (handler) handler(NSURLSessionResponseAllow);
+}
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dt
        didReceiveData:(NSData *)data {
+    const uint8_t *bytes = data.bytes;
+    NSUInteger len = data.length;
+    NSMutableData *audio = [NSMutableData dataWithCapacity:len];
     @synchronized(self) {
         if (_stopped) return;
-        static long _calls = 0, _bytes = 0;
-        _calls++; _bytes += data.length;
-        OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)data.length, data.bytes, 0);
-        if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
-            NSLog(@"[eq] ParseBytes err=%d (call#%ld totalBytes=%ld)", (int)s, _calls, _bytes);
-        } else if (_calls % 10 == 0) {
-            NSLog(@"[eq] recv call#%ld bytes=%ld q=%lu eng=%d ply=%d buf=%ld",
-                  _calls, _bytes, (unsigned long)_queue.count,
-                  (int)self.engine.isRunning, (int)self.player.isPlaying, (long)_buffered);
+        if (!_icyActive) {
+            [audio appendBytes:bytes length:len];
+        } else {
+            NSUInteger pos = 0;
+            while (pos < len) {
+                if (_icyState == 0) {            // audio
+                    NSUInteger take = MIN(len - pos, (NSUInteger)_audioRemaining);
+                    [audio appendBytes:bytes + pos length:take];
+                    pos += take;
+                    _audioRemaining -= take;
+                    if (_audioRemaining == 0) _icyState = 1;   // -> await length byte
+                } else if (_icyState == 1) {     // metadata length byte
+                    _metaRemaining = (NSInteger)bytes[pos++] * 16;
+                    if (_metaRemaining == 0) { _audioRemaining = _metaInt; _icyState = 0; }
+                    else _icyState = 2;                         // -> metadata body
+                } else {                          // metadata body (discard)
+                    NSUInteger take = MIN(len - pos, (NSUInteger)_metaRemaining);
+                    pos += take;
+                    _metaRemaining -= take;
+                    if (_metaRemaining == 0) { _audioRemaining = _metaInt; _icyState = 0; }
+                }
+            }
+        }
+        static long _calls = 0, _audioBytes = 0;
+        _calls++; _audioBytes += audio.length;
+        if (audio.length) {
+            OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
+            if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
+                NSLog(@"[eq] ParseBytes err=%d (call#%ld audioBytes=%ld)", (int)s, _calls, _audioBytes);
+            } else if (_calls % 20 == 0) {
+                NSLog(@"[eq] recv call#%ld audio=%ld q=%lu eng=%d ply=%d buf=%ld",
+                      _calls, _audioBytes, (unsigned long)_queue.count,
+                      (int)self.engine.isRunning, (int)self.player.isPlaying, (long)_buffered);
+            }
         }
     }
     [self pump];
@@ -277,7 +354,7 @@ static void packetsProc(void *userData, UInt32 numBytes, UInt32 numPackets,
         _player.volume = _desiredVolume;
 
         _formatKnown = YES;
-        [self setGains:nil];  // flat layout
+        [self setGains:_lastGains];  // re-apply the user's band gains on rebuild
         NSLog(@"[eq] ready: %.0f Hz %u ch (decoder for inFormat=%u, cookie=%uB)",
               _outputFormat.mSampleRate, _outputFormat.mChannelsPerFrame,
               _inputFormat.mFormatID, _pendingCookieSize);
