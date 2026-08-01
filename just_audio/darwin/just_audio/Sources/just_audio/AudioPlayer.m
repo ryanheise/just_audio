@@ -7,7 +7,7 @@
 #import "./include/just_audio/ConcatenatingAudioSource.h"
 #import "./include/just_audio/LoopingAudioSource.h"
 #import "./include/just_audio/ClippingAudioSource.h"
-#import "./include/just_audio/EqualizerEngine.h"
+#import "./include/just_audio/EqualizedStreamPlayer.h"
 #import <AVFoundation/AVFoundation.h>
 #import <stdlib.h>
 #include <TargetConditionals.h>
@@ -54,7 +54,7 @@
     NSDictionary<NSString *, NSObject *> *_icyMetadata;
     NSNumber *_errorCode;
     NSString *_errorMessage;
-    EqualizerEngine *_eq;
+    EqualizedStreamPlayer *_streamEq;
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar playerId:(NSString*)idParam loadConfiguration:(NSDictionary *)loadConfiguration useLazyPreparation:(BOOL)useLazyPreparation {
@@ -63,7 +63,7 @@
     _registrar = registrar;
     _playerId = idParam;
     _useLazyPreparation = useLazyPreparation;
-    _eq = [[EqualizerEngine alloc] init];
+    _streamEq = [[EqualizedStreamPlayer alloc] init];
     _methodChannel =
         [FlutterMethodChannel methodChannelWithName:[NSMutableString stringWithFormat:@"com.ryanheise.just_audio.methods.%@", _playerId]
                                     binaryMessenger:[registrar messenger]];
@@ -198,23 +198,25 @@
 }
 
 - (void)setEqualizerGains:(NSArray *)gains {
-    BOOL wasArmed = _eq.armed;
-    [_eq setGains:gains];
-    // Install the tap only on the disarmed→armed transition. Once installed,
-    // the process callback reads gain updates live via snapshotGains, so slider
-    // drags must NOT re-install (re-attaching thrashes the audio graph, rebuilds
-    // the tap, and can flip the channel layout — audible as no-op or glitch).
-    if (!wasArmed && _eq.armed) {
-        AVPlayerItem *item = _player.currentItem;
-        if (item && item.status == AVPlayerItemStatusReadyToPlay) {
-            NSLog(@"[EqualizerEngine] arming: attaching tap to current ready item");
-            [_eq attachToPlayerItem:item];
-        } else {
-            NSLog(@"[EqualizerEngine] armed but currentItem not ready (status=%ld); "
-                  @"tap will install on next readyToPlay",
-                  (long)(item ? item.status : -1));
-        }
+    // Phase B: drive the always-on AVAudioEngine EQ renderer. Flat by
+    // default (nil/empty/0 dB); slider drags update the 10 bands live.
+    [_streamEq setGains:gains];
+}
+
+/// Returns the current item's http(s) stream URL when playback should be
+/// routed through the AVAudioEngine EQ renderer (EqualizedStreamPlayer),
+/// or nil to use the normal AVQueuePlayer path (local files, etc.).
+- (NSURL *)currentStreamEqURL {
+    AVPlayerItem *item = _player.currentItem;
+    if (!item) return nil;
+    AVAsset *asset = item.asset;
+    if (![asset isKindOfClass:[AVURLAsset class]]) return nil;
+    NSURL *url = [(AVURLAsset *)asset URL];
+    NSString *scheme = url.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+        return url;
     }
+    return nil;
 }
 
 - (float)speed {
@@ -818,7 +820,6 @@
         switch (status) {
             case AVPlayerItemStatusReadyToPlay: {
                 if (playerItem != _player.currentItem) return;
-                [_eq attachToPlayerItem:playerItem];
                 // Detect buffering in different ways depending on whether we're playing
                 if (_playing) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {
@@ -1070,13 +1071,22 @@
         _playResult = result;
     }
     _playing = YES;
-    _player.rate = _speed;
     [self updatePosition];
-    if (@available(macOS 10.12, iOS 10.0, *)) {}
-    else {
-        if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
-            [self enterBuffering:@"play, _bufferUnconfirmed && !playbackBufferFull"];
-            [self broadcastPlaybackEvent];
+    // Phase B: live http(s) streams render through the AVAudioEngine EQ
+    // (EqualizedStreamPlayer) — sole fetch, hard stop on pause. AVQueuePlayer
+    // is NOT played for streams (loaded only for the state machine), so there
+    // is no continuous double-fetch. Other sources play via AVQueuePlayer.
+    NSURL *streamURL = [self currentStreamEqURL];
+    if (streamURL) {
+        [_streamEq playURL:streamURL];
+    } else {
+        _player.rate = _speed;
+        if (@available(macOS 10.12, iOS 10.0, *)) {}
+        else {
+            if (_bufferUnconfirmed && !_player.currentItem.playbackBufferFull) {
+                [self enterBuffering:@"play, _bufferUnconfirmed && !playbackBufferFull"];
+                [self broadcastPlaybackEvent];
+            }
         }
     }
 }
@@ -1085,6 +1095,7 @@
     if (!_playing) return;
     _playing = NO;
     [_player pause];
+    [_streamEq stop];
     [self updatePosition];
     [self broadcastPlaybackEvent];
     if (_playResult) {
@@ -1107,7 +1118,10 @@
 
 - (void)setVolume:(float)volume {
     _volume = volume;
-    if (_player) {
+    // Route volume to the EQ renderer for streams; AVQueuePlayer otherwise.
+    if ([self currentStreamEqURL]) {
+        _streamEq.volume = volume;
+    } else if (_player) {
         [_player setVolume:volume];
     }
 }
@@ -1367,6 +1381,7 @@
 
 - (void)dispose:(BOOL)calledFromDealloc {
     if (!_player) return;
+    [_streamEq stop];
     if (_processingState != psIdle) {
         [_player pause];
 

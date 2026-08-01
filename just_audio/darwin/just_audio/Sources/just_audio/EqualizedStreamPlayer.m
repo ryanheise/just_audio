@@ -36,6 +36,7 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
     volatile NSInteger _buffered;
     volatile BOOL _stopped;
     BOOL _mute;
+    float _desiredVolume;
     BOOL _haveFormat, _haveCookie;
     void *_pendingCookie;
     UInt32 _pendingCookieSize;
@@ -52,12 +53,15 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
         _queue = [NSMutableArray array];
         _qlock = [[NSLock alloc] init];
         _pumpQ = dispatch_queue_create("eq.pump", DISPATCH_QUEUE_SERIAL);
+        _desiredVolume = 1.0f;
     }
     return self;
 }
 
 - (BOOL)isPlaying { return _player.isPlaying; }
 - (void)setMute:(BOOL)mute { _mute = mute; }
+- (void)setVolume:(float)volume { _desiredVolume = volume; _player.volume = volume; }
+- (float)volume { return _player ? _player.volume : _desiredVolume; }
 
 - (void)openCaptureIfNeeded {
     if (!_captureFile.length) return;
@@ -262,6 +266,7 @@ static void packetsProc(void *userData, UInt32 numBytes, UInt32 numPackets,
         NSError *e = nil;
         if (![_engine startAndReturnError:&e]) { NSLog(@"[eq] engine start: %@", e); return; }
         [_player play];
+        _player.volume = _desiredVolume;
 
         _formatKnown = YES;
         [self setGains:nil];  // flat layout

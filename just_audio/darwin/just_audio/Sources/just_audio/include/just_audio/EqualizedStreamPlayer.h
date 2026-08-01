@@ -21,6 +21,8 @@
 - (void)setMute:(BOOL)mute;
 
 @property (nonatomic, readonly, getter=isPlaying) BOOL playing;
+/// Linear playback volume (0.0–1.0) applied to the EQ'd renderer node.
+@property (nonatomic) float volume;
 /// Path of a file to also write post-EQ PCM to (set before playURL:).
 @property (nonatomic, copy, nullable) NSString *captureFile;
 
