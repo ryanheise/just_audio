@@ -47,10 +47,32 @@ bytes fetched). Band centres: 31.25, 62.5, 125, 250, 500, 1k, 2k, 4k, 8k,
 issue #147). `MTAudioProcessingTap` cannot tap live/HLS streams, so a custom
 `AVAudioEngine` decode path is the only viable route.
 
-**Status.** macOS audibly verified in-app; iOS unverified (CI builds green;
-`.playback` `AVAudioSession` activation included). The earlier dead
+**Status.** Audibly verified in-app on macOS, and on the iOS simulator
+(iPhone 17 Pro / iOS 26.1): MP3 and AAC streams decode end-to-end through the
+EQ (e.g. Radio Caroline MP3, talkRADIO/Absolute Radio AAC, 1.FM Deep House).
+`.playback` `AVAudioSession` activation included. The earlier dead
 `MTAudioProcessingTap`/`EqualizerEngine` path and the zero-fill diagnostic
 have been removed.
+
+**Robustness fixes (darwin EQ).**
+- *EQ stream URL.* `EqualizedStreamPlayer` fetches the URL the app supplies via
+  `setEqualizerStreamUrl` (`_eqStreamUrl`), not `AVQueuePlayer.currentItem.asset.URL`
+  — the latter lags on rapid station switches and pointed the renderer at an
+  orphaned proxy (stale port), leaving playback silent. The app passes the
+  current localhost proxy URL (ATS-exempt, ICY already demuxed).
+- *Frame-sync pre-alignment.* `AudioFileStream` does not rescan/resync MPEG
+  audio fed mid-frame (only AAC ADTS does), and the EQ renderer joins the
+  proxy's ring buffer mid-frame — so some MP3 stations never locked on (silent,
+  e.g. 1.FM). The renderer now locates the first valid frame sync (MP3, all
+  versions/layers, or AAC ADTS) via `eqFirstFrameSync` and feeds the parser only
+  from there; the ParseBytes-error / engine-stalled resync reseeds from a sync
+  too. Unrecognised formats fall back to feeding unaligned after 64 KB (no worse
+  than before).
+- *Channel-hop resilience.* On an `AudioFileStreamParseBytes` error, or if the
+  engine hasn't started within a byte budget (watchdog, gated on
+  `engine.isRunning`), the parser is reopened and reseeded from the recent
+  32 KB window — audio recovers instead of going permanently silent until
+  STOP/PLAY.
 
 **PR-readiness — not yet.** Two blockers:
 1. **API shape.** `setEqualizerGains` is a fork-specific API (one-shot 10-band
