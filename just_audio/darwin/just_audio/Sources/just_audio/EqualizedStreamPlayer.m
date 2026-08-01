@@ -193,6 +193,14 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
     NSMutableData *audio = [NSMutableData dataWithCapacity:len];
     @synchronized(self) {
         if (_stopped) return;
+        static BOOL dumpedFirst = NO;
+        if (!dumpedFirst) {
+            dumpedFirst = YES;
+            NSMutableString *hex = [NSMutableString string];
+            NSUInteger n = MIN(len, 32);
+            for (NSUInteger i = 0; i < n; i++) [hex appendFormat:@"%02x ", bytes[i]];
+            NSLog(@"[eq] first %lu bytes: %@", (unsigned long)n, hex);
+        }
         if (!_icyActive) {
             [audio appendBytes:bytes length:len];
         } else {
