@@ -1,3 +1,8 @@
+## 0.10.6
+
+* Support AGP 9.
+* Migrate Android build files to .kts
+
 ## 0.10.5
 
 * Disable Android audio offload by default to prevent playback issues.

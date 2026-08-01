@@ -267,6 +267,7 @@ class MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     final state = snapshot.data;
                     final sequence = state?.sequence ?? [];
                     return ReorderableListView(
+                      // ignore: deprecated_member_use
                       onReorder: (int oldIndex, int newIndex) {
                         if (oldIndex < newIndex) newIndex--;
                         _player.moveAudioSource(oldIndex, newIndex);
@@ -442,3 +443,5 @@ class AudioMetadata {
     required this.artwork,
   });
 }
+
+

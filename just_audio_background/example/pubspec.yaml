@@ -8,7 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audio_session: ^0.2.0
+  audio_session: ^0.2.4
   rxdart: ^0.27.2
   just_audio:
     path: ../../just_audio
@@ -21,6 +21,10 @@ dependencies:
 #     path: ../../just_audio_platform_interface
 #   just_audio_web:
 #     path: ../../just_audio_web
+
+# dependency_overrides:
+#   audio_session:
+#     path: ../../../audio_session
 
 dev_dependencies:
   # TODO: uncomment these dependencies when they have nullsafe versions.
