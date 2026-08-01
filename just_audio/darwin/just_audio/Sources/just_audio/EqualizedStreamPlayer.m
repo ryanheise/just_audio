@@ -5,6 +5,30 @@ static const double kBandCenters[10] = {31.25, 62.5, 125, 250, 500, 1000, 2000, 
 static const NSUInteger kNumBands = 10;
 static const NSUInteger kMaxBuffered = 4;     // scheduled-ahead PCM buffers
 static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frames/buffer
+// Generic audio frame-sync finder. AudioFileStream does NOT scan-forward to
+// resync MPEG audio fed mid-frame (only AAC ADTS does), so a stream joined
+// mid-frame — e.g. via the localhost proxy's ring-buffer seed — never locks on
+// and playback stays silent. We align the first feed to a real frame start.
+// Accepts MPEG audio (MP3, all versions/layers) and AAC ADTS headers.
+// Returns byte offset, or -1 if none found.
+static long eqFirstFrameSync(const uint8_t *b, long len, long from) {
+    for (long i = from; i + 3 < len; i++) {
+        if (b[i] != 0xFF) continue;
+        uint8_t b1 = b[i+1], b2 = b[i+2], b3 = b[i+3];
+        if ((b1 & 0xE0) != 0xE0) continue;            // 11-bit frame sync
+        int ver = (b1 >> 3) & 0x3;                    // MPEG version (1 = reserved)
+        int lay = (b1 >> 1) & 0x3;                    // layer (0 = reserved)
+        int br  = (b2 >> 4) & 0xF;                    // bitrate index (0,15 invalid)
+        int sr  = (b2 >> 2) & 0x3;                    // sample-rate index (3 reserved)
+        if (ver != 1 && lay != 0 && br != 0 && br != 15 && sr != 3) return i;  // MPEG audio
+        if ((b1 & 0xF6) == 0xF0) {                    // AAC ADTS: sync 0xFFF + layer 00
+            int prof = (b2 >> 6) & 0x3;               // 3 reserved
+            int ch = ((b2 & 0x1) << 2) | ((b3 >> 6) & 0x3);  // channel config
+            if (prof != 3 && ch >= 1 && ch <= 7) return i;
+        }
+    }
+    return -1;
+}
 
 #pragma mark - packet wrapper
 
@@ -55,6 +79,8 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
     NSMutableData *_resyncWindow;     // recent audio bytes, refeed on parser reopen
     long _bytesSinceOpen;             // audio bytes fed since last AudioFileStreamOpen
     int _resyncCount;                 // parser reopens (ParseBytes errors + no-format watchdog)
+    BOOL _aligned;                    // first frame sync located → feed-through afterwards
+    NSMutableData *_pendingAlign;     // pre-sync bytes held until a frame start is found
 }
 
 - (instancetype)init {
@@ -135,6 +161,8 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
         _resyncWindow = [NSMutableData data];
         _bytesSinceOpen = 0;
         _resyncCount = 0;
+        _aligned = NO;
+        _pendingAlign = [NSMutableData data];
         if (_engine) { [_player stop]; [_engine stop]; _player = nil; _eq = nil; _engine = nil; }
     }
 
@@ -226,44 +254,67 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
         static long _calls = 0, _audioBytes = 0;
         _calls++; _audioBytes += audio.length;
         if (audio.length) {
-            // Keep a recent window to reseed the parser when it needs a fresh start.
-            [_resyncWindow appendBytes:audio.bytes length:audio.length];
-            if (_resyncWindow.length > 32768) {
-                [_resyncWindow replaceBytesInRange:NSMakeRange(0, _resyncWindow.length - 32768)
-                                          withBytes:NULL length:0];
+            // Pre-align to a frame sync before the format is known. AudioFileStream
+            // does NOT resync MPEG audio fed mid-frame, and the EQ player joins the
+            // proxy's ring buffer mid-frame — so we must find the first valid frame
+            // start (MP3 or AAC ADTS) and feed only from there. Once the format is
+            // known (_haveFormat) or a sync found (_aligned), feed through (the
+            // stream is then frame-aligned). Feeding even one mid-frame chunk first
+            // poisons the parser, so we hold bytes until a sync appears.
+            if (!_aligned && !_haveFormat) {
+                [_pendingAlign appendBytes:audio.bytes length:audio.length];
+                long off = eqFirstFrameSync(_pendingAlign.bytes, _pendingAlign.length, 0);
+                if (off >= 0) {
+                    NSLog(@"[eq] aligned to frame sync at %ld (held %luB)", off, (unsigned long)_pendingAlign.length);
+                    audio = [NSMutableData dataWithData:[_pendingAlign subdataWithRange:NSMakeRange((NSUInteger)off, _pendingAlign.length - (NSUInteger)off)]];
+                    _pendingAlign = nil;
+                    _aligned = YES;
+                } else if (_pendingAlign.length > 65536) {
+                    // No MPEG/ADTS sync in a full buffer (unrecognised format).
+                    // Feed through and let the parser try rather than stall forever.
+                    NSLog(@"[eq] no frame sync in %luB — feeding unaligned", (unsigned long)_pendingAlign.length);
+                    audio = [NSMutableData dataWithData:_pendingAlign];
+                    _pendingAlign = nil;
+                    _aligned = YES;
+                } else {
+                    audio = [NSMutableData data];   // hold until a frame start appears
+                }
             }
-            _bytesSinceOpen += audio.length;
-            OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
-            BOOL needResync = NO;
-            if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
-                NSLog(@"[eq] ParseBytes err=%d (call#%ld audio=%ld) — resyncing parser",
-                      (int)s, _calls, _audioBytes);
-                needResync = YES;
-            } else if (!_haveFormat && _bytesSinceOpen > 262144 && _resyncCount < 6) {
-                // Watchdog: some streams never trip a ParseBytes error, yet the
-                // format property never fires (e.g. joining the proxy mid-frame),
-                // so the parser is silently stuck. Reopen and reseed from the
-                // recent window so it can lock onto a valid frame — the same
-                // recovery a ParseBytes error triggers elsewhere.
-                NSLog(@"[eq] no format after %ldKB — resyncing parser (call#%ld)",
-                      _bytesSinceOpen / 1024, _calls);
-                needResync = YES;
-            } else if (_calls % 20 == 0) {
-                NSLog(@"[eq] recv call#%ld audio=%ld q=%lu eng=%d ply=%d buf=%ld",
-                      _calls, _audioBytes, (unsigned long)_queue.count,
-                      (int)self.engine.isRunning, (int)self.player.isPlaying, (long)_buffered);
-            }
-            if (needResync) {
-                // Reopen the parser and refeed the recent window. The converter/
-                // graph persist (_formatKnown stays), so packetsProc resumes
-                // feeding the existing decoder once the format is known again.
-                AudioFileStreamClose(_streamID);
-                if (AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
-                                        kAudioFileAAC_ADTSType, &_streamID) == noErr) {
-                    _bytesSinceOpen = (long)_resyncWindow.length;
-                    _resyncCount++;
-                    AudioFileStreamParseBytes(_streamID, (UInt32)_resyncWindow.length,
-                                              _resyncWindow.bytes, 0);
+            if (audio.length) {
+                [_resyncWindow appendBytes:audio.bytes length:audio.length];
+                if (_resyncWindow.length > 32768) {
+                    [_resyncWindow replaceBytesInRange:NSMakeRange(0, _resyncWindow.length - 32768)
+                                              withBytes:NULL length:0];
+                }
+                _bytesSinceOpen += audio.length;
+                OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
+                BOOL needResync = NO;
+                if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
+                    NSLog(@"[eq] ParseBytes err=%d (call#%ld audio=%ld) — resyncing parser", (int)s, _calls, _audioBytes);
+                    needResync = YES;
+                } else if (!self.engine.isRunning && _bytesSinceOpen > 262144 && _resyncCount < 6) {
+                    NSLog(@"[eq] engine stalled after %ldKB — resyncing (call#%ld)", _bytesSinceOpen / 1024, _calls);
+                    needResync = YES;
+                } else if (_calls % 20 == 0) {
+                    NSLog(@"[eq] recv call#%ld audio=%ld q=%lu eng=%d ply=%d buf=%ld fmt=%d known=%d",
+                          _calls, _audioBytes, (unsigned long)_queue.count,
+                          (int)self.engine.isRunning, (int)self.player.isPlaying, (long)_buffered,
+                          (int)_haveFormat, (int)_formatKnown);
+                }
+                if (needResync) {
+                    AudioFileStreamClose(_streamID);
+                    if (AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
+                                            kAudioFileAAC_ADTSType, &_streamID) == noErr) {
+                        // Reseed from the first frame sync in the window so the
+                        // reopened parser locks onto a clean frame.
+                        long off = eqFirstFrameSync(_resyncWindow.bytes, _resyncWindow.length, 0);
+                        const void *p = (off >= 0) ? (const uint8_t *)_resyncWindow.bytes + off : _resyncWindow.bytes;
+                        UInt32 plen = (UInt32)((off >= 0) ? _resyncWindow.length - off : _resyncWindow.length);
+                        _bytesSinceOpen = (long)plen;
+                        _resyncCount++;
+                        _aligned = YES;
+                        AudioFileStreamParseBytes(_streamID, plen, p, 0);
+                    }
                 }
             }
         }
@@ -285,6 +336,7 @@ static void propertyProc(void *userData, AudioFileStreamID streamID,
         UInt32 size = sizeof(AudioStreamBasicDescription);
         AudioFileStreamGetProperty(streamID, prop, &size, &me->_inputFormat);
         me->_haveFormat = YES;
+        me->_aligned = YES;  // format locked — stop pre-sync alignment
         [me maybeSetup];
     } else if (prop == kAudioFileStreamProperty_MagicCookieData) {
         UInt32 cookieSize = 0;
