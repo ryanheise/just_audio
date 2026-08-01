@@ -1,0 +1,567 @@
+#import "EqualizedStreamPlayer.h"
+
+// 10‑band graphic‑EQ centres (Hz), matching canonicalCentresHz.
+static const double kBandCenters[10] = {31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
+static const NSUInteger kNumBands = 10;
+static const NSUInteger kMaxBuffered = 4;     // scheduled-ahead PCM buffers
+static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frames/buffer
+// Generic audio frame-sync finder. AudioFileStream does NOT scan-forward to
+// resync MPEG audio fed mid-frame (only AAC ADTS does), so a stream joined
+// mid-frame — e.g. via the localhost proxy's ring-buffer seed — never locks on
+// and playback stays silent. We align the first feed to a real frame start.
+// Accepts MPEG audio (MP3, all versions/layers) and AAC ADTS headers.
+// Returns byte offset, or -1 if none found.
+static long eqFirstFrameSync(const uint8_t *b, long len, long from) {
+    for (long i = from; i + 3 < len; i++) {
+        if (b[i] != 0xFF) continue;
+        uint8_t b1 = b[i+1], b2 = b[i+2], b3 = b[i+3];
+        if ((b1 & 0xE0) != 0xE0) continue;            // 11-bit frame sync
+        int ver = (b1 >> 3) & 0x3;                    // MPEG version (1 = reserved)
+        int lay = (b1 >> 1) & 0x3;                    // layer (0 = reserved)
+        int br  = (b2 >> 4) & 0xF;                    // bitrate index (0,15 invalid)
+        int sr  = (b2 >> 2) & 0x3;                    // sample-rate index (3 reserved)
+        if (ver != 1 && lay != 0 && br != 0 && br != 15 && sr != 3) return i;  // MPEG audio
+        if ((b1 & 0xF6) == 0xF0) {                    // AAC ADTS: sync 0xFFF + layer 00
+            int prof = (b2 >> 6) & 0x3;               // 3 reserved
+            int ch = ((b2 & 0x1) << 2) | ((b3 >> 6) & 0x3);  // channel config
+            if (prof != 3 && ch >= 1 && ch <= 7) return i;
+        }
+    }
+    return -1;
+}
+
+#pragma mark - packet wrapper
+
+@interface EqPacket : NSObject
+@property (nonatomic, strong) NSData *data;
+@property (nonatomic) AudioStreamPacketDescription desc;
+@end
+@implementation EqPacket
+@end
+
+#pragma mark - player
+
+@interface EqualizedStreamPlayer () <NSURLSessionDataDelegate>
+@property (nonatomic, strong) AVAudioEngine *engine;
+@property (nonatomic, strong) AVAudioPlayerNode *player;
+@property (nonatomic, strong) AVAudioUnitEQ *eq;
+@property (nonatomic, strong) AVAudioFormat *outFmt;
+@property (nonatomic, strong) AVAudioFormat *convFmt;
+@end
+
+@implementation EqualizedStreamPlayer {
+    AudioFileStreamID _streamID;
+    AudioConverterRef _converter;
+    BOOL _formatKnown;
+    AudioStreamBasicDescription _inputFormat;
+    AudioStreamBasicDescription _outputFormat;
+    NSMutableArray<EqPacket *> *_queue;
+    NSLock *_qlock;
+    volatile NSInteger _buffered;
+    volatile BOOL _stopped;
+    BOOL _mute;
+    float _desiredVolume;
+    BOOL _haveFormat, _haveCookie;
+    void *_pendingCookie;
+    UInt32 _pendingCookieSize;
+    EqPacket *_held;                 // packet currently being read by the converter
+    AudioStreamPacketDescription _curDesc;  // stable desc pointer for the converter
+    dispatch_queue_t _pumpQ;
+    NSURLSession *_session;
+    NSURLSessionDataTask *_task;
+    ExtAudioFileRef _capture;
+    BOOL _icyActive;            // ICY metadata interleaving active (icy-metaint > 0)
+    NSInteger _metaInt;         // audio bytes between metadata blocks
+    NSInteger _audioRemaining;  // audio bytes until the next metadata marker
+    NSInteger _metaRemaining;   // metadata bytes left to consume
+    int _icyState;              // 0=audio, 1=await length byte, 2=metadata
+    NSArray<NSNumber *> *_lastGains;  // user gains, re-applied on graph rebuild
+    NSMutableData *_resyncWindow;     // recent audio bytes, refeed on parser reopen
+    long _bytesSinceOpen;             // audio bytes fed since last AudioFileStreamOpen
+    int _resyncCount;                 // parser reopens (ParseBytes errors + no-format watchdog)
+    BOOL _aligned;                    // first frame sync located → feed-through afterwards
+    NSMutableData *_pendingAlign;     // pre-sync bytes held until a frame start is found
+}
+
+- (instancetype)init {
+    if ((self = [super init])) {
+        _queue = [NSMutableArray array];
+        _qlock = [[NSLock alloc] init];
+        _pumpQ = dispatch_queue_create("eq.pump", DISPATCH_QUEUE_SERIAL);
+        _desiredVolume = 1.0f;
+    }
+    return self;
+}
+
+- (BOOL)isPlaying { return _player.isPlaying; }
+- (void)setMute:(BOOL)mute { _mute = mute; }
+- (void)setVolume:(float)volume { _desiredVolume = volume; _player.volume = volume; }
+- (float)volume { return _player ? _player.volume : _desiredVolume; }
+
+- (void)openCaptureIfNeeded {
+    if (!_captureFile.length) return;
+    // Write a CAF containing the post‑EQ PCM (outputFormat). Created once the
+    // format is known — see setupGraphAndConverter. For now just note the path.
+}
+
+- (void)setGains:(NSArray<NSNumber *> *)gains {
+    _lastGains = [gains isKindOfClass:[NSArray class]] ? [gains copy] : nil;
+    if (!_eq) return;
+    double g[kNumBands];
+    memset(g, 0, sizeof(g));
+    if ([gains isKindOfClass:[NSArray class]]) {
+        NSUInteger n = MIN(gains.count, kNumBands);
+        for (NSUInteger i = 0; i < n; i++) {
+            id e = gains[i];
+            double v = [e isKindOfClass:[NSNumber class]] ? [e doubleValue] : 0.0;
+            if (v > 12.0) v = 12.0;
+            if (v < -12.0) v = -12.0;
+            g[i] = v;
+        }
+    }
+    for (NSUInteger i = 0; i < _eq.bands.count && i < kNumBands; i++) {
+        AVAudioUnitEQFilterParameters *p = _eq.bands[i];
+        p.filterType = (i == 0) ? AVAudioUnitEQFilterTypeLowShelf
+                       : (i == kNumBands - 1) ? AVAudioUnitEQFilterTypeHighShelf
+                       : AVAudioUnitEQFilterTypeParametric;
+        p.frequency = kBandCenters[i];
+        p.bandwidth = 1.0;
+        p.gain = g[i];
+        p.bypass = NO;
+    }
+}
+
+#pragma mark - start / stop
+
+- (void)playURL:(NSURL *)url {
+#if TARGET_OS_IPHONE
+    // Ensure a background-capable playback session for AVAudioEngine output.
+    // (AVAudioSession is iOS-only; macOS has no equivalent.) Idempotent.
+    NSError *sessErr = nil;
+    AVAudioSession *sess = [AVAudioSession sharedInstance];
+    [sess setCategory:AVAudioSessionCategoryPlayback withOptions:0 error:&sessErr];
+    [sess setActive:YES error:&sessErr];
+#endif
+    @synchronized(self) {
+        // Each stream rebuilds the graph: formats vary per station (e.g. 44100/1
+        // MP3 vs 22050/2 AAC), and the previous stream's converter/engine must
+        // not be reused. Reset all per-stream state, tear down the old graph.
+        _stopped = NO;
+        _formatKnown = NO;
+        _haveFormat = NO;
+        _haveCookie = NO;
+        if (_converter) { AudioConverterDispose(_converter); _converter = NULL; }
+        if (_streamID) { AudioFileStreamClose(_streamID); _streamID = NULL; }
+        free(_pendingCookie); _pendingCookie = NULL; _pendingCookieSize = 0;
+        [_queue removeAllObjects];
+        _held = nil;
+        _buffered = 0;
+        _icyActive = NO; _metaInt = 0; _audioRemaining = 0;
+        _metaRemaining = 0; _icyState = 0;
+        _resyncWindow = [NSMutableData data];
+        _bytesSinceOpen = 0;
+        _resyncCount = 0;
+        _aligned = NO;
+        _pendingAlign = [NSMutableData data];
+        if (_engine) { [_player stop]; [_engine stop]; _player = nil; _eq = nil; _engine = nil; }
+    }
+
+    OSStatus s = AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
+                                     kAudioFileAAC_ADTSType, &_streamID);
+    if (s != noErr) { NSLog(@"[eq] AudioFileStreamOpen err=%d", (int)s); return; }
+
+    // Fetch the supplied URL — radiophonia's localhost proxy, which serves
+    // clean ICY-demuxed audio (so the ICY-stripping below is a no-op at
+    // metaint=0). localhost is ATS-exempt, unlike the original upstream host.
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    [req setValue:@"1" forHTTPHeaderField:@"Icy-MetaData"];
+    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
+    cfg.HTTPMaximumConnectionsPerHost = 1;
+    _session = [NSURLSession sessionWithConfiguration:cfg delegate:self delegateQueue:nil];
+    _task = [_session dataTaskWithRequest:req];
+    [_task resume];
+    NSLog(@"[eq] streaming %@", url);
+}
+
+- (void)stop {
+    @synchronized(self) { _stopped = YES; }
+    [_task cancel];
+    _task = nil;
+    [_session invalidateAndCancel];
+    _session = nil;
+    [_player stop];
+    [_engine pause];
+    @synchronized(self) {
+        if (_converter) { AudioConverterDispose(_converter); _converter = NULL; }
+        if (_streamID) { AudioFileStreamClose(_streamID); _streamID = NULL; }
+        if (_capture) { ExtAudioFileDispose(_capture); _capture = NULL; }
+        free(_pendingCookie); _pendingCookie = NULL; _pendingCookieSize = 0;
+        [_queue removeAllObjects];
+    }
+}
+
+#pragma mark - NSURLSessionDataDelegate
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dt
+      didReceiveResponse:(NSURLResponse *)response
+      completionHandler:(void (^)(NSURLSessionResponseDisposition))handler {
+    NSInteger metaint = 0;
+    if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+        NSString *m = [((NSHTTPURLResponse *)response).allHeaderFields objectForKey:@"icy-metaint"];
+        if (m.length) metaint = [m integerValue];
+    }
+    @synchronized(self) {
+        _metaInt = metaint;
+        _icyActive = (metaint > 0);
+        _audioRemaining = metaint;  // first metaint bytes are audio
+        _metaRemaining = 0;
+        _icyState = 0;              // start in audio mode
+    }
+    NSLog(@"[eq] response icy-metaint=%ld active=%d", (long)metaint, (int)_icyActive);
+    if (handler) handler(NSURLSessionResponseAllow);
+}
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dt
+       didReceiveData:(NSData *)data {
+    const uint8_t *bytes = data.bytes;
+    NSUInteger len = data.length;
+    NSMutableData *audio = [NSMutableData dataWithCapacity:len];
+    @synchronized(self) {
+        if (_stopped) return;
+        if (!_icyActive) {
+            [audio appendBytes:bytes length:len];
+        } else {
+            NSUInteger pos = 0;
+            while (pos < len) {
+                if (_icyState == 0) {            // audio
+                    NSUInteger take = MIN(len - pos, (NSUInteger)_audioRemaining);
+                    [audio appendBytes:bytes + pos length:take];
+                    pos += take;
+                    _audioRemaining -= take;
+                    if (_audioRemaining == 0) _icyState = 1;   // -> await length byte
+                } else if (_icyState == 1) {     // metadata length byte
+                    _metaRemaining = (NSInteger)bytes[pos++] * 16;
+                    if (_metaRemaining == 0) { _audioRemaining = _metaInt; _icyState = 0; }
+                    else _icyState = 2;                         // -> metadata body
+                } else {                          // metadata body (discard)
+                    NSUInteger take = MIN(len - pos, (NSUInteger)_metaRemaining);
+                    pos += take;
+                    _metaRemaining -= take;
+                    if (_metaRemaining == 0) { _audioRemaining = _metaInt; _icyState = 0; }
+                }
+            }
+        }
+        static long _calls = 0, _audioBytes = 0;
+        _calls++; _audioBytes += audio.length;
+        if (audio.length) {
+            // Pre-align to a frame sync before the format is known. AudioFileStream
+            // does NOT resync MPEG audio fed mid-frame, and the EQ player joins the
+            // proxy's ring buffer mid-frame — so we must find the first valid frame
+            // start (MP3 or AAC ADTS) and feed only from there. Once the format is
+            // known (_haveFormat) or a sync found (_aligned), feed through (the
+            // stream is then frame-aligned). Feeding even one mid-frame chunk first
+            // poisons the parser, so we hold bytes until a sync appears.
+            if (!_aligned && !_haveFormat) {
+                [_pendingAlign appendBytes:audio.bytes length:audio.length];
+                long off = eqFirstFrameSync(_pendingAlign.bytes, _pendingAlign.length, 0);
+                if (off >= 0) {
+                    NSLog(@"[eq] aligned to frame sync at %ld (held %luB)", off, (unsigned long)_pendingAlign.length);
+                    audio = [NSMutableData dataWithData:[_pendingAlign subdataWithRange:NSMakeRange((NSUInteger)off, _pendingAlign.length - (NSUInteger)off)]];
+                    _pendingAlign = nil;
+                    _aligned = YES;
+                } else if (_pendingAlign.length > 65536) {
+                    // No MPEG/ADTS sync in a full buffer (unrecognised format).
+                    // Feed through and let the parser try rather than stall forever.
+                    NSLog(@"[eq] no frame sync in %luB — feeding unaligned", (unsigned long)_pendingAlign.length);
+                    audio = [NSMutableData dataWithData:_pendingAlign];
+                    _pendingAlign = nil;
+                    _aligned = YES;
+                } else {
+                    audio = [NSMutableData data];   // hold until a frame start appears
+                }
+            }
+            if (audio.length) {
+                [_resyncWindow appendBytes:audio.bytes length:audio.length];
+                if (_resyncWindow.length > 32768) {
+                    [_resyncWindow replaceBytesInRange:NSMakeRange(0, _resyncWindow.length - 32768)
+                                              withBytes:NULL length:0];
+                }
+                _bytesSinceOpen += audio.length;
+                OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
+                BOOL needResync = NO;
+                if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
+                    NSLog(@"[eq] ParseBytes err=%d (call#%ld audio=%ld) — resyncing parser", (int)s, _calls, _audioBytes);
+                    needResync = YES;
+                } else if (!self.engine.isRunning && _bytesSinceOpen > 262144 && _resyncCount < 6) {
+                    NSLog(@"[eq] engine stalled after %ldKB — resyncing (call#%ld)", _bytesSinceOpen / 1024, _calls);
+                    needResync = YES;
+                } else if (_calls % 20 == 0) {
+                    NSLog(@"[eq] recv call#%ld audio=%ld q=%lu eng=%d ply=%d buf=%ld fmt=%d known=%d",
+                          _calls, _audioBytes, (unsigned long)_queue.count,
+                          (int)self.engine.isRunning, (int)self.player.isPlaying, (long)_buffered,
+                          (int)_haveFormat, (int)_formatKnown);
+                }
+                if (needResync) {
+                    AudioFileStreamClose(_streamID);
+                    if (AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
+                                            kAudioFileAAC_ADTSType, &_streamID) == noErr) {
+                        // Reseed from the first frame sync in the window so the
+                        // reopened parser locks onto a clean frame.
+                        long off = eqFirstFrameSync(_resyncWindow.bytes, _resyncWindow.length, 0);
+                        const void *p = (off >= 0) ? (const uint8_t *)_resyncWindow.bytes + off : _resyncWindow.bytes;
+                        UInt32 plen = (UInt32)((off >= 0) ? _resyncWindow.length - off : _resyncWindow.length);
+                        _bytesSinceOpen = (long)plen;
+                        _resyncCount++;
+                        _aligned = YES;
+                        AudioFileStreamParseBytes(_streamID, plen, p, 0);
+                    }
+                }
+            }
+        }
+    }
+    [self pump];
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+    didCompleteWithError:(NSError *)err {
+    if (err) NSLog(@"[eq] stream ended: %@", err);
+}
+
+#pragma mark - AudioFileStream callbacks (C → self)
+
+static void propertyProc(void *userData, AudioFileStreamID streamID,
+                         AudioFileStreamPropertyID prop, UInt32 *flags) {
+    EqualizedStreamPlayer *me = (__bridge EqualizedStreamPlayer *)userData;
+    if (prop == kAudioFileStreamProperty_DataFormat) {
+        UInt32 size = sizeof(AudioStreamBasicDescription);
+        AudioFileStreamGetProperty(streamID, prop, &size, &me->_inputFormat);
+        me->_haveFormat = YES;
+        me->_aligned = YES;  // format locked — stop pre-sync alignment
+        [me maybeSetup];
+    } else if (prop == kAudioFileStreamProperty_MagicCookieData) {
+        UInt32 cookieSize = 0;
+        AudioFileStreamGetPropertyInfo(streamID, prop, &cookieSize, NULL);
+        if (cookieSize > 0) {
+            free(me->_pendingCookie);
+            me->_pendingCookie = malloc(cookieSize);
+            AudioFileStreamGetProperty(streamID, prop, &cookieSize, me->_pendingCookie);
+            me->_pendingCookieSize = cookieSize;
+            me->_haveCookie = YES;
+        }
+        [me maybeSetup];
+    }
+}
+
+// Create the converter/graph only once both the stream format and (for AAC)
+// its magic cookie are known. The two arrive as separate property callbacks.
+- (void)maybeSetup {
+    @synchronized(self) {
+        if (_formatKnown || _stopped || !_haveFormat) return;
+        BOOL needsCookie = (_inputFormat.mFormatID == kAudioFormatMPEG4AAC
+                            || _inputFormat.mFormatID == kAudioFormatMPEG4AAC_HE
+                            || _inputFormat.mFormatID == kAudioFormatMPEG4AAC_HE_V2
+                            || _inputFormat.mFormatID == kAudioFormatMPEG4AAC_ELD);
+        if (needsCookie && !_haveCookie) return;  // wait for the cookie callback
+        [self setupGraphAndConverter];
+    }
+}
+
+static void packetsProc(void *userData, UInt32 numBytes, UInt32 numPackets,
+                        const void *data, AudioStreamPacketDescription *packets) {
+    EqualizedStreamPlayer *me = (__bridge EqualizedStreamPlayer *)userData;
+    [me->_qlock lock];
+    for (UInt32 i = 0; i < numPackets; i++) {
+        EqPacket *p = [EqPacket new];
+        const char *base = (const char *)data + packets[i].mStartOffset;
+        p.data = [NSData dataWithBytes:base length:packets[i].mDataByteSize];
+        AudioStreamPacketDescription d = packets[i];
+        d.mStartOffset = 0;
+        p.desc = d;
+        [me->_queue addObject:p];
+    }
+    [me->_qlock unlock];
+}
+
+#pragma mark - graph + converter
+
+- (void)setupGraphAndConverter {
+    @synchronized(self) {
+        if (_formatKnown || _stopped) return;
+
+        _outputFormat = (AudioStreamBasicDescription){0};
+        _outputFormat.mSampleRate = _inputFormat.mSampleRate > 0 ? _inputFormat.mSampleRate : 44100;
+        _outputFormat.mFormatID = kAudioFormatLinearPCM;
+        _outputFormat.mChannelsPerFrame = MAX(_inputFormat.mChannelsPerFrame, 1u);
+        _outputFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;  // interleaved
+        _outputFormat.mFramesPerPacket = 1;
+        _outputFormat.mBytesPerFrame = _outputFormat.mChannelsPerFrame * 4;
+        _outputFormat.mBytesPerPacket = _outputFormat.mBytesPerFrame;
+        _outputFormat.mBitsPerChannel = 32;
+
+        NSLog(@"[eq] input ASBD: id='%c%c%c%c' rate=%.0f ch=%u bps=%u fpp=%u bpp=%u flags=0x%x cookie=%uB",
+              (char)(_inputFormat.mFormatID>>24),(char)(_inputFormat.mFormatID>>16),
+              (char)(_inputFormat.mFormatID>>8),(char)_inputFormat.mFormatID,
+              _inputFormat.mSampleRate, _inputFormat.mChannelsPerFrame, _inputFormat.mBitsPerChannel,
+              _inputFormat.mFramesPerPacket, _inputFormat.mBytesPerPacket, _inputFormat.mFormatFlags,
+              _pendingCookieSize);
+        NSLog(@"[eq] output ASBD: rate=%.0f ch=%u bpf=%u bpp=%u flags=0x%x",
+              _outputFormat.mSampleRate, _outputFormat.mChannelsPerFrame,
+              _outputFormat.mBytesPerFrame, _outputFormat.mBytesPerPacket, _outputFormat.mFormatFlags);
+        OSStatus s = AudioConverterNew(&_inputFormat, &_outputFormat, &_converter);
+        if (s != noErr) {
+            NSLog(@"[eq] AudioConverterNew err=%d (inFormat=%u)", (int)s, _inputFormat.mFormatID);
+            return;
+        }
+        // (streaming gate added in pump: never feed the converter an empty input)
+        if (_pendingCookie) {
+            OSStatus cs = AudioConverterSetProperty(_converter, kAudioConverterDecompressionMagicCookie,
+                                                    _pendingCookieSize, _pendingCookie);
+            NSLog(@"[eq] setMagicCookie result=%d size=%u", (int)cs, _pendingCookieSize);
+        }
+        // The AAC decoder only emits interleaved PCM; AVAudioEngine needs
+        // non-interleaved between nodes. So: converter -> interleaved scratch,
+        // then deinterleave into a non-interleaved buffer for the graph.
+        _convFmt = [[AVAudioFormat alloc] initWithStreamDescription:&_outputFormat];
+        _outFmt = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:_outputFormat.mSampleRate
+                                                                  channels:_outputFormat.mChannelsPerFrame];
+        NSLog(@"[eq] convFmt interleave=%d  engineFmt interleave=%d",
+              _convFmt.isInterleaved, _outFmt.isInterleaved);
+
+        _engine = [[AVAudioEngine alloc] init];
+        _player = [[AVAudioPlayerNode alloc] init];
+        _eq = [[AVAudioUnitEQ alloc] initWithNumberOfBands:kNumBands];
+        [_engine attachNode:_player];
+        [_engine attachNode:_eq];
+        [_engine connect:_player to:_eq format:_outFmt];
+        [_engine connect:_eq to:_engine.mainMixerNode format:_outFmt];  // mainMixer auto-routes to outputNode
+        NSLog(@"[eq] graph connected");
+
+        // optional capture of post‑EQ PCM
+        if (_captureFile.length) [self openCaptureWithFormat];
+
+        NSError *e = nil;
+        if (![_engine startAndReturnError:&e]) { NSLog(@"[eq] engine start: %@", e); return; }
+        [_player play];
+        _player.volume = _desiredVolume;
+
+        _formatKnown = YES;
+        [self setGains:_lastGains];  // re-apply the user's band gains on rebuild
+        NSLog(@"[eq] ready: %.0f Hz %u ch (decoder for inFormat=%u, cookie=%uB)",
+              _outputFormat.mSampleRate, _outputFormat.mChannelsPerFrame,
+              _inputFormat.mFormatID, _pendingCookieSize);
+    }
+    [self pump];
+}
+
+- (void)openCaptureWithFormat {
+    NSURL *url = [NSURL fileURLWithPath:_captureFile];
+    AudioStreamBasicDescription f = _outputFormat;
+    OSStatus s = ExtAudioFileCreateWithURL((__bridge CFURLRef)url, kAudioFileCAFType,
+                                           &f, NULL, kAudioFileFlags_EraseFile, &_capture);
+    if (s != noErr) { NSLog(@"[eq] capture create err=%d", (int)s); return; }
+    ExtAudioFileSetProperty(_capture, kExtAudioFileProperty_ClientDataFormat, sizeof(f), &f);
+    ExtAudioFileWriteAsync(_capture, 0, NULL);  // prime async writes
+}
+
+#pragma mark - decode + schedule
+
+static OSStatus converterInputProc(AudioConverterRef conv, UInt32 *ioNumPackets,
+                                   AudioBufferList *ioData,
+                                   AudioStreamPacketDescription **outDesc,
+                                   void *userData) {
+    EqualizedStreamPlayer *me = (__bridge EqualizedStreamPlayer *)userData;
+    { static int _c = 0; _c++; if (_c <= 3 || _c % 50 == 0) NSLog(@"[eq] inputProc#%d q=%lu", _c, (unsigned long)me->_queue.count); }
+    [me->_qlock lock];
+    EqPacket *p = (me->_queue.count > 0) ? me->_queue[0] : nil;
+    if (p) [me->_queue removeObjectAtIndex:0];
+    [me->_qlock unlock];
+
+    if (!p) {
+        *ioNumPackets = 0;
+        return noErr;  // no data right now; caller will produce whatever it has so far
+    }
+    me->_curDesc = p.desc;
+    me->_curDesc.mStartOffset = 0;
+
+    *ioNumPackets = 1;
+    ioData->mNumberBuffers = 1;
+    ioData->mBuffers[0].mData = (void *)p.data.bytes;
+    ioData->mBuffers[0].mDataByteSize = (UInt32)p.data.length;
+    if (outDesc) *outDesc = &me->_curDesc;
+    {
+        static int _inpLog = 0;
+        if (_inpLog < 3) {
+            _inpLog++;
+            NSLog(@"[eq] inputProc#%d bytes=%u desc{off=%llu dbsize=%llu vfip=%u}",
+                  _inpLog, (UInt32)p.data.length, (unsigned long long)p.desc.mStartOffset,
+                  (unsigned long long)p.desc.mDataByteSize, p.desc.mVariableFramesInPacket);
+        }
+    }
+    return noErr;
+}
+
+- (void)pump {
+    dispatch_async(_pumpQ, ^{
+        @synchronized(self) {
+            if (self->_stopped || !_formatKnown) return;
+            while (self->_buffered < (NSInteger)kMaxBuffered) @try {
+                if (self->_queue.count < kPacketsPerBuffer) break;  // wait for a full buffer's worth (never starve the converter → avoids EOS)
+                UInt32 cap = kPacketsPerBuffer * MAX(self->_inputFormat.mFramesPerPacket, 1u);  // frames
+                UInt32 bytes = cap * self->_outputFormat.mBytesPerFrame;
+                float *idata = (float *)malloc(bytes);  // interleaved decode scratch (AAC → interleaved)
+                if (!idata) break;
+                AudioBufferList rawABL;
+                rawABL.mNumberBuffers = 1;
+                rawABL.mBuffers[0].mNumberChannels = self->_outputFormat.mChannelsPerFrame;
+                rawABL.mBuffers[0].mDataByteSize = bytes;
+                rawABL.mBuffers[0].mData = idata;
+                UInt32 numPackets = cap;  // ioOutputDataPacketSize == output frames (PCM fpp=1)
+                OSStatus err = AudioConverterFillComplexBuffer(self->_converter, converterInputProc,
+                                                               (__bridge void *)self, &numPackets, &rawABL, NULL);
+                { static int _f = 0; if (_f < 5) { _f++; NSLog(@"[eq] fill err=%d numPackets=%u", (int)err, (unsigned)numPackets); } }
+                if (numPackets == 0) { free(idata); break; }  // truly starved; ignore non-zero err if we got partial output
+                // deinterleave into a non-interleaved buffer for AVAudioEngine
+                AVAudioPCMBuffer *pcm = [[AVAudioPCMBuffer alloc] initWithPCMFormat:self->_outFmt frameCapacity:numPackets];
+                if (!pcm) { free(idata); break; }
+                AVAudioFrameCount fl = MIN(numPackets, pcm.frameCapacity);
+                pcm.frameLength = fl;
+                UInt32 ch = self->_outFmt.channelCount;
+                for (UInt32 c = 0; c < ch; c++) {
+                    float *dst = pcm.floatChannelData[c];
+                    for (UInt32 f = 0; f < fl; f++) dst[f] = idata[f * ch + c];
+                }
+                free(idata);
+                AudioBufferList *abl = (AudioBufferList *)pcm.audioBufferList;
+                if (self->_mute) {
+                    for (UInt32 b = 0; b < abl->mNumberBuffers; b++)
+                        memset(abl->mBuffers[b].mData, 0, abl->mBuffers[b].mDataByteSize);
+                }
+                if (self->_capture) ExtAudioFileWriteAsync(self->_capture, pcm.frameLength, abl);
+
+                self->_buffered++;
+                __weak typeof(self) ws = self;
+                [self->_player scheduleBuffer:pcm completionHandler:^{
+                    __strong typeof(ws) s = ws;
+                    { static int _cmp = 0; _cmp++; if (_cmp <= 3 || _cmp % 50 == 0) NSLog(@"[eq] buffer done #%d", _cmp); }
+                    if (!s) return;
+                    @synchronized(s) { s->_buffered--; }
+                    [s pump];
+                }];
+                if (!self->_player.isPlaying) [self->_player play];  // recover from underrun
+                if (err != noErr) {
+                    NSLog(@"[eq] convert err=%d", (int)err);
+                    break;
+                }
+            } @catch(NSException *ex) {
+                NSLog(@"[eq] pump EXC %@: %@", ex.name, ex.reason);
+                break;
+            }
+        }
+    });
+}
+
+- (void)dealloc {
+    [self stop];
+}
+
+@end

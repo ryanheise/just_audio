@@ -18,5 +18,6 @@ A flutter plugin for playing audio.
   s.osx.dependency 'FlutterMacOS'
   s.ios.deployment_target = '12.0'
   s.osx.deployment_target = '10.14'
+  s.frameworks = 'AVFoundation', 'AudioToolbox', 'MediaToolbox'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
 end
