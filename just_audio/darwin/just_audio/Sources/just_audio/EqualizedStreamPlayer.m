@@ -136,8 +136,9 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
                                      kAudioFileAAC_ADTSType, &_streamID);
     if (s != noErr) { NSLog(@"[eq] AudioFileStreamOpen err=%d", (int)s); return; }
 
-    // Fetch the ORIGINAL upstream URL directly (not radiophonia's proxy), with
-    // Icy-MetaData:1 so the server interleaves metadata we can strip ourselves.
+    // Fetch the supplied URL — radiophonia's localhost proxy, which serves
+    // clean ICY-demuxed audio (so the ICY-stripping below is a no-op at
+    // metaint=0). localhost is ATS-exempt, unlike the original upstream host.
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
     [req setValue:@"1" forHTTPHeaderField:@"Icy-MetaData"];
     NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
