@@ -52,6 +52,9 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
     NSInteger _metaRemaining;   // metadata bytes left to consume
     int _icyState;              // 0=audio, 1=await length byte, 2=metadata
     NSArray<NSNumber *> *_lastGains;  // user gains, re-applied on graph rebuild
+    NSMutableData *_resyncWindow;     // recent audio bytes, refeed on parser reopen
+    long _bytesSinceOpen;             // audio bytes fed since last AudioFileStreamOpen
+    int _resyncCount;                 // parser reopens (ParseBytes errors + no-format watchdog)
 }
 
 - (instancetype)init {
@@ -129,6 +132,9 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
         _buffered = 0;
         _icyActive = NO; _metaInt = 0; _audioRemaining = 0;
         _metaRemaining = 0; _icyState = 0;
+        _resyncWindow = [NSMutableData data];
+        _bytesSinceOpen = 0;
+        _resyncCount = 0;
         if (_engine) { [_player stop]; [_engine stop]; _player = nil; _eq = nil; _engine = nil; }
     }
 
@@ -220,23 +226,45 @@ static const NSUInteger kPacketsPerBuffer = 8; // ~8 AAC frames ≈ 8k PCM frame
         static long _calls = 0, _audioBytes = 0;
         _calls++; _audioBytes += audio.length;
         if (audio.length) {
+            // Keep a recent window to reseed the parser when it needs a fresh start.
+            [_resyncWindow appendBytes:audio.bytes length:audio.length];
+            if (_resyncWindow.length > 32768) {
+                [_resyncWindow replaceBytesInRange:NSMakeRange(0, _resyncWindow.length - 32768)
+                                          withBytes:NULL length:0];
+            }
+            _bytesSinceOpen += audio.length;
             OSStatus s = AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
+            BOOL needResync = NO;
             if (s != noErr && s != kAudioFileStreamError_NotOptimized) {
                 NSLog(@"[eq] ParseBytes err=%d (call#%ld audio=%ld) — resyncing parser",
                       (int)s, _calls, _audioBytes);
-                // The proxy can serve an out-of-sync chunk under rapid station
-                // switching; reopen the parser so subsequent chunks resync on
-                // the next valid frame. The converter/graph persist (_formatKnown
-                // stays), so packetsProc resumes feeding the existing decoder.
-                AudioFileStreamClose(_streamID);
-                if (AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
-                                        kAudioFileAAC_ADTSType, &_streamID) == noErr) {
-                    AudioFileStreamParseBytes(_streamID, (UInt32)audio.length, audio.bytes, 0);
-                }
+                needResync = YES;
+            } else if (!_haveFormat && _bytesSinceOpen > 262144 && _resyncCount < 6) {
+                // Watchdog: some streams never trip a ParseBytes error, yet the
+                // format property never fires (e.g. joining the proxy mid-frame),
+                // so the parser is silently stuck. Reopen and reseed from the
+                // recent window so it can lock onto a valid frame — the same
+                // recovery a ParseBytes error triggers elsewhere.
+                NSLog(@"[eq] no format after %ldKB — resyncing parser (call#%ld)",
+                      _bytesSinceOpen / 1024, _calls);
+                needResync = YES;
             } else if (_calls % 20 == 0) {
                 NSLog(@"[eq] recv call#%ld audio=%ld q=%lu eng=%d ply=%d buf=%ld",
                       _calls, _audioBytes, (unsigned long)_queue.count,
                       (int)self.engine.isRunning, (int)self.player.isPlaying, (long)_buffered);
+            }
+            if (needResync) {
+                // Reopen the parser and refeed the recent window. The converter/
+                // graph persist (_formatKnown stays), so packetsProc resumes
+                // feeding the existing decoder once the format is known again.
+                AudioFileStreamClose(_streamID);
+                if (AudioFileStreamOpen((__bridge void *)self, propertyProc, packetsProc,
+                                        kAudioFileAAC_ADTSType, &_streamID) == noErr) {
+                    _bytesSinceOpen = (long)_resyncWindow.length;
+                    _resyncCount++;
+                    AudioFileStreamParseBytes(_streamID, (UInt32)_resyncWindow.length,
+                                              _resyncWindow.bytes, 0);
+                }
             }
         }
     }
