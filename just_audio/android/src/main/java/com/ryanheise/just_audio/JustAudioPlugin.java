@@ -17,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 public class JustAudioPlugin implements FlutterPlugin {
     private MethodChannel channel;
     private MainMethodCallHandler methodCallHandler;
+    private JustAudioHLSCachePlugin hlsCachePlugin;
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
@@ -26,6 +27,10 @@ public class JustAudioPlugin implements FlutterPlugin {
 
         channel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods");
         channel.setMethodCallHandler(methodCallHandler);
+
+        hlsCachePlugin = new JustAudioHLSCachePlugin();
+        hlsCachePlugin.onAttachedToEngine(binding);
+
         @SuppressWarnings("deprecation")
         FlutterEngine engine = binding.getFlutterEngine();
         engine.addEngineLifecycleListener(new EngineLifecycleListener() {
@@ -44,6 +49,9 @@ public class JustAudioPlugin implements FlutterPlugin {
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         methodCallHandler.dispose();
         methodCallHandler = null;
+
+        hlsCachePlugin.onDetachedFromEngine(binding);
+        hlsCachePlugin = null;
 
         channel.setMethodCallHandler(null);
     }
