@@ -3477,12 +3477,43 @@ class LockCachingAudioSource extends StreamAudioSource {
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
-    final httpClient = _createHttpClient(userAgent: _player?._userAgent);
-    final httpRequest = await _getUrl(httpClient, uri, headers: headers);
-    final response = await httpRequest.close();
-    if (response.statusCode != 200) {
-      httpClient.close();
-      throw Exception('HTTP Status Error: ${response.statusCode}');
+    late HttpClient httpClient;
+    late HttpClientResponse response;
+
+    try {
+      httpClient = _createHttpClient(userAgent: _player?._userAgent);
+      final httpRequest = await _getUrl(httpClient, uri, headers: headers);
+      response = await httpRequest.close();
+
+      if (response.statusCode != 200) {
+        httpClient.close();
+        // Convert HTTP errors to PlayerException to ensure consistent error handling
+        // and proper propagation through the error stream
+        throw PlayerException(
+          response.statusCode,
+          'HTTP Status Error: ${response.statusCode}',
+          _player?.currentIndex,
+        );
+      }
+    } catch (e) {
+      // Clean up HTTP client on any error
+      try {
+        httpClient.close();
+      } catch (_) {
+        // Ignore errors during cleanup
+      }
+
+      // If it's already a PlayerException, re-throw it
+      if (e is PlayerException) {
+        rethrow;
+      }
+
+      // Convert network/connection errors to PlayerException
+      throw PlayerException(
+        -1, // Use -1 for network connectivity errors
+        'Network Error: ${e.toString()}',
+        _player?.currentIndex,
+      );
     }
     (await _partialCacheFile).createSync(recursive: true);
     // TODO: Should close sink after done, but it throws an error.
@@ -3592,31 +3623,75 @@ class LockCachingAudioSource extends StreamAudioSource {
         _requests.remove(request);
         final start = request.start!;
         final end = request.end ?? sourceLength;
-        final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+        try {
+          final httpClient = _createHttpClient(userAgent: _player?._userAgent);
 
-        final rangeRequest = _HttpRangeRequest(start, end);
-        _getUrl(httpClient, uri, headers: {
-          if (headers != null) ...headers!,
-          HttpHeaders.rangeHeader: rangeRequest.header,
-        }).then((httpRequest) async {
-          final response = await httpRequest.close();
-          if (response.statusCode != 206) {
+          final rangeRequest = _HttpRangeRequest(start, end);
+          _getUrl(httpClient, uri, headers: {
+            if (headers != null) ...headers!,
+            HttpHeaders.rangeHeader: rangeRequest.header,
+          }).then((httpRequest) async {
+            final response = await httpRequest.close();
+            if (response.statusCode != 206) {
+              httpClient.close();
+              // Convert HTTP errors to PlayerException to ensure consistent error handling
+              // and proper propagation through the error stream
+              throw PlayerException(
+                response.statusCode,
+                'HTTP Status Error: ${response.statusCode}',
+                _player?.currentIndex,
+              );
+            }
+            request.complete(StreamAudioResponse(
+              rangeRequestsSupported: originSupportsRangeRequests,
+              sourceLength: sourceLength,
+              contentLength: end != null ? end - start : null,
+              offset: start,
+              contentType: mimeType,
+              stream: response.asBroadcastStream(),
+            ));
+          }, onError: (dynamic e, StackTrace? stackTrace) {
             httpClient.close();
-            throw Exception('HTTP Status Error: ${response.statusCode}');
-          }
-          request.complete(StreamAudioResponse(
-            rangeRequestsSupported: originSupportsRangeRequests,
-            sourceLength: sourceLength,
-            contentLength: end != null ? end - start : null,
-            offset: start,
-            contentType: mimeType,
-            stream: response.asBroadcastStream(),
-          ));
-        }, onError: (dynamic e, StackTrace? stackTrace) {
-          request.fail(e, stackTrace);
-        }).onError((Object e, StackTrace st) {
-          request.fail(e, st);
-        });
+            // Convert errors to PlayerException if they aren't already
+            if (e is PlayerException) {
+              request.fail(e, stackTrace);
+            } else {
+              request.fail(
+                PlayerException(
+                  -1,
+                  'Network Error: ${e.toString()}',
+                  _player?.currentIndex,
+                ),
+                stackTrace,
+              );
+            }
+          }).onError((Object e, StackTrace st) {
+            httpClient.close();
+            // Convert errors to PlayerException if they aren't already
+            if (e is PlayerException) {
+              request.fail(e, st);
+            } else {
+              request.fail(
+                PlayerException(
+                  -1,
+                  'Network Error: ${e.toString()}',
+                  _player?.currentIndex,
+                ),
+                st,
+              );
+            }
+          });
+        } catch (e, stackTrace) {
+          // Handle HTTP client creation errors
+          request.fail(
+            PlayerException(
+              -1,
+              'Network Error: ${e.toString()}',
+              _player?.currentIndex,
+            ),
+            stackTrace,
+          );
+        }
       }
     }, onDone: () async {
       if (sourceLength == null) {
@@ -4612,5 +4687,10 @@ HttpClient _createHttpClient({String? userAgent}) {
   if (userAgent != null) {
     client.userAgent = userAgent;
   }
+
+  // Set reasonable timeout values to prevent hanging connections
+  client.connectionTimeout = const Duration(seconds: 30);
+  client.idleTimeout = const Duration(seconds: 30);
+
   return client;
 }
