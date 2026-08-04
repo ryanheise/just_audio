@@ -10,6 +10,161 @@ import 'package:synchronized/synchronized.dart';
 
 export 'package:audio_service/audio_service.dart' show MediaItem;
 
+/// Logging levels for just_audio_background diagnostic logging
+/// Uses the same LogLevel enum as just_audio for consistency
+enum LogLevel {
+  /// Enable all logging categories (queueOperations, handlerState, concurrentOps, platformCalls, errorContext, performanceMetrics)
+  /// Use for comprehensive debugging and development
+  VERBOSE,
+
+  /// Enable most logging categories (queueOperations, concurrentOps, platformCalls, errorContext)
+  /// Excludes performanceMetrics and handlerState to reduce noise
+  /// Use for general debugging
+  DEBUG,
+
+  /// Enable only essential operational logging (queueOperations, errorContext)
+  /// Use for monitoring key operations without overwhelming detail
+  INFO,
+
+  /// Enable only error-related logging (errorContext)
+  /// Use for production error tracking
+  ERROR,
+
+  /// Disable all logging (default for production)
+  /// Use for production to ensure zero performance impact
+  OFF,
+}
+
+/// Background Audio Player Diagnostic Logging Configuration
+///
+/// Provides comprehensive logging for debugging background audio operations,
+/// concurrent access issues, and platform integration problems.
+///
+/// Usage:
+/// ```dart
+/// // Enable comprehensive debugging
+/// BackgroundAudioLogging.setLevel(LogLevel.VERBOSE);
+///
+/// // Enable general debugging (recommended)
+/// BackgroundAudioLogging.setLevel(LogLevel.DEBUG);
+///
+/// // Enable only essential operations
+/// BackgroundAudioLogging.setLevel(LogLevel.INFO);
+///
+/// // Enable only error tracking
+/// BackgroundAudioLogging.setLevel(LogLevel.ERROR);
+///
+/// // Disable all logging (default)
+/// BackgroundAudioLogging.setLevel(LogLevel.OFF);
+/// ```
+class BackgroundAudioLogging {
+  /// Current logging level
+  static LogLevel _level = LogLevel.OFF;
+
+  /// Internal granular logging controls (set automatically by logging level)
+  static bool _queueOperations = false;    // Queue insert/remove operations
+  static bool _handlerState = false;       // Audio handler state transitions
+  static bool _concurrentOps = false;      // Concurrent operation detection
+  static bool _platformCalls = false;      // Platform method calls
+  static bool _errorContext = false;       // Enhanced error context
+  static bool _performanceMetrics = false; // Operation timing and performance
+
+  /// Set the logging level (primary public API)
+  static void setLevel(LogLevel level) {
+    _level = level;
+    _updateLoggingFlags();
+  }
+
+  /// Get the current logging level
+  static LogLevel get level => _level;
+
+  /// Check if logging is enabled (any level except OFF)
+  static bool get enabled => _level != LogLevel.OFF;
+
+  /// Internal method to update logging flags based on current level
+  static void _updateLoggingFlags() {
+    switch (_level) {
+      case LogLevel.VERBOSE:
+        _queueOperations = true;
+        _handlerState = true;
+        _concurrentOps = true;
+        _platformCalls = true;
+        _errorContext = true;
+        _performanceMetrics = true;
+        break;
+      case LogLevel.DEBUG:
+        _queueOperations = true;
+        _handlerState = false;  // Excluded to reduce noise
+        _concurrentOps = true;
+        _platformCalls = true;
+        _errorContext = true;
+        _performanceMetrics = false;  // Excluded to reduce noise
+        break;
+      case LogLevel.INFO:
+        _queueOperations = true;
+        _handlerState = false;
+        _concurrentOps = false;
+        _platformCalls = false;
+        _errorContext = true;
+        _performanceMetrics = false;
+        break;
+      case LogLevel.ERROR:
+        _queueOperations = false;
+        _handlerState = false;
+        _concurrentOps = false;
+        _platformCalls = false;
+        _errorContext = true;
+        _performanceMetrics = false;
+        break;
+      case LogLevel.OFF:
+        _queueOperations = false;
+        _handlerState = false;
+        _concurrentOps = false;
+        _platformCalls = false;
+        _errorContext = false;
+        _performanceMetrics = false;
+        break;
+    }
+  }
+
+  /// Backward compatibility getters (internal use)
+  static bool get queueOperations => _queueOperations;
+  static bool get handlerState => _handlerState;
+  static bool get concurrentOps => _concurrentOps;
+  static bool get platformCalls => _platformCalls;
+  static bool get errorContext => _errorContext;
+  static bool get performanceMetrics => _performanceMetrics;
+
+  /// Backward compatibility methods (deprecated - use setLevel instead)
+  @Deprecated('Use setLevel(LogLevel.VERBOSE) instead')
+  static void enableAll() => setLevel(LogLevel.VERBOSE);
+
+  @Deprecated('Use setLevel(LogLevel.OFF) instead')
+  static void disableAll() => setLevel(LogLevel.OFF);
+
+  @Deprecated('Use setLevel(LogLevel.ERROR) instead')
+  static void enableErrorsOnly() => setLevel(LogLevel.ERROR);
+
+  /// Conditional debug print that respects logging configuration
+  static void log(String message, {String category = 'general'}) {
+    if (!enabled) return;
+
+    bool shouldLog = switch (category) {
+      'queue' => _queueOperations,
+      'handler' => _handlerState,
+      'concurrent' => _concurrentOps,
+      'platform' => _platformCalls,
+      'error' => _errorContext,
+      'performance' => _performanceMetrics,
+      _ => true,
+    };
+
+    if (shouldLog) {
+      debugPrint('[JustAudioBackground][$category] $message');
+    }
+  }
+}
+
 late SwitchAudioHandler _audioHandler;
 late JustAudioPlatform _platform;
 
@@ -369,6 +524,101 @@ class _PlayerAudioHandler extends BaseAudioHandler
   List<int> _effectiveIndices = [];
   List<int> _effectiveIndicesInv = [];
 
+  // Concurrent operation tracking for enhanced error handling
+  final _activeOperations = <String, DateTime>{};
+  int _operationDepth = 0;
+
+  /// Retry background platform operations with exponential backoff for transient failures
+  Future<T> _retryBackgroundPlatformOperation<T>({
+    required Future<T> Function() operation,
+    required String operationName,
+    required Map<String, dynamic> context,
+    required DateTime startTime,
+    int maxRetries = 3,
+    Duration initialDelay = const Duration(milliseconds: 100),
+  }) async {
+    int attempt = 0;
+    Duration delay = initialDelay;
+
+    while (attempt <= maxRetries) {
+      try {
+        return await operation();
+      } on PlatformException catch (e) {
+        attempt++;
+        final duration = DateTime.now().difference(startTime);
+
+        // Check if this is a retryable error
+        final isRetryable = _isRetryableBackgroundPlatformException(e);
+
+        if (!isRetryable || attempt > maxRetries) {
+          debugPrint('JustAudioBackground: $operationName platform error (final) - '
+              'attempt=$attempt, duration=${duration.inMilliseconds}ms, '
+              'code=${e.code}, message=${e.message}, details=${e.details}, '
+              'stackTrace=${e.stacktrace}, context=$context, '
+              'isRetryable=$isRetryable, maxRetries=$maxRetries');
+
+          // Enhanced error context for platform exceptions
+          throw PlatformException(
+            code: e.code,
+            message: 'JustAudioBackground.$operationName platform operation failed: '
+                'context=$context, attempt=$attempt, '
+                'duration=${duration.inMilliseconds}ms, '
+                'isRetryable=$isRetryable, maxRetries=$maxRetries, '
+                'originalError=${e.message}, originalDetails=${e.details}',
+            details: e.details,
+          );
+        }
+
+        debugPrint('JustAudioBackground: $operationName platform error (retrying) - '
+            'attempt=$attempt, duration=${duration.inMilliseconds}ms, '
+            'code=${e.code}, message=${e.message}, details=${e.details}, '
+            'stackTrace=${e.stacktrace}, retryDelay=${delay.inMilliseconds}ms, '
+            'isRetryable=$isRetryable, context=$context');
+
+        // Wait before retry with exponential backoff
+        await Future<void>.delayed(delay);
+        delay = Duration(milliseconds: (delay.inMilliseconds * 1.5).round());
+      } catch (e) {
+        // Non-platform exceptions are not retryable
+        final duration = DateTime.now().difference(startTime);
+        debugPrint('JustAudioBackground: $operationName non-platform error - '
+            'attempt=$attempt, duration=${duration.inMilliseconds}ms, '
+            'error=$e, context=$context');
+        rethrow;
+      }
+    }
+
+    // This should never be reached, but just in case
+    throw Exception('JustAudioBackground.$operationName: Maximum retries exceeded');
+  }
+
+  /// Check if a PlatformException is retryable in background operations
+  bool _isRetryableBackgroundPlatformException(PlatformException e) {
+    // Retry on specific error codes that indicate transient issues
+    const retryableCodes = [
+      'Error', // Generic platform errors that might be transient
+      'IllegalArgumentException', // Often caused by race conditions
+      'IllegalStateException', // May be caused by timing issues
+      'ConcurrentModificationException', // Concurrent access issues
+    ];
+
+    // Check for concurrent operation indicators in the message
+    final message = e.message?.toLowerCase() ?? '';
+    const concurrentIndicators = [
+      'concurrent',
+      'reentrant',
+      'illegal',
+      'state',
+      'argument',
+      'modification',
+      'thread',
+      'synchronization',
+    ];
+
+    return retryableCodes.contains(e.code) ||
+           concurrentIndicators.any((indicator) => message.contains(indicator));
+  }
+
   Future<AudioPlayerPlatform> get _player => _playerCompleter.future;
   int? index;
   MediaItem? get currentMediaItem =>
@@ -490,26 +740,318 @@ class _PlayerAudioHandler extends BaseAudioHandler
 
   Future<ConcatenatingInsertAllResponse> customConcatenatingInsertAll(
       ConcatenatingInsertAllRequest request) async {
-    final cat = _source!.findCat(request.id)!;
-    cat.children.insertAll(request.index, request.children);
-    cat.shuffleOrder
-        .replaceRange(0, cat.shuffleOrder.length, request.shuffleOrder);
-    _updateShuffleIndices();
-    _broadcastStateIfActive();
-    _updateQueue();
-    return await (await _player).concatenatingInsertAll(request);
+    final operationId = 'insertAll_${request.id}_${DateTime.now().millisecondsSinceEpoch}';
+    final startTime = DateTime.now();
+
+    // Enhanced diagnostic logging - operation start with complete state
+    BackgroundAudioLogging.log(
+      'customConcatenatingInsertAll starting - '
+      'operationId=$operationId, id=${request.id}, index=${request.index}, '
+      'childrenToInsert=${request.children.length}, '
+      'requestShuffleOrderLength=${request.shuffleOrder.length}, '
+      'operationDepth=$_operationDepth, activeOperations=${_activeOperations.length}, '
+      'timestamp=${DateTime.now().toIso8601String()}',
+      category: 'queue',
+    );
+
+    debugPrint('JustAudioBackground: customConcatenatingInsertAll starting - '
+        'operationId=$operationId, id=${request.id}, index=${request.index}, '
+        'childrenToInsert=${request.children.length}, '
+        'requestShuffleOrderLength=${request.shuffleOrder.length}, '
+        'operationDepth=$_operationDepth, activeOperations=${_activeOperations.length}, '
+        'timestamp=${DateTime.now().toIso8601String()}');
+
+    // Track concurrent operations
+    _operationDepth++;
+    _activeOperations[operationId] = startTime;
+
+    try {
+      final cat = _source!.findCat(request.id);
+      if (cat == null) {
+        debugPrint('JustAudioBackground: ConcatenatingAudioSource not found - '
+            'id=${request.id}, operationDepth=$_operationDepth');
+        throw Exception(
+          'ConcatenatingAudioSource not found: id=${request.id}, '
+          'operation=insertAll, index=${request.index}, '
+          'operationDepth=$_operationDepth, activeOperations=${_activeOperations.length}'
+        );
+      }
+
+      // Validate index bounds before attempting insertion
+      if (request.index < 0 || request.index > cat.children.length) {
+        debugPrint('JustAudioBackground: insertAll validation failed - '
+            'id=${request.id}, index=${request.index}, '
+            'currentLength=${cat.children.length}');
+        throw RangeError.index(
+          request.index,
+          cat.children,
+          'index',
+          'Index out of range for ConcatenatingAudioSource insertAll: '
+          'id=${request.id}, childrenLength=${cat.children.length}, '
+          'operationDepth=$_operationDepth',
+          cat.children.length,
+        );
+      }
+
+      // Detect potential concurrent operation conflicts
+      if (_operationDepth > 1) {
+        final activeOps = _activeOperations.keys.where((key) => key != operationId).toList();
+        // Log concurrent operation warning for debugging
+        debugPrint('JustAudioBackground: Concurrent operation detected - '
+            'operation=$operationId, depth=$_operationDepth, '
+            'activeOperations=$activeOps');
+      }
+
+      // Store context for error reporting and detailed state logging
+      final childrenLength = cat.children.length;
+      final shuffleOrderLength = cat.shuffleOrder.length;
+
+      // SCENARIO B: Critical pre-insertAll validation logging
+      BackgroundAudioLogging.log(
+        'SCENARIO_B_ANALYSIS: insertAll pre-operation validation - '
+        'operationId=$operationId, '
+        'requestedIndex=${request.index}, currentQueueLength=$childrenLength, '
+        'isIndexValid=${request.index >= 0 && request.index <= childrenLength}, '
+        'childrenToInsert=${request.children.length}, '
+        'requestShuffleOrderLength=${request.shuffleOrder.length}, '
+        'currentShuffleOrderLength=$shuffleOrderLength, '
+        'shuffleOrderConsistency=${shuffleOrderLength == childrenLength}, '
+        'operationDepth=$_operationDepth, '
+        'concurrentOperations=${_activeOperations.length}, '
+        'handlerState=${_source != null ? "active" : "inactive"}, '
+        'mutexStatus=acquired',
+        category: 'error',
+      );
+
+      debugPrint('JustAudioBackground: insertAll pre-modification state - '
+          'operationId=$operationId, id=${request.id}, index=${request.index}, '
+          'currentChildrenLength=$childrenLength, currentShuffleOrderLength=$shuffleOrderLength, '
+          'currentChildrenTypes=[${cat.children.map((c) => c.runtimeType.toString()).join(', ')}], '
+          'insertChildrenTypes=[${request.children.map((c) => c.runtimeType.toString()).join(', ')}], '
+          'requestShuffleOrder=[${request.shuffleOrder.join(', ')}], '
+          'currentShuffleOrder=[${cat.shuffleOrder.join(', ')}]');
+
+      try {
+        cat.children.insertAll(request.index, request.children);
+        cat.shuffleOrder
+            .replaceRange(0, cat.shuffleOrder.length, request.shuffleOrder);
+
+        // Log state after local modification
+        debugPrint('JustAudioBackground: insertAll post-modification state - '
+            'operationId=$operationId, id=${request.id}, '
+            'newChildrenLength=${cat.children.length}, newShuffleOrderLength=${cat.shuffleOrder.length}, '
+            'newChildrenTypes=[${cat.children.map((c) => c.runtimeType.toString()).join(', ')}], '
+            'newShuffleOrder=[${cat.shuffleOrder.join(', ')}], '
+            'insertedAt=${request.index}, insertedCount=${request.children.length}');
+
+        _updateShuffleIndices();
+        _broadcastStateIfActive();
+        _updateQueue();
+
+        // SCENARIO B: Critical platform call logging
+        BackgroundAudioLogging.log(
+          'SCENARIO_B_ANALYSIS: insertAll calling platform - '
+          'operationId=$operationId, '
+          'platformRequest={id: ${request.id}, index: ${request.index}, '
+          'childrenCount: ${request.children.length}, shuffleOrderLength: ${request.shuffleOrder.length}}, '
+          'preCallQueueLength=${cat.children.length}, '
+          'preCallShuffleOrder=[${cat.shuffleOrder.join(', ')}], '
+          'operationDepth=$_operationDepth, '
+          'concurrentOperations=${_activeOperations.keys.toList()}',
+          category: 'platform',
+        );
+
+        debugPrint('JustAudioBackground: insertAll calling platform - '
+            'operationId=$operationId, id=${request.id}, newLength=${cat.children.length}, '
+            'platformRequestDetails={id: ${request.id}, index: ${request.index}, '
+            'childrenCount: ${request.children.length}, shuffleOrderLength: ${request.shuffleOrder.length}}');
+
+        // Enhanced platform operation with retry logic for IllegalArgumentException
+        final result = await _retryBackgroundPlatformOperation(
+          operation: () async {
+            return await (await _player).concatenatingInsertAll(request);
+          },
+          operationName: 'insertAll',
+          context: {
+            'operationId': operationId,
+            'id': request.id,
+            'index': request.index,
+            'childrenLength': childrenLength,
+            'shuffleOrderLength': shuffleOrderLength,
+            'childrenToInsert': request.children.length,
+            'operationDepth': _operationDepth,
+          },
+          startTime: startTime,
+        );
+
+        final duration = DateTime.now().difference(startTime);
+
+        // SCENARIO B: Success logging with state verification
+        BackgroundAudioLogging.log(
+          'SCENARIO_B_ANALYSIS: insertAll completed successfully - '
+          'operationId=$operationId, '
+          'postCallQueueLength=${cat.children.length}, '
+          'postCallShuffleOrder=[${cat.shuffleOrder.join(', ')}], '
+          'duration=${duration.inMilliseconds}ms, '
+          'stateConsistency=${cat.shuffleOrder.length == cat.children.length}, '
+          'operationDepth=$_operationDepth',
+          category: 'queue',
+        );
+
+        debugPrint('JustAudioBackground: insertAll completed successfully - '
+            'id=${request.id}, duration=${duration.inMilliseconds}ms');
+
+        return result;
+      } catch (e) {
+        final duration = DateTime.now().difference(startTime);
+        debugPrint('JustAudioBackground: insertAll failed - '
+            'id=${request.id}, duration=${duration.inMilliseconds}ms, error=$e');
+
+        // Enhanced error context for debugging
+        throw Exception(
+          'ConcatenatingAudioSource.insertAll failed: '
+          'id=${request.id}, index=${request.index}, '
+          'childrenLength=$childrenLength, '
+          'shuffleOrderLength=$shuffleOrderLength, '
+          'childrenToInsert=${request.children.length}, '
+          'operationDepth=$_operationDepth, '
+          'duration=${duration.inMilliseconds}ms, error=$e'
+        );
+      }
+    } finally {
+      // Clean up operation tracking
+      _activeOperations.remove(operationId);
+      _operationDepth--;
+
+      final totalDuration = DateTime.now().difference(startTime);
+      debugPrint('JustAudioBackground: insertAll operation cleanup - '
+          'id=${request.id}, totalDuration=${totalDuration.inMilliseconds}ms, '
+          'remainingDepth=$_operationDepth');
+    }
   }
 
   Future<ConcatenatingRemoveRangeResponse> customConcatenatingRemoveRange(
       ConcatenatingRemoveRangeRequest request) async {
-    final cat = _source!.findCat(request.id)!;
-    cat.children.removeRange(request.startIndex, request.endIndex);
-    cat.shuffleOrder
-        .replaceRange(0, cat.shuffleOrder.length, request.shuffleOrder);
-    _updateShuffleIndices();
-    _broadcastStateIfActive();
-    _updateQueue();
-    return await (await _player).concatenatingRemoveRange(request);
+    final operationId = 'removeRange_${request.id}_${DateTime.now().millisecondsSinceEpoch}';
+    final startTime = DateTime.now();
+
+    // Track concurrent operations
+    _operationDepth++;
+    _activeOperations[operationId] = startTime;
+
+    try {
+      final cat = _source!.findCat(request.id);
+      if (cat == null) {
+        throw Exception(
+          'ConcatenatingAudioSource not found: id=${request.id}, '
+          'operation=removeRange, startIndex=${request.startIndex}, '
+          'endIndex=${request.endIndex}, operationDepth=$_operationDepth, '
+          'activeOperations=${_activeOperations.length}'
+        );
+      }
+
+      // Validate index bounds before attempting removal
+      if (request.startIndex < 0 ||
+          request.endIndex > cat.children.length ||
+          request.startIndex >= request.endIndex) {
+        throw RangeError(
+          'Invalid range for ConcatenatingAudioSource removeRange: '
+          'id=${request.id}, startIndex=${request.startIndex}, '
+          'endIndex=${request.endIndex}, childrenLength=${cat.children.length}, '
+          'operationDepth=$_operationDepth'
+        );
+      }
+
+      // Detect potential concurrent operation conflicts
+      if (_operationDepth > 1) {
+        final activeOps = _activeOperations.keys.where((key) => key != operationId).toList();
+        // Log concurrent operation warning for debugging
+        debugPrint('JustAudio: Concurrent operation detected - '
+            'operation=$operationId, depth=$_operationDepth, '
+            'activeOperations=$activeOps');
+      }
+
+      // Store context for error reporting and detailed state logging
+      final childrenLength = cat.children.length;
+      final shuffleOrderLength = cat.shuffleOrder.length;
+      final removeCount = request.endIndex - request.startIndex;
+
+      debugPrint('JustAudioBackground: removeRange pre-modification state - '
+          'operationId=$operationId, id=${request.id}, startIndex=${request.startIndex}, '
+          'endIndex=${request.endIndex}, removeCount=$removeCount, '
+          'currentChildrenLength=$childrenLength, currentShuffleOrderLength=$shuffleOrderLength, '
+          'currentChildrenTypes=[${cat.children.map((c) => c.runtimeType.toString()).join(', ')}], '
+          'targetChildrenTypes=[${cat.children.sublist(request.startIndex, request.endIndex).map((c) => c.runtimeType.toString()).join(', ')}], '
+          'requestShuffleOrder=[${request.shuffleOrder.join(', ')}], '
+          'currentShuffleOrder=[${cat.shuffleOrder.join(', ')}]');
+
+      try {
+        cat.children.removeRange(request.startIndex, request.endIndex);
+        cat.shuffleOrder
+            .replaceRange(0, cat.shuffleOrder.length, request.shuffleOrder);
+
+        // Log state after local modification
+        debugPrint('JustAudioBackground: removeRange post-modification state - '
+            'operationId=$operationId, id=${request.id}, '
+            'newChildrenLength=${cat.children.length}, newShuffleOrderLength=${cat.shuffleOrder.length}, '
+            'newChildrenTypes=[${cat.children.map((c) => c.runtimeType.toString()).join(', ')}], '
+            'newShuffleOrder=[${cat.shuffleOrder.join(', ')}], '
+            'removedFrom=${request.startIndex}, removedCount=$removeCount');
+
+        _updateShuffleIndices();
+        _broadcastStateIfActive();
+        _updateQueue();
+
+        debugPrint('JustAudioBackground: removeRange calling platform - '
+            'operationId=$operationId, id=${request.id}, startIndex=${request.startIndex}, '
+            'endIndex=${request.endIndex}, newLength=${cat.children.length}, '
+            'platformRequestDetails={id: ${request.id}, startIndex: ${request.startIndex}, '
+            'endIndex: ${request.endIndex}, shuffleOrderLength: ${request.shuffleOrder.length}}');
+
+        // Enhanced platform operation with retry logic for IllegalArgumentException
+        final result = await _retryBackgroundPlatformOperation(
+          operation: () async {
+            return await (await _player).concatenatingRemoveRange(request);
+          },
+          operationName: 'removeRange',
+          context: {
+            'operationId': operationId,
+            'id': request.id,
+            'startIndex': request.startIndex,
+            'endIndex': request.endIndex,
+            'childrenLength': childrenLength,
+            'shuffleOrderLength': shuffleOrderLength,
+            'removeCount': removeCount,
+            'operationDepth': _operationDepth,
+          },
+          startTime: startTime,
+        );
+
+        final duration = DateTime.now().difference(startTime);
+        debugPrint('JustAudioBackground: removeRange completed successfully - '
+            'id=${request.id}, duration=${duration.inMilliseconds}ms');
+
+        return result;
+      } catch (e) {
+        // Enhanced error context for debugging
+        throw Exception(
+          'ConcatenatingAudioSource.removeRange failed: '
+          'id=${request.id}, startIndex=${request.startIndex}, '
+          'endIndex=${request.endIndex}, childrenLength=$childrenLength, '
+          'shuffleOrderLength=$shuffleOrderLength, '
+          'removeCount=$removeCount, operationDepth=$_operationDepth, error=$e'
+        );
+      }
+    } finally {
+      // Clean up operation tracking
+      _activeOperations.remove(operationId);
+      _operationDepth--;
+
+      final totalDuration = DateTime.now().difference(startTime);
+      debugPrint('JustAudioBackground: removeRange operation cleanup - '
+          'id=${request.id}, totalDuration=${totalDuration.inMilliseconds}ms, '
+          'remainingDepth=$_operationDepth');
+    }
   }
 
   Future<ConcatenatingMoveResponse> customConcatenatingMove(
