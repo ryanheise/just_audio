@@ -1,3 +1,7 @@
+## 0.4.17
+
+* Fix stale audio source cache in load() replaying the first loaded source on subsequent loads (#1513, #1454) (@AugustLigh).
+
 ## 0.4.16
 
 * Fix play interrupted by load.
