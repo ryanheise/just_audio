@@ -2663,6 +2663,28 @@ abstract class AudioSource {
     return AudioSource.uri(Uri.parse('asset:///$keyName'), tag: tag);
   }
 
+  /// Convenience method to create a DRM-protected audio source for [uri],
+  /// guessing whether it should be a [DashAudioSource] or [HlsAudioSource]
+  /// from the URI's path (`.mpd`/`dash` → DASH, otherwise HLS).
+  ///
+  /// If you know in advance which stream type you have, prefer
+  /// instantiating [DashAudioSource] or [HlsAudioSource] directly with the
+  /// [drm] parameter.
+  static UriAudioSource drm({
+    required Uri uri,
+    required DrmConfiguration drm,
+    Map<String, String>? headers,
+    dynamic tag,
+  }) {
+    final path = uri.path.toLowerCase();
+    final isDash = path.endsWith('.mpd') || path.contains('dash');
+    if (isDash) {
+      return DashAudioSource(uri, headers: headers, tag: tag, drm: drm);
+    } else {
+      return HlsAudioSource(uri, headers: headers, tag: tag, drm: drm);
+    }
+  }
+
   AudioSource({String? id}) : _id = id ?? _uuid.v4();
 
   @mustCallSuper
@@ -2851,8 +2873,12 @@ class ProgressiveAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class DashAudioSource extends UriAudioSource {
+  /// Optional DRM configuration used by the native players to acquire a
+  /// license (Widevine on Android, FairPlay on iOS/macOS) for this stream.
+  final DrmConfiguration? drm;
+
   DashAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
+      {Map<String, String>? headers, dynamic tag, Duration? duration, this.drm})
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
@@ -2861,6 +2887,7 @@ class DashAudioSource extends UriAudioSource {
         uri: _effectiveUri.toString(),
         headers: _mergedHeaders,
         tag: tag,
+        drm: drm?._toMap(),
       );
 }
 
@@ -2878,8 +2905,12 @@ class DashAudioSource extends UriAudioSource {
 /// If headers are set, just_audio will create a cleartext local HTTP proxy on
 /// your device to forward HTTP requests with headers included.
 class HlsAudioSource extends UriAudioSource {
+  /// Optional DRM configuration used by the native players to acquire a
+  /// license (Widevine on Android, FairPlay on iOS/macOS) for this stream.
+  final DrmConfiguration? drm;
+
   HlsAudioSource(Uri uri,
-      {Map<String, String>? headers, dynamic tag, Duration? duration})
+      {Map<String, String>? headers, dynamic tag, Duration? duration, this.drm})
       : super(uri, headers: headers, tag: tag, duration: duration);
 
   @override
@@ -2888,7 +2919,40 @@ class HlsAudioSource extends UriAudioSource {
         uri: _effectiveUri.toString(),
         headers: _mergedHeaders,
         tag: tag,
+        drm: drm?._toMap(),
       );
+}
+
+/// DRM configuration for a [DashAudioSource] or [HlsAudioSource].
+///
+/// This is used by the native platform implementations to acquire a license:
+/// Widevine via [MediaItem.DrmConfiguration] on Android, and FairPlay
+/// Streaming via `AVContentKeySession` on iOS/macOS.
+///
+/// License credentials must be supplied by the app at runtime (for example via
+/// [licenseHeaders]). just_audio does not embed or manage license tokens.
+class DrmConfiguration {
+  /// The URL of the license server used to acquire a decryption key.
+  final String licenseUrl;
+
+  /// Extra HTTP headers to send with the license request.
+  final Map<String, String> licenseHeaders;
+
+  /// The URL from which to fetch the FairPlay application certificate.
+  /// Required on iOS/macOS for FairPlay Streaming; ignored on Android.
+  final String? fairplayCertUrl;
+
+  const DrmConfiguration({
+    required this.licenseUrl,
+    this.licenseHeaders = const {},
+    this.fairplayCertUrl,
+  });
+
+  Map<String, dynamic> _toMap() => {
+        'licenseUrl': licenseUrl,
+        'licenseHeaders': licenseHeaders,
+        'fairplayCertUrl': fairplayCertUrl,
+      };
 }
 
 /// An [AudioSource] for a period of silence.

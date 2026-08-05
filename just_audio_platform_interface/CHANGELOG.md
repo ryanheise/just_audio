@@ -1,3 +1,7 @@
+## 4.6.1
+
+* Add optional drm map to DashAudioSourceMessage and HlsAudioSourceMessage (@Francisny03).
+
 ## 4.6.0
 
 * Add androidAudioOffloadPreferences.

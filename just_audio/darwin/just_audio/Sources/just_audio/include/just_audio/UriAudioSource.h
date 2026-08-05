@@ -13,4 +13,11 @@
 
 - (instancetype)initWithId:(NSString *)sid uri:(NSString *)uri loadControl:(LoadControl *)loadControl headers:(NSDictionary *)headers options:(NSDictionary *)options;
 
+- (instancetype)initWithId:(NSString *)sid
+                       uri:(NSString *)uri
+               loadControl:(LoadControl *)loadControl
+                   headers:(NSDictionary *)headers
+                   options:(NSDictionary *)options
+                       drm:(NSDictionary *)drm;
+
 @end

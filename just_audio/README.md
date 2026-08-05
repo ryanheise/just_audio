@@ -114,6 +114,24 @@ Note: By default, headers are implemented via a local HTTP proxy which on Androi
 
 Alternatively, settings `useProxyForRequestHeaders: false` will use the platform's native headers implementation without a proxy. Although note that iOS doesn't offer an official native API for setting headers, and so this will use the undocumented `AVURLAssetHTTPHeaderFieldsKey` API (or in the case of the user-agent header on iOS 16 and above, the official `AVURLAssetHTTPUserAgentKey` API).
 
+### Working with DRM
+
+Optional DRM configuration can be supplied on [DashAudioSource] or [HlsAudioSource]. License URLs and headers are provided by your app at runtime; just_audio does not embed license tokens.
+
+```dart
+final source = HlsAudioSource(
+  Uri.parse('https://example.com/stream.m3u8'),
+  drm: DrmConfiguration(
+    licenseUrl: 'https://license.example.com/fairplay',
+    licenseHeaders: {'Authorization': 'Bearer <token>'},
+    fairplayCertUrl: 'https://license.example.com/fairplay/cert',
+  ),
+);
+await player.setAudioSource(source);
+```
+
+On Android, Widevine is used via ExoPlayer. On iOS/macOS, FairPlay Streaming is used via `AVContentKeySession`. `fairplayCertUrl` is required for FairPlay and ignored on Android. You can also use `AudioSource.drm(...)` to pick DASH vs HLS from the URI path.
+
 ### Working with caches
 
 ```dart

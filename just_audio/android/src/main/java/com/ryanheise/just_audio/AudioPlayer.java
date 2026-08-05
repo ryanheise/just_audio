@@ -640,19 +640,30 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setTag(id)
                             .build());
-        case "dash":
+        case "dash": {
+            MediaItem.Builder dashItemBuilder = new MediaItem.Builder()
+                    .setUri(Uri.parse((String)map.get("uri")))
+                    .setMimeType(MimeTypes.APPLICATION_MPD)
+                    .setTag(id);
+            MediaItem.DrmConfiguration dashDrmConfiguration = buildDrmConfiguration(mapGet(map, "drm"));
+            if (dashDrmConfiguration != null) {
+                dashItemBuilder.setDrmConfiguration(dashDrmConfiguration);
+            }
             return new DashMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")))
-                    .createMediaSource(new MediaItem.Builder()
-                            .setUri(Uri.parse((String)map.get("uri")))
-                            .setMimeType(MimeTypes.APPLICATION_MPD)
-                            .setTag(id)
-                            .build());
-        case "hls":
+                    .createMediaSource(dashItemBuilder.build());
+        }
+        case "hls": {
+            MediaItem.Builder hlsItemBuilder = new MediaItem.Builder()
+                    .setUri(Uri.parse((String)map.get("uri")))
+                    .setMimeType(MimeTypes.APPLICATION_M3U8)
+                    .setTag(id);
+            MediaItem.DrmConfiguration hlsDrmConfiguration = buildDrmConfiguration(mapGet(map, "drm"));
+            if (hlsDrmConfiguration != null) {
+                hlsItemBuilder.setDrmConfiguration(hlsDrmConfiguration);
+            }
             return new HlsMediaSource.Factory(buildDataSourceFactory(mapGet(map, "headers")))
-                    .createMediaSource(new MediaItem.Builder()
-                            .setUri(Uri.parse((String)map.get("uri")))
-                            .setMimeType(MimeTypes.APPLICATION_M3U8)
-                            .build());
+                    .createMediaSource(hlsItemBuilder.build());
+        }
         case "silence":
             return new SilenceMediaSource.Factory()
                     .setDurationUs(getLong(map.get("duration")))
@@ -726,6 +737,29 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             it.remove();
         }
         audioEffectsMap.clear();
+    }
+
+    // Builds a Widevine DRM configuration for a "dash"/"hls" audio source
+    // when the Dart-side map included a "drm" entry, e.g.:
+    // {
+    //   "licenseUrl": "https://license.example.com/widevine",
+    //   "licenseHeaders": {"Authorization": "..."},
+    //   "fairplayCertUrl": null // unused on Android
+    // }
+    private MediaItem.DrmConfiguration buildDrmConfiguration(Map<?, ?> drm) {
+        if (drm == null) return null;
+        Object licenseUrlObj = drm.get("licenseUrl");
+        if (!(licenseUrlObj instanceof String) || ((String)licenseUrlObj).isEmpty()) return null;
+        String licenseUrl = (String)licenseUrlObj;
+        Map<String, String> licenseHeaders = castToStringMap((Map<?, ?>)drm.get("licenseHeaders"));
+        MediaItem.DrmConfiguration.Builder drmBuilder =
+                new MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
+                        .setLicenseUri(licenseUrl)
+                        .setMultiSession(false);
+        if (licenseHeaders != null && licenseHeaders.size() > 0) {
+            drmBuilder.setLicenseRequestHeaders(licenseHeaders);
+        }
+        return drmBuilder.build();
     }
 
     private DataSource.Factory buildDataSourceFactory(Map<?, ?> headers) {
