@@ -1194,11 +1194,16 @@ class ProgressiveAudioSourceMessage extends UriAudioSourceMessage {
 /// Information about a DASH audio source to be communicated with the platform
 /// implementation.
 class DashAudioSourceMessage extends UriAudioSourceMessage {
+  /// Optional DRM configuration for this source, e.g.
+  /// `{'licenseUrl': ..., 'licenseHeaders': {...}, 'fairplayCertUrl': ...}`.
+  final Map<String, dynamic>? drm;
+
   DashAudioSourceMessage({
     required super.id,
     required super.uri,
     super.headers,
     super.tag,
+    this.drm,
   });
 
   @override
@@ -1207,17 +1212,23 @@ class DashAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        if (drm != null) 'drm': drm,
       };
 }
 
 /// Information about a HLS audio source to be communicated with the platform
 /// implementation.
 class HlsAudioSourceMessage extends UriAudioSourceMessage {
+  /// Optional DRM configuration for this source, e.g.
+  /// `{'licenseUrl': ..., 'licenseHeaders': {...}, 'fairplayCertUrl': ...}`.
+  final Map<String, dynamic>? drm;
+
   HlsAudioSourceMessage({
     required super.id,
     required super.uri,
     super.headers,
     super.tag,
+    this.drm,
   });
 
   @override
@@ -1226,6 +1237,7 @@ class HlsAudioSourceMessage extends UriAudioSourceMessage {
         'id': id,
         'uri': uri,
         'headers': headers,
+        if (drm != null) 'drm': drm,
       };
 }
 

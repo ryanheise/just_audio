@@ -1,3 +1,7 @@
+## 0.10.7
+
+* Add optional DRM support for DashAudioSource and HlsAudioSource (Widevine on Android, FairPlay on iOS/macOS) (@Francisny03).
+
 ## 0.10.6
 
 * Support AGP 9.
