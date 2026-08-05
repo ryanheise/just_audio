@@ -258,6 +258,15 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     _currentAudioSourcePlayer?.pause();
+    // Since just_audio 0.10, every load() transmits the player's internal
+    // playlist, whose ID stays the same for the player's lifetime. Without
+    // invalidation, the cache below would keep returning the source tree
+    // built on the first load, replaying the original audio no matter what
+    // was loaded afterwards (#1513, #1454). A load starts a new lifecycle
+    // for the whole tree: reset the cache and let getAudioSource rebuild it
+    // from the incoming message (it re-registers every node, so subsequent
+    // playlist operations that look up players by ID keep working).
+    _audioSourcePlayers.clear();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = request.initialIndex ?? 0;
     final duration = await _currentAudioSourcePlayer!
