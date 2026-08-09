@@ -20,11 +20,11 @@ dependencies:
     path: ../
 
 # Uncomment when testing platform interface changes.
-# dependency_overrides:
+dependency_overrides:
 #   just_audio_platform_interface:
 #     path: ../../just_audio_platform_interface
-#   just_audio_web:
-#     path: ../../just_audio_web
+  just_audio_web:
+    path: ../../just_audio_web
 
 dev_dependencies:
   # TODO: uncomment these dependencies when they have nullsafe versions.
@@ -32,6 +32,8 @@ dev_dependencies:
   #   sdk: flutter
   flutter_test:
     sdk: flutter
+  just_audio_platform_interface: ^4.6.0
+  just_audio_web: ^0.4.16
   # integration_test: ^1.0.1
   test: ^1.16.4
   flutter_lints: ^2.0.1

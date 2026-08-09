@@ -1,3 +1,7 @@
+## 0.4.17
+
+* Fix stale audio source cache when replacing the playlist (@hanxi).
+
 ## 0.4.16
 
 * Fix play interrupted by load.
