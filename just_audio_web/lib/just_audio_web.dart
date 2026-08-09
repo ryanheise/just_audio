@@ -258,6 +258,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     _currentAudioSourcePlayer?.pause();
+    _audioSourcePlayers.clear();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = request.initialIndex ?? 0;
     final duration = await _currentAudioSourcePlayer!
