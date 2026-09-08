@@ -8,7 +8,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
-import 'package:meta/meta.dart' show experimental;
+import 'package:meta/meta.dart' show experimental, visibleForTesting;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
@@ -115,6 +115,12 @@ class AudioPlayer {
 
   String? _id;
   final _proxy = _ProxyHttpServer();
+
+  /// Simulates the proxy server's listening socket being reclaimed by the
+  /// platform while the player still believes it is running — see
+  /// `_ProxyHttpServer.ensureRunning`.
+  @visibleForTesting
+  Future<void> simulateProxySocketLoss() => _proxy.simulateSocketLoss();
   // ignore: deprecated_member_use_from_same_package
   final ConcatenatingAudioSource _playlist;
   final Map<String, AudioSource> _audioSources = {};
@@ -2510,26 +2516,63 @@ class _ProxyHttpServer {
   /// but differ in other respects such as the port or headers.
   String _requestKey(Uri uri) => '${uri.path}?${uri.query}';
 
-  /// Starts the server if it is not already running.
+  /// Starts the server if it is not already running, and restarts it if it
+  /// is believed to be running but no longer accepts connections.
+  ///
+  /// iOS reclaims an app's sockets while the app is suspended in the
+  /// background (e.g. after the device has been locked for a while with no
+  /// audio playing). The listening socket dies without the [HttpServer]
+  /// stream ever reporting done or error, so [_running] would stay true
+  /// forever: every proxied source the platform is subsequently handed
+  /// points at a port nobody listens on and fails immediately
+  /// (NSURLErrorCannotConnectToHost / connection refused) until the app is
+  /// cold-started. Probing the port before trusting [_running] turns that
+  /// into a transparent restart; sources re-register on their next load, so
+  /// they pick up the new port.
   Future<dynamic> ensureRunning() async {
-    if (_running) return;
+    if (!_running) return await start();
+    if (await _isAccepting()) return;
+    await stop();
     return await start();
+  }
+
+  /// Whether the bound port still accepts a connection.
+  Future<bool> _isAccepting() async {
+    try {
+      final socket = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        port,
+        timeout: const Duration(seconds: 1),
+      );
+      socket.destroy();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Starts the server.
   Future<dynamic> start() async {
     _running = true;
-    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    _server.listen((request) async {
+    final HttpServer server;
+    try {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    } catch (_) {
+      _running = false;
+      rethrow;
+    }
+    _server = server;
+    server.listen((request) async {
       if (request.method == 'GET') {
         final uriPath = _requestKey(request.uri);
         final handler = _handlerMap[uriPath]!;
         handler(this, request);
       }
     }, onDone: () {
-      _running = false;
+      // A server replaced by a restart must not mark its successor stopped.
+      if (identical(server, _server)) _running = false;
     }, onError: (Object e, StackTrace st) {
-      _running = false;
+      if (identical(server, _server)) _running = false;
     });
   }
 
@@ -2537,7 +2580,24 @@ class _ProxyHttpServer {
   Future<dynamic> stop() async {
     if (!_running) return;
     _running = false;
-    return await _server.close();
+    try {
+      return await _server.close();
+    } catch (_) {
+      // A socket the platform already reclaimed has nothing left to close.
+    }
+  }
+
+  /// Simulates the platform reclaiming the listening socket without the
+  /// server stream reporting it: the port stops accepting connections while
+  /// [_running] stays true, which is the state a suspended-then-resumed iOS
+  /// app finds itself in.
+  @visibleForTesting
+  Future<void> simulateSocketLoss() async {
+    await _server.close();
+    // Let the closed server's done event land (it clears `_running`) before
+    // re-asserting the stale belief the field scenario leaves behind.
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    _running = true;
   }
 }
 
