@@ -503,6 +503,36 @@ void runTests() {
     await player.dispose();
   });
 
+  test('proxy restarts after its socket is reclaimed', () async {
+    final player = AudioPlayer();
+    await player.setAudioSource(TestStreamAudioSource(tag: 'before'));
+    final before = Uri.parse(player.icyMetadata!.info!.url!);
+    // Sanity: the proxy answers.
+    var response = await (await HttpClient().getUrl(before)).close();
+    expect(response.statusCode, equals(HttpStatus.ok));
+    await response.drain<void>();
+
+    // iOS reclaims the listening socket of a suspended app without the
+    // server stream reporting it; the player still believes the proxy is
+    // running.
+    await player.simulateProxySocketLoss();
+    await expectLater(
+        HttpClient().getUrl(before).then((r) => r.close()), throwsException);
+
+    // The next load must not hand the platform the dead port.
+    await player.setAudioSource(TestStreamAudioSource(tag: 'after'));
+    final after = Uri.parse(player.icyMetadata!.info!.url!);
+    expect(after.port, isNot(equals(before.port)));
+    response = await (await HttpClient().getUrl(after)).close();
+    expect(response.statusCode, equals(HttpStatus.ok));
+    final responseData = <int>[];
+    await for (var chunk in response) {
+      responseData.addAll(chunk);
+    }
+    expect(responseData, equals(byteRangeData));
+    await player.dispose();
+  });
+
   test('stream-source', () async {
     final server = MockWebServer();
     await server.start();
