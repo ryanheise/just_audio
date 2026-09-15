@@ -503,6 +503,61 @@ void runTests() {
     await player.dispose();
   });
 
+  test('proxy restarts after its socket is reclaimed', () async {
+    final player = AudioPlayer();
+    await player.setAudioSource(TestStreamAudioSource(tag: 'before'));
+    final before = Uri.parse(player.icyMetadata!.info!.url!);
+    // Sanity: the proxy answers.
+    var response = await (await HttpClient().getUrl(before)).close();
+    expect(response.statusCode, equals(HttpStatus.ok));
+    await response.drain<void>();
+
+    // iOS reclaims the listening socket of a suspended app without the
+    // server stream reporting it; the player still believes the proxy is
+    // running.
+    await player.simulateProxySocketLoss();
+    await expectLater(
+        HttpClient().getUrl(before).then((r) => r.close()), throwsException);
+
+    // The next load must not hand the platform the dead port.
+    await player.setAudioSource(TestStreamAudioSource(tag: 'after'));
+    final after = Uri.parse(player.icyMetadata!.info!.url!);
+    expect(after.port, isNot(equals(before.port)));
+    response = await (await HttpClient().getUrl(after)).close();
+    expect(response.statusCode, equals(HttpStatus.ok));
+    final responseData = <int>[];
+    await for (var chunk in response) {
+      responseData.addAll(chunk);
+    }
+    expect(responseData, equals(byteRangeData));
+    await player.dispose();
+  });
+
+  test('proxy answers 404 for an unregistered path and 405 for non-GET',
+      () async {
+    final player = AudioPlayer();
+    await player.setAudioSource(TestStreamAudioSource(tag: 'registered'));
+    final registered = Uri.parse(player.icyMetadata!.info!.url!);
+
+    // A GET for a path no source claims used to throw a null-check error
+    // inside the listener (an unhandled async error) and never answer.
+    final unregistered = registered.replace(path: '/id/not-registered');
+    var response = await (await HttpClient().getUrl(unregistered)).close();
+    expect(response.statusCode, equals(HttpStatus.notFound));
+    await response.drain<void>();
+
+    // Non-GET requests were silently left hanging.
+    response = await (await HttpClient().headUrl(registered)).close();
+    expect(response.statusCode, equals(HttpStatus.methodNotAllowed));
+    await response.drain<void>();
+
+    // The registered source is still served.
+    response = await (await HttpClient().getUrl(registered)).close();
+    expect(response.statusCode, equals(HttpStatus.ok));
+    await response.drain<void>();
+    await player.dispose();
+  });
+
   test('stream-source', () async {
     final server = MockWebServer();
     await server.start();
