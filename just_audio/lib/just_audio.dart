@@ -3791,6 +3791,14 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
       request.response.statusCode = 200;
     }
 
+    // headers.clear() above also resets chunked transfer encoding, so a body
+    // of unknown length has no framing and the client can only detect its end
+    // when the connection closes. ExoPlayer otherwise waits for its read
+    // timeout, then restarts the whole stream from the beginning.
+    if (request.response.contentLength == -1) {
+      request.response.persistentConnection = false;
+    }
+
     final completer = Completer<void>();
     final subscription = stream.listen(request.response.add,
         onError: (e, st) {}, onDone: completer.complete);

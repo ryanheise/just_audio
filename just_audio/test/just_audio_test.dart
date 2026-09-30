@@ -555,6 +555,33 @@ void runTests() {
     await player.dispose();
   });
 
+  test('stream-source-unknown-length', () async {
+    final player = AudioPlayer();
+    await player.setAudioSource(
+        TestUnknownLengthStreamAudioSource(tag: 'stream-test'));
+    final proxyUri = Uri.parse(player.icyMetadata!.info!.url!);
+
+    Future<void> testRequest(int? start) async {
+      final request = await HttpClient().getUrl(proxyUri);
+      if (start != null) {
+        request.headers.set(HttpHeaders.rangeHeader, 'bytes=$start-');
+      }
+      final response = await request.close();
+      final responseData = <int>[];
+      await for (var chunk in response.timeout(const Duration(seconds: 2))) {
+        responseData.addAll(chunk);
+      }
+      expect(response.statusCode, equals(HttpStatus.ok));
+      expect(response.contentLength, equals(-1));
+      expect(responseData, equals(byteRangeData));
+    }
+
+    await testRequest(null);
+    await testRequest(20);
+
+    await player.dispose();
+  });
+
   test('sequence', () async {
     final source1 = ConcatenatingAudioSource(children: [
       LoopingAudioSource(
@@ -2164,6 +2191,22 @@ class TestStreamAudioSource extends StreamAudioSource {
       contentLength: (end ?? byteRangeData.length) - (start ?? 0),
       offset: start ?? 0,
       sourceLength: byteRangeData.length,
+    );
+  }
+}
+
+class TestUnknownLengthStreamAudioSource extends StreamAudioSource {
+  TestUnknownLengthStreamAudioSource({dynamic tag}) : super(tag: tag);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    return StreamAudioResponse(
+      contentType: 'audio/mock',
+      stream: Stream.fromIterable(
+          [byteRangeData.sublist(0, 50), byteRangeData.sublist(50)]),
+      contentLength: null,
+      offset: null,
+      sourceLength: null,
     );
   }
 }
