@@ -1,3 +1,7 @@
+## 0.10.7
+
+* Fix StreamAudioSource responses of unknown length never ending, which made Android replay the audio from the start (@binSaed).
+
 ## 0.10.6
 
 * Support AGP 9.
