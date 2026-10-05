@@ -1,3 +1,7 @@
+## 0.4.17
+
+* Fix uncaught play() rejections (AbortError/NotAllowedError) from playback the player starts itself after a load, seek or item end (@mtallenca).
+
 ## 0.4.16
 
 * Fix play interrupted by load.

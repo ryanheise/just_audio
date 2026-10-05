@@ -203,7 +203,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
   Future<void> onEnded() async {
     if (_loopMode == LoopModeMessage.one) {
       await _seek(0, null);
-      _play();
+      _playUnawaited();
     } else {
       final order = this.order;
       final orderInv = getInv(order);
@@ -213,7 +213,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
         await _currentAudioSourcePlayer!.load();
         // Should always be true...
         if (_playing) {
-          _play();
+          _playUnawaited();
         }
       } else {
         // reached end of playlist
@@ -221,13 +221,13 @@ class Html5AudioPlayer extends JustAudioPlayer {
           // Loop back to the beginning
           if (order.length == 1) {
             await _seek(0, null);
-            _play();
+            _playUnawaited();
           } else {
             _index = order[0];
             await _currentAudioSourcePlayer!.load();
             // Should always be true...
             if (_playing) {
-              _play();
+              _playUnawaited();
             }
           }
         } else {
@@ -267,7 +267,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
           .seek(request.initialPosition!.inMilliseconds);
     }
     if (_playing) {
-      _currentAudioSourcePlayer!.play();
+      _playUnawaited();
     }
     return LoadResponse(duration: duration);
   }
@@ -313,6 +313,17 @@ class Html5AudioPlayer extends JustAudioPlayer {
 
   Future<void> _play() async {
     await _currentAudioSourcePlayer?.play();
+  }
+
+  /// Resumes playback for a play() this player starts on its own — after a
+  /// load, a seek to another item, or the end of an item — rather than for a
+  /// [play] request. Nothing awaits these, so a rejected
+  /// `HTMLMediaElement.play()` promise (an AbortError when a pause or a new
+  /// source interrupts it, a NotAllowedError when the browser refuses
+  /// playback outside a user gesture) would surface as an uncaught error. The
+  /// element's own events still report the playback state.
+  void _playUnawaited() {
+    _currentAudioSourcePlayer?.play().catchError((Object _) {});
   }
 
   @override
@@ -399,7 +410,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
       _index = index;
       await _currentAudioSourcePlayer!.load(position);
       if (_playing) {
-        _currentAudioSourcePlayer!.play();
+        _playUnawaited();
       }
     } else {
       await _currentAudioSourcePlayer!.seek(position);
@@ -450,7 +461,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
         if (_currentAudioSourcePlayer != null) {
           await _currentAudioSourcePlayer!.load();
           if (_playing) {
-            _currentAudioSourcePlayer!.play();
+            _playUnawaited();
           }
         }
       } else if (request.endIndex <= _index!) {
