@@ -1,3 +1,7 @@
+## 0.4.17
+
+* Fix "Bad state: Cannot add new events after calling close" from media element events that arrive after the player is released (@mtallenca).
+
 ## 0.4.16
 
 * Fix play interrupted by load.

@@ -82,6 +82,10 @@ abstract class JustAudioPlayer extends AudioPlayerPlatform {
 
   /// Broadcasts a playback event from the platform side to the plugin side.
   void broadcastPlaybackEvent() {
+    // The audio element's listeners outlive [release], which closes this
+    // controller, and the element keeps firing events after it (progress,
+    // stalled, and the ones its own unload in release queues).
+    if (_eventController.isClosed) return;
     var updateTime = DateTime.now();
     _eventController.add(PlaybackEventMessage(
       processingState: _processingState,
@@ -133,6 +137,7 @@ class Html5AudioPlayer extends JustAudioPlayer {
     _audioElement.addEventListener(
         'error',
         (Event event) {
+          if (_eventController.isClosed) return;
           _eventController.addError(PlatformException(
             code: '${_audioElement.error!.code}',
             message: _audioElement.error!.message,
