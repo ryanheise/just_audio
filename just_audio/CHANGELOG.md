@@ -1,3 +1,7 @@
+## 0.10.7
+
+* Fix iOS/macOS currentIndex running to the end of the playlist when LoopMode.one is set right after an auto-advance (@AhmedSalikRiaz).
+
 ## 0.10.6
 
 * Support AGP 9.

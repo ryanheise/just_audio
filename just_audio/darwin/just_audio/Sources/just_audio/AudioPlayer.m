@@ -578,7 +578,10 @@
                 [_indexedAudioSources[_index] preparePlayerItem2];
                 [self addItemObservers:_indexedAudioSources[_index].playerItem2];
             }
-            [_player insertItem:_indexedAudioSources[_index].playerItem2 afterItem:nil];
+            // A nested enqueueFrom (via the currentItem observer) may have queued it already.
+            if (![_player.items containsObject:_indexedAudioSources[_index].playerItem2]) {
+                [_player insertItem:_indexedAudioSources[_index].playerItem2 afterItem:nil];
+            }
         }
     }
 
@@ -962,9 +965,15 @@
         /* } */
 
         if (_justAdvanced) {
+            // Cleared first: enqueueFrom below can change currentItem and re-enter here.
+            _justAdvanced = NO;
             IndexedAudioSource *audioSource = playerItem.audioSource;
             if (_loopMode == lmLoopOne) {
-                [audioSource flip];
+                // Only an advance onto the loop copy is a loop. A loop mode set
+                // after the item ended but before this advance has no copy yet.
+                if (playerItem == audioSource.playerItem2) {
+                    [audioSource flip];
+                }
                 [self enqueueFrom:_index];
             } else if (_loopMode == lmLoopAll) {
                 if (_index == [_order[0] intValue] && playerItem == audioSource.playerItem2) {
@@ -978,7 +987,6 @@
             } else if (!_enqueuedAll) {
                 [self enqueueFrom:_index];
             }
-            _justAdvanced = NO;
         }
     } else if ([keyPath isEqualToString:@"loadedTimeRanges"]) {
         IndexedPlayerItem *playerItem = (IndexedPlayerItem *)object;
