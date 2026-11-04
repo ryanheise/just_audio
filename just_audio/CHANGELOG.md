@@ -1,3 +1,7 @@
+## 0.10.7
+
+* Fix errors when a playlist changes or the player is disposed during load (@almazfm)
+
 ## 0.10.6
 
 * Support AGP 9.
