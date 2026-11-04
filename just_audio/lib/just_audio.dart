@@ -2958,7 +2958,11 @@ class ConcatenatingAudioSource extends AudioSource {
   @override
   Future<void> _onLoad() async {
     await super._onLoad();
-    for (var source in children) {
+    // A snapshot: this loop holds no lock across its awaits, so any playlist
+    // edit or `AudioPlayer.dispose` may change `children` meanwhile.
+    for (var source in children.toList()) {
+      // Disposed: the sources are detached, and there is nothing to load for.
+      if (_player == null) return;
       await source._onLoad();
     }
   }

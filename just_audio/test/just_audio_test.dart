@@ -1716,6 +1716,101 @@ void runTests() {
     expect(player.shuffleModeEnabled, equals(true));
     await player.dispose();
   });
+
+  group('playlist changes during load', () {
+    const pathProviderChannel =
+        MethodChannel('plugins.flutter.io/path_provider');
+    late Directory tempDir;
+    late Completer<void> assetLoad;
+    late int temporaryDirectoryCalls;
+
+    Future<void> until(bool Function() done) async {
+      for (var i = 0; i < 1000 && !done(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(done(), isTrue);
+    }
+
+    // Starts loading [sources] and returns the load's outcome. The first asset
+    // is held open by the second call, since a new player asks once for itself.
+    Future<Object?> Function() loadHeld(
+        AudioPlayer player, List<AudioSource> sources) {
+      Object? error;
+      final load = player
+          .setAudioSources(sources)
+          .then<void>((_) {}, onError: (Object e) => error = e);
+      return () async {
+        await load;
+        return error;
+      };
+    }
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('just_audio_test');
+      File('${tempDir.path}/just_audio_cache/assets/audio/foo.mp3')
+          .createSync(recursive: true);
+      assetLoad = Completer();
+      temporaryDirectoryCalls = 0;
+      _ambiguate(TestDefaultBinaryMessengerBinding.instance)!
+          .defaultBinaryMessenger
+          .setMockMethodCallHandler(pathProviderChannel, (methodCall) async {
+        temporaryDirectoryCalls++;
+        await assetLoad.future;
+        return tempDir.path;
+      });
+    });
+
+    tearDown(() {
+      _ambiguate(TestDefaultBinaryMessengerBinding.instance)!
+          .defaultBinaryMessenger
+          .setMockMethodCallHandler(pathProviderChannel, null);
+      tempDir.deleteSync(recursive: true);
+    });
+
+    Future<Object?> disposeDuringLoad(List<AudioSource> sources) async {
+      final player = AudioPlayer();
+      final result = loadHeld(player, sources);
+      await until(() => temporaryDirectoryCalls == 2);
+      final disposing = player.dispose();
+      await until(() => player.audioSources.isEmpty);
+      assetLoad.complete();
+      await disposing;
+      return result();
+    }
+
+    test('dispose interrupts the load and later sources stay unloaded',
+        () async {
+      final error = await disposeDuringLoad(
+          [for (var i = 0; i < 3; i++) AudioSource.asset('audio/foo.mp3')]);
+      expect(error, isA<PlayerInterruptedException>());
+      expect(temporaryDirectoryCalls, equals(2));
+    });
+
+    test('dispose interrupts the load of a remote source after an asset',
+        () async {
+      final error = await disposeDuringLoad([
+        AudioSource.asset('audio/foo.mp3'),
+        AudioSource.uri(Uri.parse('https://foo.foo/foo.mp3')),
+      ]);
+      expect(error, isA<PlayerInterruptedException>());
+    });
+
+    test('a playlist of another length interrupts the load in flight',
+        () async {
+      final player = AudioPlayer();
+      final result = loadHeld(player, [AudioSource.asset('audio/foo.mp3')]);
+      await until(() => temporaryDirectoryCalls == 2);
+      final next = player.setAudioSources([
+        for (final name in ['a', 'b', 'c'])
+          AudioSource.uri(Uri.parse('https://foo.foo/$name.mp3')),
+      ]);
+      await until(() => player.audioSources.length == 3);
+      assetLoad.complete();
+      expect(await next, equals(audioSourceDuration));
+      expect(await result(), isA<PlayerInterruptedException>());
+      await player.dispose();
+    });
+  });
 }
 
 class MockJustAudio extends Mock
